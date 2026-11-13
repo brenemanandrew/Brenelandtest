@@ -1476,7 +1476,7 @@ function showText(title,t){const ta=document.createElement('textarea');ta.value=
 // ---------------------------------------------------------------- the dressing room: the creator opens on the inside of its door; pick who you are, the door opens,
 // your character walks in and stops where the mirror is (the camera looks back from the mirror). The room is Meshy's, the door wall and door are built here so the door can swing.
 renderer.localClippingEnabled=true;
-const ROOM={cut3:new THREE.Plane(new THREE.Vector3(0,0,-1),99),g:new THREE.Group(),hinge:null,zw:-1.33,phase:'wait',t:0,shadow:null};ROOM.g.visible=false;scene.add(ROOM.g);
+const ROOM={cut3:new THREE.Plane(new THREE.Vector3(0,0,-1),99),g:new THREE.Group(),hinge:null,zw:-1.33,phase:'wait',t:0,shadow:null};ROOM.g.visible=false;ROOM.g.position.y=-0.07;scene.add(ROOM.g);   // the room scan's floor is 7 cm up: lowered so she stands on it, not in it
 function roomBuild(b64){
   if(b64){const bs=atob(b64),u8=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)u8[i]=bs.charCodeAt(i);const ab=u8.buffer,dv=new DataView(ab);
     let off=12,json=null,bin=null;while(off<ab.byteLength){const len=dv.getUint32(off,true),type=dv.getUint32(off+4,true),st=off+8;if(type===0x4e4f534a)json=JSON.parse(new TextDecoder().decode(new Uint8Array(ab,st,len)));else if(type===0x004e4942)bin=ab.slice(st,st+len);off=st+len;}
