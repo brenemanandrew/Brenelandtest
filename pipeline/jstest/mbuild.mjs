@@ -1,0 +1,20 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest';const RIG=process.argv[2]||'male';
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(8861);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const wait=ms=>new Promise(r=>setTimeout(r,ms));const errs=[];
+const p=await b.newPage();await p.setViewport({width:1000,height:700});p.on('pageerror',e=>errs.push(e.message));
+await p.goto('http://localhost:8861/',{waitUntil:'load'});await p.waitForFunction(()=>document.getElementById('loading').hidden,{timeout:120000});
+await p.evaluate((r)=>document.querySelector('#who [data-r='+r+']').click(),RIG);await wait(500);await p.waitForFunction((r)=>window.__x.C===window.__x.cache[r]&&document.getElementById('loading').hidden,{timeout:120000},RIG);
+await p.evaluate(()=>window.__dbg.dots());
+const cam=(t,c)=>p.evaluate((t,c)=>{const{camera,orbit}=window.__dbg;orbit.target.set(...t);camera.position.set(...c);orbit.update();},t,c);
+console.log(await p.evaluate(()=>JSON.stringify({d:window.__x.C.mesh.morphTargetDictionary,b:document.getElementById('buildrow').hidden,m:document.getElementById('musclerow').hidden,o:document.getElementById('obuild').textContent})));
+const set=(id,v)=>p.evaluate((id,v)=>{const el=document.getElementById(id);el.value=v;el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'));},id,v);
+const clip={x:120,y:20,width:400,height:660};
+for(const[n,bv,mv]of [['avg',0,0],['heavy',100,0],['slim',-100,0],['ath',0,100]]){await set('build',bv);await set('muscle',mv);await wait(2500);
+  for(const[base,t]of [['stand',0],['midle',3],['cheer',1.1]]){await p.evaluate((base,t)=>window.__dbg.setBase(base,t),base,t);
+    await cam([0,0.9,0],[0,1.0,4.0]);await wait(300);await p.screenshot({path:`/home/claude/out/mb-${n}-${base}-F.png`,clip});
+    if(base==='stand'){await cam([0,0.9,0],[4,1.0,0.2]);await wait(300);await p.screenshot({path:`/home/claude/out/mb-${n}-${base}-S.png`,clip});await cam([0,0.9,0],[0.3,1.2,-4.0]);await wait(300);await p.screenshot({path:`/home/claude/out/mb-${n}-${base}-B.png`,clip});}}}
+console.log('errors',errs.length?errs:'none');await b.close();srv.close();

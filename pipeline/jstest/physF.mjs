@@ -1,0 +1,20 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest';const tag=process.argv[2]||'a';
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(8880);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const wait=ms=>new Promise(r=>setTimeout(r,ms));const errs=[];
+const p=await b.newPage();await p.setViewport({width:900,height:700});p.on('pageerror',e=>errs.push(e.message));
+await p.goto('http://localhost:8880/',{waitUntil:'load'});await p.waitForFunction(()=>document.getElementById('loading').hidden,{timeout:120000});await wait(1500);
+await p.screenshot({path:`/home/claude/out/pf-${tag}-door.png`});
+await p.evaluate(()=>document.querySelector('.who-btn[data-id=f]').click());await wait(2500);await p.screenshot({path:`/home/claude/out/pf-${tag}-walk.png`});
+await p.waitForFunction(()=>!document.body.classList.contains('intro')&&window.__x.C===window.__x.cache.plus,{timeout:90000});await wait(2500);
+await p.screenshot({path:`/home/claude/out/pf-${tag}-in.png`});
+await p.evaluate(()=>{document.getElementById('creator').style.display='none';document.getElementById('crfab').style.display='none';});
+const cam=(t,c)=>p.evaluate((t,c)=>{const{camera,orbit}=window.__dbg;document.querySelector('#stage canvas').dispatchEvent(new Event('pointerdown'));camera.clearViewOffset();camera.updateProjectionMatrix();orbit.autoRotate=false;orbit.target.set(...t);camera.position.set(...c);orbit.update();},t,c);
+const set=(id,v)=>p.evaluate((id,v)=>{const el=document.getElementById(id);el.value=v;el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'));},id,v);
+const clip={x:250,y:20,width:400,height:660};
+for(const[n,bv,mv]of [['plus',100,0],['avg',0,0],['slim',-100,0]]){await set('build',bv);await set('muscle',mv);await wait(1800);
+  for(const[base,t]of [['stand',0],['midle',2]]){await p.evaluate((base,t)=>{if(document.getElementById('play').textContent==='Stop')document.getElementById('play').click();window.__dbg.setBase(base,t);},base,t);await cam([0,0.9,0],[0,1.0,4.3]);await wait(350);await p.screenshot({path:`/home/claude/out/pf-${tag}-${n}-${base}.png`,clip});}}
+console.log('errors',errs.length?errs:'none');await b.close();srv.close();

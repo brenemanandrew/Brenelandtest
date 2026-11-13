@@ -1,0 +1,10 @@
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import fs from 'node:fs';
+const buf=fs.readFileSync(process.argv[2]); const ab=buf.buffer.slice(buf.byteOffset,buf.byteOffset+buf.byteLength);
+const L=new GLTFLoader(); L.register(()=>({name:'stub',loadTexture:()=>Promise.resolve(new THREE.Texture())}));
+L.parse(ab,'',g=>{let sm;g.scene.traverse(o=>{if(o.isSkinnedMesh)sm=o;});const B=n=>sm.skeleton.getBoneByName(n);g.scene.updateMatrixWorld(true);
+ const P=n=>B('mixamorig'+n).getWorldPosition(new THREE.Vector3()).toArray().map(v=>+v.toFixed(3));
+ console.log('LeftArm',P('LeftArm'),'LeftHand',P('LeftHand'),'LeftFoot',P('LeftFoot'),'LeftToeBase',P('LeftToeBase'),'Head',P('Head'),'Hips',P('Hips'));
+ console.log('LeftIndex1',P('LeftHandIndex1'),'LeftPinky1',P('LeftHandPinky1'),'LeftThumb1',P('LeftHandThumb1'));
+ console.log('clips',g.animations.map(a=>a.name+' '+a.duration.toFixed(2)), 'bones', sm.skeleton.bones.length);},e=>console.log('ERR',e));

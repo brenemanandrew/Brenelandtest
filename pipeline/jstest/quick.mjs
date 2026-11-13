@@ -1,0 +1,22 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest';
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(8869);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const wait=ms=>new Promise(r=>setTimeout(r,ms));const errs=[];
+const p=await b.newPage();await p.setViewport({width:390,height:800,deviceScaleFactor:2});p.on('pageerror',e=>errs.push(e.message));
+await p.goto('http://localhost:8869/',{waitUntil:'load'});await p.waitForFunction(()=>document.getElementById('loading').hidden,{timeout:120000});
+let i=0;const sh=async n=>{await p.screenshot({path:`/home/claude/out/qk-${i++}-${n}.png`});};
+await wait(1200);await sh('welcome');
+await p.evaluate(()=>document.querySelector('.who-btn[data-id=m]').click());
+await p.waitForFunction(()=>document.getElementById('loading').hidden&&!document.getElementById('crnext').hidden,{timeout:120000});await wait(4500);
+console.log('base after wave',await p.evaluate(()=>window.__poser&&document.querySelector('#bases .chip.on')?.textContent));await sh('picked');
+await p.evaluate(()=>document.getElementById('crnext').click());await wait(5000);await sh('face');
+console.log('togo',await p.evaluate(()=>document.getElementById('crtogo').textContent));
+await p.evaluate(()=>{for(const l of document.querySelectorAll('.ed-panel:not([hidden]) .ed-label[data-k]')){const f=l.parentNode;f.querySelector('.tile,.swatch').click();}});await wait(1200);
+console.log('next shown',await p.evaluate(()=>!document.getElementById('crnext').hidden));await sh('face-done');
+await p.evaluate(()=>document.getElementById('crnext').click());await wait(9000);await sh('hair');
+const cam=(t,c)=>p.evaluate((t,c)=>{const{camera,orbit}=window.__dbg;orbit.target.set(...t);camera.position.set(...c);orbit.update();},t,c);
+for(const h of ['buzz','h01','tousled','spiky']){await p.evaluate(h=>[...document.querySelectorAll('.tile')].find(b=>b.title===({buzz:'Buzz cut',h01:'Short messy',tousled:'Tousled',spiky:'Spiky'})[h]).click(),h);await wait(2500);await cam([0,1.6,0],[0.3,1.9,-1.1]);await wait(400);await sh('back-'+h);}
+console.log('errors',errs.length?errs:'none');await b.close();srv.close();

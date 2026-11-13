@@ -1,0 +1,12 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest';
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(8863);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const p=await b.newPage();await p.setViewport({width:1000,height:700});p.on('pageerror',e=>console.log('ERR',e.message));p.on('console',m=>m.type()==='error'&&console.log('C',m.text()));
+await p.goto('http://localhost:8863/',{waitUntil:'load'});await p.waitForFunction(()=>document.getElementById('loading').hidden,{timeout:120000});
+await p.evaluate(()=>document.querySelector('#who [data-r=male]').click());await wait(500);await p.waitForFunction(()=>window.__x.C===window.__x.cache.male&&document.getElementById('loading').hidden,{timeout:120000});
+console.log(await p.evaluate(()=>{const C=window.__x.C;return JSON.stringify({rf:window.__x.RIGS.male.face,keys:Object.keys(C).join(' ')});return JSON.stringify({face:!!C.face,dec:C.face&&Object.fromEntries(Object.entries(C.face.decals).map(([k,m])=>[k,[m.geometry.attributes.position.count,m.geometry.index.count,m.visible]])),featsel:document.getElementById('featsel').hidden,dict:Object.keys(C.mesh.morphTargetDictionary||{})})}));
+await b.close();srv.close();

@@ -1,0 +1,12 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest',PORT=8791;
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(PORT);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const p=await b.newPage();p.on('pageerror',e=>console.log('ERR',(e.stack||e.message).slice(0,900)));
+await p.goto('http://localhost:'+PORT+'/',{waitUntil:'load'});await p.waitForFunction(()=>document.getElementById('loading').hidden,{timeout:120000});await wait(1000);
+await p.evaluate(()=>document.querySelector('#who [data-r=plus]').onclick());await p.waitForFunction(()=>window.__x.C===window.__x.cache.plus&&document.getElementById('loading').hidden,{timeout:120000});
+await p.evaluate(()=>{const el=document.getElementById('build');el.value=-100;el.dispatchEvent(new Event('input'));console.log('input done');el.dispatchEvent(new Event('change'));});await wait(1500);
+await b.close();srv.close();

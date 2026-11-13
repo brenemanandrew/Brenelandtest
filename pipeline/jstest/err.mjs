@@ -1,0 +1,11 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest';
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(8840);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const p=await b.newPage();p.on('pageerror',e=>console.log('PAGEERR',e.message));p.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',m.text())});
+await p.goto('http://localhost:8840/',{waitUntil:'load'});await new Promise(r=>setTimeout(r,20000));
+if(process.argv[2])await p.evaluate(r=>document.querySelector(`#who [data-r=${r}]`)?.click(),process.argv[2]);await new Promise(r=>setTimeout(r,15000));
+console.log('loading hidden',await p.evaluate(()=>document.getElementById('loading').hidden),await p.evaluate(()=>document.getElementById('loading').textContent));
+await b.close();srv.close();

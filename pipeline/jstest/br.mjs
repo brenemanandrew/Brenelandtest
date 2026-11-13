@@ -1,0 +1,11 @@
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+import puppeteer from 'puppeteer-core';
+const ROOT='/home/claude/ptest';
+const srv=http.createServer((q,r)=>{const u=decodeURIComponent(q.url.split('?')[0]);const f=path.join(ROOT,u==='/'?'index.html':u);
+  fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);return r.end();}r.writeHead(200,{'content-type':f.endsWith('.js')?'text/javascript':'text/html'});r.end(d);});}).listen(8890);
+const b=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+const errs=[];const p=await b.newPage();p.on('pageerror',e=>errs.push(e.message));
+await p.goto('http://localhost:8890/',{waitUntil:'load'});await p.waitForFunction(()=>document.getElementById('loading').hidden,{timeout:100000});
+await p.evaluate(()=>document.querySelector('#who [data-r=male]').onclick());await p.waitForFunction(()=>window.__x.C===window.__x.cache.male&&document.getElementById('loading').hidden,{timeout:100000});
+console.log(await p.evaluate(()=>{const C=window.__x.C,cl=C.clips.MaleStand,h=C.bones.find(b=>/Spine2$/.test(b.name));const out=[cl.duration,cl.tracks.length];for(const t of [0,1,3]){window.__dbg.setBase('midle',t);out.push(h.quaternion.x.toFixed(4));}return out.join(' ');}));
+console.log('errors',errs.filter(e=>!e.includes('setPointer')));await b.close();srv.close();
