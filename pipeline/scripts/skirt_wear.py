@@ -35,7 +35,10 @@ legw=Wd[:,[i for i,n_ in enumerate(jn) if 'UpLeg' in n_ or n_.endswith('Leg')]].
 trunk=Wd[:,[i for i,n_ in enumerate(jn) if any(k in n_ for k in ('Hips','Spine','UpLeg','Leg'))]].sum(1)>0.5   # (no hands or arms in the hull)
 # ---- heights: waist from the scan's top, hem above the knee
 YT=float(np.percentile(P[:,1],99.7))-0.005
-YH=ENV('HEM',float(knee[1]+0.07));NY=ENV('NY',46);NT=ENV('NT',192)
+# lengths: hip (mini), knee, ankle. Longer skirts flare more and swing more with the thigh so a stride fits inside the hem
+LEN=os.environ.get('LEN','knee');ycr0=BP[(legw>0.3)&(np.abs(BP[:,0]-MID)<0.02),1].max();ank=JPOS['mixamorig:LeftFoot'][1]
+PRE={'hip':dict(hem=ycr0-0.14,swing=0.5,flare=0.0012,hemr=0.0),'knee':dict(hem=knee[1]+0.07,swing=0.65,flare=0.0012,hemr=0.0),'ankle':dict(hem=ank+0.05,swing=0.8,flare=0.0016,hemr=ENV('HEMR',0.34))}[LEN]
+YH=ENV('HEM',float(PRE['hem']));NY=ENV('NY',max(16,int(round((1.058-YH)/0.013))));NT=ENV('NT',192)
 ys=np.linspace(YT,YH,NY);th=np.linspace(0,2*np.pi,NT,endpoint=False)
 dirs=np.c_[np.sin(th),np.zeros(NT),np.cos(th)]   # theta 0 = front (+z), 90 deg = her left (+x)
 def hull(Bx):   # body radius per (height, angle): the furthest skin in each sector round the axis
@@ -61,12 +64,15 @@ def smooth_t(r,it=6):
     return r
 CL=ENV('CLEAR',0.012)
 def shape(rb,rs):
-    r=np.maximum(rs,rb+CL);r=smooth_t(r,8)
-    iw=int(np.argmax(r.mean(1)[:NY//2+1]))   # widest at the hips: below it the skirt never narrows (A-line, never between the legs)
-    for i in range(iw+1,NY):r[i]=np.maximum(r[i],r[i-1]+ENV('FLARE',0.0012))
-    r[:iw+1]=np.minimum(r[:iw+1],rb[:iw+1]+ENV('YOKE',0.007))   # waist to hips: a snug yoke, so a top worn over it covers it
+    snug=smooth_t(rb+ENV('YOKE',0.012),8);loose=smooth_t(np.maximum(rs,rb+CL),8)
+    nh=max(3,int(0.3*NY));iw=int(np.argmax(snug.mean(1)[:nh+1]))   # widest at the hips
+    # waist to hips snug (a top worn over it covers it); below the hips the scan's looseness comes in gradually, no ledge
+    ramp=np.clip((ys[iw]-ys)/ENV('RAMP',0.12),0,1)**1.5;r=snug+(np.maximum(loose,snug)-snug)*ramp[:,None]
+    for i in range(iw+1,NY):r[i]=np.maximum(r[i],r[i-1]+ENV('FLARE',PRE['flare'])*(0.3+0.7*ramp[i]))   # never narrows again
+    if PRE['hemr']>0:   # a long skirt: the hem opens to a walking width
+        k=np.clip((ys[iw]-ys)/max(0.05,ys[iw]-YH),0,1)**1.6;r[iw:]=np.maximum(r[iw:],r[iw][None,:]*(1-k[iw:])[:,None]+PRE['hemr']*k[iw:,None])   # (rows below the hips only)
     return r
-RB=hull(BP);RS=scanr();RS=np.minimum(RS,RB+ENV('MAXLOOSE',0.06))   # (the scan's floor-length hem flares far wider than a short skirt should)
+RB=hull(BP);RS=scanr();RS=np.minimum(RS,RB+ENV('MAXLOOSE',0.06 if LEN!='ankle' else 0.03))   # (the scan's floor-length hem flares far wider than a short skirt should)
 r0=shape(RB,RS)
 # ---- pleats (knife pleats, opening toward the hem) and the waistband
 NPL=ENV('PLEATS',24);t=th*NPL/(2*np.pi);saw=(t%1.0);pl=np.where(saw<0.85,saw/0.85,(1-saw)/0.15)   # long face, short return
@@ -89,7 +95,7 @@ for j in range(NT):a,b=idx(NY-1,j),idx(NY-1,j+1);c,d=NY*NT+j,NY*NT+(j+1)%NT;F+=[
 F=np.array(F,int)
 # ---- weights: hips at the waist, then a share of each thigh by side (front and back centre: half each)
 Wsk=np.zeros((nv,NJ));yy=V[:,1];ang=np.arctan2(V[:,0]-MID,V[:,2]-CZ)
-a=np.clip((YT-0.05-yy)/max(0.05,YT-0.05-YH),0,1)*ENV('SWING',0.65)
+a=np.clip((YT-0.05-yy)/max(0.05,YT-0.05-YH),0,1)*ENV('SWING',PRE['swing'])
 left=np.clip(0.5+0.75*np.sin(ang),0,1)
 Wsk[:,ji('Hips')]=1-a;Wsk[:,ji('LeftUpLeg')]=a*left;Wsk[:,ji('RightUpLeg')]=a*(1-left)
 top4=np.argsort(-Wsk,axis=1)[:,:4];w4=np.take_along_axis(Wsk,top4,1);w4/=w4.sum(1,keepdims=True)
