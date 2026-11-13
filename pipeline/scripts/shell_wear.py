@@ -71,6 +71,17 @@ if body_id=='f':
     LIFT=np.where((cur[bi_]>0.002)&(BP[:,1]<1.36),0.04*cur[bi_],0.0)[first]
 L3=np.c_[np.zeros(nw),LIFT,np.zeros(nw)]
 WPl=WP+L3   # the body as the scan piece sees it
+MID={'f':0.0175,'m':0.0}[body_id]
+IBM=ba(BJ['skins'][0]['inverseBindMatrices']).astype(float);JPOS={n_:np.linalg.inv(IBM[i].reshape(4,4).T)[:3,3] for i,n_ in enumerate(jn)}
+def jp(n_,lift=True):   # a joint where the cloth sees it (her arms ride 4 cm up)
+    p_=JPOS['mixamorig:'+n_].copy()
+    if lift and body_id=='f' and any(k in n_ for k in ('Arm','Hand')):p_[1]+=0.04
+    return p_
+def arm_u(X,side):   # distance along the arm from the shoulder joint (upper arm, then forearm)
+    S_,E_,H_=jp(side+'Arm'),jp(side+'ForeArm'),jp(side+'Hand');d1=E_-S_;L1=np.linalg.norm(d1);d2=H_-E_
+    t1=np.clip((X-S_)@d1/L1**2,0,1.3);t2=np.clip((X-E_)@d2/(d2@d2),-0.3,1.5)
+    p1=S_+t1[:,None]*d1;p2=E_+t2[:,None]*d2;r1=np.linalg.norm(X-p1,axis=1);r2=np.linalg.norm(X-p2,axis=1)
+    return np.where((r1<r2)&(t1<1.0),t1*L1,L1+t2*np.linalg.norm(d2))
 # ---- 1. the area as a smooth field; skin that must stay bare (head, neck, hands; feet under trousers) is pinned to 0
 f=np.zeros(nw);f[binv[cover]]=1
 bare=jw(('Head','Hand') if slot=='top' else ('Foot','Toe','Arm','Hand','Head','Neck'))>0.45   # (the neck is the scan's call: a turtleneck covers it, a crew neck does not)
@@ -85,8 +96,56 @@ if slot=='top':   # a top ends at a level hem: a shell cannot hang, so whatever 
     mx=np.median(WP[jw(('Spine',))>0.5,0]);ul=jw(('UpLeg',))>0.3;ycr=WP[ul&(np.abs(WP[:,0]-mx)<0.02),1].max()   # the crotch
     ys=P[np.abs(P[:,0]-mx)<0.14,1];yhem=max(np.percentile(ys,4),ycr+ENV('HEMUP',0.01))   # the scan's hem, but never down over the seat
     yhem=float(os.environ.get('YHEM',yhem));f[(WPl[:,1]<yhem)&(jw(('Arm','Hand'))<0.5)]=0;print('  hem at y %.3f'%yhem)
+UEND={}
+if slot=='top':   # sleeves: filled to the scan's own length and cut square across the arm there (no ragged flecks down the arm)
+    for side,sg in (('Left',1),('Right',-1)):
+        am=jw((side+'Arm',side+'ForeArm'))>0.5
+        if not am.any():continue
+        xs=np.abs(jp(side+'Arm')[0]-MID);Sa=P[sg*(P[:,0]-MID)>xs+0.02]
+        if len(Sa)<50:UEND[side]=0.0;continue
+        us=arm_u(Sa,side);ue_=float(np.percentile(us,ENV('SLVP',97.0)));UEND[side]=ue_
+        u_=arm_u(WPl,side);f[am&(u_<ue_-0.01)]=1;print('  %s sleeve to %.3f m down the arm'%(side,ue_))
 f[bare]=0
 YHEM_=yhem if slot=='top' else None
+# ---- shape definition: where the seams and pockets go (seam distance in metres; computed again on the fine mesh)
+YW=None
+if slot=='bottom':
+    fr_=(f>0)&(np.abs(WP[:,0]-MID)<0.03)&(WN[:,2]>0.3);YW=float(WPl[fr_,1].max()) if fr_.any() else None
+def jw2(Wx,keys):return Wx[:,[i for i,n_ in enumerate(jn) if any(k in n_ for k in keys)]].sum(1)
+def features(X,Nx,Wx):
+    """seam: distance to the nearest seam line (m). pk: extra offset from pockets, fly and yokes (m)."""
+    BIG=9.0;sd=np.full(len(X),BIG);pk=np.zeros(len(X))
+    torso=jw2(Wx,('Spine','Hips'))>0.5;leg=jw2(Wx,('UpLeg','Leg'))>0.5;arm=jw2(Wx,('Arm',))>0.5
+    side=np.abs(Nx[:,0])>0.5
+    sd=np.where(torso&side,np.abs(Nx[:,2])*0.15,sd)          # side seams
+    if slot=='bottom':sd=np.where(leg&side,np.minimum(sd,np.abs(Nx[:,2])*0.07),sd)   # out- and inseams
+    if slot=='top':
+        sd=np.where(arm&(Nx[:,1]<-0.4),np.minimum(sd,np.abs(Nx[:,2])*0.05),sd)   # under the sleeve
+        aw=jw2(Wx,('LeftArm','RightArm'))+jw2(Wx,('ForeArm',));sd=np.minimum(sd,np.where((aw>0.15)&(aw<0.85),np.abs(aw-0.5)*0.06,BIG))   # armholes
+        sh=(Nx[:,1]>0.55)&~arm&(X[:,1]>1.2);sd=np.where(sh,np.minimum(sd,np.abs(Nx[:,2])*0.12),sd)   # shoulder seams
+    if slot=='bottom' and YW is not None and key in('jeans','f_jeans','cargo','trousers'):
+        x=X[:,0]-MID;y=X[:,1];hb=(y>YW-0.30)&torso|((y>YW-0.30)&leg)
+        hw=float(np.percentile(np.abs(x[(np.abs(y-(YW-0.09))<0.01)&(jw2(Wx,('Hips','UpLeg'))>0.5)]),95)) if ((np.abs(y-(YW-0.09))<0.01)).any() else 0.17
+        fr=(Nx[:,2]>0.15)&hb;bk=(Nx[:,2]<-0.15)&hb;ax=np.abs(x)
+        # front pockets: the opening is a curve from the waistband down to the side; the panel steps down behind it, with a topstitch
+        cy=YW-0.012-0.085*np.clip((ax-0.42*hw)/(0.55*hw),0,1)**0.7;inn=fr&(ax>0.40*hw)&(y>cy-0.002)
+        st=np.clip((y-cy)/0.002,0,1)*(ax>0.40*hw);pk-=np.where(fr,0.0016*st,0)
+        dcur=np.abs(y-(cy-0.007));pk-=np.where(fr&(ax>0.40*hw)&(ax<1.05*hw),0.0007*np.exp(-(dcur/0.0012)**2),0)
+        # fly: a J of stitching on her/his left of the centre front
+        fx=0.028;fy0=YW-0.04;fy1=YW-0.16
+        dj=np.where(y>fy1,np.abs(x-fx),np.hypot(x-fx*0.4,np.maximum(0,fy1-y))-fx*0.6);inz=fr&(y<fy0)&(y>fy1-0.03)&(x>-0.005)
+        pk-=np.where(inz,0.0007*np.exp(-(dj/0.0012)**2),0);sd=np.where(fr&(y<fy0)&(np.abs(x)<0.006),np.minimum(sd,np.abs(x)),sd)
+        # back patch pockets: raised a little, edges stitched
+        pw=0.78*hw;pt=YW-0.07;ph=0.95*pw
+        for sg in (1,-1):
+            cxp=sg*0.52*hw;u=(x-cxp)/(pw/2);v=(pt-y)/ph
+            bot=1-0.18*(1-np.abs(u));insd=bk&(np.abs(u)<1)&(v>0)&(v<bot)
+            de=np.minimum.reduce([(1-np.abs(u))*pw/2,v*ph,(bot-v)*ph]);de=np.where(insd,de,-1)
+            pk+=np.where(insd,0.0018*np.clip(de/0.002,0,1)-0.0007*np.exp(-((de-0.005)/0.0012)**2),0)
+        # back yoke seam
+        yy=YW-0.06-0.035*np.clip(1-ax/hw,0,1);sd=np.where(bk&torso,np.minimum(sd,np.abs(y-yy)),sd)
+    return sd,pk
+sd_c,pk_c=features(WPl,WN,WW)
 # ---- the body under the garment is split finer (no edge over LMAX), so the cut line is a smooth curve even where her
 #      mesh has big triangles (the upper chest); the split is conforming (both sides of an edge), so nothing cracks
 WTN={k:vnorm(WP+WT[k],WF) for k in WT}
@@ -98,13 +157,13 @@ SFc=WF[sel[WF].any(1)]
 edge_=np.zeros(nw,bool);bb_=(f[E[:,0]]>0)!=(f[E[:,1]]>0);edge_[E[bb_].ravel()]=True
 for _ in range(ENV('BAND',4)):
     g_=edge_.copy();g_[E[edge_[E[:,1]],0]]=True;g_[E[edge_[E[:,0]],1]]=True;edge_=g_
-lapc=smooth(WP,1,1.0)-WP;concc=-(lapc*WN).sum(1)
+edge_|=(sd_c<0.02)|(np.abs(pk_c)>0);lapc=smooth(WP,1,1.0)-WP;concc=-(lapc*WN).sum(1)
 VA={'P':WP,'N':WN,'W':WW,'L':L3,'f':f[:,None],'band':edge_[:,None].astype(float),'conc':concc[:,None],'bare':bare[:,None].astype(float),**{'T_'+k:WT[k] for k in WT},**{'TN_'+k:WTN[k] for k in WT}}
-LMAX=ENV('LMAX',0.009)
-for it in range(8):
+LMAX=ENV('LMAX',0.004);LGEN=ENV('LGEN',0.011)   # fine at edges, seams and pockets; everywhere else fine enough to keep the scan's folds
+for it in range(10):
     e3=np.sort(np.stack([SFc[:,[0,1]],SFc[:,[1,2]],SFc[:,[2,0]]],1),axis=2);ek=e3.reshape(-1,2)
     ue,einv=np.unique(ek,axis=0,return_inverse=True);einv=einv.reshape(-1,3)
-    ln=np.linalg.norm(VA['P'][ue[:,0]]-VA['P'][ue[:,1]],axis=1);lg=(ln>LMAX)&((VA['band'][ue[:,0],0]>0)|(VA['band'][ue[:,1],0]>0))
+    ln=np.linalg.norm(VA['P'][ue[:,0]]-VA['P'][ue[:,1]],axis=1);lg=(ln>LGEN)|((ln>LMAX)&((VA['band'][ue[:,0],0]>0)|(VA['band'][ue[:,1],0]>0)))
     if not lg.any():break
     n0=len(VA['P']);mid=-np.ones(len(ue),int);mid[lg]=n0+np.arange(lg.sum())
     VA={k:np.r_[v,(v[ue[lg,0]]+v[ue[lg,1]])/2] for k,v in VA.items()}
@@ -143,6 +202,8 @@ for l,c_ in zip(ul,uc):   # specks of area away from the piece (a few rays that 
 f=smooth(f,2)
 if YHEM_ is not None:   # the hem is level: cut exactly at its height (sleeves are not cut)
     f=np.where(jw(('Arm','Hand'))<0.5,np.minimum(f,np.clip((WPl[:,1]-YHEM_)/0.004+0.5,0,1)),f)
+for side,ue_ in UEND.items():
+    am=jw((side+'Arm',side+'ForeArm','Hand'))>0.5;u_=arm_u(WPl,side);f=np.where(am,np.minimum(f,np.clip((ue_-u_)/0.004+0.5,0,1)),f)
 if LEGS:   # trouser cuffs are level too, just above the ankle
     f=np.where(jw(('UpLeg','Leg'))>0.3,np.minimum(f,np.clip((WP[:,1]-(ya+0.02))/0.004+0.5,0,1)),f)
 # ---- 2. offset out to the scan: dense samples on the scan surface, with UVs
@@ -165,7 +226,7 @@ if unk.any():   # past the end of the scan (trouser legs run down to the ankle):
     if len(kn):OFF[unk]=OFF[kn[cKDTree(WP[kn]).query(WP[unk])[1]]]
     OFF=smooth(OFF,300,mask=unk);print('  points past the scan',int(unk.sum()))
 conc=VA['conc'][:,0];OFF=np.minimum(OFF,np.where(conc>0.0006,0.008,HI))
-m_=f>0.02;OFF=smooth(OFF,ENV('SM',40),mask=m_);OFF=np.clip(OFF,LO,HI)
+m_=f>0.02;OFF=smooth(OFF,ENV('SM',5),mask=m_)   # light: the scan's folds and drape stay;OFF=np.clip(OFF,LO,HI)
 # ---- 4. colours: the scan colour under each point -> a few flat colours, specks voted away
 COL=np.zeros((nw,3));uv_=SUV[uvi];COL[act]=TEX[np.clip((uv_[:,1]*TH).astype(int),0,TH-1),np.clip((uv_[:,0]*TW).astype(int),0,TW-1)]
 COL=np.where(m_[:,None],smooth(COL,4,mask=m_),COL)
@@ -227,7 +288,33 @@ ring=onb.astype(float)
 for _ in range(4):
     nb=np.zeros(n);np.add.at(nb,Ed[:,0],ring[Ed[:,1]]);np.add.at(nb,Ed[:,1],ring[Ed[:,0]]);ring=np.maximum(ring,0.65*nb/np.maximum(dg2,1))
 O=np.maximum(LO,O*(1-ENV('RING',0.4)*ring))
-N=nrm(A['N']);X=A['P']+A['L']+N*O[:,None]
+N=nrm(A['N'])
+# ---- shape definition 1: trims. Each edge gets a band with thickness (waistband, cuffs, collar, hem), a step where it
+#      meets the body of the garment, and a topstitch groove
+from scipy.sparse.csgraph import dijkstra
+Ln=np.linalg.norm(A['P'][Ed[:,0]]-A['P'][Ed[:,1]],axis=1);Gd=coo_matrix((np.r_[Ln,Ln],(np.r_[Ed[:,0],Ed[:,1]],np.r_[Ed[:,1],Ed[:,0]])),shape=(n,n)).tocsr()
+bv=np.unique(be);Wn=A['W'];Pn=A['P']+A['L']
+cls={}
+if slot=='top':
+    isn=jw2(Wn[bv],('Neck','Spine2'))>0.4;isn|=Pn[bv,1]>Pn[:,1].max()-0.06
+    isc=(jw2(Wn[bv],('Arm',))>0.5)&~isn;cls={'neck':(bv[isn],ENV('TNECK',0.016)),'cuff':(bv[isc],ENV('TCUFF',0.022)),'hem':(bv[~isn&~isc],ENV('THEM',0.026))}
+    if key in('f_sweater','hoodie'):cls={k:(v[0],v[1]*2.0) for k,v in cls.items()}   # knit: deep ribbed bands
+else:
+    isw=Pn[bv,1]>(YW-0.03 if YW is not None else 0.8);cls={'waist':(bv[isw],ENV('TWAIST',0.036)),'cuff':(bv[~isw],ENV('TCUFF',0.02))}
+trim=np.zeros(n);BAND=np.zeros(n)
+for nm_,(src_,W_) in cls.items():
+    if not len(src_):continue
+    d_=dijkstra(Gd,indices=src_,min_only=True,limit=W_+0.02)
+    prof=ENV('TRIMH',0.0026)*(1-np.clip((d_-W_)/0.002+0.5,0,1))-0.0007*np.exp(-((d_-(W_-0.005))/0.0012)**2)
+    trim=np.where(np.abs(prof)>np.abs(trim),prof,trim);BAND=np.maximum(BAND,(d_<W_).astype(float))
+    print('  trim %-5s width %.3f, %d edge points'%(nm_,W_,len(src_)))
+# ---- shape definition 2: seams (a raised seam with a stitched groove each side), pockets, fly, yoke
+sd_f,pk_f=features(Pn,N,Wn)
+seam=0.0016*np.exp(-(sd_f/0.0018)**2)-0.0007*np.exp(-((sd_f-0.0045)/0.0012)**2)
+seam*=(1-BAND)   # seams run under the bands, not over them
+O=O+trim+seam+pk_f*(1-BAND)
+print('  seam points %d, pocket points %d'%(int((sd_f<0.003).sum()),int((np.abs(pk_f)>1e-4).sum())))
+X=A['P']+A['L']+N*O[:,None]
 own=set()
 for t in SF:own|={(t[0],t[1]),(t[1],t[2]),(t[2],t[0])}
 ub=np.unique(be);rmap=-np.ones(n,int);rmap[ub]=n+np.arange(len(ub))

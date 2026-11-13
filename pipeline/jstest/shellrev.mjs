@@ -21,7 +21,7 @@ const cam=(t,c)=>p.evaluate((t,c)=>{const{camera,orbit}=window.__dbg;document.qu
 const male=RIG==='male',ty=male?1.25:1.12;let i=0;
 // full body: front 3/4, side, back; then walking; then close-ups of the chest and the hips
 const shots=[['stand',0,[0,0.95,0],[1.2,1.2,2.9],'full'],['stand',0,[0,0.95,0],[3.1,1.15,0.2],'full'],['stand',0,[0,0.95,0],[-0.8,1.2,-3.0],'full'],['fwalk',0.4,[0,0.95,0],[1.9,1.15,2.5],'full'],
-  ['stand',0,[0,ty,0],[0.5,ty+0.05,1.25],'close'],['stand',0,[0,male?0.75:0.7,0],[-0.6,male?0.7:0.65,1.3],'close']];
+  ['stand',0,[0,ty,0],[0.5,ty+0.05,1.25],'close'],['stand',0,[0,male?0.75:0.7,0],[-0.6,male?0.7:0.65,1.3],'close'],['stand',0,[0,0.16,0.03],[0.55,0.32,1.05],'close']];
 for(const[bs,tm,t,c,kind]of shots){await p.evaluate((bs,tm)=>{const pl=document.getElementById('play');if(pl&&pl.textContent==='Stop')pl.click();window.__dbg.setBase(bs,tm);},bs,tm);
   await cam(t,c);await wait(600);await p.screenshot({path:`${OUT}/${tag}-${i++}.png`,clip:kind==='full'?{x:300,y:60,width:300,height:600}:{x:250,y:110,width:400,height:480}});}
 console.log(tag,'errors',errs.filter(e=>!e.includes('setPointer')).slice(0,5));await b.close();srv.close();
