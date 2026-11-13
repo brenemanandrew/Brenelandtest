@@ -224,9 +224,13 @@ unk=np.zeros(nw,bool);unk[act]=d_near>ENV('FAR',0.04)
 if unk.any():   # past the end of the scan (trouser legs run down to the ankle): the looseness carries on from where the scan stops
     kn=act[~unk[act]]
     if len(kn):OFF[unk]=OFF[kn[cKDTree(WP[kn]).query(WP[unk])[1]]]
+    if key.startswith('f_jeans') or key in('f_jeans',):OFF[unk]=np.minimum(OFF[unk],ENV('SKINNY',0.006))   # skinny: tight to the ankle, not baggy
     OFF=smooth(OFF,300,mask=unk);print('  points past the scan',int(unk.sum()))
+if key=='f_jeans':   # skinny: from mid-thigh down the leg the cloth closes in to the ankle
+    kn_y=JPOS['mixamorig:LeftLeg'][1];tt=np.clip((kn_y+0.15-WP[:,1])/0.3,0,1);legm=jw(('UpLeg','Leg'))>0.5
+    OFF=np.where(legm,np.minimum(OFF,HI*(1-tt)+ENV('SKINNY',0.006)*tt),OFF)
 conc=VA['conc'][:,0];OFF=np.minimum(OFF,np.where(conc>0.0006,0.008,HI))
-m_=f>0.02;OFF=smooth(OFF,ENV('SM',5),mask=m_)   # light: the scan's folds and drape stay;OFF=np.clip(OFF,LO,HI)
+m_=f>0.02;OFF=smooth(OFF,ENV('SM',14),mask=m_)   # light: the scan's folds and drape stay;OFF=np.clip(OFF,LO,HI)
 # ---- 4. colours: the scan colour under each point -> a few flat colours, specks voted away
 COL=np.zeros((nw,3));uv_=SUV[uvi];COL[act]=TEX[np.clip((uv_[:,1]*TH).astype(int),0,TH-1),np.clip((uv_[:,0]*TW).astype(int),0,TW-1)]
 COL=np.where(m_[:,None],smooth(COL,4,mask=m_),COL)
