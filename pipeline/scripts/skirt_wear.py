@@ -42,7 +42,7 @@ def hull(Bx):   # body radius per (height, angle): the furthest skin in each sec
     rel=Bx-[MID,0,CZ];ang=np.arctan2(rel[:,0],rel[:,2])%(2*np.pi);rad=np.hypot(rel[:,0],rel[:,2])
     rb=np.zeros((NY,NT));bi=(ang/(2*np.pi)*NT).astype(int)%NT
     for i,y in enumerate(ys):
-        m=trunk&(np.abs(Bx[:,1]-y)<0.012)
+        m=trunk&(np.abs(Bx[:,1]-y)<0.02)
         if not m.any():continue
         np.maximum.at(rb[i],bi[m],rad[m])
         for _ in range(2):rb[i]=np.maximum(rb[i],np.maximum(np.roll(rb[i],1),np.roll(rb[i],-1))*0.985)   # fill empty sectors
@@ -64,7 +64,7 @@ def shape(rb,rs):
     r=np.maximum(rs,rb+CL);r=smooth_t(r,8)
     iw=int(np.argmax(r.mean(1)[:NY//2+1]))   # widest at the hips: below it the skirt never narrows (A-line, never between the legs)
     for i in range(iw+1,NY):r[i]=np.maximum(r[i],r[i-1]+ENV('FLARE',0.0012))
-    r[:2]=np.maximum(r[:2],rb[:2]+0.004)   # the waistband sits close
+    r[:iw+1]=np.minimum(r[:iw+1],rb[:iw+1]+ENV('YOKE',0.007))   # waist to hips: a snug yoke, so a top worn over it covers it
     return r
 RB=hull(BP);RS=scanr();RS=np.minimum(RS,RB+ENV('MAXLOOSE',0.06))   # (the scan's floor-length hem flares far wider than a short skirt should)
 r0=shape(RB,RS)
