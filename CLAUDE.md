@@ -35,7 +35,7 @@ The 28 live pieces are Meshy scans warped onto the bodies. From a distance they 
 
 Andrew's verdict: not good enough, and he will not regenerate every garment in Meshy for every iteration.
 
-## Agreed direction: shell clothes
+## Proposed direction (waiting on Andrew to approve): shell clothes
 Stop warping scans. Build each garment FROM the body:
 1. Take the body triangles listed in the piece's `cover` (the region the garment occupies).
 2. Push them out along the body normal by the distance to the fitted scan at that point, clamped (about 4 to 50 mm) and smoothed.
