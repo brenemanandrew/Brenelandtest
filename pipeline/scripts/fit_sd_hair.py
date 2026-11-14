@@ -24,12 +24,20 @@ for h in (sys.argv[2:] or list(TAB)):
     EY=ENV('EYEY',top-0.245);fc=P[F].mean(1);win=(np.abs(fc[:,0]-hx)<ENV('WINX',0.2))&(fc[:,1]<EY+ENV('WINUP',0.075))&(fc[:,1]>ny-0.14)&(fc[:,2]>hz+0.04)   # nothing over the face below the brows
     F=F[~win];fa=fa[~win]
     # a cap of hair on the skull itself (several of the styles have no scalp at all: bald from behind)
-    BF=R['F'].astype(int);bc=BP[BF].mean(1);capf=(bc[:,1]>ny+0.04)&((bc[:,1]>EY+ENV('CAPUP',0.105))|((bc[:,2]<hz-0.02)&(bc[:,1]>EY-ENV('CAPLOW',0.10))))&(np.abs(bc[:,0]-hx)<hw*0.47)
-    CF=BF[capf];cu=np.unique(CF);cm=-np.ones(len(BP),int);cm[cu]=len(P)+np.arange(len(cu))
+    # the scalp under the hair, drawn in the hair colour right on the skull (4 mm out), cut along a smooth hairline: higher at the
+    # centre of the forehead, coming down at the temples, round behind the ears and across the nape
+    BF=R['F'].astype(int);xr=np.abs(BP[:,0]-hx)/(hw/2)
+    front=BP[:,1]-(EY+ENV('CAPUP',0.115)-ENV('TEMPLE',0.05)*np.clip(xr,0,1)**2);back=np.minimum((hz-0.015)-BP[:,2],BP[:,1]-(EY-ENV('CAPLOW',0.10)))
+    fld=np.maximum(front,back);fld=np.minimum(fld,BP[:,1]-(ny+0.04));fld=np.minimum(fld,(hw*ENV('CAPSIDE',0.485)-np.abs(BP[:,0]-hx))*2)   # (not the ears)
+    fld=np.where(np.abs(fld)<1e-7,-1e-7,fld);nearF=(BP[BF][:,:,1].max(1)>ny);Fc=BF[nearF];pos=fld[Fc]>0;n_=pos.sum(1);full=Fc[n_==3];mx=Fc[(n_==1)|(n_==2)];nm=n_[(n_==1)|(n_==2)]
     fn=np.cross(BP[BF[:,1]]-BP[BF[:,0]],BP[BF[:,2]]-BP[BF[:,0]]);BN=np.zeros_like(BP)
     for q in range(3):np.add.at(BN,BF[:,q],fn)
     BN/=np.linalg.norm(BN,axis=1,keepdims=True).clip(1e-12)
-    P=np.r_[P,BP[cu]+BN[cu]*ENV('CAPOUT',0.004)];N=np.r_[N,BN[cu]];vc=np.r_[vc,np.full((len(cu),3),0.9/1.6)];F=np.r_[F,cm[CF]];fa=np.r_[fa,np.zeros(len(CF),bool)]
+    lone=np.where(nm==1,np.argmax(fld[mx]>0,1),np.argmin(fld[mx]>0,1));r_=np.arange(len(mx));A_=mx[r_,lone];B_=mx[r_,(lone+1)%3];C_=mx[r_,(lone+2)%3]
+    Es=np.sort(np.r_[np.c_[A_,B_],np.c_[A_,C_]],1);ue,inv=np.unique(Es,axis=0,return_inverse=True);inv=inv.ravel();i_,j_=ue[:,0],ue[:,1];t_=np.clip(fld[i_]/(fld[i_]-fld[j_]),1e-3,1-1e-3)[:,None]
+    XP=np.r_[BP,BP[i_]+(BP[j_]-BP[i_])*t_];XN=np.r_[BN,BN[i_]+(BN[j_]-BN[i_])*t_];XN/=np.linalg.norm(XN,axis=1,keepdims=True).clip(1e-12);nid=len(BP)+np.arange(len(ue));p_=nid[inv[:len(mx)]];q_=nid[inv[len(mx):]];ins=nm==1
+    CF=np.r_[full,np.c_[A_,p_,q_][ins],np.c_[p_,B_,C_][~ins],np.c_[p_,C_,q_][~ins]];cu=np.unique(CF);cm=-np.ones(len(XP),int);cm[cu]=len(P)+np.arange(len(cu))
+    P=np.r_[P,XP[cu]+XN[cu]*ENV('CAPOUT',0.004)];N=np.r_[N,XN[cu]];vc=np.r_[vc,np.full((len(cu),3),0.9/1.6)];F=np.r_[F,cm[CF]];fa=np.r_[fa,np.zeros(len(CF),bool)]
     BIN=bytearray();views=[];accs=[]
     def add(arr,comp,typ,mm=False,norm=False):
         while len(BIN)%4:BIN.append(0)

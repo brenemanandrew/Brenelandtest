@@ -51,6 +51,9 @@ if not os.environ.get('JOINTS'):
 PW=np.zeros((nwv,3));PW[wi]=P;fnw=np.cross(PW[FWd[:,1]]-PW[FWd[:,0]],PW[FWd[:,2]]-PW[FWd[:,0]]);NW=np.zeros((nwv,3))
 for q in range(3):np.add.at(NW,FWd[:,q],fnw)
 N=(NW/np.linalg.norm(NW,axis=1,keepdims=True).clip(1e-12))[wi]   # normals of the reshaped surface (smooth across texture seams)
+# the face is lit like one smooth ball (the usual cel-shading trick): no patchy bands across the cheeks; the nose keeps a little of its own
+hc=np.array([0.0,ey+0.03,float(P[P[:,1]>NK+0.05,2].mean())]);sp=P-hc;sp/=np.linalg.norm(sp,axis=1,keepdims=True).clip(1e-9)
+fw=np.clip((P[:,2]-(zf-0.16))/0.06,0,1)*np.clip((P[:,1]-NK)/0.04,0,1)*(np.abs(P[:,0])<0.24)*ENV('BALL',0.8);N=N*(1-fw[:,None])+sp*fw[:,None];N/=np.linalg.norm(N,axis=1,keepdims=True).clip(1e-12)
 b0=io.BytesIO();T.save(b0,'JPEG',quality=92);b1=io.BytesIO();Image.new('RGB',(8,8),(128,128,255)).save(b1,'PNG')
 os.makedirs(H+'/../out/sd',exist_ok=True)
 np.savez_compressed(H+'/../out/sd/%s_rigin.npz'%n,P=P.astype(np.float32),F=F.astype(np.int32),white=np.zeros(len(P),np.float32),head=np.ones(len(P),bool),UV=UV.astype(np.float32),N=N.astype(np.float32),
