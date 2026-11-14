@@ -70,21 +70,23 @@ def gsmooth(A,it,lam=0.5):
 gy0,gy1=G0[:,1].min(),G0[:,1].max();gh=gy1-gy0
 def rot_to(a,b):
     v=np.cross(a,b);c=float(a@b);K=np.array([[0,-v[2],v[1]],[v[2],0,-v[0]],[-v[1],v[0],0]]);return np.eye(3)+K+K@K/(1+c)
+sh_=(jw(('LeftShoulder','RightShoulder','LeftArm','RightArm'))>0.5)&(np.abs(BP[:,0]-MID)<0.25);YSHT=float((BP[sh_,1]+LIFT[sh_]).max());print('  shoulder top %.3f'%YSHT)
 def fit_top(bd,sy=None):
     # 1. size and place: trunk points just outside the skin
     core=np.where((np.abs(G0[:,0])<0.16*gh/0.6*0.6)&(G0[:,1]>gy0+0.3*gh)&(G0[:,1]<gy0+0.8*gh))[0]
     core=np.random.default_rng(1).choice(core,min(800,len(core)),replace=False);best=(1e9,)
     SC=lambda s:np.array([s,sy if sy else s,s])   # with sy fixed (from the average build) only width and depth change: bigger, not longer
     for s in np.arange(0.24,0.62,0.01)*(1.0/max(gh,1e-6))*1.74/1.0:
-        for ty in np.arange(0.85,1.40,0.02):
+        yn=YSHT+ENV('NECKUP',0.02)   # the top of the garment (shoulders, collar) just over the top of her shoulders
+        for ty in yn-SC(s)[1]*gy1+np.arange(-0.04,0.041,0.01):
             for tz in (-0.02,0.0,0.02,0.04):
-                d,_=bd.sd(G0[core]*SC(s)+[MID,ty,tz]);c=np.where(d<0,6*-d,np.abs(d-0.012)).mean()
+                d,_=bd.sd(G0[core]*SC(s)+[MID,ty,tz]);c=np.where(d<0.004,ENV('INPEN',30.0)*(0.004-d),np.abs(d-ENV('CLR',0.015))).mean()
                 if c<best[0]:best=(c,s,ty,tz)
     c,s,ty,tz=best
     for s2 in s+np.arange(-0.008,0.009,0.004):
         for ty2 in ty+np.arange(-0.012,0.013,0.006):
             for tz2 in tz+np.arange(-0.012,0.013,0.006):
-                d,_=bd.sd(G0[core]*SC(s2)+[MID,ty2,tz2]);c2=np.where(d<0,6*-d,np.abs(d-0.012)).mean()
+                d,_=bd.sd(G0[core]*SC(s2)+[MID,ty2,tz2]);c2=np.where(d<0.004,ENV('INPEN',30.0)*(0.004-d),np.abs(d-ENV('CLR',0.015))).mean()
                 if c2<best[0]:best=(c2,s2,ty2,tz2)
     c,s,ty,tz=best;P=G0*SC(s)+[MID,ty,tz]
     # 2. sleeves along the arms (bind pose arms are out to the side; the scan's hang down)
@@ -103,15 +105,15 @@ def fit_top(bd,sy=None):
     return P,s,W_arm
 def push_out(P,bd,mc_fn,it=3):
     """nothing within mc of the skin or inside it; the move is spread so the cloth does not dent"""
-    for _ in range(it):
+    for _ in range(ENV('PUSHIT',8)):
         d,i=bd.sd(P);mc=mc_fn(P);need=np.maximum(0,mc-d);D=bd.SN[i]*need[:,None]
         if need.max()<1e-4:break
-        own=need>0;Ds=gsmooth(D,4);P=P+np.where(own[:,None],np.maximum(D,0)*0+D,Ds)
+        Ds=gsmooth(D,ENV('PUSHSM',30));sc=need.max()/max(np.linalg.norm(Ds,axis=1).max(),1e-9);P=P+Ds*min(sc,2.0)   # a wide smooth lift, not a dent
     d,i=bd.sd(P);mc=mc_fn(P);need=np.maximum(0,mc-d);P=P+bd.SN[i]*need[:,None]
     return P
 YH=JPOS['mixamorig:Hips'][1]
 if slot=='top':
-    mcf=lambda P:0.006+0.012*ss((YH+0.16-P[:,1])/0.08)   # a top hangs outside whatever is worn at the waist
+    mcf=lambda P:0.006+ENV('HIPCLR',0.026)*ss((YH+0.16-P[:,1])/0.08)   # over the hips a top clears whatever bottom is worn (a skirt's yoke sits ~2 cm out)   # a top hangs outside whatever is worn at the waist
 else:
     mcf=lambda P:np.full(len(P),0.006)
 fits={};info={}
@@ -143,6 +145,19 @@ if slot=='bottom' and 'skirt' in key:
         rs=np.hypot(rel0[:,0],rel0[:,2]);wb=t<0.03;sc=np.median(hull[0])/max(np.median(rs[wb]),1e-6)*1.0
         r=np.maximum(rs*sc,hr+np.where(t<0.06,0.006,0.012))
         P=np.c_[MID+r*np.sin(th),y,CZ+r*np.cos(th)];fits[b]=P;print(name,b,'waist r %.3f hem r %.3f'%(np.median(r[t<0.02]),np.median(r[t>0.98])))
+# ---- a solid Meshy garment has an inside wall: the push-out moves it more than the outside and it shows through as blotches.
+#      Faces that face the body (inner wall) are dropped; the builder draws the cloth two-sided, so one layer is enough
+if ENV('INNER',1):
+    bdi=Body(body_of(BUILDS[0]));Pb=fits[BUILDS[0]];cf=Pb[GF].mean(1);_,ii=bdi.t.query(cf);out_=cf-bdi.S[ii];out_/=np.linalg.norm(out_,axis=1,keepdims=True).clip(1e-9)
+    fnm=np.cross(Pb[GF[:,1]]-Pb[GF[:,0]],Pb[GF[:,2]]-Pb[GF[:,0]]);fnm/=np.linalg.norm(fnm,axis=1,keepdims=True).clip(1e-12)
+    keepF=(fnm*out_).sum(1)>ENV('INDOT',-0.15)
+    # small islands left behind go too
+    nF=len(GF);ek=np.sort(np.stack([GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],1),axis=2).reshape(-1,2);_,einv=np.unique(ek,axis=0,return_inverse=True);einv=einv.reshape(-1,3)
+    fo=np.repeat(np.arange(nF),3);ee=einv.ravel();o=np.argsort(ee);ee=ee[o];fo=fo[o];same=ee[1:]==ee[:-1];pa=np.c_[fo[:-1][same],fo[1:][same]]
+    pa=pa[keepF[pa[:,0]]&keepF[pa[:,1]]];lab_=connected_components(coo_matrix((np.ones(len(pa)),(pa[:,0],pa[:,1])),shape=(nF,nF)),directed=False)[1]
+    big=np.bincount(lab_[keepF],minlength=nF);keepF&=big[lab_]>=ENV('ISLE',300)
+    print('  inner wall dropped: %d of %d faces kept'%(int(keepF.sum()),nF));GF=GF[keepF]
+    GE=np.unique(np.sort(np.r_[GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],axis=1),axis=0);gdeg=np.zeros(len(G0));np.add.at(gdeg,GE[:,0],1);np.add.at(gdeg,GE[:,1],1);gdeg=np.maximum(gdeg,1)
 # ---- weights (from the base build's fit)
 b0=BUILDS[0];P0=fits[b0];X0=body_of(b0)
 if slot=='top':
@@ -150,6 +165,8 @@ if slot=='top':
     _,kk=cKDTree(X0).query(P0,k=4);w3=1/(np.linalg.norm(X0[kk]-P0[:,None],axis=2)+1e-3);w3/=w3.sum(1,keepdims=True);Wg=(Wd[kk]*w3[:,:,None]).sum(1)
     for side,(bb,uu,Lu,f) in info[b0][1].items():
         ia,ie=ji(side+'Arm'),ji(side+'ForeArm');Wa=np.zeros_like(Wg);Wa[:,ia]=1-f;Wa[:,ie]=f;b2=(bb*ss((uu-0.03)/0.12))[:,None];Wg=Wg*(1-b2)+Wa*b2
+    lg=[i for i,n_ in enumerate(jn) if 'UpLeg' in n_ or n_.endswith('Leg')];h_=ji('Hips');low=ss((YH+0.06-P0[:,1])/0.08)   # a hem below the hips hangs from the hips, not the thighs (it tore in the walk)
+    mv=Wg[:,lg].sum(1)*low;Wg[:,lg]*=(1-low)[:,None];Wg[:,h_]+=mv
     Wg=gsmooth(Wg,4)
     LF=(LIFT[kk]*w3).sum(1);LF=gsmooth(LF,6)
 else:
@@ -172,11 +189,26 @@ _,binv=np.unique(np.round(BP*1e5).astype(np.int64),axis=0,return_inverse=True);b
 hw=np.zeros(nwb,bool);hw[binv[hidden]]=True;hidden=hw[binv]
 print('  skin hidden on every build',int(hidden.sum()))
 # ---- colour from the fitted piece already in the game (same body, nearest point), cut to a few flat swatches
-J2,B2=glb(R+'/wear/%s.glb'%name);g2=mk(J2,B2);p2=J2['meshes'][0]['primitives'][0]
-Q=g2(p2['attributes']['POSITION']).astype(float);QUV=g2(p2['attributes']['TEXCOORD_0']).astype(float)
-iv=J2['bufferViews'][J2['images'][0]['bufferView']];TX=np.array(Image.open(io.BytesIO(B2[iv.get('byteOffset',0):iv.get('byteOffset',0)+iv['byteLength']])).convert('RGB')).astype(float);TH,TW=TX.shape[:2]
+OLD=os.path.exists(R+'/wear/%s.glb'%name)
+if OLD:
+  J2,B2=glb(R+'/wear/%s.glb'%name);g2=mk(J2,B2);p2=J2['meshes'][0]['primitives'][0]
+if OLD:
+  Q=g2(p2['attributes']['POSITION']).astype(float);QUV=g2(p2['attributes']['TEXCOORD_0']).astype(float)
+if OLD:
+  iv=J2['bufferViews'][J2['images'][0]['bufferView']];TX=np.array(Image.open(io.BytesIO(B2[iv.get('byteOffset',0):iv.get('byteOffset',0)+iv['byteLength']])).convert('RGB')).astype(float);TH,TW=TX.shape[:2]
 P0l=P0+np.c_[np.zeros(len(P0)),LF,np.zeros(len(P0))]
-_,qi=cKDTree(Q).query(P0l);col=TX[np.clip((QUV[qi,1]*TH).astype(int),0,TH-1),np.clip((QUV[qi,0]*TW).astype(int),0,TW-1)];col=gsmooth(col,3)
+if OLD:
+  _,qi=cKDTree(Q).query(P0l);col=TX[np.clip((QUV[qi,1]*TH).astype(int),0,TH-1),np.clip((QUV[qi,0]*TW).astype(int),0,TW-1)];col=gsmooth(col,3)
+else:   # no texture: BASE colour everywhere; ACCENT on the collar (COLLAR m below the top, near the neck) and on buttons (bumps on the centre front)
+  cb=np.array([float(x) for x in os.environ.get('BASE','196,98,58').split(',')]);ca=np.array([float(x) for x in os.environ.get('ACCENT','243,229,203').split(',')])
+  acc_=np.zeros(len(G0),bool);sc_=0.6/gh   # scan units to roughly metres
+  if ENV('COLLAR',0.0)>0:
+      ytop=G0[:,1].max();acc_|=(G0[:,1]>ytop-ENV('COLLAR',0.0)/sc_)&(np.abs(G0[:,0])<ENV('COLLARW',0.11)/sc_)
+  if ENV('BUTTONS',0)>0:
+      Gs=gsmooth(G0,25);bump=((G0-Gs)*vnorm(G0,GF)).sum(1)*sc_;front=G0[:,2]>np.percentile(G0[:,2],60)
+      acc_|=front&(np.abs(G0[:,0])<0.05/sc_)&(bump>ENV('BUMP',0.0025))
+      acc_=gsmooth(acc_.astype(float),2)>0.5
+  col=np.where(acc_[:,None],ca,cb);print('  accent points',int(acc_.sum()))
 K=4;rk=np.random.default_rng(3);cen=[col[rk.integers(len(col))]]
 for _ in range(K-1):cen.append(col[np.argmax(np.min([((col-c)**2).sum(1) for c in cen],0))])
 cen=np.array(cen)
@@ -191,7 +223,7 @@ for k in np.argsort(cnt):
 for _ in range(10):
     V=np.zeros((len(P0),K));np.add.at(V,(GE[:,0],lab[GE[:,1]]),1);np.add.at(V,(GE[:,1],lab[GE[:,0]]),1);V[np.arange(len(P0)),lab]+=1.5;lab=V.argmax(1)
 cnt=np.bincount(lab,minlength=K)
-if os.environ.get('ONECOL')=='1' or 'skirt' in key:lab[:]=cnt.argmax()
+if os.environ.get('ONECOL')=='1' or ('skirt' in key and OLD):lab[:]=cnt.argmax()
 PAL=np.array([np.median(col[lab==k],0) if (lab==k).any() else [0,0,0] for k in range(K)])
 print('  colours',[(tuple(int(x) for x in PAL[k]),int(c)) for k,c in enumerate(np.bincount(lab,minlength=K)) if c])
 flab=np.array([np.bincount(lab[t],minlength=K).argmax() for t in GF])
