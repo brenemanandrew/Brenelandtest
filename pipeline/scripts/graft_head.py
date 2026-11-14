@@ -27,7 +27,7 @@ Xh=X[used].copy();UVh=UV[used];Nh=N[used];Th={n:v[used] for n,v in T.items()}
 ring=Xh[Xh[:,1]<YO+0.01];oc=np.array([(ring[:,0].max()+ring[:,0].min())/2,(ring[:,2].max()+ring[:,2].min())/2]);orx=np.ptp(ring[:,0])/2;orz=np.ptp(ring[:,2])/2
 # ---- the figure: scaled, moved under her head, its own head cut off
 Z=np.load(INP);P=Z['P'].astype(float);Fb=Z['F'].astype(int);white=Z['white'].astype(float)
-YN=ENV('NEWCUT',1.425);S=ENV('S',(YO+0.001)/YN);nr=P[(np.abs(P[:,1]-YN)<0.012)&(np.abs(P[:,0])<0.3)];nc=np.array([(nr[:,0].max()+nr[:,0].min())/2,(nr[:,2].max()+nr[:,2].min())/2])*S
+YN=ENV('NEWCUT',1.425);NL=ENV('NECKLEN',0.045);S=ENV('S',(YO+0.001-NL)/YN);nr=P[(np.abs(P[:,1]-YN)<0.012)&(np.abs(P[:,0])<0.3)];nc=np.array([(nr[:,0].max()+nr[:,0].min())/2,(nr[:,2].max()+nr[:,2].min())/2])*S
 sh=np.array([oc[0]-nc[0],0,oc[1]-nc[1]+ENV('DZ',0.0)]);P=P*S+sh;yc=YN*S
 f=np.where(np.abs(P[:,0]-MID)<0.3*S,yc-P[:,1],1.0);f[np.abs(f)<1e-9]=-1e-9;pos=f[Fb]>0;n=pos.sum(1);mx=(n==1)|(n==2);Fm=Fb[mx]
 lone=np.where(n[mx]==1,np.argmax(pos[mx],1),np.argmin(pos[mx],1));r=np.arange(len(Fm));A_=Fm[r,lone];B_=Fm[r,(lone+1)%3];C_=Fm[r,(lone+2)%3]
@@ -41,8 +41,9 @@ tt=ss((YO+ENV('FLARE',0.03)-Xh[:,1])/ENV('FLARE',0.03))*(1-ss((Xh[:,2]-0.02)/0.0
 if ENV('DOFLARE',0):Xh[:,0]=oc[0]+(Xh[:,0]-oc[0])*(1+tt*(nrx*K/orx-1));Xh[:,2]=(oc[1]+tt*(ncz-oc[1]))+(Xh[:,2]-oc[1])*(1+tt*(nrz*K/orz-1))
 t2=ss((YO+0.012-Xh[:,1])/0.012);Xh[:,1]-=t2*ENV('TUCK',0.02);Xh[:,0]=oc[0]+(Xh[:,0]-oc[0])*(1-0.08*t2)   # her neck's last centimetre runs down inside the stump
 # the stump narrows to her neck over its last TAPER metres (no ledge)
-tp=ss((P[:,1]-(yc-ENV('TAPER',0.05)))/ENV('TAPER',0.05))*(np.hypot(P[:,0]-nc[0]-sh[0],P[:,2]-ncz)<0.2)
+tp=ss((P[:,1]-(yc-ENV('TAPER',0.07)))/ENV('TAPER',0.07))*(np.hypot(P[:,0]-nc[0]-sh[0],P[:,2]-ncz)<0.2)
 P[:,0]=oc[0]+(P[:,0]-oc[0])*(1+tp*((orx+0.003)/nrx-1));P[:,2]=(ncz+tp*(oc[1]-ncz))+(P[:,2]-ncz)*(1+tp*((orz+0.003)/nrz-1))
+P[:,1]+=tp*NL;yc+=NL   # ... and rises into the neck
 # the stump gets a closed, slightly domed top (her neck stands in it)
 ri=np.where((np.abs(P[:,1]-yc)<0.002)&(np.abs(P[:,0]-MID)<0.3))[0];rc=np.array([P[ri,0].mean(),yc,P[ri,2].mean()]);o_=ri[np.argsort(np.arctan2(P[ri,0]-rc[0],P[ri,2]-rc[2]))]
 ci=len(P);P=np.r_[P,[rc+[0,ENV('CAPUP',0.012),0]]];white=np.r_[white,0.0];Fb=np.r_[Fb,np.c_[o_,np.roll(o_,-1),np.full(len(o_),ci)]]
