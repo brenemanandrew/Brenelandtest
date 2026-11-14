@@ -1,0 +1,44 @@
+{
+ "maple.glb": {
+  "id": "T2",
+  "preview": "01a1dbf4-c08c-7318-907b-82556b28e350",
+  "refine": "01a1dbf6-06c5-709e-9145-2af37e4250ed",
+  "done": true,
+  "credits": 10
+ },
+ "hedge_section.glb": {
+  "id": "P1",
+  "preview": "01a1dbf4-cbeb-72c5-85f7-c15a5d7c632f",
+  "refine": "01a1dbf7-1af4-7169-9bec-96c2dd171623",
+  "done": true,
+  "credits": 10
+ },
+ "flower_patch.glb": {
+  "id": "P3",
+  "preview": "01a1dbf4-d65e-72c9-a59f-ab3a17e49f4d",
+  "refine": "01a1dbf6-64ac-71d9-b4de-85c32f92566e",
+  "done": true,
+  "credits": 10
+ },
+ "mossy_rock.glb": {
+  "id": "P6",
+  "preview": "01a1dbf4-e206-72f6-84ea-fb7b54c27c30",
+  "refine": "01a1dbf5-b014-7078-869e-e73fe835df3f",
+  "done": true,
+  "credits": 10
+ },
+ "lettuce_row.glb": {
+  "id": "G2",
+  "preview": "01a1dbf4-ed74-7735-a107-11ab7997d936",
+  "refine": "01a1dbf6-6d0e-717b-9941-c56cada78c0e",
+  "done": true,
+  "credits": 10
+ },
+ "tomato_plants.glb": {
+  "id": "G5",
+  "preview": "01a1dbf4-f967-75ec-8aa1-22c76479f470",
+  "refine": "01a1dbf6-0ebf-74b9-bb2d-a8074c85ca5e",
+  "done": true,
+  "credits": 10
+ }
+}

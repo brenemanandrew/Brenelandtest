@@ -1,0 +1,19 @@
+preview maple.glb 01a1dbf4-c08c-7318-907b-82556b28e350
+preview hedge_section.glb 01a1dbf4-cbeb-72c5-85f7-c15a5d7c632f
+preview flower_patch.glb 01a1dbf4-d65e-72c9-a59f-ab3a17e49f4d
+preview mossy_rock.glb 01a1dbf4-e206-72f6-84ea-fb7b54c27c30
+preview lettuce_row.glb 01a1dbf4-ed74-7735-a107-11ab7997d936
+preview tomato_plants.glb 01a1dbf4-f967-75ec-8aa1-22c76479f470
+refine mossy_rock.glb
+refine maple.glb
+refine tomato_plants.glb
+refine flower_patch.glb
+DONE mossy_rock.glb
+refine lettuce_row.glb
+DONE maple.glb
+DONE tomato_plants.glb
+refine hedge_section.glb
+DONE lettuce_row.glb
+DONE flower_patch.glb
+DONE hedge_section.glb
+ALL FINISHED 6 done, 0 failed
