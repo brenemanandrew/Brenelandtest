@@ -23,14 +23,18 @@ print('  %s: scale %.4f, face: eye line y %.3f, eyes at x +-%.3f, front z %.3f, 
 JF={'Hips':[0,0.80,-0.01],'Spine':[0,0.92,0.0],'Spine1':[0,1.02,0.01],'Spine2':[0,1.12,0.01],'Neck':[0,1.31,-0.02],'Head':[0,1.37,0.0],'HeadTop_End':[0,1.80,0.0],'headfront':[0,1.37,0.25],
     'Shoulder':[0.07,1.25,-0.02],'Arm':[0.21,1.235,-0.02],'ForeArm':[0.40,1.225,-0.01],'Hand':[0.56,1.218,0.0],'HandEnd':[0.661,1.215,0.0],
     'UpLeg':[0.13,0.72,-0.01],'Leg':[0.14,0.42,-0.02],'Foot':[0.14,0.14,-0.02],'ToeBase':[0.15,0.04,0.10],'Toe_End':[0.15,0.03,0.21]}
-if os.environ.get('JOINTS'):JF.update(json.loads(os.environ['JOINTS']))
-kx=P[:,0].max()/0.661   # arm span: the hand joints follow this model's reach
-for k in ('ForeArm','Hand','HandEnd'):JF[k]=[0.21+(JF[k][0]-0.21)*((P[:,0].max()-0.21)/(0.661-0.21)),JF[k][1],JF[k][2]]
-ay=float(np.mean([P[(np.abs(P[:,0]-x)<0.015)&(P[:,1]>1.0),1].mean() for x in (JF['ForeArm'][0],JF['Hand'][0]-0.03)]))   # arm height
-for k in ('Arm','ForeArm','Hand','HandEnd'):JF[k][1]=round(ay+(JF[k][1]-1.225),4)
+MW={}
+if 'W' in Z:   # the model came rigged by Meshy: its joints (scaled) and its weights
+    MW={'W':Z['W'].astype(np.float32)};JM=json.loads(str(Z['J']));JF.update({k:[v[0]*s,v[1]*s,v[2]*s] for k,v in JM.items()});JF['HandEnd']=[float(P[:,0].max()),JF['Hand'][1],JF['Hand'][2]];os.environ['JOINTS']='x'
+elif os.environ.get('JOINTS'):JF.update(json.loads(os.environ['JOINTS']))   # a model with other proportions brings its own joints (used as they are)
+if not os.environ.get('JOINTS'):
+    kx=P[:,0].max()/0.661   # arm span: the hand joints follow this model's reach
+    for k in ('ForeArm','Hand','HandEnd'):JF[k]=[0.21+(JF[k][0]-0.21)*((P[:,0].max()-0.21)/(0.661-0.21)),JF[k][1],JF[k][2]]
+    ay=float(np.mean([P[(np.abs(P[:,0]-x)<0.015)&(P[:,1]>1.0),1].mean() for x in (JF['ForeArm'][0],JF['Hand'][0]-0.03)]))   # arm height
+    for k in ('Arm','ForeArm','Hand','HandEnd'):JF[k][1]=round(ay+(JF[k][1]-1.225),4)
 b0=io.BytesIO();T.save(b0,'JPEG',quality=92);b1=io.BytesIO();Image.new('RGB',(8,8),(128,128,255)).save(b1,'PNG')
 os.makedirs(H+'/../out/sd',exist_ok=True)
 np.savez_compressed(H+'/../out/sd/%s_rigin.npz'%n,P=P.astype(np.float32),F=F.astype(np.int32),white=np.zeros(len(P),np.float32),head=np.ones(len(P),bool),UV=UV.astype(np.float32),N=N.astype(np.float32),
     tnames=np.array([],dtype=str),T=np.zeros((0,len(P),3),np.float32),tex0=np.frombuffer(b0.getvalue(),np.uint8),tex1=np.frombuffer(b1.getvalue(),np.uint8),uvskin=np.zeros(2),uvwhite=np.zeros(2),
-    joints=json.dumps(JF),shift=np.zeros(3),heady=NK+0.01)
+    joints=json.dumps(JF),shift=np.zeros(3),heady=NK+0.01,**MW)
 json.dump({'m':0.0,'y':round(ey,4),'k':round(ex/0.075,3),'z':round(zf-0.128,4)},open(H+'/../out/sd/%s_face.json'%n,'w'))

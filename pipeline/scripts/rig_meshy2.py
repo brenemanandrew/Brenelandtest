@@ -82,21 +82,24 @@ anyarm=armw('Left')+armw('Right');W=np.zeros((len(P),NJ))
 def take(dst,src):
     if not dst.any():return
     si=np.where(src)[0];dd,kk=cKDTree(Xp[si]).query(P[dst],k=4);w=1/(dd+1e-3);w/=w.sum(1,keepdims=True);W[dst]=(Wod[si[kk]]*w[:,:,None]).sum(1)
-KS=float(np.linalg.norm(np.array(J['HandEnd'])-np.array(J['Hand']))/0.152) if 'joints' in Z else 1.0;AX=ENV('ARMX',0.33)*KS;LY=ENV('LEGY',0.74)*KS
-for side,sg in (('Left',1),('Right',-1)):
-    oth='Right' if side=='Left' else 'Left'
-    take(sg*(P[:,0]-SHX[0])>AX,(armw(side)>0.5)|((anyarm<0.2)&(sg*Xo[:,0]>0)&(Xo[:,1]>1.0)))                       # arm: from that arm (and the shoulder beside it)
-    take((sg*(P[:,0]-SHX[0])>=0)&(np.abs(P[:,0]-SHX[0])<=AX)&(P[:,1]<LY),(legw(oth)<0.3)&(anyarm<0.2))                    # leg and hip: never the other leg
-    take((sg*(P[:,0]-SHX[0])>=0)&(np.abs(P[:,0]-SHX[0])<=AX)&(P[:,1]>=LY),(anyarm<0.5)|(armw(side)>0))                    # trunk and head
-E=np.unique(np.sort(np.r_[F[:,[0,1]],F[:,[1,2]],F[:,[2,0]]],axis=1),axis=0);deg=np.zeros(len(P));np.add.at(deg,E[:,0],1);np.add.at(deg,E[:,1],1);deg=np.maximum(deg,1)
-for _ in range(ENV('WSM',12)):
-    nb=np.zeros_like(W);np.add.at(nb,E[:,0],W[E[:,1]]);np.add.at(nb,E[:,1],W[E[:,0]]);W=0.5*W+0.5*nb/deg[:,None]
-HY=float(Z['heady']) if 'heady' in Z else ENV('HEADY',1.44)
-rad_=np.hypot(P[:,0]-JT['Head'][0],P[:,2]-JT['Neck'][2]);hd=ix['Head'];top=((P[:,1]>HY)&(np.abs(P[:,0]-SHX[0])<0.3))|(HAS&(P[:,1]>HY-ENV('SEAMDOWN',0.045))&(rad_<ENV('SEAMR',0.14))&(ENV('SEAMDOWN',0.045)>0));   # the join (her neck and the stump's rim) moves with the head as one piece
-W[top]=0;W[top,hd]=1   # the head is rigid: the face is drawn on it
-band=(P[:,1]>HY-ENV('NECKBAND',0.07)-(ENV('SEAMDOWN',0.045) if HAS else 0))&~top&(np.abs(P[:,0])<0.3)   # under the head: weights ease from the rigid head into the neck and shoulders
-for _ in range(ENV('NECKSM',10)):
-    nb=np.zeros_like(W);np.add.at(nb,E[:,0],W[E[:,1]]);np.add.at(nb,E[:,1],W[E[:,0]]);W[band]=(0.5*W+0.5*nb/deg[:,None])[band]
+HY=float(Z['heady']) if 'heady' in Z else ENV('HEADY',1.44);E=np.unique(np.sort(np.r_[F[:,[0,1]],F[:,[1,2]],F[:,[2,0]]],axis=1),axis=0);deg=np.zeros(len(P));np.add.at(deg,E[:,0],1);np.add.at(deg,E[:,1],1);deg=np.maximum(deg,1)
+if 'W' in Z:W=Z['W'].astype(float)   # weights that came with the model (Meshy's own rig), already on our bones
+else:
+    KS=float(np.linalg.norm(np.array(J['HandEnd'])-np.array(J['Hand']))/0.152) if 'joints' in Z else 1.0;AX=ENV('ARMX',0.33)*KS;LY=ENV('LEGY',0.74)*KS
+    for side,sg in (('Left',1),('Right',-1)):
+        oth='Right' if side=='Left' else 'Left'
+        take(sg*(P[:,0]-SHX[0])>AX,(armw(side)>0.5)|((anyarm<0.2)&(sg*Xo[:,0]>0)&(Xo[:,1]>1.0)))                       # arm: from that arm (and the shoulder beside it)
+        take((sg*(P[:,0]-SHX[0])>=0)&(np.abs(P[:,0]-SHX[0])<=AX)&(P[:,1]<LY),(legw(oth)<0.3)&(anyarm<0.2))                    # leg and hip: never the other leg
+        take((sg*(P[:,0]-SHX[0])>=0)&(np.abs(P[:,0]-SHX[0])<=AX)&(P[:,1]>=LY),(anyarm<0.5)|(armw(side)>0))                    # trunk and head
+    E=np.unique(np.sort(np.r_[F[:,[0,1]],F[:,[1,2]],F[:,[2,0]]],axis=1),axis=0);deg=np.zeros(len(P));np.add.at(deg,E[:,0],1);np.add.at(deg,E[:,1],1);deg=np.maximum(deg,1)
+    for _ in range(ENV('WSM',12)):
+        nb=np.zeros_like(W);np.add.at(nb,E[:,0],W[E[:,1]]);np.add.at(nb,E[:,1],W[E[:,0]]);W=0.5*W+0.5*nb/deg[:,None]
+    HY=float(Z['heady']) if 'heady' in Z else ENV('HEADY',1.44)
+    rad_=np.hypot(P[:,0]-JT['Head'][0],P[:,2]-JT['Neck'][2]);hd=ix['Head'];top=((P[:,1]>HY)&(np.abs(P[:,0]-SHX[0])<0.3))|(HAS&(P[:,1]>HY-ENV('SEAMDOWN',0.045))&(rad_<ENV('SEAMR',0.14))&(ENV('SEAMDOWN',0.045)>0));   # the join (her neck and the stump's rim) moves with the head as one piece
+    W[top]=0;W[top,hd]=1   # the head is rigid: the face is drawn on it
+    band=(P[:,1]>HY-ENV('NECKBAND',0.07)-(ENV('SEAMDOWN',0.045) if HAS else 0))&~top&(np.abs(P[:,0])<0.3)   # under the head: weights ease from the rigid head into the neck and shoulders
+    for _ in range(ENV('NECKSM',10)):
+        nb=np.zeros_like(W);np.add.at(nb,E[:,0],W[E[:,1]]);np.add.at(nb,E[:,1],W[E[:,0]]);W[band]=(0.5*W+0.5*nb/deg[:,None])[band]
 _,gi=np.unique(np.round(P*2e4).astype(np.int64),axis=0,return_inverse=True);gi=gi.ravel();Wg_=np.zeros((gi.max()+1,NJ));np.add.at(Wg_,gi,W);cg_=np.bincount(gi).astype(float);W=(Wg_/cg_[:,None])[gi]   # points split at texture seams move together
 t4=np.argsort(-W,axis=1)[:,:4];w4=np.take_along_axis(W,t4,1);w4/=w4.sum(1,keepdims=True);W=np.zeros_like(W);np.put_along_axis(W,t4,w4,1)
 # ---- re-pose T -> rest
