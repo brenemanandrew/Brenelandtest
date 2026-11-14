@@ -44,3 +44,12 @@ DONE potting_shed.glb
 DONE swing_set.glb
 refine picnic_blanket.glb
 refine clothing_rack.glb
+preview stepping_stones.glb 01a1dc20-5a3d-7299-87d2-181bd43d0e74
+preview stone_wall.glb 01a1dc20-6cc6-7098-9162-e0199cc91cf3
+DONE picnic_blanket.glb
+DONE clothing_rack.glb
+refine stepping_stones.glb
+refine stone_wall.glb
+DONE stepping_stones.glb
+DONE stone_wall.glb
+ALL FINISHED 18 done, 0 failed

@@ -100,11 +100,29 @@
  "picnic_blanket.glb": {
   "id": "L15",
   "preview": "01a1dc1f-33cd-714e-a2cb-8df30d1a1355",
-  "refine": "01a1dc1f-ff6f-7257-8376-2dd9125bc714"
+  "refine": "01a1dc1f-ff6f-7257-8376-2dd9125bc714",
+  "done": true,
+  "credits": 10
  },
  "clothing_rack.glb": {
   "id": "L16",
   "preview": "01a1dc1f-3ebf-7278-b664-09ad1d7df4f1",
-  "refine": "01a1dc20-0495-7466-835b-6a5b95f30b1e"
+  "refine": "01a1dc20-0495-7466-835b-6a5b95f30b1e",
+  "done": true,
+  "credits": 10
+ },
+ "stepping_stones.glb": {
+  "id": "P",
+  "preview": "01a1dc20-5a3d-7299-87d2-181bd43d0e74",
+  "refine": "01a1dc21-1e7a-72ff-9821-91c70272980f",
+  "done": true,
+  "credits": 10
+ },
+ "stone_wall.glb": {
+  "id": "P",
+  "preview": "01a1dc20-6cc6-7098-9162-e0199cc91cf3",
+  "refine": "01a1dc21-23c2-75a2-ac44-bf0268d852c0",
+  "done": true,
+  "credits": 10
  }
 }
