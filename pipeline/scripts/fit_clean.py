@@ -212,10 +212,24 @@ if slot=='shoes':
 #      Faces that face the body (inner wall) are dropped; the builder draws the cloth two-sided, so one layer is enough
 if ENV('INNER',1):
     bdi=Body(body_of(BUILDS[0]));Pb=fits[BUILDS[0]];cf=Pb[GF].mean(1);_,ii=bdi.t.query(cf);out_=cf-bdi.S[ii]
+    if slot=='top' and ENV('SIDEFIX',0):   # torso cloth whose nearest skin is the arm (under the arms): outside is straight out from the trunk, not away from the arm
+        CZt=JPOS['mixamorig:Spine1'][2];slv=np.zeros(len(Pb))
+        for _s,(bb_,_u,_L,_f) in info[BUILDS[0]][1].items():slv=np.maximum(slv,bb_)
+        armn=jw(('Arm','ForeArm','Hand'))[bdi.src[ii]]>0.5;tor=slv[GF].mean(1)<0.5;rad_=np.c_[cf[:,0]-MID,np.zeros(len(cf)),cf[:,2]-CZt]
+        out_=np.where((armn&tor)[:,None],rad_,out_)
     if slot=='bottom' and 'skirt' in key:out_=np.c_[cf[:,0]-MID,np.zeros(len(cf)),cf[:,2]-CZ]   # a skirt's outside is straight out from its axis (low on a flare the nearest skin is up at the hips)
     out_/=np.linalg.norm(out_,axis=1,keepdims=True).clip(1e-9)
     fnm=np.cross(Pb[GF[:,1]]-Pb[GF[:,0]],Pb[GF[:,2]]-Pb[GF[:,0]]);fnm/=np.linalg.norm(fnm,axis=1,keepdims=True).clip(1e-12)
     keepF=(fnm*out_).sum(1)>ENV('INDOT',-0.15)
+    if ENV('INALL',0) and slot=='top':   # Andrew: ragged dark shards are faces that fold inward on some build: they must face out on every build
+        for b_ in BUILDS[1:]:
+            Pb_=fits[b_];bdb_=Body(body_of(b_));cfb_=Pb_[GF].mean(1);_,ib_=bdb_.t.query(cfb_);ob_=cfb_-bdb_.S[ib_];ob_/=np.linalg.norm(ob_,axis=1,keepdims=True).clip(1e-9)
+            fb_=np.cross(Pb_[GF[:,1]]-Pb_[GF[:,0]],Pb_[GF[:,2]]-Pb_[GF[:,0]]);fb_/=np.linalg.norm(fb_,axis=1,keepdims=True).clip(1e-12);keepF&=(fb_*ob_).sum(1)>ENV('INDOT',-0.15)
+    if ENV('CRUMPLE',0.0)>0 and slot=='top':   # Andrew: ragged shards: faces folded against the cloth around them (on any build) go; the side panels show behind
+        for b_ in BUILDS:
+            Pb_=fits[b_];fb_=np.cross(Pb_[GF[:,1]]-Pb_[GF[:,0]],Pb_[GF[:,2]]-Pb_[GF[:,0]]);fb_/=np.linalg.norm(fb_,axis=1,keepdims=True).clip(1e-12)
+            vn_=vnorm(Pb_,GF[keepF]);vn_=gsmooth(vn_,ENV('CRUMPLESM',8));vn_/=np.linalg.norm(vn_,axis=1,keepdims=True).clip(1e-12);sm_=vn_[GF].mean(1)
+            keepF&=np.abs((fb_*sm_).sum(1))>ENV('CRUMPLE',0.0)
     # small islands left behind go too
     nF=len(GF);ek=np.sort(np.stack([GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],1),axis=2).reshape(-1,2);_,einv=np.unique(ek,axis=0,return_inverse=True);einv=einv.reshape(-1,3)
     fo=np.repeat(np.arange(nF),3);ee=einv.ravel();o=np.argsort(ee);ee=ee[o];fo=fo[o];same=ee[1:]==ee[:-1];pa=np.c_[fo[:-1][same],fo[1:][same]]
@@ -244,20 +258,21 @@ else:
     Wg=np.zeros((len(P0),NJ));Wg[:,ji('Hips')]=1-a;Wg[:,ji('LeftUpLeg')]=a*left;Wg[:,ji('RightUpLeg')]=a*(1-left);LF=np.zeros(len(P0))
 top4=np.argsort(-Wg,axis=1)[:,:4];w4=np.take_along_axis(Wg,top4,1);w4/=w4.sum(1,keepdims=True)
 # ---- skin hidden: under the cloth on EVERY build (so no build shows a flat patch where its own cloth is not)
-hidden=np.ones(len(BP),bool)
+hidden=np.ones(len(BP),bool);HCOV={}
 for b in BUILDS:
     X=body_of(b);N=vnorm(X,BF);P=fits[b];t=cKDTree(P);cand=t.query_ball_point(X+N*0.06,r=0.064);h=np.zeros(len(BP),bool)
     for v in range(len(BP)):
         c=cand[v]
         if not c:continue
         D=P[c]-X[v];al=D@N[v];pp=np.linalg.norm(D-np.outer(al,N[v]),axis=1);h[v]=((al>0.002)&(pp<0.006+0.15*al)).any()
+    HCOV[b]=h.copy()
     if KEEP:   # skin that pokes out through the cloth: cloth right behind it
         cand2=t.query_ball_point(X-N*0.02,r=0.024)
         for v in np.where(~h)[0]:
             c=cand2[v]
             if c:
                 D=P[c]-X[v];al=D@N[v];pp=np.linalg.norm(D-np.outer(al,N[v]),axis=1);h[v]=((al<0)&(al>-0.04)&(pp<0.012)).any()
-    if slot=='top':h&=jw(('Head','Neck','Hand'))<0.35
+    if slot=='top':h&=(jw(('Head','Neck','Hand'))<0.35)&(jw(('Hand',))<ENV('HANDW',1.0))   # HANDW: no hidden skin on the wrist past the cuff
     if slot=='shoes':h&=X[:,1]<P[:,1].max()-0.025
     if slot=='bottom':h&=(jw(('UpLeg','Leg','Foot'))<0.5)|(X[:,1]>ycr+0.01) if 'skirt' in key else h
     hidden=(hidden&h) if not KEEP else (h if b==BUILDS[0] else hidden|h)
@@ -272,6 +287,23 @@ for l in np.unique(lab_):
     if len(m)<ENV('ISLE2',400) and keepW[m].max()<0.35:hw[m]=True
 hidden=hw[binv]
 print('  skin hidden on every build',int(hidden.sum()))
+# ---- Andrew: ragged sides. The scan has no cloth where the sleeve touched the torso; laying the sleeves along the arms opens a gap.
+#      Fill it with a panel made from her own trunk skin, PATCH metres out, tucked under the garment's edges, in the base colour.
+if slot=='top' and ENV('PATCH',0.0)>0:
+    trunkw=jw(('Hips','Spine'))>0.5;rg=np.zeros(len(BP),bool)
+    for b_ in BUILDS:
+        rg|=hidden&trunkw&~HCOV[b_]
+    rw=np.zeros(nwb,bool);rw[binv[rg]]=True
+    for _ in range(ENV('PATCHGROW',3)):
+        nb_=rw.copy();nb_[BE[:,0][rw[BE[:,1]]]]=True;nb_[BE[:,1][rw[BE[:,0]]]]=True;rw=nb_
+    rg=rw[binv]&hidden;PF=BF[rg[BF].all(1)]
+    if len(PF):
+        pv=np.unique(PF);rm_=-np.ones(len(BP),int);rm_[pv]=len(G0)+np.arange(len(pv));nG=len(G0)
+        for b_ in BUILDS:
+            X_=body_of(b_);fits[b_]=np.r_[fits[b_],X_[pv]+vnorm(X_,BF)[pv]*ENV('PATCH',0.0)]
+        G0=np.r_[G0,np.tile([[0.0,-1e3,0.0]],(len(pv),1))];Wg=np.r_[Wg,Wd[pv]];LF=np.r_[LF,LIFT[pv]];GF=np.r_[GF,rm_[PF]];P0=fits[b0]
+        GE=np.unique(np.sort(np.r_[GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],axis=1),axis=0);gdeg=np.zeros(len(G0));np.add.at(gdeg,GE[:,0],1);np.add.at(gdeg,GE[:,1],1);gdeg=np.maximum(gdeg,1)
+        print('  side panels: %d faces from the body'%len(PF))
 # ---- colour from the fitted piece already in the game (same body, nearest point), cut to a few flat swatches
 OLD=os.path.exists(R+'/wear/%s.glb'%name)
 if OLD:
@@ -322,6 +354,7 @@ else:   # no texture: BASE colour everywhere; ACCENT regions; SOLE at the bottom
           Pq=fits[b_];_,kk_=cKDTree(body_of(b_)).query(Pq,k=6);zf=1-ss((Pq[:,2]-ENV('NECKZ',0.03))/0.03)   # sides and back only: the front collar stays as designed
           xin=1-ss((np.abs(Pq[:,0]-MID)-ENV('NECKX',0.10))/0.04);t_=np.maximum(gsmooth(jw(('Neck','Head'))[kk_].mean(1),2)-ENV('NECKCUT',0.0),(Pq[:,1]+LF-(YSHT+ENV('NECKY',0.0)))*20*xin)
           fN=np.maximum(fN,t_*zf-0.5*(1-zf))
+          if ENV('HANDCUT',0.0)>0:fN=np.maximum(fN,gsmooth(jw(('Hand',))[kk_].mean(1),2)-ENV('HANDCUT',0.0))   # sleeves end at the wrist: nothing lying on the hand
   arrs=[G0,fA,fS,Wg,LF,fN]+[fits[b] for b in BL]
   for k_ in (1,2,5):
       f_=arrs[k_].copy();f_[np.abs(f_)<1e-9]=-1e-9;GF,arrs=cut(GF,f_,arrs)
