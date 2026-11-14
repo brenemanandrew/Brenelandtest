@@ -42,11 +42,11 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 - Render checks: `jstest/mkroot.sh ROOT slot_key=glb ...` makes a test copy of site/ with pieces swapped in, then `node jstest/shellrev.mjs ROOT plus OUTFIT_JSON TAG OUTDIR BUILD` (BUILD 100 plus, 0 average, -100 thin; `MUS=100` with 0 for athletic). New pieces are rendered under existing slot keys (e.g. top_f_wrap) until added to the builder's WEAR lists.
 
 ## Next steps (in order)
-Done 2026-11-14: (1) collar/button colour edges are cut along the region line (clean curves), (2) skirt side holes fixed, plus Andrew's markups: shoulders/upper back/upper sleeves sit on her (`HUG`, tops of shoulders closer with `HUGCTOP`), forearm puff reduced and cuff in to the wrist (`SLEEVEK`), sleeves 6 cm shorter (`SLEEVESHORT`), less flare at the skirt front (`FRONTK`). All in `scripts/build_fall_outfit.sh`. Renders: `out/fall_outfit_markup_fixes.png` (before/after), `out/fall_outfit_v4.png`.
+Done 2026-11-14: (1) collar/button colour edges are cut along the region line (clean curves), (2) skirt side holes fixed, plus Andrew's markups: shoulders/upper back/upper sleeves sit on her (`HUG`, tops of shoulders closer with `HUGCTOP`), forearm puff reduced and cuff in to the wrist (`SLEEVEK`), sleeves 6 cm shorter (`SLEEVESHORT`), less flare at the skirt front (`FRONTK`). All in `scripts/build_fall_outfit.sh`. Back collar: `NECKCUT=0.85` cuts everything above the base of the neck at the sides and back (on every build, shoulder lift included); front collar untouched. Renders: `out/fall_outfit_markup_fixes.png` (before/after), `out/fall_outfit_v5.png`, `out/fall_blouse_neck_v5.png`.
 Custom cameras for shellrev: `SHOTS='[["stand",0,[tx,ty,tz],[cx,cy,cz],"close"],...]'`.
 1. Blouse: ragged side hem and ragged cuff edges (Andrew asked for these clean); darker patches at the waist sides from the side.
-2. White collar bits stick up beside the neck/jaw (front and walk views), worst on Thin/Average/Athletic.
-3. Stockings: build from her legs (shell_wear-style), colour not chosen yet (plum, charcoal or mustard) - ask Andrew.
+2. Plum tights built (`scripts/stockings.py legs_f_tights_plum` -> `out/clean/legs_f_tights_plum.glb`) but NOT render-checked yet. Needs a 4th "legwear" slot in the builder to be worn with boots.
+3. Small light-grey bits at the back corners of the neckline on Plus.
 4. Add the new pieces to the builder (WEAR lists, cloth/*.js via build.py), run `piece.mjs` checks, then deploy (push to main deploys to Fly) only when Andrew says.
 5. More garments from Andrew; prompt template for Meshy is in the chat: simple chunky cel-shade shapes, garment only, waist-length tops when worn with skirts.
 

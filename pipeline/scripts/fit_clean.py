@@ -143,6 +143,9 @@ if slot=='top':
                 z2=np.clip(z2,0,1);c_=ENV('HUGC',0.012);d0,i0=bd.sd(P);src0=bd.src[i0];w2=z2[src0];T=c_+(np.minimum(d0,0.25)-c_)*kz[src0]
                 for _ in range(ENV('SLEEVEIT',10)):
                     d,i=bd.sd(P);mv=np.where((d>T)&(w2>0.01),(d-T)*w2,0.0);P=P+gsmooth(-bd.SN[i]*mv[:,None],3)
+            if ENV('COLLARK',0.0)>0:   # Andrew: the back of the collar stands too high up her neck: squash it down toward the base of the neck
+                Nk=JPOS['mixamorig:Neck'];YB=YSHT+ENV('COLLARYB',0.0);zb=ss((Nk[2]+ENV('COLLARZ',0.02)-P[:,2])/0.04)*(1-ss((np.abs(P[:,0]-MID)-ENV('COLLARBW',0.10))/0.05))
+                dy=np.where(P[:,1]>YB,(P[:,1]-YB)*(1-ENV('COLLARK',0.0)),0.0)*zb;P=P-np.c_[np.zeros(len(P)),gsmooth(dy,3),np.zeros(len(P))]
             d,_=bd.sd(P);print('  %s hug: points within 2 cm of skin in the shoulder zone %.0f%%'%(b,100*np.mean(d[zw[bd.src[bd.sd(P)[1]]]>0.5]<0.02)))
         if ENV('SETTLE',1) and not KEEP:   # cloth over the tops of the shoulders rests on them instead of floating; spread smoothly
             for _ in range(3):
@@ -313,10 +316,17 @@ else:   # no texture: BASE colour everywhere; ACCENT regions; SOLE at the bottom
       p=nid[inv[:len(Fm)]];q=nid[inv[len(Fm):]]
       return np.r_[F[~mx],np.c_[A_,p,q],np.c_[p,B_,C_],np.c_[p,C_,q]],out
   BL=list(fits)
-  arrs=[G0,fA,fS,Wg,LF]+[fits[b] for b in BL]
-  for k_ in (1,2):
+  fN=np.full(len(G0),-1.0)
+  if slot=='top' and ENV('NECKCUT',0.0)>0:   # Andrew: nothing above the base of the neck, on any build (shoulder lift included)
+      for b_ in BL:
+          Pq=fits[b_];_,kk_=cKDTree(body_of(b_)).query(Pq,k=6);zf=1-ss((Pq[:,2]-ENV('NECKZ',0.03))/0.03)   # sides and back only: the front collar stays as designed
+          xin=1-ss((np.abs(Pq[:,0]-MID)-ENV('NECKX',0.10))/0.04);t_=np.maximum(gsmooth(jw(('Neck','Head'))[kk_].mean(1),2)-ENV('NECKCUT',0.0),(Pq[:,1]+LF-(YSHT+ENV('NECKY',0.0)))*20*xin)
+          fN=np.maximum(fN,t_*zf-0.5*(1-zf))
+  arrs=[G0,fA,fS,Wg,LF,fN]+[fits[b] for b in BL]
+  for k_ in (1,2,5):
       f_=arrs[k_].copy();f_[np.abs(f_)<1e-9]=-1e-9;GF,arrs=cut(GF,f_,arrs)
-  G0,fA,fS,Wg,LF=arrs[:5];fits={b:arrs[5+i] for i,b in enumerate(BL)};P0=fits[b0]
+  G0,fA,fS,Wg,LF,fN=arrs[:6];fits={b:arrs[6+i] for i,b in enumerate(BL)};P0=fits[b0]
+  nk_=fN[GF].mean(1)>0;GF=GF[~nk_];print('  cut above the neck base: %d faces'%int(nk_.sum()))
   top4=np.argsort(-Wg,axis=1)[:,:4];w4=np.take_along_axis(Wg,top4,1);w4/=w4.sum(1,keepdims=True)
   GE=np.unique(np.sort(np.r_[GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],axis=1),axis=0)
   K=3;PAL=np.array([cb,ca,cs]);fc=lambda f:f[GF].mean(1)
