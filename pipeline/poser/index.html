@@ -1147,7 +1147,8 @@ function drawMouthSD(m,F,f,c){const cv=m.userData.cv,g=cv.getContext('2d'),W=cv.
   const ls=LIPS[(C.face.ft||{}).lips]||LIPS.full,pk=Math.max(0,f.pucker),open=Math.max(0,f.open),smile=(f.smileL+f.smileR)/2,cx=L.c[0],cy=L.c[1];
   const hw=0.033*(0.85+0.15*ls.w)*(1+0.2*f.wide-0.5*pk),KL=[cx+hw,cy+0.007*f.smileL+0.002],KR=[cx-hw,cy+0.007*f.smileR+0.002],dip=0.0075+0.008*smile;
   g.lineCap='round';g.lineJoin='round';
-  {const ny=cy+0.031,nc=shade(c.skin,0.56);g.strokeStyle=nc;g.lineWidth=0.0034*S;g.beginPath();g.moveTo(X(cx+0.001),Y(ny+0.017));g.quadraticCurveTo(X(cx-0.001),Y(ny+0.004),X(cx-0.0065),Y(ny));g.quadraticCurveTo(X(cx),Y(ny-0.0035),X(cx+0.0065),Y(ny+0.001));g.stroke();}   // the nose: a short line down and a small curve under it
+  if(!F.sdNose){   // (the nose is sculpted now: only two small nostril marks are drawn)
+    const ny=cy+0.03,nc=shade(c.skin,0.6);g.fillStyle=nc;for(const sx of [-1,1]){g.beginPath();g.ellipse(X(cx+sx*0.0085),Y(ny),0.0032*S,0.0016*S,sx*0.5,0,TAU);g.fill();}}
   if(open>0.06){const dn=0.008+open*0.03;g.save();g.beginPath();g.moveTo(X(KR[0]),Y(KR[1]));g.quadraticCurveTo(X(cx),Y(cy+0.001),X(KL[0]),Y(KL[1]));g.quadraticCurveTo(X(cx),Y(cy-dn*2),X(KR[0]),Y(KR[1]));g.closePath();
     g.fillStyle=c.mouth;g.fill();g.clip();g.fillStyle=c.tongue;g.beginPath();g.ellipse(X(cx),Y(cy-dn*1.15),hw*0.62*S,dn*0.55*S,0,0,TAU);g.fill();
     if(open>0.3){g.fillStyle=c.teeth;g.fillRect(X(cx-hw),Y(cy+0.003),2*hw*S,0.0055*S);}g.restore();
