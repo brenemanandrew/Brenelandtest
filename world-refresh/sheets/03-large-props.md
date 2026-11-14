@@ -14,7 +14,7 @@ Start every prompt with the style block from `../STYLE.md`. This list comes from
 | L8 | Car (family car) | cars.js, vehicle-models.js | 1,500 | A chunky rounded cartoon family car, toy-like proportions, big round headlights, simple windows, body in one flat colour. Four wheels as separate objects. |
 | L9 | Van | cars.js, vehicle-models.js | 1,500 | A chunky cartoon minivan, tall and rounded, sliding door line painted on, big windows. Wheels separate. |
 | L10 | Town bus | bus.js | 2,000 | A short cozy town bus, rounded corners, cream top and blue bottom with a red stripe, big side windows, front door. Wheels separate. |
-| L11 | Water tower | water-tower.js | 1,500 | A small town water tower, round wooden tank with metal hoops and a conical roof on four braced legs, a ladder up one side. Blank tank for the town name. |
+| L11 | Water tower (IS A GAME - Andrew: do not change it in a way that breaks the game; keep its shape, size, ladder, climb and play spots exactly, reskin only after checking water-tower.js) | water-tower.js | 1,500 | A small town water tower, round wooden tank with metal hoops and a conical roof on four braced legs, a ladder up one side. Blank tank for the town name. |
 | L12 | Firepit seating circle | firepit.js | 800 | A stone ring firepit with four log seats around it. Seats 0.3 m high. No flames. |
 | L13 | Garden potting shed | garden-build.js | 1,500 | A small wooden potting shed, plank walls, a blue shingled roof, one window with a flower box, a door, tools leaning outside. |
 | L14 | Playground swing set | park.js (check) | 800 | A wooden A-frame swing set with two plank seats on chains. |
