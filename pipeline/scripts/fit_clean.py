@@ -99,7 +99,7 @@ def fit_top(bd,sy=None):
         Sg=c0+ag*((np.array([MID+sg*xs,Sj[1],Sj[2]])-c0)@ag)   # where the sleeve axis passes the shoulder
         u=(P-Sg)@ag;rv=(P-Sg)-np.outer(u,ag);sel=(u>-0.04)&(X>xs-0.03)
         Lu=np.linalg.norm(Ej-Sj);Lf=np.linalg.norm(Hj-Ej);d1=(Ej-Sj)/Lu;d2=(Hj-Ej)/Lf;Lg=np.percentile(u[sel],99.5)
-        k=min(1.0,(Lu+Lf-0.01)/max(Lg,1e-6));uu=np.clip(u,0,None)*k
+        k=min(1.0,(Lu+Lf-ENV('SLEEVESHORT',0.01))/max(Lg,1e-6));uu=np.clip(u,0,None)*k
         R1=rot_to(ag,d1);R2=rot_to(ag,d2);m1=Sj+np.outer(uu,d1)+rv@R1.T;m2=Ej+np.outer(uu-Lu,d2)+rv@R2.T;f=ss((uu-Lu+0.04)/0.08)[:,None];M=m1*(1-f)+m2*f
         b=(ss((u+0.02)/0.10)*sel)[:,None];P=P*(1-b)+M*b;W_arm[side]=(b[:,0],uu,Lu,f[:,0])
     return P,s,W_arm
@@ -132,8 +132,8 @@ if slot=='top':
             zw=np.maximum(zw,ENV('HUGBACK',1.0)*bk)
             zw*=(jw(('Neck','Head'))<ENV('HUGNECKW',0.3))*ss((np.abs(X_[:,0]-MID)-ENV('HUGNECK',0.05))/0.03)   # not right at the neck (the collar stands there)
             for _ in range(ENV('HUGIT',6)):
-                d,i=bd.sd(P);w_=zw[bd.src[i]]*ENV('HUG',0.0);m=(d>ENV('HUGC',0.012))&(d<ENV('HUGMAX',0.08))
-                D=np.where(m[:,None],-bd.SN[i]*((d-ENV('HUGC',0.012))*w_)[:,None],0.0);P=P+gsmooth(D,ENV('HUGSM',4))
+                d,i=bd.sd(P);w_=zw[bd.src[i]]*ENV('HUG',0.0);up=ss((bd.SN[i][:,1]-0.35)/0.3);cc=ENV('HUGC',0.012)*(1-up)+ENV('HUGCTOP',ENV('HUGC',0.012))*up   # tops of the shoulders sit closer
+                m=(d>cc)&(d<ENV('HUGMAX',0.08));D=np.where(m[:,None],-bd.SN[i]*((d-cc)*w_)[:,None],0.0);P=P+gsmooth(D,ENV('HUGSM',4))
             if ENV('SLEEVEK',0.0)>0:   # Andrew: sleeves from the elbow down too big: keep SLEEVEK of the puff, the cuff closes in to the wrist (SLEEVEKC)
                 z2=np.zeros(len(BP));kz=np.ones(len(BP))
                 for side in ('Left','Right'):

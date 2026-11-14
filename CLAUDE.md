@@ -42,12 +42,13 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 - Render checks: `jstest/mkroot.sh ROOT slot_key=glb ...` makes a test copy of site/ with pieces swapped in, then `node jstest/shellrev.mjs ROOT plus OUTFIT_JSON TAG OUTDIR BUILD` (BUILD 100 plus, 0 average, -100 thin; `MUS=100` with 0 for athletic). New pieces are rendered under existing slot keys (e.g. top_f_wrap) until added to the builder's WEAR lists.
 
 ## Next steps (in order)
-1. Collar/button cream regions have spiky edges (per-triangle colour on big triangles): clip triangles along the region boundary.
-2. A-line skirt: small holes low on the sides (inner-wall drop removes some outer faces).
-3. Blouse: ragged side hem; darker underlayer patches at the waist sides seen from the side.
-4. Stockings: build from her legs (shell_wear-style), colour not chosen yet (plum, charcoal or mustard).
-5. Add the new pieces to the builder (WEAR lists, cloth/*.js via build.py), run `piece.mjs` checks, then deploy (push to main deploys to Fly).
-6. More garments from Andrew; prompt template for Meshy is in the chat: simple chunky cel-shade shapes, garment only, waist-length tops when worn with skirts.
+Done 2026-11-14: (1) collar/button colour edges are cut along the region line (clean curves), (2) skirt side holes fixed, plus Andrew's markups: shoulders/upper back/upper sleeves sit on her (`HUG`, tops of shoulders closer with `HUGCTOP`), forearm puff reduced and cuff in to the wrist (`SLEEVEK`), sleeves 6 cm shorter (`SLEEVESHORT`), less flare at the skirt front (`FRONTK`). All in `scripts/build_fall_outfit.sh`. Renders: `out/fall_outfit_markup_fixes.png` (before/after), `out/fall_outfit_v4.png`.
+Custom cameras for shellrev: `SHOTS='[["stand",0,[tx,ty,tz],[cx,cy,cz],"close"],...]'`.
+1. Blouse: ragged side hem and ragged cuff edges (Andrew asked for these clean); darker patches at the waist sides from the side.
+2. White collar bits stick up beside the neck/jaw (front and walk views), worst on Thin/Average/Athletic.
+3. Stockings: build from her legs (shell_wear-style), colour not chosen yet (plum, charcoal or mustard) - ask Andrew.
+4. Add the new pieces to the builder (WEAR lists, cloth/*.js via build.py), run `piece.mjs` checks, then deploy (push to main deploys to Fly) only when Andrew says.
+5. More garments from Andrew; prompt template for Meshy is in the chat: simple chunky cel-shade shapes, garment only, waist-length tops when worn with skirts.
 
 ## Older work (kept for reference)
 - `scripts/shell_wear.py` / `skirt_wear.py`: shell clothes built from the body. Good for tight things (skinny jeans, stockings); lost details on designed garments. Live on the site now: her sweater, skinny jeans, knee skirt, his tee and jeans. 14 more shells in `out/shell/` were NOT deployed (worse than scans).
