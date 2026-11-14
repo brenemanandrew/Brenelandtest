@@ -119,9 +119,14 @@ BE_=np.array([k for k,c in ec.items() if c==1])
 bv=np.unique(BE_);neckline=bv[P0[bv,1]>FY-0.04];dneck=cKDTree(P0[neckline]).query(P0)[0];dneck=sm(dneck,ENV('NSM',20))
 # Peter Pan collar: a band round the neck, two rounded lobes at the front, split at the centre front
 lob=np.max([ENV('LOBR',0.056)-np.hypot(np.abs(P0[:,0]-MID)-ENV('LOBX',0.05),dneck-ENV('LOBD',0.016)) for _ in (0,)],0)
-fcol=np.where(front>0.35,np.maximum(lob,0.016-dneck),ENV('COLW',0.035)-dneck);fcol=np.minimum(fcol,np.where(front>0.35,np.abs(P0[:,0]-MID)-0.004-ENV('VGAP',0.5)*dneck,1.0));fcol=np.minimum(fcol,0.5-a);fcol=np.minimum(fcol,np.where(front>0.35,1.0,ENV('CXMAX',0.088)-np.abs(P0[:,0]-MID)))   # Andrew: the collar ends before the shoulders
+fcol=np.where(front>0.35,np.maximum(lob,0.016-dneck),ENV('COLW',0.035)-dneck);fcol=np.minimum(fcol,np.where(front>0.35,np.abs(P0[:,0]-MID)+ENV('CMEET',0.004)-ENV('VGAP',0.0)*dneck,1.0));fcol=np.minimum(fcol,0.5-a);fcol=np.minimum(fcol,np.where(front>0.35,1.0,ENV('CXMAX',0.088)-np.abs(P0[:,0]-MID)))   # Andrew: the collar ends before the shoulders
 fband=np.where(a<0.5,(HEMY+BANDH)-P0[:,1],-1.0) if BANDH>0 else np.full(len(P0),-1.0)
 fcuff=U-CU;fcuff=np.where(a>0.5,fcuff,-1.0)
+dax=np.full(len(P0),9.0)
+for s_,sg_ in (('Left',1),('Right',-1)):
+    Sj,Ej=JPOS['mixamorig:'+s_+'Arm'],JPOS['mixamorig:'+s_+'ForeArm'];ax=(Ej-Sj)/np.linalg.norm(Ej-Sj);r_=(P0-Sj)-np.outer((P0-Sj)@ax,ax)
+    dd=np.linalg.norm(r_,axis=1);dax=np.where(sg_*(P0[:,0]-MID)>0.04,np.minimum(dax,dd),dax)
+fseam=ENV('SEAMW',0.005)-np.abs(dax-ENV('ARMR',0.075))
 fpl=np.minimum(ENV('PLW',0.026)-np.abs(P0[:,0]-MID),front-0.6);fpl=np.minimum(fpl,0.5-a)
 def cutf(Fc,f,arrs):
     f=f.copy();f[np.abs(f)<1e-9]=-1e-9;pos=f[Fc]>0;n=pos.sum(1);mx=(n==1)|(n==2)
@@ -131,9 +136,9 @@ def cutf(Fc,f,arrs):
     t=np.clip(f[i_]/(f[i_]-f[j_]),1e-3,1-1e-3);nid=len(f)+np.arange(len(ue))
     out=[np.r_[X,X[i_]+(X[j_]-X[i_])*t.reshape(-1,*[1]*(X.ndim-1))] for X in arrs];p=nid[inv[:len(Fm)]];q=nid[inv[len(Fm):]]
     return np.r_[Fc[~mx],np.c_[A_,p,q],np.c_[p,B_,C_],np.c_[p,C_,q]],out
-arrs=[S[b] for b in BL]+[NB[b] for b in BL]+[o,Wv,LFv,fcol,fcuff,fpl,fband,U]
-for k in (len(arrs)-5,len(arrs)-4,len(arrs)-3,len(arrs)-2):F,arrs=cutf(F,arrs[k],arrs)
-S={b:arrs[i] for i,b in enumerate(BL)};NB={b:arrs[4+i] for i,b in enumerate(BL)};o,Wv,LFv,fcol,fcuff,fpl,fband,U=arrs[8:]
+arrs=[S[b] for b in BL]+[NB[b] for b in BL]+[o,Wv,LFv,fcol,fcuff,fpl,fband,U,fseam]
+for k in (len(arrs)-6,len(arrs)-5,len(arrs)-4,len(arrs)-3,len(arrs)-1):F,arrs=cutf(F,arrs[k],arrs)
+S={b:arrs[i] for i,b in enumerate(BL)};NB={b:arrs[4+i] for i,b in enumerate(BL)};o,Wv,LFv,fcol,fcuff,fpl,fband,U,fseam=arrs[8:]
 for b in BL:NB[b]/=np.linalg.norm(NB[b],axis=1,keepdims=True).clip(1e-12)
 fcen=lambda f:f[F].mean(1)
 # cloth bridges hollows (between and under the breasts) instead of following the skin into them: smooth the outer surface, never closer than OMIN
@@ -181,11 +186,33 @@ def layer(Fl,extra,col,rim=True,rimD=False):
             ri=np.unique(be);mi=emit(ri,None,col,lift_rim=(0.0 if rimD else ENV('RIM',0.003)),rimD=rimD);a_=np.vectorize(m.get)(be);b_=np.vectorize(mi.get)(be)
             OUTF.append(np.r_[np.c_[a_[:,0],a_[:,1],b_[:,1]],np.c_[a_[:,0],b_[:,1],b_[:,0]]])
 layer(F,0.0,0)                                              # the blouse
-layer(F[fcen(fpl)>0],ENV('PLUP',0.003),0,rimD=True)                   # the placket, raised
-tc=np.clip((U-CU)/max(UEND-CU,1e-6),0,1);layer(F[fcen(fcuff)>0],ENV('CUFF0',0.005)+ENV('CUFFROLL',0.013)*np.sin(np.pi*tc),1,rimD=True)   # rolled cuff               # cream cuffs, standing out from the gathered sleeve
+layer(F[fcen(fseam)>0],ENV('SEAMUP',0.002),2,rimD=True)   # sleeve seam                   # the placket, raised
+tc=np.clip((U-CU)/max(UEND-CU,1e-6),0,1);layer(F[fcen(fcuff)>0],ENV('CUFFUP',0.012)+0*tc,1,rimD=True)   # rolled cuff               # cream cuffs, standing out from the gathered sleeve
 tb=np.clip((HEMY+BANDH-S['plus'][:,1])/max(BANDH,1e-6),0,1)
-if BANDH>0:layer(F[fcen(fband)>0],ENV('BAND0',0.003)+ENV('BANDROLL',0.008)*np.sin(np.pi*tb),ENV('BANDCOL',0),rimD=True)   # rolled hem   # cream band round the hem
-layer(F[fcen(fcol)>0],ENV('COLUP',0.007),1,rimD=True)                 # cream Peter Pan collar
+if BANDH>0:layer(F[fcen(fband)>0],ENV('BANDUP',0.010)+0*tb,ENV('BANDCOL',1),rimD=True)   # rolled hem   # cream band round the hem
+layer(F[fcen(fcol)>0],ENV('COLUP',0.009),1,rimD=True)                 # cream Peter Pan collar
+# centre strip: its own ribbon laid down the front of the blouse (straight edges whatever the cloth does)
+P0=S['plus'];fr2=np.cos(np.arctan2(P0[:,0]-MID,P0[:,2]-zc));cand=np.where((fr2>0.8)&(np.abs(P0[:,0]-MID)<ENV('PLW',0.026)+0.01))[0]
+ytopP=FY-ENV('PLTOP',0.035);ybot=HEMY+BANDH;rows=np.linspace(ytopP,ybot,ENV('PLROWS',40));PW=ENV('PLW',0.026);RB={};okr=[]
+for y_ in rows:
+    k_=cand[np.abs(P0[cand,1]-y_)<0.006]
+    okr.append(k_[np.argsort(np.abs(P0[k_,0]-MID))[:6]] if len(k_) else None)
+okr=[k_ for k_ in okr if k_ is not None and len(k_)]
+for b in BL:
+    C_=np.array([D[b][k_].mean(0) for k_ in okr]);N_=np.array([NS_[b][k_].mean(0) for k_ in okr]);N_/=np.linalg.norm(N_,axis=1,keepdims=True)
+    C_[:,0]=MID+(C_[:,0]-MID)*0;T_=np.array([1.0,0,0])-N_[:,[0]]*N_;T_/=np.linalg.norm(T_,axis=1,keepdims=True)
+    C_=C_+N_*ENV('PLUP',0.005);RB[b]=(C_,N_,T_)
+nr=len(okr);Wr=np.array([Wv[k_].mean(0) for k_ in okr]);Lr=np.array([LFv[k_].mean() for k_ in okr])
+for b in BL:
+    C_,N_,T_=RB[b];OUTV[b].append(np.r_[C_-T_*PW,C_+T_*PW,C_-T_*PW-N_*ENV('PLUP',0.005),C_+T_*PW-N_*ENV('PLUP',0.005)])
+OUTW.append(np.tile(Wr,(4,1)));OUTL.append(np.tile(Lr,4));OUTC.append(np.full(4*nr,ENV('PLCOL',2)));base=nv[0];nv[0]+=4*nr
+fs=[]
+for k in range(nr-1):
+    a0,a1,b0_,b1=base+k,base+k+1,base+nr+k,base+nr+k+1;fs+=[[a0,b1,b0_],[a0,a1,b1]]
+    for (p,q) in ((0,2),(1,3)):   # side walls down to the cloth
+        u0,u1,v0,v1=base+p*nr+k,base+p*nr+k+1,base+q*nr+k,base+q*nr+k+1;fs+=[[u0,v0,v1],[u0,v1,u1]]
+fs+=[[base,base+nr,base+3*nr],[base,base+3*nr,base+2*nr],[base+nr-1,base+3*nr+nr-1,base+2*nr-1],[base+nr-1,base+2*nr+nr-1,base+3*nr+nr-1]]
+OUTF.append(np.array(fs))
 # buttons: three domed discs down the placket
 P0=S['plus'];front=np.cos(np.arctan2(P0[:,0]-MID,P0[:,2]-zc));col_=np.where((np.abs(P0[:,0]-MID)<0.006)&(front>0.8))[0]
 ys=np.linspace(FY-ENV('BTOP',0.05),HEMY+BANDH+ENV('BBOT',0.03),3)   # top button just under the collar's V, bottom one at the hem
@@ -193,7 +220,7 @@ R_=ENV('BR',0.019);NS=16;ang=np.linspace(0,2*np.pi,NS,endpoint=False)
 for yk in ys:
     i=col_[np.argmin(np.abs(P0[col_,1]-yk))];base=nv[0]
     for b in BL:
-        n=NS_[b][i];t1=np.cross([0,1,0],n);t1/=np.linalg.norm(t1);t2=np.cross(n,t1);c=D[b][i]+n*ENV('PLUP',0.003)
+        n=NS_[b][i];t1=np.cross([0,1,0],n);t1/=np.linalg.norm(t1);t2=np.cross(n,t1);c=D[b][i]+n*(ENV('PLUP',0.005)+0.001)
         ring=lambda r,h:c+np.outer(np.cos(ang)*r,t1)+np.outer(np.sin(ang)*r,t2)+n*h
         OUTV[b].append(np.r_[ring(R_,0.0005),ring(R_,0.004),ring(R_*0.75,0.0075),[c+n*0.0085]])
     OUTW.append(np.repeat(Wv[i:i+1],3*NS+1,0));OUTL.append(np.full(3*NS+1,LFv[i]));OUTC.append(np.full(3*NS+1,1));nv[0]+=3*NS+1
@@ -217,7 +244,7 @@ cover=np.where(inside)[0];print('  hides %d skin points'%len(cover))
 from PIL import Image
 top4=np.argsort(-W,axis=1)[:,:4];w4=np.take_along_axis(W,top4,1);w4/=w4.sum(1,keepdims=True).clip(1e-9)
 P=V['plus']+np.c_[np.zeros(len(LF)),LF,np.zeros(len(LF))];VN=vn(P,FF);names=BL[1:];TG={b:V[b]-V['plus'] for b in names}
-UV=np.c_[(CL*16+8)/32.0,np.full(len(CL),0.5)]
+UV=np.c_[(CL*16+8)/48.0,np.full(len(CL),0.5)]
 BIN=bytearray();views=[];accs=[]
 def add(arr,comp,typ,mm=False):
     while len(BIN)%4:BIN.append(0)
@@ -227,7 +254,7 @@ def add(arr,comp,typ,mm=False):
 pr={'attributes':{'POSITION':add(P.astype(np.float32),5126,'VEC3',True),'NORMAL':add(VN.astype(np.float32),5126,'VEC3'),'TEXCOORD_0':add(UV.astype(np.float32),5126,'VEC2'),'JOINTS_0':add(top4.astype(np.uint16),5123,'VEC4'),'WEIGHTS_0':add(w4.astype(np.float32),5126,'VEC4')},
     'indices':add(FF.astype(np.uint32).reshape(-1),5125,'SCALAR'),'material':1,'targets':[{'POSITION':add(TG[b].astype(np.float32),5126,'VEC3',True)} for b in names]}
 cv=add(cover.astype(np.uint32),5125,'SCALAR')
-tex=np.zeros((16,32,3),np.uint8);tex[:,:16]=ORANGE;tex[:,16:]=CREAM;buf=io.BytesIO();Image.fromarray(tex).save(buf,'PNG');IMG=buf.getvalue()
+tex=np.zeros((16,48,3),np.uint8);tex[:,:16]=ORANGE;tex[:,16:32]=CREAM;tex[:,32:]=[int(c*0.82) for c in ORANGE];buf=io.BytesIO();Image.fromarray(tex).save(buf,'PNG');IMG=buf.getvalue()
 while len(BIN)%4:BIN.append(0)
 views.append({'buffer':0,'byteOffset':len(BIN),'byteLength':len(IMG)});BIN.extend(IMG)
 while len(BIN)%4:BIN.append(0)
