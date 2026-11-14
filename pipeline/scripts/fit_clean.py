@@ -331,6 +331,10 @@ else:   # no texture: BASE colour everywhere; ACCENT regions; SOLE at the bottom
   GE=np.unique(np.sort(np.r_[GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],axis=1),axis=0)
   K=3;PAL=np.array([cb,ca,cs]);fc=lambda f:f[GF].mean(1)
   flab=np.where(fc(fS)>0,2,np.where(fc(fA)>0,1,0));lab=np.zeros(len(G0),int)
+  if ENV('ACCDROP',0.0)>0 and (flab==1).any():   # base cloth sitting in front of the (lifted) collar pokes through it: drop those faces, the collar shows
+      bd0=Body(body_of(b0));cf_=P0[GF].mean(1);d_,_=bd0.sd(cf_);ac_=np.where(flab==1)[0];dd_,jj_=cKDTree(cf_[ac_]).query(cf_)
+      dr_=(flab==0)&(dd_<ENV('ACCDROP',0.0))&(d_>d_[ac_[jj_]]+ENV('COLLIFT',0.0)+0.001);GF=GF[~dr_];flab=flab[~dr_]
+      print('  base faces in front of the collar recoloured: dropped %d'%int(dr_.sum()))
   print('  colour faces',[(tuple(int(x) for x in PAL[k]),int(c)) for k,c in enumerate(np.bincount(flab,minlength=K)) if c],'(%d faces after cutting)'%len(GF))
 if OLD:
   K=4;rk=np.random.default_rng(3);cen=[col[rk.integers(len(col))]]
@@ -365,6 +369,13 @@ VUV=np.c_[(vl*sw+sw/2)/(sw*K),np.full(len(vl),0.5)]
 Lv=np.c_[np.zeros(len(P0)),LF,np.zeros(len(P0))];V=(P0+Lv)[src];VN=vnorm(P0+Lv,GF)[src]
 names=[b for b in BUILDS[1:]]
 TG={b:(fits[b]-P0)[src] for b in names}
+if ENV('COLLIFT',0.0)>0 and (vl==1).any():   # the accent (collar, buttons) sits COLLIFT out from the cloth under it on every build, so the blouse cannot poke through it
+    ac_=vl==1;offs={}
+    for b in BUILDS:
+        X_=body_of(b);N_=vnorm(X_,BF);_,ii_=cKDTree(X_).query(fits[b][src[ac_]]);offs[b]=N_[ii_]*ENV('COLLIFT',0.0)
+    V[ac_]+=offs[b0]
+    for b in names:TG[b][ac_]+=offs[b]-offs[b0]
+    print('  accent lifted %.1f mm (%d points)'%(ENV('COLLIFT',0.0)*1000,int(ac_.sum())))
 BIN=bytearray();views=[];accs=[]
 def add(arr,comp,typ,mm=False):
     while len(BIN)%4:BIN.append(0)

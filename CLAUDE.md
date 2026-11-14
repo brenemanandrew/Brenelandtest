@@ -46,7 +46,7 @@ Done 2026-11-14: (1) collar/button colour edges are cut along the region line (c
 Custom cameras for shellrev: `SHOTS='[["stand",0,[tx,ty,tz],[cx,cy,cz],"close"],...]'`.
 1. Blouse: ragged side hem and ragged cuff edges (Andrew asked for these clean); darker patches at the waist sides from the side.
 2. Plum tights built (`scripts/stockings.py legs_f_tights_plum` -> `out/clean/legs_f_tights_plum.glb`) but NOT render-checked yet. Needs a 4th "legwear" slot in the builder to be worn with boots.
-3. Small light-grey bits at the back corners of the neckline on Plus.
+3. Collar clipping: `COLLIFT=0.004` (collar 4 mm out) + `ACCDROP` fixed the lower collar edge and the back band. Left: a few small dark triangles at the top of the collar near the neck (Average, Athletic, Plus); light-grey bits at the back neckline corners on Plus. 8 mm lift and recolouring nearby faces were tried and looked worse.
 4. Add the new pieces to the builder (WEAR lists, cloth/*.js via build.py), run `piece.mjs` checks, then deploy (push to main deploys to Fly) only when Andrew says.
 5. More garments from Andrew; prompt template for Meshy is in the chat: simple chunky cel-shade shapes, garment only, waist-length tops when worn with skirts.
 
