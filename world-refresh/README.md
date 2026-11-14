@@ -11,7 +11,7 @@ Replace existing game assets with Meshy models that have high visual impact and 
 1. Plants and trees - `sheets/01-plants-trees.md`
 2. Small props - `sheets/02-small-props.md`
 3. Larger props - `sheets/03-large-props.md`
-4. Set pieces and game areas - `sheets/04-set-pieces.md`
+4. Set pieces and game areas - `sheets/04-set-pieces.md`. Each one a true diorama-style redo designed as one finished scene, not props cobbled together (Andrew's rule).
 
 **All Meshy prompts, ready to paste, are in `MESHY.md`.** Each sheet lists every asset to replace, what it is in the game today, its size and triangle budget, and the exact Meshy description to paste.
 

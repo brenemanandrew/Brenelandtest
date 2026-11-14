@@ -2,6 +2,9 @@
 
 These are whole places. Each is a small project: several models that must fit a fixed layout, doors, colliders and seats. Do them last, one at a time. For each, first take screenshots of the area in the live game and list its parts in the repo, then write the part prompts. The descriptions below are the direction for the main building of each area.
 
+## Andrew's rule for this sheet (2026-11-14)
+Every building and game area is a TRUE DIORAMA-STYLE REDO, designed as one finished scene, not existing pieces or single props cobbled together. Each area is planned as a whole: ground, paths, building, planting, props and lighting composed together like a hand-made diorama of that place, in the concept sheet's style. It still has to fit the game's fixed layout (footprint, doors, colliders, seats, anchors), but the look is designed fresh as one piece.
+
 Start every prompt with the style block from `../STYLE.md`.
 
 | # | Area | Game module | Direction |

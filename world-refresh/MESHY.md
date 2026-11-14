@@ -570,4 +570,4 @@ Stylized low poly game asset, cel shaded look, cozy storybook small town style l
 
 ---
 ## 5. Sheet 04 set pieces
-Whole places (houses, garden, park, shack, strip mall). Done last, one at a time. Prompts get written here when we reach them. Direction is in `sheets/04-set-pieces.md`.
+Whole places (houses, garden, park, shack, strip mall). Done last, one at a time. Each is a TRUE DIORAMA-STYLE REDO: designed as one finished scene (ground, paths, building, planting, props), not props cobbled together. Prompts get written here when we reach them. Direction is in `sheets/04-set-pieces.md`.
