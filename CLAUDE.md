@@ -30,21 +30,27 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 - Clothes are SkinnedMeshes on the body's bones with the body's morph names. Each carries `extras.cover` (body verts it hides) and `extras.under` (a flat color). Hidden skin is redrawn in that color as an "underlayer", so a hole in the cloth never shows skin. Tops are stencil-drawn over bottoms.
 - Hair: each style has a copy per body (`hairAlt`), loaded raw.
 
-## State of the clothes (the open problem)
-The 28 live pieces are Meshy scans warped onto the bodies. From a distance they hold up. Close up they still show flat underlayer patches, ragged cut edges, mottled whites and loose silhouettes. Per-piece checker results for her tops (worst view, percent of figure that is underlayer): sweater 4.5, blazer 2.3, peasant 1.8, wrap 1.2, crop tee 0.3. Men's pieces were never run through the checker. A cloth-lifting pass (`LIFT=1` in `fit_wear.py`) threw spikes and is off.
+## Current direction (2026-11-14): clean Meshy garments fitted per build
+- Body builds are FIXED: Body step has four buttons (Thin, Average, Athletic, Plus). No in-between builds. Live on brenelandtest.fly.dev.
+- Andrew makes garments in Meshy on the build models (`pipeline/out/bodies_f/body_female_*.glb`, made by `scripts/export_bodies.py`). Garment only: no mannequin, no body, untextured. We color them.
+- `scripts/fit_clean.py IN.npz SLOT_KEY f` fits one garment to each of the 4 builds. Base build (her: plus) is the mesh; the other 3 fits are stored as the builds' morph targets, so each build wears its own exact fit and the builder needs no change. Inputs: decimated scans in `pipeline/in_clean/*.npz` (`scripts/decimate_clean.py IN.glb OUT.npz 60000`, needs `pip install fast-simplification scipy`).
+  - Tops: sized/placed under the shoulders (height fixed from the average build, width per build), sleeves laid along the arms. `KEEP=1` (Andrew's choice): the garment keeps its designed shape (shoulders, puffs); skin that would show is hidden instead of bending the cloth. The inner wall of Meshy's solid cloth is dropped (it showed through as blotches).
+  - Skirts: one tube from the waist, A-line, legs show and move inside (Andrew's rule). `LEN=hip|knee|ankle`.
+  - Shoes: pair set on the feet, sole on the floor, toe bends.
+  - Colour for untextured scans: `BASE`, `ACCENT` (+ `ACIRC`/`ABOX` regions in scan units from a front view), `SOLE`.
+- Fall outfit (waist blouse, brown A-line knee skirt, burgundy mountain boots): `scripts/build_fall_outfit.sh` -> `out/clean/`. Renders: `out/fall_outfit_keepshape.png`.
+- Render checks: `jstest/mkroot.sh ROOT slot_key=glb ...` makes a test copy of site/ with pieces swapped in, then `node jstest/shellrev.mjs ROOT plus OUTFIT_JSON TAG OUTDIR BUILD` (BUILD 100 plus, 0 average, -100 thin; `MUS=100` with 0 for athletic). New pieces are rendered under existing slot keys (e.g. top_f_wrap) until added to the builder's WEAR lists.
 
-Andrew's verdict: not good enough, and he will not regenerate every garment in Meshy for every iteration.
+## Next steps (in order)
+1. Collar/button cream regions have spiky edges (per-triangle colour on big triangles): clip triangles along the region boundary.
+2. A-line skirt: small holes low on the sides (inner-wall drop removes some outer faces).
+3. Blouse: ragged side hem; darker underlayer patches at the waist sides seen from the side.
+4. Stockings: build from her legs (shell_wear-style), colour not chosen yet (plum, charcoal or mustard).
+5. Add the new pieces to the builder (WEAR lists, cloth/*.js via build.py), run `piece.mjs` checks, then deploy (push to main deploys to Fly).
+6. More garments from Andrew; prompt template for Meshy is in the chat: simple chunky cel-shade shapes, garment only, waist-length tops when worn with skirts.
 
-## Proposed direction (waiting on Andrew to approve): shell clothes
-Stop warping scans. Build each garment FROM the body:
-1. Take the body triangles listed in the piece's `cover` (the region the garment occupies).
-2. Push them out along the body normal by the distance to the fitted scan at that point, clamped (about 4 to 50 mm) and smoothed.
-3. Copy skin weights and morph targets straight from the body, so it follows every build and animation with no clipping and no holes by construction.
-4. Color from the scan's flat palette (per vertex or a small texture); add a thickened rim at hems, cuffs and necklines.
-5. Keep scan geometry only where a shell cannot work: the skirt, hood, lapels, shoe soles.
-Inputs already exist for all 28 pieces (`out/wear/*.glb`), so nothing has to be regenerated in Meshy. Prototype on the women's sweater and men's tee first, compare with `piece.mjs`, then run the rest.
-
-## Other open items
-- Buzz cut has small pits at the back. Jeans cuffs on her skinny jeans are ragged.
-- Outfit tiles for the "None" rows, face and eye shapes from his head model (`in26/head.glb`, not in repo), and the 12 shop accessories are not started.
-- He asked for a numbered sheet of all Breneland plant and tree assets plus Meshy cel-shade instructions. Instructions were given in chat. The sheet is not made. The tree code is on his Google Drive (`world-trees.js`).
+## Older work (kept for reference)
+- `scripts/shell_wear.py` / `skirt_wear.py`: shell clothes built from the body. Good for tight things (skinny jeans, stockings); lost details on designed garments. Live on the site now: her sweater, skinny jeans, knee skirt, his tee and jeans. 14 more shells in `out/shell/` were NOT deployed (worse than scans).
+- The original 28 warped scans are in `out/wear/` (still live for the other pieces).
+- Fly deploy works (workflow creates the app if missing). Dressing room lowered 7 cm so she stands on the floor.
+- Buzz cut pits at the back; outfit tiles for None rows; face shapes from his head model; 12 shop accessories; plant/tree sheet: not started.
