@@ -16,7 +16,7 @@ Chosen model per asset. Paths relative to models/01-plants-trees/.
 | G6 | Pumpkins | pumpkin_vines_with_pumpkins.glb |
 | G7 | Sunflower | sunflowers.glb |
 | T6 | Palm | wave2/palm.glb |
-| T7 | Swing tree | wave2_redo/swing_tree.glb (redo with a clear side limb) |
+| T7 | Swing tree | wave2_redo/swing_tree.glb. Decided: use this tree for the trunk and crown; the game keeps its own code-made side limb, rope and swing in the same place (swing-tree.js), coloured to match the new bark. |
 | P1c | Topiary ball (new, Andrew: keep) | wave2/hedge_end.glb |
 | P2 | Hedge end | wave2_redo/hedge_end.glb (redo) |
 | P4 | Fern | wave2/fern.glb (cut the rock base) |

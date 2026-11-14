@@ -40,3 +40,16 @@ refine planter_brick.glb
 refine planter_pot.glb
 DONE bench_park.glb
 DONE picnic_table.glb
+preview mailbox.glb 01a1dc0d-a286-7615-b4e6-f7811aef2676
+preview picket_fence.glb 01a1dc0d-adb6-7382-b38d-f3a5ea9a864b
+refine picnic_table_long.glb
+refine board.glb
+DONE planter_brick.glb
+DONE planter_pot.glb
+preview garden_gate.glb 01a1dc0e-7145-7107-ae4d-9f46fbbf8960
+preview watering_can.glb 01a1dc0e-7a17-7379-96e5-3851c543f7f0
+DONE picnic_table_long.glb
+DONE board.glb
+refine mailbox.glb
+refine picket_fence.glb
+preview wheelbarrow.glb 01a1dc0e-e95c-75dd-b2b5-597ebb9b64be

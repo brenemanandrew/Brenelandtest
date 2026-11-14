@@ -65,12 +65,16 @@
  "planter_brick.glb": {
   "id": "S10",
   "preview": "01a1dc0a-81a4-7570-84c6-2f8a33e09a3a",
-  "refine": "01a1dc0d-42b2-748a-90e0-a8db41502fbd"
+  "refine": "01a1dc0d-42b2-748a-90e0-a8db41502fbd",
+  "done": true,
+  "credits": 10
  },
  "planter_pot.glb": {
   "id": "S11",
   "preview": "01a1dc0a-8cff-75dc-80ed-6c676fefa9d3",
-  "refine": "01a1dc0d-480e-70d2-b23d-3fc9bcf09201"
+  "refine": "01a1dc0d-480e-70d2-b23d-3fc9bcf09201",
+  "done": true,
+  "credits": 10
  },
  "bench_plank.glb": {
   "id": "S12",
@@ -95,10 +99,38 @@
  },
  "picnic_table_long.glb": {
   "id": "S15",
-  "preview": "01a1dc0c-d59a-7583-9edc-c0810b070fba"
+  "preview": "01a1dc0c-d59a-7583-9edc-c0810b070fba",
+  "refine": "01a1dc0d-baa5-74fc-83ef-04a54e091307",
+  "done": true,
+  "credits": 10
  },
  "board.glb": {
   "id": "S16",
-  "preview": "01a1dc0c-e13b-7186-97a5-3e3c0341d373"
+  "preview": "01a1dc0c-e13b-7186-97a5-3e3c0341d373",
+  "refine": "01a1dc0d-c223-7377-8933-6fd92f4ab021",
+  "done": true,
+  "credits": 10
+ },
+ "mailbox.glb": {
+  "id": "S17",
+  "preview": "01a1dc0d-a286-7615-b4e6-f7811aef2676",
+  "refine": "01a1dc0e-8ee9-7720-8ae4-59e860372fce"
+ },
+ "picket_fence.glb": {
+  "id": "S18",
+  "preview": "01a1dc0d-adb6-7382-b38d-f3a5ea9a864b",
+  "refine": "01a1dc0e-93dc-748d-8d5b-71ddd52c5ce1"
+ },
+ "garden_gate.glb": {
+  "id": "S19",
+  "preview": "01a1dc0e-7145-7107-ae4d-9f46fbbf8960"
+ },
+ "watering_can.glb": {
+  "id": "S20",
+  "preview": "01a1dc0e-7a17-7379-96e5-3851c543f7f0"
+ },
+ "wheelbarrow.glb": {
+  "id": "S21",
+  "preview": "01a1dc0e-e95c-75dd-b2b5-597ebb9b64be"
  }
 }
