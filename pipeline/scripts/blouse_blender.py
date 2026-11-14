@@ -16,7 +16,7 @@ exec(open(HERE+'/fit_clean.py').read().split('def fit_top')[0])
 ENV=lambda k,d:type(d)(os.environ.get(k,d))
 BL=['plus','average','slim','athletic']
 ORANGE=[int(x) for x in os.environ.get('BASE','196,98,58').split(',')];CREAM=[int(x) for x in os.environ.get('ACCENT','243,229,203').split(',')]
-HEMY=ENV('HEMY',1.03)
+HEMY=ENV('HEMY',0.985)
 SLEND=ENV('SLEEVEEND',0.03)   # >=0: sleeves end this far past the elbow joint (Andrew: cuffs at the elbows); <0: at the wrists
 BANDH=ENV('BANDH',0.04)       # >0: a cream band this tall round the hem            # hem on the waistline (the skirt's waistband is at 1.058, so the blouse just covers it)
 # ---- weld the body (UV seams split points) so the cloth has no cracks
