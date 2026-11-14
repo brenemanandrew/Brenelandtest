@@ -8,13 +8,21 @@ from PIL import Image,ImageDraw
 H=os.path.dirname(os.path.abspath(__file__));n=sys.argv[1];ENV=lambda k,d:type(d)(os.environ.get(k,d))
 Z=np.load(H+'/../in_sd/%s.npz'%n);P=Z['P'].astype(float);UV=Z['UV'].astype(float);N=Z['N'].astype(float);F=Z['F'].astype(int)
 s=ENV('HEIGHT',1.80)/np.ptp(P[:,1]);P=P*s;P[:,1]-=P[:,1].min();P[:,0]-=(P[:,0].max()+P[:,0].min())/2
+# ---- Meshy embossed its painted face into the surface (rings round the old eyes, cheek marks): smooth the front of the head flat
+_,wi=np.unique(np.round(P*2e4).astype(np.int64),axis=0,return_inverse=True);wi=wi.ravel();nwv=wi.max()+1;FWd=wi[F];Ew=np.unique(np.sort(np.r_[FWd[:,[0,1]],FWd[:,[1,2]],FWd[:,[2,0]]],axis=1),axis=0);Ew=Ew[Ew[:,0]!=Ew[:,1]]
+if ENV('SMOOTHFACE',40):
+    NKs=ENV('NECKY',1.36);PW=np.zeros((nwv,3));PW[wi]=P;fzs=PW[(PW[:,1]>NKs+0.1)&(np.abs(PW[:,0])<0.04),2].max()
+    mk=np.clip((PW[:,2]-(fzs-ENV('SMD',0.15)))/0.04,0,1)*np.clip((PW[:,1]-(NKs+0.01))/0.03,0,1)*(np.abs(PW[:,0])<ENV('SMW',0.21));dg=np.zeros(nwv);np.add.at(dg,Ew[:,0],1);np.add.at(dg,Ew[:,1],1);dg=np.maximum(dg,1)
+    for _ in range(ENV('SMOOTHFACE',40)):
+        nb=np.zeros_like(PW);np.add.at(nb,Ew[:,0],PW[Ew[:,1]]);np.add.at(nb,Ew[:,1],PW[Ew[:,0]]);PW=PW+(0.5*mk)[:,None]*(nb/dg[:,None]-PW)
+    P=PW[wi]
 # ---- profile (Andrew's side-view markup): a real nose, lips and chin stand out from the face; the eyes sit a little in
 if ENV('PROFILE',1):
     EYp=ENV('EYEY',1.555);K=ENV('FK',1.0);fz=float(P[(np.abs(P[:,1]-EYp)<0.03)&(np.abs(P[:,0])<0.04),2].max());fr=np.clip((P[:,2]-(fz-0.10*K))/(0.06*K),0,1)*(P[:,1]>ENV('NECKY',1.36))
     gb=lambda x0,y0,rx,ry:np.exp(-(((np.abs(P[:,0])-x0)/(rx*K))**2+((P[:,1]-(EYp+y0*K))/(ry*K))**2))
     dz=ENV('NOSE',0.034)*gb(0,-0.062,0.02,0.024)+0.012*gb(0,-0.045,0.016,0.035)     # the tip, and the bridge running up to the brow
     dz+=ENV('LIPS',0.009)*gb(0,-0.115,0.045,0.016)+ENV('CHIN',0.014)*gb(0,-0.165,0.045,0.03)
-    dz+=0.006*gb(0,0.05,0.12,0.02)-ENV('SOCKET',0.007)*gb(0.105,0.0,0.05,0.035)-0.006*gb(0,-0.092,0.03,0.008)   # brow, eye sockets, the dip under the nose
+    dz+=0.006*gb(0,0.05,0.12,0.02)-ENV('SOCKET',0.0)*gb(0.105,0.0,0.05,0.035)-0.006*gb(0,-0.092,0.03,0.008)   # brow, eye sockets, the dip under the nose
     P[:,2]+=dz*K*fr;print('  profile: nose stands %.1f cm out'%(ENV('NOSE',0.034)*K*100))
 T=Image.open(H+'/../in_sd/%s.jpg'%n).convert('RGB');TW,TH=T.size;A=np.asarray(T).astype(float)
 col=A[np.clip((UV[:,1]%1*TH).astype(int),0,TH-1),np.clip((UV[:,0]%1*TW).astype(int),0,TW-1)]
@@ -22,7 +30,7 @@ col=A[np.clip((UV[:,1]%1*TH).astype(int),0,TH-1),np.clip((UV[:,0]%1*TW).astype(i
 NK=ENV('NECKY',1.36);hd=(P[:,1]>NK)&(P[:,2]>0.05)&(np.abs(P[:,0])<0.2);skin=np.median(col[hd],0);dark=hd&(col.sum(1)<330)&(P[:,1]>NK+0.05)
 ey=float(np.median(P[dark&(np.abs(P[:,0])>0.04),1])) if dark.sum()>20 else NK+0.14;ex=float(np.median(np.abs(P[dark&(np.abs(P[:,0])>0.04),0]))) if dark.sum()>20 else 0.085
 zf=float(P[(np.abs(P[:,1]-ey)<0.02)&(np.abs(P[:,0])<0.03),2].max())
-fc=P[F].mean(1);fm=(fc[:,1]>NK+ENV('FACELO',-0.02))&(fc[:,1]<ey+ENV('FACEUP',0.2))&(np.abs(fc[:,0])<ENV('FACEW',0.235))&(fc[:,2]>zf-ENV('FACED',0.17))
+fc=P[F].mean(1);fm=(fc[:,1]>NK+ENV('FACELO',-0.02))&(np.abs(fc[:,0])<0.4)   # the whole head in one even skin colour: no edge between repainted and original skin (the toon shading does the rest)
 D=ImageDraw.Draw(T);sk=tuple(int(x) for x in skin)
 for tri in F[fm]:
     pts=[(UV[i,0]%1*TW,UV[i,1]%1*TH) for i in tri];D.polygon(pts,fill=sk,outline=sk);D.line(pts+[pts[0]],fill=sk,width=ENV('ERASEW',9))   # (a wide edge: the soft rim of the old paint goes too)
@@ -40,6 +48,9 @@ if not os.environ.get('JOINTS'):
     for k in ('ForeArm','Hand','HandEnd'):JF[k]=[0.21+(JF[k][0]-0.21)*((P[:,0].max()-0.21)/(0.661-0.21)),JF[k][1],JF[k][2]]
     ay=float(np.mean([P[(np.abs(P[:,0]-x)<0.015)&(P[:,1]>1.0),1].mean() for x in (JF['ForeArm'][0],JF['Hand'][0]-0.03)]))   # arm height
     for k in ('Arm','ForeArm','Hand','HandEnd'):JF[k][1]=round(ay+(JF[k][1]-1.225),4)
+PW=np.zeros((nwv,3));PW[wi]=P;fnw=np.cross(PW[FWd[:,1]]-PW[FWd[:,0]],PW[FWd[:,2]]-PW[FWd[:,0]]);NW=np.zeros((nwv,3))
+for q in range(3):np.add.at(NW,FWd[:,q],fnw)
+N=(NW/np.linalg.norm(NW,axis=1,keepdims=True).clip(1e-12))[wi]   # normals of the reshaped surface (smooth across texture seams)
 b0=io.BytesIO();T.save(b0,'JPEG',quality=92);b1=io.BytesIO();Image.new('RGB',(8,8),(128,128,255)).save(b1,'PNG')
 os.makedirs(H+'/../out/sd',exist_ok=True)
 np.savez_compressed(H+'/../out/sd/%s_rigin.npz'%n,P=P.astype(np.float32),F=F.astype(np.int32),white=np.zeros(len(P),np.float32),head=np.ones(len(P),bool),UV=UV.astype(np.float32),N=N.astype(np.float32),

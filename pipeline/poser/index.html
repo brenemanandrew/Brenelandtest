@@ -1145,20 +1145,23 @@ function drawEyeButton(m,F,s,f,c){const cv=m.userData.cv,g=cv.getContext('2d'),W
 function drawMouthSD(m,F,f,c){const cv=m.userData.cv,g=cv.getContext('2d'),W=cv.width,H=cv.height,[x0,x1,y0,y1]=m.userData.rect,L=F.lips;
   const X=x=>(x-x0)/(x1-x0)*W,Y=y=>(y1-y)/(y1-y0)*H,S=W/(x1-x0);g.clearRect(0,0,W,H);
   const ls=LIPS[(C.face.ft||{}).lips]||LIPS.full,pk=Math.max(0,f.pucker),open=Math.max(0,f.open),smile=(f.smileL+f.smileR)/2,cx=L.c[0],cy=L.c[1];
-  const hw=0.043*(0.85+0.15*ls.w)*(1+0.2*f.wide-0.5*pk),KL=[cx+hw,cy+0.007*f.smileL+0.002],KR=[cx-hw,cy+0.007*f.smileR+0.002],dip=0.0075+0.008*smile;
+  const hw=0.033*(0.85+0.15*ls.w)*(1+0.2*f.wide-0.5*pk),KL=[cx+hw,cy+0.007*f.smileL+0.002],KR=[cx-hw,cy+0.007*f.smileR+0.002],dip=0.0075+0.008*smile;
   g.lineCap='round';g.lineJoin='round';
   {const ny=cy+0.034,nc=shade(c.skin,0.66);g.strokeStyle=nc;g.lineWidth=0.0026*S;g.beginPath();g.moveTo(X(cx+0.001),Y(ny+0.017));g.quadraticCurveTo(X(cx-0.001),Y(ny+0.004),X(cx-0.0065),Y(ny));g.quadraticCurveTo(X(cx),Y(ny-0.0035),X(cx+0.0065),Y(ny+0.001));g.stroke();}   // the nose: a short line down and a small curve under it
   if(open>0.06){const dn=0.008+open*0.03;g.save();g.beginPath();g.moveTo(X(KR[0]),Y(KR[1]));g.quadraticCurveTo(X(cx),Y(cy+0.001),X(KL[0]),Y(KL[1]));g.quadraticCurveTo(X(cx),Y(cy-dn*2),X(KR[0]),Y(KR[1]));g.closePath();
     g.fillStyle=c.mouth;g.fill();g.clip();g.fillStyle=c.tongue;g.beginPath();g.ellipse(X(cx),Y(cy-dn*1.15),hw*0.62*S,dn*0.55*S,0,0,TAU);g.fill();
     if(open>0.3){g.fillStyle=c.teeth;g.fillRect(X(cx-hw),Y(cy+0.003),2*hw*S,0.0055*S);}g.restore();
     g.strokeStyle=c.lipLine;g.lineWidth=0.0026*S;g.beginPath();g.moveTo(X(KR[0]),Y(KR[1]));g.quadraticCurveTo(X(cx),Y(cy+0.001),X(KL[0]),Y(KL[1]));g.quadraticCurveTo(X(cx),Y(cy-dn*2),X(KR[0]),Y(KR[1]));g.stroke();}
-  else{if(!ls.subtle){g.fillStyle=c.lip;g.globalAlpha=0.55;g.beginPath();g.ellipse(X(cx),Y(cy-dip-0.0035*ls.h),hw*0.55*S,0.0032*ls.h*S,0,0,TAU);g.fill();g.globalAlpha=1;}   // a soft touch of lip colour under the line
-    g.strokeStyle=c.lipLine;g.lineWidth=0.0036*S;g.beginPath();g.moveTo(X(KR[0]),Y(KR[1]));g.quadraticCurveTo(X(cx),Y(cy-dip*2+0.002),X(KL[0]),Y(KL[1]));g.stroke();}
+  else{const my=cy-dip+0.001,lh=0.0052*ls.h,uh=0.0034*ls.h,mid=(x)=>[X(x),Y(cy-dip*2+0.002)];
+    if(!ls.subtle){g.fillStyle=c.lip;g.beginPath();g.moveTo(X(KR[0]*0.82+cx*0.18),Y(KR[1]*0.7+my*0.3));g.quadraticCurveTo(X(cx),Y(cy-dip*2+0.002),X(KL[0]*0.82+cx*0.18),Y(KL[1]*0.7+my*0.3));g.quadraticCurveTo(X(cx),Y(cy-dip*2-lh*2.3),X(KR[0]*0.82+cx*0.18),Y(KR[1]*0.7+my*0.3));g.fill();   // lower lip
+      g.fillStyle=c.lipUp;g.beginPath();g.moveTo(X(KR[0]*0.86+cx*0.14),Y(KR[1]*0.8+my*0.2));g.quadraticCurveTo(X(cx),Y(cy-dip*2+0.002),X(KL[0]*0.86+cx*0.14),Y(KL[1]*0.8+my*0.2));g.quadraticCurveTo(X(cx+hw*0.3),Y(my+uh*1.9),X(cx),Y(my+uh*0.9));g.quadraticCurveTo(X(cx-hw*0.3),Y(my+uh*1.9),X(KR[0]*0.86+cx*0.14),Y(KR[1]*0.8+my*0.2));g.fill();}   // upper lip with a small bow
+    g.strokeStyle=c.lipLine;g.lineWidth=0.0027*S;g.beginPath();g.moveTo(X(KR[0]),Y(KR[1]));g.quadraticCurveTo(X(cx),Y(cy-dip*2+0.002),X(KL[0]),Y(KL[1]));g.stroke();
+    g.fillStyle=c.lipLine;for(const K of [KL,KR]){g.beginPath();g.arc(X(K[0]),Y(K[1]),0.0019*S,0,TAU);g.fill();}}
   m.userData.tx.needsUpdate=true;}
 function drawEye(m,F,s,f,c){if(F.sdEye)return drawEyeSD(m,F,s,f,c);if(F.sd&&(EYE_SHAPES[(C.face.ft||{}).eyes]||{}).button)return drawEyeButton(m,F,s,f,c);const cv=m.userData.cv,g=cv.getContext('2d'),W=cv.width,H=cv.height,[x0,x1,y0,y1]=m.userData.rect,e=F.eyes[s],sg=s==='L'?1:-1;
   const X=x=>(x-x0)/(x1-x0)*W,Y=y=>(y1-y)/(y1-y0)*H,S=W/(x1-x0);g.clearRect(0,0,W,H);
   if(!F.noCover)feather(g,W,H,W*0.5,H*0.5,c.skin,0.14);
-  const sh0=F.selectable?(EYE_SHAPES[(C.face.ft||{}).eyes]||EYE_SHAPES.almond):null,sh=F.sd&&sh0?{...sh0,top:sh0.top*1.45,bot:sh0.bot*1.5,lift:-0.006+sh0.lift*0.25,apex:0.5,hood:0,w:sh0.w?0.9+0.1*sh0.w:0}:sh0,mid0=(e.top+e.bot)/2;   // (SD heads: rounder and level)
+  const sh0=F.selectable?(EYE_SHAPES[(C.face.ft||{}).eyes]||EYE_SHAPES.almond):null,sh=F.sd&&sh0?{...sh0,top:sh0.top*1.18,bot:sh0.bot*1.12,lift:-0.006+sh0.lift*0.25,apex:0.48,hood:0,w:sh0.w?0.9+0.1*sh0.w:0}:sh0,mid0=(e.top+e.bot)/2;   // (SD heads: rounder and level)
   const blink=Math.min(1,Math.max(0,f['blink'+s])),squint=Math.max(0,f['cheek'+s])*0.3,I=e.inner,O=sh?[sh.w?e.inner[0]+(e.outer[0]-e.inner[0])*sh.w:e.outer[0],e.outer[1]+sh.lift]:e.outer,top=sh?mid0+(e.top-mid0)*sh.top:e.top,bot=sh?mid0-(mid0-e.bot)*sh.bot:e.bot;
   const span=O[0]-I[0],tx=I[0]+span*(sh?sh.apex:0.42),bx=I[0]+span*0.55,closedY=bot+(top-bot)*0.28;
   const upY=top+(closedY-top)*blink,loY=bot+(top-bot)*squint;
@@ -1169,15 +1172,15 @@ function drawEye(m,F,s,f,c){if(F.sdEye)return drawEyeSD(m,F,s,f,c);if(F.sd&&(EYE
   g.lineCap='round';g.lineJoin='round';const soft=(C.face.ft||{}).lashes==='soft';
   if(blink<0.94){g.save();almond();g.clip();g.fillStyle=c.sclera;g.fill();
     if(sh&&sh.car){g.fillStyle='#d99a8e';g.beginPath();g.arc(X(I[0]+sg*0.0035),Y(I[1]-0.0005),0.0042*S,0,TAU);g.fill();}   // the pink inner corner
-    const ix=(I[0]+O[0])/2-sg*0.004+f.lookX*0.017,iy=(top+bot)/2+0.0012+f.lookY*0.008,r=F.irisR*S;
+    const ix=(I[0]+O[0])/2-sg*0.004+f.lookX*0.017,iy=(top+bot)/2+0.0012+(F.sd?0.0028:0)+f.lookY*0.008,r=F.irisR*S*(F.sd?1.28:1);
     const gr=g.createRadialGradient(X(ix),Y(iy),r*0.2,X(ix),Y(iy),r);gr.addColorStop(0,c.iris);gr.addColorStop(0.75,c.iris);gr.addColorStop(1,c.irisDark);
-    g.fillStyle=gr;g.beginPath();g.arc(X(ix),Y(iy),r,0,TAU);g.fill();g.fillStyle='#120b08';g.beginPath();g.arc(X(ix),Y(iy),F.pupilR*S,0,TAU);g.fill();
+    g.fillStyle=gr;g.beginPath();g.arc(X(ix),Y(iy),r,0,TAU);g.fill();g.fillStyle='#120b08';g.beginPath();g.arc(X(ix),Y(iy),F.pupilR*S*(F.sd?1.2:1),0,TAU);g.fill();
     g.fillStyle='rgba(255,255,255,0.95)';g.beginPath();g.arc(X(ix+0.006),Y(iy+0.006),r*0.24,0,TAU);g.fill();g.beginPath();g.arc(X(ix-0.004),Y(iy-0.005),r*0.1,0,TAU);g.fill();
     g.strokeStyle='rgba(60,30,30,0.35)';g.lineWidth=0.009*S;g.beginPath();g.moveTo(X(I[0]),Y(I[1]));g.quadraticCurveTo(X(cu[0]),Y(cu[1]-0.002),X(O[0]),Y(O[1]));g.stroke();g.restore();
     if(sh&&sh.hood&&blink<0.6){const h2=sh.hood===2,fa=[I[0]+sg*(h2?0.007:0.003),I[1]+(h2?0.0075:0.006)],fb=h2?[O[0]+sg*0.007,O[1]-0.0015]:[O[0]-sg*0.002,O[1]+0.0012],fc=q(fa,[tx+sg*(h2?0.002:0.008),upY+(h2?0.0058:0.005)],fb);   // (2: a level eye whose fold droops past the outer corner)
          // the hood: a heavy fold just above the lash line, closing over the outer corner
       g.strokeStyle='rgba(115,65,50,0.6)';g.lineWidth=0.0024*S;g.beginPath();g.moveTo(X(fa[0]),Y(fa[1]));g.quadraticCurveTo(X(fc[0]),Y(fc[1]),X(fb[0]),Y(fb[1]));g.stroke();}
-    g.strokeStyle=c.liner;g.lineWidth=(soft?0.0042:sh&&!sh.crease?0.0075:0.0062)*S;g.beginPath();g.moveTo(X(I[0]),Y(I[1]));g.quadraticCurveTo(X(cu[0]),Y(cu[1]),X(O[0]),Y(O[1]));g.stroke();
+    g.strokeStyle=c.liner;g.lineWidth=(soft?0.0042:sh&&!sh.crease?0.0075:0.0062)*S*(F.sd?0.72:1);g.beginPath();g.moveTo(X(I[0]),Y(I[1]));g.quadraticCurveTo(X(cu[0]),Y(cu[1]),X(O[0]),Y(O[1]));g.stroke();
     if(sh&&sh.crease){const fo=sh.fold||1,a0=[I[0]+sg*0.004,I[1]+0.004*fo],b0=[O[0]-sg*0.003,O[1]+0.0045*fo],cr=q(a0,[tx,upY+0.0075*fo],b0);
       if(sh.lid){g.save();g.beginPath();g.moveTo(X(I[0]),Y(I[1]));g.quadraticCurveTo(X(cu[0]),Y(cu[1]),X(O[0]),Y(O[1]));g.lineTo(X(b0[0]),Y(b0[1]));g.quadraticCurveTo(X(cr[0]),Y(cr[1]),X(a0[0]),Y(a0[1]));g.closePath();g.fillStyle=shade(c.skin,sh.deep?0.86:0.93);g.globalAlpha=0.75;g.fill();g.restore();}   // the lid itself, a touch darker than the skin
       g.strokeStyle=sh.lid?'rgba(105,60,45,0.7)':'rgba(120,70,55,0.4)';g.lineWidth=(sh.lid?0.0024:0.0016)*S;g.beginPath();g.moveTo(X(a0[0]),Y(a0[1]));g.quadraticCurveTo(X(cr[0]),Y(cr[1]),X(b0[0]),Y(b0[1]));g.stroke();}
