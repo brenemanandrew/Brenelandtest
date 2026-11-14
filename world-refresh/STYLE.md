@@ -1,7 +1,17 @@
 # Style guide
 
 ## The look in one line
-A cozy small town, cel shaded, with simple Animal Crossing style shapes and flat colours that have a soft watercolour wash, like the concept sheet.
+The concept sheet's scenery panel brought into the game: a cozy storybook small town, cel shaded, chunky slightly rounded shapes, rich warm flat colours with a soft hand painted watercolour wash. Our own look, not a copy of any existing game; the concept sheet and the live game are the only references.
+
+## What the concept sheet's scenery shows (the target)
+- Storybook illustration feel: warm, sunny, saturated but soft colours, never neon.
+- Wood is chunky and slightly uneven: thick planks with painted grain lines and darker plank edges (garden beds, sign, fence, bench).
+- Trees and bushes are big soft leaf masses with a few painted leaf shapes at the edges, deep green with sunlit yellow-green tops.
+- Small white and yellow flowers dotted through the greenery.
+- Stone and paths: flat warm beige slabs with soft edges.
+- Ironwork (lamp, bench sides) is dark navy-black, matte.
+- The house: blue clapboard, white trim, red door, red brick steps.
+- Proportions are real-world-ish, slightly chunky, not toy-like or squashed.
 
 ## What that means for a model
 - Shapes: chunky, rounded, a little squat. Big readable silhouettes. Leaves are a few soft clumps, not thousands of leaf cards. No thin spikes, no noise.
@@ -17,7 +27,7 @@ A cozy small town, cel shaded, with simple Animal Crossing style shapes and flat
   - sheet palette: brown, red, green, yellow, blue, light blue, cream, navy
 
 ## The style block (paste at the start of EVERY Meshy prompt)
-> Stylized low poly game asset, cozy cel shaded look, chunky rounded shapes like Animal Crossing, flat colours with a soft hand painted watercolour wash, simple painted details, matte, no gloss, no realistic texture, no outline, no ground, no base, single object centred, neutral flat lighting.
+> Stylized low poly game asset, cozy cel shaded look, cozy storybook small town style like a hand painted illustration, chunky slightly rounded shapes, rich warm flat colours with a soft hand painted watercolour wash, simple painted details, matte, no gloss, no realistic texture, no outline, no ground, no base, single object centred, neutral flat lighting.
 
 ## Meshy settings
 - Mode: text to 3D, or image to 3D from a crop of the concept sheet when the sheet shows the object.

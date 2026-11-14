@@ -1,6 +1,6 @@
 # Breneland character builder (test environment)
 
-> NEW PROJECT (2026-11-14, Andrew's clean start): the **World Refresh** lives in `world-refresh/` - read `world-refresh/README.md` first. Scope: Meshy models to replace existing game WORLD assets (plants and trees, then small props, larger props, set pieces), cel shaded, simple Animal Crossing style, slightly watercoloured, per `world-refresh/reference/concept-sheet.png`. Characters are out of scope: Andrew decided the live game's characters are close enough. Everything below (the character builder, clothes, SD outfits) is kept for reference only.
+> NEW PROJECT (2026-11-14, Andrew's clean start): the **World Refresh** lives in `world-refresh/` - read `world-refresh/README.md` first. Scope: Meshy models to replace existing game WORLD assets (plants and trees, then small props, larger props, set pieces), cel shaded, simple hand painted, slightly watercoloured, per `world-refresh/reference/concept-sheet.png`. Characters are out of scope: Andrew decided the live game's characters are close enough. Everything below (the character builder, clothes, SD outfits) is kept for reference only.
 
 Andrew's modular character creator for his Three.js game Breneland. This repo is the test build plus the whole asset pipeline, moved here from a long chat session on 2026-11-13.
 

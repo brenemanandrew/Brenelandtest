@@ -16,7 +16,7 @@ Replace existing game assets with Meshy models that have high visual impact and 
 **All Meshy prompts, ready to paste, are in `MESHY.md`.** Each sheet lists every asset to replace, what it is in the game today, its size and triangle budget, and the exact Meshy description to paste.
 
 ## Rules
-- Style: `STYLE.md`. Cel shaded, simple Animal Crossing style textures, slightly watercoloured like the concept art. Every Meshy prompt starts with the style block from that file.
+- Style: `STYLE.md`. Cel shaded, simple hand painted textures, slightly watercoloured, matching the concept art and the live game's look (not modelled on any other game). Every Meshy prompt starts with the style block from that file.
 - How a model gets into the game: `SWAP.md`.
 - Nothing ships to the live game (breneland.fly.dev, repo Breneland-Next) until Andrew says so.
 - Writing for Andrew: never use em dashes, answer first and short, no claims without evidence.
