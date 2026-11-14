@@ -13,7 +13,7 @@ R = 'models/'; P1 = R + '01-plants-trees/'; TR = R + 'trimmed/'
 A = {
  'oak':          (P1 + 'v3/oak.glb', 'h', 5.9, {'neutral': 1}),
  'maple':        (P1 + 'v2/maple.glb', 'h', 5.37, {'neutral': 1}),
- 'birch':        (TR + 'birch.glb', 'h', 6.71, {'neutral': 1}),
+ 'birch':        (TR + 'birch.glb', 'h', 6.71, {'neutral': 1, 'crown': 0.45}),
  'pine':         (P1 + 'pine.glb', 'h', 6.62, {}),
  'palm':         (P1 + 'wave2/palm.glb', 'h', 5.89, {}),
  'hedge_box':    (P1 + 'v3/hedge_a.glb', 'box', [3.3, 1.5, 0.92], {'long': 1}),
@@ -43,8 +43,11 @@ def neutral(img):
     a = np.asarray(img.convert('RGB')).astype(float) / 255
     h, s, v = np.vectorize(colorsys.rgb_to_hsv, otypes=[float] * 3)(a[..., 0], a[..., 1], a[..., 2])
     leaf = (h > 0.13) & (h < 0.5) & (s > 0.12)                    # greens and yellow-greens
+    from scipy import ndimage                                      # pale highlight strokes inside the leaves count as leaf too
+    pale = (v > 0.6) & (s < 0.25)
+    leaf = leaf | (pale & ndimage.binary_dilation(leaf, iterations=8))
     lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
-    g = np.clip(0.55 + (lum - lum[leaf].mean()) * 1.2, 0, 1) if leaf.any() else lum   # pale, keeps the wash light/dark
+    g = np.clip(0.86 + (lum - lum[leaf].mean()) * 1.0, 0, 1) if leaf.any() else lum   # pale, keeps the wash light/dark
     out = a.copy()
     for c, tint in enumerate((0.97, 1.0, 0.95)): out[..., c] = np.where(leaf, g * tint, a[..., c])
     return Image.fromarray((out * 255).astype(np.uint8)), Image.fromarray((leaf * 255).astype(np.uint8))
@@ -73,6 +76,9 @@ def run(name, src, mode, tgt, o):
     alpha = np.full(len(x), 255)
     if leafmask is not None:                                       # alpha 128 = leaf: the game tints these by season
         lm = np.asarray(leafmask.resize((512, 512))); alpha = np.where(lm[y, x] > 127, 128, 255)
+        fa = alpha[faces].reshape(-1, 3); fl = (fa == 128).sum(1) >= 2  # one answer per face: no half-tinted triangles
+        fy = v[faces][:, :, 1].mean(1); fl &= fy > o.get('crown', 0.3) * v[:, 1].max()   # nothing low on the trunk is leaf (moss marks on bark)
+        alpha = alpha.copy(); alpha[faces[fl].ravel()] = 128; alpha[faces[~fl].ravel()] = 255
     col = np.c_[a[y, x], alpha].astype(np.uint8)
     vc = trimesh.Trimesh(v, faces, vertex_colors=col, process=False); vc.export(f'{R}converted/vc/{name}.glb', include_normals=True)
     e = v.max(0) - v.min(0)

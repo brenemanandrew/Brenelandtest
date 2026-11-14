@@ -23,7 +23,7 @@ for (const k of KINDS) {
   const gl = await new Promise((res, rej) => ld.load(`/world-refresh/models/converted/vc/${k}.glb`, res, undefined, rej));
   const tint = new THREE.Color(TINT[k] || '#ffffff');
   gl.scene.traverse(o => { if (!o.isMesh) return; const c = o.geometry.attributes.color;
-    if (c && c.itemSize === 4 && TINT[k]) { for (let i = 0; i < c.count; i++) if (c.getW(i) < 0.75) c.setXYZ(i, Math.min(1, c.getX(i) * tint.r * 1.9), Math.min(1, c.getY(i) * tint.g * 1.9), Math.min(1, c.getZ(i) * tint.b * 1.9)); c.needsUpdate = true; }
+    if (c && c.itemSize === 4 && TINT[k]) { for (let i = 0; i < c.count; i++) if (c.getW(i) < 0.75) c.setXYZ(i, Math.min(1, c.getX(i) * tint.r * 1.15), Math.min(1, c.getY(i) * tint.g * 1.15), Math.min(1, c.getZ(i) * tint.b * 1.15)); c.needsUpdate = true; }
     o.material = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad, side: THREE.DoubleSide }); });
   gl.scene.position.x = x; sc.add(gl.scene); x += gap;
 }
