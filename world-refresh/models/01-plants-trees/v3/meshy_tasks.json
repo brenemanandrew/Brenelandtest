@@ -1,0 +1,30 @@
+{
+ "oak.glb": {
+  "id": "T1",
+  "preview": "01a1dbfa-5157-7439-ad10-fce5ab649f2d",
+  "refine": "01a1dbfb-753e-76e9-b540-32cf509a06e2",
+  "done": true,
+  "credits": 10
+ },
+ "hedge_a.glb": {
+  "id": "P1",
+  "preview": "01a1dbfa-5df7-7109-80cc-eb2a56a81ada",
+  "refine": "01a1dbfc-7a75-744f-aab8-985e3524d2df",
+  "done": true,
+  "credits": 10
+ },
+ "hedge_b.glb": {
+  "id": "P1",
+  "preview": "01a1dbfa-6944-773c-adf5-70bb82eccfc4",
+  "refine": "01a1dbfc-d0b3-7314-8fc9-6dc6557c862c",
+  "done": true,
+  "credits": 10
+ },
+ "raised_bed.glb": {
+  "id": "G1",
+  "preview": "01a1dbfa-729b-760d-b964-bbb0cef78107",
+  "refine": "01a1dbfb-7b99-77e7-b9cb-80e17568dbcc",
+  "done": true,
+  "credits": 10
+ }
+}
