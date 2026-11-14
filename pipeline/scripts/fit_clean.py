@@ -120,7 +120,13 @@ fits={};info={}
 if slot=='top':
     order=[b for b in BUILDS if b=='average']+[b for b in BUILDS if b!='average'];SY=None
     for b in order:
-        bd=Body(body_of(b));P,s,WA=fit_top(bd,SY);SY=SY or s;P=push_out(P,bd,mcf);fits[b]=P;info[b]=(s,WA,bd);print(name,b,'scale %.3f'%s,'y %.2f..%.2f'%(P[:,1].min(),P[:,1].max()))
+        bd=Body(body_of(b));P,s,WA=fit_top(bd,SY);SY=SY or s;P=push_out(P,bd,mcf)
+        if ENV('SETTLE',1):   # cloth over the tops of the shoulders rests on them instead of floating; spread smoothly
+            for _ in range(3):
+                d,i=bd.sd(P);n_=bd.SN[i];m=(n_[:,1]>0.45)&(d>0.007)&(d<ENV('SETTLED',0.07))&(P[:,1]>YSHT-0.16)
+                D=np.where(m[:,None],-n_*(d-0.006)[:,None],0.0);P=P+gsmooth(D,6)
+            P=push_out(P,bd,mcf,2)
+        fits[b]=P;info[b]=(s,WA,bd);print(name,b,'scale %.3f'%s,'y %.2f..%.2f'%(P[:,1].min(),P[:,1].max()))
 # ---- skirt: one tube from the waist; per build the radius at each height and angle clears the hull of the hips and legs
 if slot=='bottom' and 'skirt' in key:
     LEN=os.environ.get('LEN','knee');knee=JPOS['mixamorig:LeftLeg'][1];CZ=JPOS['mixamorig:Hips'][2]
@@ -209,7 +215,14 @@ for b in BUILDS:
     hidden&=h
 # drop single stragglers
 _,binv=np.unique(np.round(BP*1e5).astype(np.int64),axis=0,return_inverse=True);binv=binv.ravel();nwb=binv.max()+1
-hw=np.zeros(nwb,bool);hw[binv[hidden]]=True;hidden=hw[binv]
+hw=np.zeros(nwb,bool);hw[binv[hidden]]=True
+BU_=np.zeros((nwb,3));BU_[binv]=BP;BFU=binv[BF];BE=np.unique(np.sort(np.r_[BFU[:,[0,1]],BFU[:,[1,2]],BFU[:,[2,0]]],axis=1),axis=0);BE=BE[BE[:,0]!=BE[:,1]]
+U_=np.where(~hw)[0];G_=coo_matrix((np.ones(len(BE)),(BE[:,0],BE[:,1])),shape=(nwb,nwb)).tocsr()[U_][:,U_];lab_=connected_components(G_,directed=False)[1]
+keepW=np.zeros(nwb);keepW[binv]=jw(('Head','Hand','Foot'))
+for l in np.unique(lab_):
+    m=U_[lab_==l]
+    if len(m)<ENV('ISLE2',400) and keepW[m].max()<0.35:hw[m]=True
+hidden=hw[binv]
 print('  skin hidden on every build',int(hidden.sum()))
 # ---- colour from the fitted piece already in the game (same body, nearest point), cut to a few flat swatches
 OLD=os.path.exists(R+'/wear/%s.glb'%name)
@@ -227,6 +240,14 @@ else:   # no texture: BASE colour everywhere; ACCENT on the collar (COLLAR m bel
   acc_=np.zeros(len(G0),bool);sc_=0.6/gh   # scan units to roughly metres
   if ENV('COLLAR',0.0)>0:
       ytop=G0[:,1].max();acc_|=(G0[:,1]>ytop-ENV('COLLAR',0.0)/sc_)&(np.abs(G0[:,0])<ENV('COLLARW',0.11)/sc_)
+  for c_ in [c for c in os.environ.get('ACIRC','').split(';') if c]:   # x,y,r[,front|back|both] in scan units, from a front view
+      cx_,cy_,cr_=[float(v) for v in c_.split(',')[:3]];side_=(c_.split(',')+['front'])[3]
+      zc_=(G0[:,2].max()+G0[:,2].min())/2;sel_=(G0[:,2]>zc_) if side_=='front' else (G0[:,2]<zc_) if side_=='back' else np.ones(len(G0),bool)
+      acc_|=sel_&(np.hypot(G0[:,0]-cx_,G0[:,1]-cy_)<cr_)
+  for b_ in [c for c in os.environ.get('ABOX','').split(';') if c]:   # x0,x1,y0,y1[,front|back|both]
+      x0_,x1_,y0_,y1_=[float(v) for v in b_.split(',')[:4]];side_=(b_.split(',')+['both'])[4]
+      zc_=(G0[:,2].max()+G0[:,2].min())/2;sel_=(G0[:,2]>zc_) if side_=='front' else (G0[:,2]<zc_) if side_=='back' else np.ones(len(G0),bool)
+      acc_|=sel_&(G0[:,0]>x0_)&(G0[:,0]<x1_)&(G0[:,1]>y0_)&(G0[:,1]<y1_)
   if ENV('BUTTONS',0)>0:
       Gs=gsmooth(G0,25);bump=((G0-Gs)*vnorm(G0,GF)).sum(1)*sc_;front=G0[:,2]>np.percentile(G0[:,2],60)
       acc_|=front&(np.abs(G0[:,0])<0.05/sc_)&(bump>ENV('BUMP',0.0025))
