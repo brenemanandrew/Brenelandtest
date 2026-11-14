@@ -7,3 +7,28 @@ refine a1_main_house.glb
 refine a4_community_garden.glb
 refine a2_joyce_house.glb
 DONE a3_lovecraft_house.glb
+preview a5_strickler_park.glb 01a1dc1b-1469-7337-8f65-5978733d5dd9
+DONE a1_main_house.glb
+DONE a4_community_garden.glb
+preview a6_summit_square.glb 01a1dc1b-76c4-7244-bcc0-338efb442bad
+preview a7_fish_shack.glb 01a1dc1b-845c-772e-94b4-905e15c8af11
+DONE a2_joyce_house.glb
+preview a8_strip_mall.glb 01a1dc1b-e3ff-711c-8a86-cdeabb0bd0d1
+refine a5_strickler_park.glb
+DONE a5_strickler_park.glb
+refine a6_summit_square.glb
+preview a9_lake_firepit.glb 01a1dc1c-f3eb-7335-a496-25ce6303707b
+refine a7_fish_shack.glb
+refine a8_strip_mall.glb
+DONE a6_summit_square.glb
+preview a10_town_street.glb 01a1dc1d-b0a7-7170-a099-0d38eb00c17a
+DONE a7_fish_shack.glb
+DONE a8_strip_mall.glb
+refine a9_lake_firepit.glb
+preview a13_clock_tower.glb 01a1dc1e-191f-74ad-bf0c-4e5fd3a93abf
+DONE a9_lake_firepit.glb
+refine a10_town_street.glb
+refine a13_clock_tower.glb
+DONE a10_town_street.glb
+DONE a13_clock_tower.glb
+ALL FINISHED 11 done, 0 failed

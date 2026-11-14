@@ -2,12 +2,16 @@
  "a1_main_house.glb": {
   "id": "A1",
   "preview": "01a1dc18-e329-7218-a459-df1cf0f6fff4",
-  "refine": "01a1dc1a-5e9a-757f-b2b7-dc510d024119"
+  "refine": "01a1dc1a-5e9a-757f-b2b7-dc510d024119",
+  "done": true,
+  "credits": 10
  },
  "a2_joyce_house.glb": {
   "id": "A2",
   "preview": "01a1dc18-ed42-73b5-b494-8068a131fd2b",
-  "refine": "01a1dc1a-bd2e-72b6-bae8-5fb4e3aa4a79"
+  "refine": "01a1dc1a-bd2e-72b6-bae8-5fb4e3aa4a79",
+  "done": true,
+  "credits": 10
  },
  "a3_lovecraft_house.glb": {
   "id": "A3",
@@ -19,6 +23,57 @@
  "a4_community_garden.glb": {
   "id": "A4",
   "preview": "01a1dc19-0830-725f-8b28-1101fbc72709",
-  "refine": "01a1dc1a-64b3-73e9-8ada-9adae7c2edc0"
+  "refine": "01a1dc1a-64b3-73e9-8ada-9adae7c2edc0",
+  "done": true,
+  "credits": 10
+ },
+ "a5_strickler_park.glb": {
+  "id": "A5",
+  "preview": "01a1dc1b-1469-7337-8f65-5978733d5dd9",
+  "refine": "01a1dc1b-f302-7121-8e60-6ea4fa91cb27",
+  "done": true,
+  "credits": 10
+ },
+ "a6_summit_square.glb": {
+  "id": "A6",
+  "preview": "01a1dc1b-76c4-7244-bcc0-338efb442bad",
+  "refine": "01a1dc1c-9e74-750f-81a1-17ff684c7f8f",
+  "done": true,
+  "credits": 10
+ },
+ "a7_fish_shack.glb": {
+  "id": "A7",
+  "preview": "01a1dc1b-845c-772e-94b4-905e15c8af11",
+  "refine": "01a1dc1c-ff78-7767-8003-37867a498d70",
+  "done": true,
+  "credits": 10
+ },
+ "a8_strip_mall.glb": {
+  "id": "A8",
+  "preview": "01a1dc1b-e3ff-711c-8a86-cdeabb0bd0d1",
+  "refine": "01a1dc1d-06fe-773b-ba30-ce22c0040e7b",
+  "done": true,
+  "credits": 10
+ },
+ "a9_lake_firepit.glb": {
+  "id": "A9",
+  "preview": "01a1dc1c-f3eb-7335-a496-25ce6303707b",
+  "refine": "01a1dc1d-c435-7099-bb93-9176e91e8ee4",
+  "done": true,
+  "credits": 10
+ },
+ "a10_town_street.glb": {
+  "id": "A10",
+  "preview": "01a1dc1d-b0a7-7170-a099-0d38eb00c17a",
+  "refine": "01a1dc1e-ca27-75cc-b298-1602ba4675f3",
+  "done": true,
+  "credits": 10
+ },
+ "a13_clock_tower.glb": {
+  "id": "A13",
+  "preview": "01a1dc1e-191f-74ad-bf0c-4e5fd3a93abf",
+  "refine": "01a1dc1e-d05b-764e-96d2-07cca843450e",
+  "done": true,
+  "credits": 10
  }
 }

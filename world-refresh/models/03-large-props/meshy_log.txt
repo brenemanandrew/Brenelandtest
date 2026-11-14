@@ -13,3 +13,34 @@ preview rowboat.glb 01a1dc1a-af2c-7399-b723-8ec384637a8f
 preview dock.glb 01a1dc1a-bc0f-7106-a175-28288946c2e4
 preview garden_cart.glb 01a1dc1a-c747-7695-95a9-5067d39fbd9a
 DONE shelter.glb
+preview car.glb 01a1dc1b-2608-7288-ae34-525c93a175d2
+refine rowboat.glb
+refine dock.glb
+refine garden_cart.glb
+refine car.glb
+DONE rowboat.glb
+DONE dock.glb
+preview van.glb 01a1dc1c-931d-725a-9a31-8ea6a5c95124
+preview bus.glb 01a1dc1c-a076-7006-a4c9-8ae13a0b37b4
+DONE garden_cart.glb
+DONE car.glb
+preview water_tower.glb 01a1dc1d-0574-73af-ab39-724efe53451a
+preview firepit_circle.glb 01a1dc1d-0fcc-7358-adfd-1ef63edeffe4
+refine van.glb
+refine bus.glb
+DONE van.glb
+DONE bus.glb
+refine water_tower.glb
+refine firepit_circle.glb
+preview potting_shed.glb 01a1dc1e-788f-703b-8705-ea68e4a1f379
+preview swing_set.glb 01a1dc1e-8306-76ee-856c-ed7c3de9018c
+DONE water_tower.glb
+DONE firepit_circle.glb
+preview picnic_blanket.glb 01a1dc1f-33cd-714e-a2cb-8df30d1a1355
+preview clothing_rack.glb 01a1dc1f-3ebf-7278-b664-09ad1d7df4f1
+refine potting_shed.glb
+refine swing_set.glb
+DONE potting_shed.glb
+DONE swing_set.glb
+refine picnic_blanket.glb
+refine clothing_rack.glb

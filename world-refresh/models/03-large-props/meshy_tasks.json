@@ -29,14 +29,82 @@
  },
  "rowboat.glb": {
   "id": "L5",
-  "preview": "01a1dc1a-af2c-7399-b723-8ec384637a8f"
+  "preview": "01a1dc1a-af2c-7399-b723-8ec384637a8f",
+  "refine": "01a1dc1b-849d-72d6-beca-a96681c704d8",
+  "done": true,
+  "credits": 10
  },
  "dock.glb": {
   "id": "L6",
-  "preview": "01a1dc1a-bc0f-7106-a175-28288946c2e4"
+  "preview": "01a1dc1a-bc0f-7106-a175-28288946c2e4",
+  "refine": "01a1dc1b-8af2-75a5-a0e4-445b720f7dd1",
+  "done": true,
+  "credits": 10
  },
  "garden_cart.glb": {
   "id": "L7",
-  "preview": "01a1dc1a-c747-7695-95a9-5067d39fbd9a"
+  "preview": "01a1dc1a-c747-7695-95a9-5067d39fbd9a",
+  "refine": "01a1dc1b-e306-7532-985c-973dcdbaeb88",
+  "done": true,
+  "credits": 10
+ },
+ "car.glb": {
+  "id": "L8",
+  "preview": "01a1dc1b-2608-7288-ae34-525c93a175d2",
+  "refine": "01a1dc1b-e8a4-7092-8e4f-2a6d2a74832b",
+  "done": true,
+  "credits": 10
+ },
+ "van.glb": {
+  "id": "L9",
+  "preview": "01a1dc1c-931d-725a-9a31-8ea6a5c95124",
+  "refine": "01a1dc1d-6b2d-7483-a6ec-4dec9a1f15be",
+  "done": true,
+  "credits": 10
+ },
+ "bus.glb": {
+  "id": "L10",
+  "preview": "01a1dc1c-a076-7006-a4c9-8ae13a0b37b4",
+  "refine": "01a1dc1d-7027-7700-9e90-971f6e50975d",
+  "done": true,
+  "credits": 10
+ },
+ "water_tower.glb": {
+  "id": "L11",
+  "preview": "01a1dc1d-0574-73af-ab39-724efe53451a",
+  "refine": "01a1dc1e-1eee-7406-8a6d-45a80a3b3aa5",
+  "done": true,
+  "credits": 10
+ },
+ "firepit_circle.glb": {
+  "id": "L12",
+  "preview": "01a1dc1d-0fcc-7358-adfd-1ef63edeffe4",
+  "refine": "01a1dc1e-244d-7698-97ca-cf5438b5c4a5",
+  "done": true,
+  "credits": 10
+ },
+ "potting_shed.glb": {
+  "id": "L13",
+  "preview": "01a1dc1e-788f-703b-8705-ea68e4a1f379",
+  "refine": "01a1dc1f-4b79-70f9-a528-8f0a08344c5a",
+  "done": true,
+  "credits": 10
+ },
+ "swing_set.glb": {
+  "id": "L14",
+  "preview": "01a1dc1e-8306-76ee-856c-ed7c3de9018c",
+  "refine": "01a1dc1f-4fe0-73f8-903d-a2b25352ea21",
+  "done": true,
+  "credits": 10
+ },
+ "picnic_blanket.glb": {
+  "id": "L15",
+  "preview": "01a1dc1f-33cd-714e-a2cb-8df30d1a1355",
+  "refine": "01a1dc1f-ff6f-7257-8376-2dd9125bc714"
+ },
+ "clothing_rack.glb": {
+  "id": "L16",
+  "preview": "01a1dc1f-3ebf-7278-b664-09ad1d7df4f1",
+  "refine": "01a1dc20-0495-7466-835b-6a5b95f30b1e"
  }
 }
