@@ -27,7 +27,7 @@ The concept sheet's scenery panel brought into the game: a cozy storybook small 
   - sheet palette: brown, red, green, yellow, blue, light blue, cream, navy
 
 ## The style block (paste at the start of EVERY Meshy prompt)
-> Stylized low poly game asset, cozy cel shaded look, cozy storybook small town style like a hand painted illustration, chunky slightly rounded shapes, rich warm flat colours with a soft hand painted watercolour wash, simple painted details, matte, no gloss, no realistic texture, no outline, no ground, no base, single object centred, neutral flat lighting.
+> Stylized low poly game asset, cel shaded look, cozy storybook small town style like a hand painted illustration, chunky slightly rounded shapes, rich warm flat colours with a soft hand painted watercolour wash, simple painted details, matte, no gloss, no realistic texture, no outline, no ground, no base, single object centred, neutral flat lighting.
 
 ## Meshy settings
 - Mode: text to 3D, or image to 3D from a crop of the concept sheet when the sheet shows the object.
