@@ -1,0 +1,30 @@
+{
+ "herb_pot.glb": {
+  "id": "G8",
+  "preview": "01a1dc08-a686-7154-a879-db683cefb31c",
+  "refine": "01a1dc0b-166a-7372-ae66-9e5b73258c2a",
+  "done": true,
+  "credits": 10
+ },
+ "weed.glb": {
+  "id": "G9",
+  "preview": "01a1dc08-b0d7-7441-8876-f619cfbb03c6",
+  "refine": "01a1dc09-6978-7202-a5ba-225ad67eb88a",
+  "done": true,
+  "credits": 10
+ },
+ "hedge_end.glb": {
+  "id": "P2",
+  "preview": "01a1dc08-bbaf-76ef-bb54-a0d42f9b8bfc",
+  "refine": "01a1dc09-bed5-74e0-987c-5acf48490955",
+  "done": true,
+  "credits": 10
+ },
+ "swing_tree.glb": {
+  "id": "T7",
+  "preview": "01a1dc0a-66b3-7238-9176-0ac7e898df84",
+  "refine": "01a1dc0b-bf13-7783-9d01-a1c92eb3c0ec",
+  "done": true,
+  "credits": 10
+ }
+}

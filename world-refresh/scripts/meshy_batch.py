@@ -21,16 +21,23 @@ items = re.findall(r'\d+\. (\S+) .*? - polycount (\d+)[^,]*, texture \d+ px, sav
 stf = os.path.join(out, 'meshy_tasks.json')
 st = json.load(open(stf)) if os.path.exists(stf) else {}
 save = lambda: json.dump(st, open(stf, 'w'), indent=1)
-for k, poly, fn, prompt in items:
-    s = st.setdefault(fn, {'id': k})
-    if 'preview' not in s:
-        s['preview'] = req('POST', API, {'mode': 'preview', 'prompt': prompt, 'ai_model': 'latest', 'should_remesh': True,
-                                          'topology': 'triangle', 'target_polycount': max(100, int(poly)), 'target_formats': ['glb']})['result']
-        save(); print('preview', fn, s['preview'], flush=True)
+MAXFLY = int(os.environ.get('MAXFLY', '8'))
+def submit_more():
+    fly = sum(1 for v in st.values() if 'preview' in v and not v.get('done') and not v.get('failed'))
+    for k, poly, fn, prompt in items:
+        if fly >= MAXFLY: return
+        s = st.setdefault(fn, {'id': k})
+        if 'preview' not in s:
+            s['preview'] = req('POST', API, {'mode': 'preview', 'prompt': prompt, 'ai_model': 'latest', 'should_remesh': True,
+                                              'topology': 'triangle', 'target_polycount': max(100, int(poly)), 'target_formats': ['glb']})['result']
+            fly += 1; save(); print('preview', fn, s['preview'], flush=True)
 while True:
+    submit_more()
     busy = 0
     for k, poly, fn, prompt in items:
-        s = st[fn]
+        s = st.get(fn)
+        if s is None: busy += 1; continue
+        if 'preview' not in s: busy += 1; continue
         if s.get('done') or s.get('failed'): continue
         busy += 1
         if 'refine' not in s:
