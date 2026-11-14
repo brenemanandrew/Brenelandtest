@@ -1,0 +1,4 @@
+preview welcome_sign.glb 01a1dc18-cd66-700e-98f3-70b4fd42dbd1
+preview porch_swing.glb 01a1dc18-d85c-76ce-a85d-bf622b34ce7c
+preview shelter.glb 01a1dc18-e34a-720e-8a0b-c91029248af8
+preview tree_swing.glb 01a1dc18-ed44-7420-b16c-65534ba5f3f9

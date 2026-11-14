@@ -105,3 +105,6 @@
 
 36. S33 fire_ring - polycount 3000, texture 1024 px, save as fire_ring.glb
    Prompt: Stylized game asset, cel shaded look, cozy storybook small town style like a hand painted illustration, chunky soft rounded shapes, solid closed forms, rich warm colours with a soft hand painted watercolour wash, simple painted details, matte, no gloss, no realistic texture, no outline, no ground, no base, single object centred, neutral flat lighting. A ring of rounded grey stones with stacked split logs in the middle. No flames.
+
+## Redo list (Andrew: after the game areas are rolling)
+wall_lantern, van_stop_sign, pendant_lamp, planter_box, planter_pot, bench_plank, seed_crate, dog_rope, balloons.
