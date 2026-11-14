@@ -116,8 +116,8 @@ for f in F:
 BE_=np.array([k for k,c in ec.items() if c==1])
 bv=np.unique(BE_);neckline=bv[P0[bv,1]>FY-0.04];dneck=cKDTree(P0[neckline]).query(P0)[0];dneck=sm(dneck,ENV('NSM',20))
 # Peter Pan collar: a band round the neck, two rounded lobes at the front, split at the centre front
-lob=np.max([ENV('LOBR',0.06)-np.hypot(np.abs(P0[:,0]-MID)-ENV('LOBX',0.05),dneck-ENV('LOBD',0.015)) for _ in (0,)],0)
-fcol=np.where(front>0.35,np.maximum(lob,0.016-dneck),ENV('COLW',0.050)-dneck);fcol=np.minimum(fcol,np.where(front>0.35,np.abs(P0[:,0]-MID)-0.004-ENV('VGAP',0.5)*dneck,1.0));fcol=np.minimum(fcol,0.5-a)
+lob=np.max([ENV('LOBR',0.045)-np.hypot(np.abs(P0[:,0]-MID)-ENV('LOBX',0.042),dneck-ENV('LOBD',0.015)) for _ in (0,)],0)
+fcol=np.where(front>0.35,np.maximum(lob,0.016-dneck),ENV('COLW',0.050)-dneck);fcol=np.minimum(fcol,np.where(front>0.35,np.abs(P0[:,0]-MID)-0.004-ENV('VGAP',0.5)*dneck,1.0));fcol=np.minimum(fcol,0.5-a);fcol=np.minimum(fcol,ENV('CXMAX',0.088)-np.abs(P0[:,0]-MID))   # Andrew: the collar ends before the shoulders
 fband=np.where(a<0.5,(HEMY+BANDH)-P0[:,1],-1.0) if BANDH>0 else np.full(len(P0),-1.0)
 fcuff=U-CU;fcuff=np.where(a>0.5,fcuff,-1.0)
 fpl=np.minimum(ENV('PLW',0.019)-np.abs(P0[:,0]-MID),front-0.6);fpl=np.minimum(fpl,0.5-a)
