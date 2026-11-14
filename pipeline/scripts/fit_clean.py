@@ -99,7 +99,7 @@ def fit_top(bd,sy=None):
         Sg=c0+ag*((np.array([MID+sg*xs,Sj[1],Sj[2]])-c0)@ag)   # where the sleeve axis passes the shoulder
         u=(P-Sg)@ag;rv=(P-Sg)-np.outer(u,ag);sel=(u>-0.04)&(X>xs-0.03)
         Lu=np.linalg.norm(Ej-Sj);Lf=np.linalg.norm(Hj-Ej);d1=(Ej-Sj)/Lu;d2=(Hj-Ej)/Lf;Lg=np.percentile(u[sel],99.5)
-        k=min(1.0,(Lu+Lf-ENV('SLEEVESHORT',0.01))/max(Lg,1e-6));uu=np.clip(u,0,None)*k
+        k=min(ENV('SLEEVEMAXK',1.0),(Lu+Lf-ENV('SLEEVESHORT',0.01))/max(Lg,1e-6));uu=np.clip(u,0,None)*k
         R1=rot_to(ag,d1);R2=rot_to(ag,d2);m1=Sj+np.outer(uu,d1)+rv@R1.T;m2=Ej+np.outer(uu-Lu,d2)+rv@R2.T;f=ss((uu-Lu+0.04)/0.08)[:,None];M=m1*(1-f)+m2*f
         b=(ss((u+0.02)/0.10)*sel)[:,None];P=P*(1-b)+M*b;W_arm[side]=(b[:,0],uu,Lu,f[:,0])
     return P,s,W_arm
@@ -191,6 +191,39 @@ if slot=='bottom' and 'skirt' in key:
         r=np.maximum(rs*sc,hr+np.where(t<0.06,0.006,0.012))
         fl=hr+np.where(t<0.06,0.006,0.012);r=fl+(r-fl)*(1-ENV('FRONTK',0.0)*np.clip(np.cos(th),0,1)**2)   # less flare at the front (Andrew)
         P=np.c_[MID+r*np.sin(th),y,CZ+r*np.cos(th)];fits[b]=P;print(name,b,'waist r %.3f hem r %.3f'%(np.median(r[t<0.02]),np.median(r[t>0.98])))
+# ---- trousers (Andrew's Meshy route 2): the scan may be made on a figure with other proportions (short wide legs). Heights are
+#      re-mapped (waist -> crotch -> hem), the seat is scaled to her hips at each height, each leg is laid round her own leg
+#      (its centre line on hers, its girth to hers), then pushed clear of the skin. One fit per build.
+if slot=='bottom' and 'skirt' not in key:
+    NB_=48;sm_=lambda a,k=5:np.convolve(np.pad(a,k,mode='edge'),np.ones(2*k+1)/(2*k+1),mode='valid')
+    def prof(val,t,fn,m=None):   # a profile over t in 0..1 from scattered values (empty bins filled from neighbours, smoothed)
+        out=np.full(NB_,np.nan);bi=np.clip((t*NB_).astype(int),0,NB_-1)
+        for k in range(NB_):
+            q=(bi==k) if m is None else (bi==k)&m
+            if q.sum()>=3:out[k]=fn(val[q])
+        ok=np.isfinite(out);out=np.interp(np.arange(NB_),np.where(ok)[0],out[ok]);return sm_(out,3)
+    at=lambda pr,t:np.interp(np.clip(t,0,1)*NB_-0.5,np.arange(NB_),pr)
+    Wsc=np.ptp(G0[:,0]);cen=np.abs(G0[:,0])<0.02*Wsc;ycs=G0[cen,1].min();zcs=(G0[:,2].max()+G0[:,2].min())/2   # scan crotch: the lowest point on the centre line
+    up_s=np.clip((gy1-G0[:,1])/(gy1-ycs),0,1);lg_s=np.clip((ycs-G0[:,1])/(ycs-gy0),0,1)
+    S_xw=prof(np.abs(G0[:,0]),up_s,lambda v:np.percentile(v,98),G0[:,1]>=ycs);S_zf=prof(G0[:,2],up_s,lambda v:np.percentile(v,98),G0[:,1]>=ycs);S_zb=prof(G0[:,2],up_s,lambda v:np.percentile(v,2),G0[:,1]>=ycs)
+    Sl={}
+    for sg in (1,-1):
+        m=(sg*G0[:,0]>0)&(G0[:,1]<ycs);cx=prof(G0[:,0],lg_s,np.mean,m);cz=prof(G0[:,2],lg_s,np.mean,m)
+        r=np.hypot(G0[:,0]-at(cx,lg_s),G0[:,2]-at(cz,lg_s));Sl[sg]=(cx,cz,sm_(prof(r,lg_s,np.mean,m),6))
+    legw=jw(('UpLeg','Leg','Foot','Toe'));trw=jw(('Hips','Spine'))+legw;ycr=BP[(legw>0.3)&(np.abs(BP[:,0]-MID)<0.02),1].max();ank=JPOS['mixamorig:LeftFoot'][1]
+    YT=ENV('YT',1.06);YB=ank+ENV('HEMUP',0.035);K_=ENV('EASE',1.05);bl_=ss((G0[:,1]-(ycs-0.05*gh))/(0.10*gh))   # 1 = seat mapping, 0 = leg mapping
+    for b in BUILDS:
+        X=body_of(b);tb=trw>0.6;ub=np.clip((YT-X[:,1])/(YT-ycr),0,1);lb=np.clip((ycr-X[:,1])/(ycr-YB),0,1);hi=tb&(X[:,1]>=ycr-0.01)&(X[:,1]<=YT+0.02)
+        B_xw=prof(np.abs(X[:,0]-MID),ub,lambda v:np.percentile(v,98),hi);B_zf=prof(X[:,2],ub,lambda v:np.percentile(v,98),hi);B_zb=prof(X[:,2],ub,lambda v:np.percentile(v,2),hi)
+        ys=YT+(ycr-YT)*up_s;yl=ycr+(YB-ycr)*lg_s;y=np.where(G0[:,1]>=ycs,ys,yl)
+        kx=at(B_xw,up_s)/at(S_xw,up_s)*K_;zs0=(at(S_zf,up_s)+at(S_zb,up_s))/2;zb0=(at(B_zf,up_s)+at(B_zb,up_s))/2;kz=(at(B_zf,up_s)-at(B_zb,up_s))/(at(S_zf,up_s)-at(S_zb,up_s))*K_
+        Ps=np.c_[MID+G0[:,0]*kx,y,zb0+(G0[:,2]-zs0)*kz];Pl=Ps.copy()
+        for sg in (1,-1):
+            mb=(legw>0.6)&(sg*(X[:,0]-MID)>0)&(X[:,1]<ycr)&(X[:,1]>YB-0.02);cxb=prof(X[:,0],lb,np.mean,mb);czb=prof(X[:,2],lb,np.mean,mb)
+            rb=sm_(prof(np.hypot(X[:,0]-at(cxb,lb),X[:,2]-at(czb,lb)),lb,np.mean,mb),6);cx,cz,rs=Sl[sg];q=sg*G0[:,0]>0;k=(at(rb,lg_s)/at(rs,lg_s)*K_)[q]
+            Pl[q,0]=at(cxb,lg_s)[q]+(G0[q,0]-at(cx,lg_s)[q])*k;Pl[q,2]=at(czb,lg_s)[q]+(G0[q,2]-at(cz,lg_s)[q])*k
+        P=Ps*bl_[:,None]+Pl*(1-bl_[:,None]);P[:,1]=y
+        bd=Body(X);P=push_out(P,bd,lambda Q:np.full(len(Q),ENV('PCLR',0.007)));fits[b]=P;print(name,b,'waist %.2f crotch %.2f hem %.2f'%(YT,ycr,YB))
 # ---- shoes: a pair, one size for both, each set on its foot (heel to toe, sole on the floor), let out sideways if the foot is broad
 if slot=='shoes':
     ys0=G0[:,1].min()
@@ -248,6 +281,9 @@ if slot=='top':
     mv=Wg[:,lg].sum(1)*low;Wg[:,lg]*=(1-low)[:,None];Wg[:,h_]+=mv
     Wg=gsmooth(Wg,4)
     LF=(LIFT[kk]*w3).sum(1);LF=gsmooth(LF,6)
+elif slot=='bottom' and 'skirt' not in key:   # trousers: the skin's own weights under each point (arms left out), smoothed
+    na_=np.where(jw(('Arm','Hand'))<0.1)[0];_,kk=cKDTree(X0[na_]).query(P0,k=4);kk=na_[kk];w3=1/(np.linalg.norm(X0[kk]-P0[:,None],axis=2)+1e-3);w3/=w3.sum(1,keepdims=True)
+    Wg=gsmooth((Wd[kk]*w3[:,:,None]).sum(1),3);LF=np.zeros(len(P0))
 elif slot=='shoes':   # rigid on the foot, the front on the toes
     Wg=np.zeros((len(P0),NJ));LF=np.zeros(len(P0))
     for side,sg in (('Left',1),('Right',-1)):
