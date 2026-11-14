@@ -11,7 +11,7 @@ R = 'models/'; P1 = R + '01-plants-trees/'; TR = R + 'trimmed/'
 # name: (source, mode, target). mode 'h' = uniform to height, 'w' = uniform to widest side, 'bed' = uniform to fit 2.6 x 1.3,
 # 'box' = non-uniform to [length x, height y, depth z]. 'long': turn so the long side is x. 'neutral': seasonal leaves.
 A = {
- 'oak':          (P1 + 'v3/oak.glb', 'h', 5.9, {'neutral': 1}),
+ 'oak':          (P1 + 'v3/oak.glb', 'h', 5.9, {'neutral': 1, 'maxw': 5.6}),   # Andrew: the picnic's big oak (s 1.6) was massive; crown kept near the old 5.3 m
  'maple':        (P1 + 'v2/maple.glb', 'h', 5.37, {'neutral': 1}),
  'birch':        (TR + 'birch.glb', 'h', 6.71, {'neutral': 1, 'crown': 0.45}),
  'pine':         (P1 + 'pine.glb', 'h', 6.62, {}),
@@ -63,7 +63,10 @@ def run(name, src, mode, tgt, o):
     elif mode == 'w': k = np.full(3, tgt / max(ext[0], ext[2]))
     elif mode == 'bed': k = np.full(3, min(2.6 / ext[0], 1.3 / ext[2], o.get('maxh', 9) / ext[1]))
     else: k = np.array(tgt) / ext
-    v = v * k; mn, mx = v.min(0), v.max(0)
+    v = v * k
+    if o.get('maxw'):                                              # narrow the crown, keep the height
+        e = v.max(0) - v.min(0); f = min(1, o['maxw'] / max(e[0], e[2])); v[:, [0, 2]] *= f
+    mn, mx = v.min(0), v.max(0)
     v -= [(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2]
     faces = m.faces if np.linalg.det(np.diag(k)) > 0 and not (o.get('long') and (m.vertices.max(0) - m.vertices.min(0))[2] > (m.vertices.max(0) - m.vertices.min(0))[0]) else m.faces
     uv = m.visual.uv
