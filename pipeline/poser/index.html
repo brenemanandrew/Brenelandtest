@@ -1649,8 +1649,10 @@ function crBuild(){const root=$('creator');root.textContent='';CR.groups=[];CR.s
     const fb=tiles(p,'hair','Facial hair',null,E(BEARDS),ft('beard'),fset('beard'),'head',fvar('beard'));CR.syncers.push(()=>{fb.hidden=!(C&&C.face&&C.face.decals.BD);}); }
   { const p=CR.panels.body;
     const f=field(p,'Body frame'),w=crEl('div','chips');for(const[k,l]of [['plus','Feminine'],['male','Masculine']]){const b=crEl('button','chip wide',l);b.type='button';b.onclick=()=>crBody(k);w.append(b);CR.syncers.push(()=>b.classList.toggle('on',S.rig===k));}f.append(w);CR.syncers.push(()=>{f.hidden=S.identity!=='nb';});
-    slider(p,'Build','Slim',isMale()?'Heavy':'Plus','build',()=>buildName(bval()));
-    slider(p,'Muscle','Soft','Athletic','muscle',()=>Math.round((S.muscle||0)*100)+'%');
+    {const f=field(p,'Build'),w=crEl('div','chips');w.setAttribute('role','radiogroup');   // four fixed bodies (no in-between builds): every piece can be fitted and checked on each
+      for(const[l,bv,mu]of [['Thin',-100,0],['Average',0,0],['Athletic',0,100],['Plus',100,0]]){const bt=crEl('button','chip wide',l);bt.type='button';
+        bt.onclick=()=>{if(busy)return;$('build').value=bv;$('muscle').value=mu;for(const id of ['build','muscle']){$(id).dispatchEvent(new Event('input'));$(id).dispatchEvent(new Event('change'));}crSync();crRefresh();};
+        w.append(bt);CR.syncers.push(()=>bt.classList.toggle('on',Math.round(bval()*100)===bv&&Math.round((S.muscle||0)*100)===mu));}f.append(w);}
     const fa=field(p,'See it move'),wa=crEl('div','chips');const seen=new Set();for(const[k,l]of [['midle','Idle'],['fwalk','Walk'],['mrun','Run'],['orun','Run'],['dance','Dance'],['sit','Sit'],['wave','Wave'],['clap','Clap']]){if(!R||!R.bases.find(x=>x[0]===k)||seen.has(l))continue;seen.add(l);const b=crEl('button','chip',l);b.type='button';b.onclick=()=>crMove(k);wa.append(b);}fa.append(wa); }
   { const p=CR.panels.outfit;let any=false;for(const[sl,label,frame]of [['top','Top','torso'],['bottom','Bottoms','legs'],['shoes','Shoes','feet']]){const list=(R&&R.wear&&R.wear[sl])||[];if(!list.length)continue;any=true;tiles(p,'outfit',label,null,[['none',WEAR[sl].none],...list.map(k=>[k,WEAR[sl][k]])],ft(sl),fset(sl),frame,fvar(sl));}
     if(!any)p.append(crEl('p','ed-note','Clothes for this body are coming. Tap the check to keep going.')); }
@@ -1671,7 +1673,7 @@ const crLook=()=>({identity:S.identity||null,body:S.rig==='male'?'m':'f',voice:+
 function crRandom(){const pick=o=>{const k=Object.keys(o);return k[Math.floor(Math.random()*k.length)];},male=isMale(),r=()=>+(Math.random()*1.2-0.6).toFixed(2);
   S.feat={...ftNow(),hair:pick(HAIRS),hairColor:pick(HAIR_COLORS),skin:pick(SKIN_TONES),eyes:pick(EYE_SHAPES),eyeColor:pick(EYE_COLORS),brows:pick(BROWS),lips:male?(Math.random()<0.6?'subtle':'thin'):pick(LIPS),lipColor:male||Math.random()<0.5?'natural':pick(LIP_COLORS),nose:pick(NOSES),
     lashes:male?'soft':(Math.random()<0.7?'wing':'soft'),beard:male&&Math.random()<0.5?pick(BEARDS):'none',freckles:Math.random()<0.2,blush:!male&&Math.random()<0.35,mark:Math.random()<0.12,age:Math.random()<0.25?Math.random():0,eyeS:r(),eyeG:r(),eyeY:r(),browY:r(),mouthW:r(),mouthY:r()};
-  S.faceShape=FACE_SHAPES[Math.floor(Math.random()*FACE_SHAPES.length)][0];S.build=+(Math.random()*2-1).toFixed(2);S.muscle=Math.random()<0.35?+Math.random().toFixed(2):0;
+  S.faceShape=FACE_SHAPES[Math.floor(Math.random()*FACE_SHAPES.length)][0];{const B=[[-1,0],[0,0],[0,1],[1,0]][Math.floor(Math.random()*4)];S.build=B[0];S.muscle=B[1];}
   for(const st of STEPS)if(st[0]==='face'||st[0]==='hair')for(const k of st[3])CR.picked.add(S.rig+':'+k);
   syncUI();crChanged();crReact({smile:1,open:0.3,brow:0.8});clearTimeout(rebuildT);rebuildT=setTimeout(()=>{busy=true;try{rebuildForBuild();}finally{busy=false;}},30);}
 async function crBody(k){if(S.rig===k||busy)return;CR.queue=[];CR.looks[S.rig]={feat:S.feat,build:S.build,muscle:S.muscle,faceShape:S.faceShape,faceAmt:S.faceAmt};
