@@ -22,7 +22,7 @@ Start every prompt with the style block from `../STYLE.md`, then add the descrip
 - **T5 Fir:** A tall narrow cartoon spruce, five or six slim stacked tiers with drooping scalloped edges, blue-green and darker than a pine, lighter blue-green tier edges. Short dark trunk. About 9 metres tall.
 - **T6 Palm:** A cartoon palm tree with a gently curved ringed trunk, thicker at the base, and seven broad drooping fronds like folded paper leaves. Bright green fronds with a lighter centre line, tan trunk with simple painted rings.
 - **T7 Swing tree:** A grand old cartoon oak, extra thick trunk with big roots, one long strong horizontal limb reaching out to one side at about 3 metres height, wide crown of six or seven large soft leaf clumps. No swing, no rope.
-- **Autumn versions (T1, T2, T3):** same prompt, replace the leaf colour line with: leaves in warm autumn orange, gold and rust red (birch: golden yellow), watercolour wash. Or make one version with pale neutral leaves so the game can tint it by season (preferred, see SWAP.md).
+- **Leaf colour (T1, T2, T3) - decided:** make ONE version with pale neutral leaves so the game tints it by season. Replace the leaf colour line with: leaves in pale light grey-green with lighter tops and darker undersides in a soft watercolour wash. No autumn models.
 
 ## Hedges, flowers, ground plants
 | # | Asset | In the game today | Size | Triangles | Batch |

@@ -12,7 +12,7 @@ Facts about the live game, read from its code at breneland.fly.dev on 2026-11-14
 4. Keep what the game logic owns unchanged: colliders, seats, anchors (lamp light positions), wind sway, seasonal leaf colours, level of detail swaps.
 5. Check in game: day and night, near and far, frame rate in the woods.
 
-## Things that need a decision in the new project
-- Trees in the woods are instanced by the thousand with far versions of a few dozen triangles. A Meshy tree needs a near model AND a very low far model, or the woods keep their code-made trees and only hand-placed trees are swapped.
-- Leaf colour changes by season in code (one grey-ish leaf texture tinted by the game is the simplest way to keep that).
-- Vertex colours or textures: the current batch is vertex coloured. Watercolour wash is easier with a small texture.
+## Decisions (Andrew, 2026-11-14)
+- Woods: only hand-placed trees (yard, street, park) get Meshy models. The instanced woods and their far versions keep the code-made trees for now (T5 fir and T8 stay code-made until revisited).
+- Seasons: one model per tree with pale neutral leaves; the game tints them by season as it does today. No separate autumn models.
+- Colour: bake Meshy textures to vertex colours so models drop into the existing toon batch. A textured batch for a stronger watercolour wash can come later.
