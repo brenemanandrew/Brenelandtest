@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 96 96">
+<defs><g id="tb"><path d="M31 11 H65 Q69 11 69 15 V21 Q69 25 65 25 H55 V71 H65 Q69 71 69 75 V81 Q69 85 65 85 H31 Q27 85 27 81 V75 Q27 71 31 71 H41 V25 H31 Q27 25 27 21 V15 Q27 11 31 11 Z"/></g></defs>
+<use href="#tb" transform="translate(0 4)" fill="#2b2340" stroke="#2b2340" stroke-width="9" stroke-linejoin="round" opacity="0.32"/>
+<use href="#tb" fill="#2b2340" stroke="#2b2340" stroke-width="9" stroke-linejoin="round"/>
+<use href="#tb" fill="#fff8ec" stroke="none"/><rect x="41" y="27" width="4" height="42" rx="2" fill="#f1dfbd"/>
+</svg>

@@ -1,0 +1,4 @@
+/* The dance wheel (hud-emotes.js). A tap on Dance pops the wheel out again as the four dances, tinted with their colours. */
+.wheel.dances .wh-slot { background: color-mix(in srgb, var(--c, #fff) 38%, var(--mk-paper, #fff8ec)); }
+.wheel.dances .wh-hub { background: #ffb3d9; }
+@media (prefers-reduced-motion: reduce) { .wheel.dances .wh-slot { animation: none; } }

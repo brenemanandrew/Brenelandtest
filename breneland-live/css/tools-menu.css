@@ -1,0 +1,75 @@
+/* Andrew's tools menu (js/tools-menu.js): the loading screen's photos with a paper card on them. Play first and big, the three
+   editors as cards, then a row of tiles (Music & SFX, Voice booth, Exit: owner-tiles), smaller, the icon over the words. Over the loading card while the yard loads (.tm-over: see-through, the loading
+   card's own photos show), otherwise on its own collage. Phone first: everything is a big thumb target. */
+.tm {
+  position: fixed; inset: 0; z-index: 31; display: grid; place-items: center; overflow: auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: linear-gradient(#8fc7ee, #ffe3b8 70%, #f6d2a8);
+  touch-action: manipulation; -webkit-user-select: none; user-select: none;
+}
+.tm.tm-over { background: transparent; }
+.tm .collage-plate { display: none; }   /* the card is its own plate */
+.tm-card {
+  position: relative; z-index: 2; width: min(560px, 100%); display: grid; justify-items: center; gap: 12px;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 22px;
+  box-shadow: 0 5px 0 rgba(43, 35, 64, 0.9), 0 14px 30px rgba(43, 35, 64, 0.25);
+  padding: 18px 20px 20px;
+}
+.tm-logo { margin: -2px 0 0; line-height: 1.05; }
+.tm-hi { margin: 0; font: 700 18px var(--font-head); color: var(--ink); text-align: center; }
+.tm-play { font-size: 26px; padding: 14px 28px; min-height: 64px; }
+.tm-eds { width: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; } /* (pose-editor: four editors) */
+.tm-ed {
+  display: grid; justify-items: center; align-content: start; gap: 6px; text-align: center; text-decoration: none; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink);
+  padding: 12px 8px 10px; min-height: 64px; transition: transform 0.06s, box-shadow 0.06s;
+}
+.tm-ed:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--ink); }
+.tm-ed:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.tm-ic {
+  display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%;
+  background: var(--c, #ffd24a); border: 3px solid var(--ink);
+}
+.tm-ic svg { width: 30px; height: 30px; display: block; }
+.tm-txt { display: grid; gap: 2px; }
+.tm-txt b { font: 700 17px var(--font-head); }
+.tm-txt small { font: 700 12.5px var(--font-body); color: var(--muted); line-height: 1.25; }
+.tm-pc { margin: -2px 0 0; font: 700 13px var(--font-body); color: var(--muted); text-align: center; }
+.tm-tiles { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding-top: 12px; border-top: 2px dashed rgba(43, 35, 64, 0.25); }
+.tm-tile {
+  display: grid; justify-items: center; align-content: start; gap: 5px; text-align: center; text-decoration: none; color: var(--ink);
+  background: #fff; border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 4px 0 var(--ink); cursor: pointer;
+  padding: 10px 6px 9px; min-height: 64px; font: inherit; margin: 0; transition: transform 0.06s, box-shadow 0.06s;
+}
+.tm-tile:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--ink); }
+.tm-tile:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.tm-tile .tm-ic { width: 42px; height: 42px; }
+.tm-tile .tm-ic svg { width: 27px; height: 27px; }
+.tm-tile .tm-txt b { font-size: 16px; }
+.tm-tile .tm-txt small { font-size: 12px; }
+/* Breneland's clock (clock-lag): how far behind, then two round icon buttons, real time and 5 pm now */
+.tm-clock { width: 100%; display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: 2px dashed rgba(43, 35, 64, 0.25); }
+.tm-clock-txt { flex: 1; margin: 0; font: 700 14px var(--font-body); color: var(--ink); }
+.tm-clock-btn { flex: none; display: grid; place-items: center; width: 52px; height: 52px; padding: 0; margin: 0; cursor: pointer;
+  background: #fff; border: 3px solid var(--ink); border-radius: 50%; box-shadow: 0 3px 0 var(--ink); transition: transform 0.06s, box-shadow 0.06s; }
+.tm-clock-btn .tm-ic { width: 38px; height: 38px; border-width: 0; }
+.tm-clock-btn .tm-ic svg { width: 28px; height: 28px; }
+.tm-clock-btn:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+.tm-clock-btn:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.tm-ed:focus-visible, .tm-tile:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+
+/* a phone held upright: the editors as rows, the icon beside the words */
+@media (max-width: 600px) {
+  .tm-card { padding: 16px 14px 16px; gap: 10px; }
+  .tm-eds { grid-template-columns: 1fr; gap: 9px; }
+  .tm-ed { grid-template-columns: auto 1fr; justify-items: start; align-items: center; text-align: left; gap: 12px; padding: 9px 12px; }
+  .tm-ic { width: 44px; height: 44px; }
+  .tm-tiles { gap: 8px; padding-top: 10px; }
+  .tm-tile { padding: 9px 4px 8px; }
+  .tm-tile .tm-txt b { font-size: 15px; line-height: 1.1; }
+}
+/* a narrow phone: the tiles' short lines go, the icon and the name stay */
+@media (max-width: 360px) { .tm-tile .tm-txt small { display: none; } }
+/* a short screen (a phone on its side): the card as compact as it goes */
+@media (max-height: 520px) { .tm-card { gap: 8px; padding-top: 12px; padding-bottom: 12px; } .tm-play { min-height: 52px; padding: 8px 24px; } }
+@media (prefers-reduced-motion: reduce) { .tm-ed, .tm-tile, .tm-clock-btn { transition: none; } }

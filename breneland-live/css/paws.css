@@ -1,0 +1,58 @@
+/* Dog affection levels (js/paws.js): the four paws under a dog's name tag, and the "Pet Owner" popup. */
+
+/* the paws ride under the tag (an absolute child: the tag's own measured size and the bubbles' spacing are untouched) */
+.tag3d .paws {
+  position: absolute; left: 50%; top: 100%; translate: -50% 3px;
+  display: flex; gap: 2px; padding: 1px 4px 2px; border-radius: 999px;
+  background: rgba(43, 35, 64, 0.72); border: 2px solid rgba(255, 255, 255, 0.55);
+}
+.paw { width: 13px; height: 13px; display: block; overflow: visible; }
+.paw path, .paw ellipse { fill: none; stroke: rgba(255, 255, 255, 0.85); stroke-width: 2.4; stroke-linejoin: round; }
+.paw.on path, .paw.on ellipse { fill: #ffd34d; stroke: #2b2340; stroke-width: 1.8; }
+/* a newly lit paw pops in (the row gets .gain for a moment when a level changes) */
+@media (prefers-reduced-motion: no-preference) {
+  .paws.gain .paw.on { animation: paw-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+}
+@keyframes paw-pop { 0% { transform: scale(0.6); } 100% { transform: scale(1); } }
+
+/* ---- the popup: a big centred card over the HUD, under the menus */
+.paws-pop { position: fixed; inset: 0; z-index: 14; display: grid; place-items: center; padding: 16px; background: rgba(43, 35, 64, 0); pointer-events: auto; transition: background 0.3s; }
+.paws-pop.in { background: rgba(43, 35, 64, 0.35); }
+.paws-pop.out { background: rgba(43, 35, 64, 0); }
+.paws-card {
+  position: relative; width: min(440px, calc(100vw - 32px)); padding: 24px 22px 22px; text-align: center; color: var(--ink, #2b2340);
+  background: var(--paper, #fff8ec); border: 4px solid var(--ink, #2b2340); border-radius: 28px;
+  box-shadow: 0 8px 0 var(--ink, #2b2340), 0 18px 40px rgba(43, 35, 64, 0.3); font-family: var(--font-head, "Fredoka", sans-serif);
+  transform: scale(0.6) rotate(-4deg); opacity: 0;
+}
+.paws-pop.in .paws-card { transform: none; opacity: 1; }
+.paws-pop.out .paws-card { transform: scale(0.8); opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .paws-card { transition: transform 0.42s cubic-bezier(0.3, 1.5, 0.5, 1), opacity 0.25s; }
+  .paws-pop.out .paws-card { transition: transform 0.25s ease-in, opacity 0.25s; }
+}
+@media (prefers-reduced-motion: reduce) { .paws-card { transition: opacity 0.2s; transform: none; } }
+.paws-card::before { content: ""; position: absolute; left: 18px; right: 18px; top: -4px; height: 9px; border-radius: 0 0 10px 10px; background: #ffd34d; border: 3px solid var(--ink, #2b2340); border-top: 0; }
+.paws-card-paws { display: flex; justify-content: center; gap: 8px; margin: 6px 0 10px; }
+.paws-card-paws .paw { width: 38px; height: 38px; }
+.paws-card-paws .paw path, .paws-card-paws .paw ellipse { stroke: var(--ink, #2b2340); stroke-width: 1.8; }
+.paws-card h2 { margin: 0; font: 700 clamp(26px, 6vw, 38px)/1.1 var(--font-head, "Fredoka", sans-serif); letter-spacing: 0.01em; }
+.paws-gratz { margin: 4px 0 8px; font: 700 clamp(44px, 11vw, 72px)/1 var(--font-head, "Fredoka", sans-serif); color: #e8743a; -webkit-text-stroke: 2px var(--ink, #2b2340); text-shadow: 0 5px 0 var(--ink, #2b2340); transform: rotate(-4deg); }
+.paws-card p { margin: 0 0 16px; font: 700 17px/1.35 var(--font-body, "Nunito", sans-serif); color: #3b3352; }
+.paws-ok { font: 700 20px var(--font-head, "Fredoka", sans-serif); padding: 10px 26px; }
+.paws-ok:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 3px; }
+
+/* confetti: paper bits falling from the top, pure CSS (no canvas) */
+.paws-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.paws-confetti span {
+  position: absolute; left: var(--x); top: -4%; width: 12px; height: 18px; border-radius: 3px; background: var(--c);
+  transform: scale(var(--s)) rotate(var(--r)); opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .paws-pop.in .paws-confetti span { animation: paws-fall var(--d) cubic-bezier(0.2, 0.6, 0.4, 1) var(--w) 1 forwards; }
+}
+@keyframes paws-fall {
+  0% { transform: translateY(0) scale(var(--s)) rotate(var(--r)); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translateY(110vh) scale(var(--s)) rotate(calc(var(--r) + 420deg)); opacity: 0; }
+}

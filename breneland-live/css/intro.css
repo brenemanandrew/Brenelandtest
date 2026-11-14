@@ -1,0 +1,14 @@
+/* The morning: the eyelids over the canvas while you wake (intro.js moves them), under the skip prompt (z 12)
+   and the fade (z 15). Closed, the two lids meet in the middle with soft edges; open, they are off the screen. */
+.intro-lids { position: fixed; inset: 0; z-index: 11; pointer-events: none; overflow: hidden; }
+.intro-lids[hidden] { display: none; }
+.intro-lids .lid {
+  position: absolute; left: -10%; right: -10%; height: 58%; background: #0c0a12; will-change: transform;
+  box-shadow: 0 0 7vh 5vh #0c0a12;
+}
+.intro-lids .lid.top { top: 0; border-radius: 0 0 50% 50% / 0 0 22% 22%; }
+.intro-lids .lid.bot { bottom: 0; border-radius: 50% 50% 0 0 / 22% 22% 0 0; }
+.intro-lids.opening .lid { transition: transform 0.4s ease-out; }
+
+/* the skip prompt (only on a visit that may skip: main.js shows it), worded for the device in your hands */
+#skip.intro-skip { pointer-events: auto; cursor: pointer; }

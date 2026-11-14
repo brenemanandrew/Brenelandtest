@@ -1,0 +1,102 @@
+/* Name + PIN on the start screen (accounts.js). Loaded after style.css and editor.css. */
+
+/* the panel stacks as a column so whichever step is showing (the editor or the PIN pad) takes the free height */
+#start .start-panel { display: flex; flex-direction: column; }
+#start .start-panel > * { flex: 0 0 auto; }
+#start .start-panel > #avatar-editor, #start .start-panel > .acct-view { flex: 1 1 auto; min-height: 0; }
+#start .start-panel > [hidden] { display: none; }
+
+/* ---- under the name box, and under Step outside ---- */
+.acct-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: -4px; min-height: 0; text-align: left; }
+.acct-row[hidden] { display: none; }
+.acct-note { margin: 0; font: 700 13px var(--font-body); color: var(--muted); }
+.acct-note.err { color: #b8322a; }
+.acct-note:empty { display: none; }
+.acct-link {
+  font: 700 14px var(--font-head); color: var(--accent-2); background: none; border: 0; padding: 2px 4px; margin: 0;
+  cursor: var(--cur-pointer, pointer); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; border-radius: 6px;
+}
+.acct-link:hover { color: #2c6fb3; }
+.acct-link:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.acct-link[hidden] { display: none; }
+.acct-switch { flex: none; margin-left: auto; }
+#start .acct-guest { align-self: center; margin-top: -4px; font-size: 14px; color: var(--muted); }
+#start .acct-guest:hover { color: var(--ink); }
+
+/* ---- the PIN step ---- */
+.acct-view { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 6px 0 2px; overflow: auto; }
+.acct-step {
+  font: 700 12px var(--font-head); letter-spacing: 0.1em; text-transform: uppercase; color: #fff;
+  background: var(--accent-2); border: 2.5px solid var(--ink); border-radius: 99px; padding: 3px 12px; box-shadow: 0 3px 0 var(--ink);
+}
+.acct-step[hidden] { display: none; }
+.acct-title { margin: 2px 0 0; font: 700 clamp(22px, 3.2vw, 28px)/1.15 var(--font-head); color: var(--ink); overflow-wrap: anywhere; }
+.acct-sub { margin: -2px 0 2px; max-width: 36ch; text-wrap: balance; font: 700 15px/1.35 var(--font-body); color: var(--muted); }
+
+.pin-boxes { position: relative; display: flex; gap: 12px; margin: 4px 0 0; }
+.pin-boxes[hidden], .pin-pad[hidden] { display: none; }
+.pin-box {
+  width: 56px; height: 64px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; box-shadow: 0 4px 0 var(--ink);
+  display: grid; place-items: center; transition: transform 0.08s, background 0.15s;
+}
+.pin-box::after { content: ''; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); transform: scale(0); transition: transform 0.12s cubic-bezier(0.3, 1.8, 0.5, 1); }
+.pin-box.on::after { transform: scale(1); }
+.pin-box.on { transform: translateY(-2px); }
+.pin-boxes:focus-within .pin-box.next { border-color: var(--accent-2); box-shadow: 0 4px 0 var(--accent-2); }
+.pin-boxes.bad .pin-box, .pin-boxes.bad:focus-within .pin-box.next { border-color: #d0453b; background: #fff0ee; box-shadow: 0 4px 0 var(--ink); }
+.pin-boxes.good .pin-box { background: var(--grass); }
+.pin-boxes.good .pin-box::after { background: #fff; }
+/* the real field sits over the boxes: typing, Backspace and paste land in it; its own text and caret stay invisible */
+.pin-input {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; margin: 0;
+  font-size: 16px; color: transparent; caret-color: transparent; background: transparent; cursor: var(--cur-text, text);
+}
+.pin-boxes.shake { animation: pin-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes pin-shake {
+  10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(5px); }
+  30%, 50%, 70% { transform: translateX(-9px); } 40%, 60% { transform: translateX(9px); }
+}
+
+.acct-msg { margin: 0; min-height: 20px; font: 700 15px var(--font-head); color: var(--muted); }
+.acct-msg.err { color: #b8322a; }
+
+.pin-pad { display: grid; grid-template-columns: repeat(3, 68px); gap: 9px; margin-top: 2px; }
+.pin-key {
+  height: 50px; font: 700 23px var(--font-head); color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 14px;
+  box-shadow: 0 4px 0 var(--ink); cursor: var(--cur-pointer, pointer); padding: 0; touch-action: manipulation;
+  transition: transform 0.06s, box-shadow 0.06s;
+}
+.pin-key:hover { transform: translateY(-1px); box-shadow: 0 5px 0 var(--ink); }
+.pin-key:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.pin-key:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.pin-key.pin-fn { background: var(--paper-2); font-size: 20px; }
+.pin-key.pin-clear { font-size: 15px; }
+
+.acct-guest-go { width: 100%; font-size: 20px; padding: 11px 20px; margin-top: 4px; }
+.acct-guest-go[hidden] { display: none; }
+.acct-links { display: flex; gap: 18px; justify-content: center; margin-top: 2px; }
+.acct-forgot { margin: -4px 0 0; font: 700 12px var(--font-body); color: var(--muted); }
+.acct-forgot[hidden] { display: none; }
+
+/* no dice or wave buttons while you type a PIN (the avatar is not yours to change until you are in) */
+#start.acct-pin .ed-fab { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-box, .pin-box::after, .pin-key { transition: none; }
+}
+
+/* phones (portrait and landscape): the panel is shorter */
+@media (max-width: 899px), (max-height: 559px) {
+  .acct-row { margin-top: -2px; }
+  .acct-view { gap: 7px; padding: 2px 0 0; }
+  .acct-title { font-size: 22px; }
+  .acct-sub { font-size: 14px; }
+  .pin-box { width: 50px; height: 56px; }
+  .pin-pad { grid-template-columns: repeat(3, 76px); gap: 8px; }
+  .pin-key { height: 48px; }
+  #start .acct-guest { margin-top: -2px; font-size: 13px; }
+}
+@media (max-height: 559px) {
+  .acct-sub { display: none; }
+  .pin-key { height: 40px; }
+}

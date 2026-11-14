@@ -1,0 +1,69 @@
+/* Peak Threads (clothing-store.js) and the wardrobe at home (wardrobe.js): a card for a piece on the rack, the fitting room's bar,
+   the wardrobe's panel. Cream paper, the ink outline and the hard shadow like the rest of the HUD; icons over words; every button
+   44 px or more for thumbs. */
+.cl-card, .cl-bar, .wd-panel {
+  --ink: #2b2340; --paper: #fbf6e8; --gold: #f2cf7a;
+  position: fixed; z-index: 40; box-sizing: border-box; font-family: var(--font-body); color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; box-shadow: 0 5px 0 rgba(43, 35, 64, 0.85);
+  -webkit-user-select: none; user-select: none; pointer-events: auto;
+}
+.cl-card[hidden], .cl-bar[hidden], .wd-panel[hidden], .cl-card [hidden], .wd-panel [hidden] { display: none !important; }
+.cl-card { left: 50%; top: 50%; translate: -50% -50%; width: min(340px, calc(100vw - 24px)); padding: 14px 16px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cl-x { position: absolute; right: 4px; top: 4px; width: 44px; height: 44px; padding: 8px; border: 0; background: transparent; border-radius: 22px; cursor: pointer; }
+.cl-x svg, .cl-ic svg { display: block; width: 100%; height: 100%; }
+.cl-ic { display: inline-block; width: 28px; height: 28px; vertical-align: middle; }
+.cl-pic { width: 160px; height: 160px; border-radius: 14px; background: #e9e0cf; border: 2px solid var(--ink); overflow: hidden; display: grid; place-items: center; }
+.cl-pic canvas { width: 100%; height: 100%; display: block; }
+.cl-name { font: 700 22px/1.1 var(--font-head); text-align: center; }
+.cl-kind { font: 600 13px var(--font-body); color: #6f6a7a; letter-spacing: 0.06em; text-transform: uppercase; }
+.cl-price { display: flex; align-items: center; gap: 6px; font: 800 24px var(--font-head); }
+.cl-price .cl-ic { width: 34px; height: 34px; }
+.cl-price.owned { font-size: 15px; color: #3f7a4f; }
+.cl-btns { display: flex; gap: 12px; margin-top: 4px; }
+.cl-btn {
+  min-width: 56px; height: 56px; padding: 6px 14px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 3px solid var(--ink); border-radius: 14px; background: #fff; color: var(--ink); font: 800 20px var(--font-head);
+  box-shadow: 0 4px 0 rgba(43, 35, 64, 0.85); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.cl-btn:active { translate: 0 2px; box-shadow: 0 2px 0 rgba(43, 35, 64, 0.85); }
+.cl-btn:focus-visible, .cl-x:focus-visible, .wd-tile:focus-visible, .wd-tab:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.cl-btn.buy { background: #bfe6f7; }
+.cl-btn.try { background: #e9e0cf; }
+.cl-btn.done { background: var(--gold); }
+.cl-btn[disabled] { opacity: 0.45; cursor: default; }
+.cl-btn .cl-ic { width: 30px; height: 30px; }
+.cl-note { font: 600 13px var(--font-body); color: #6f6a7a; text-align: center; }
+/* the fitting room's bar along the bottom: turn, buy, done */
+.cl-bar { left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); translate: -50% 0; width: min(460px, calc(100vw - 12px)); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 20px; }
+.cl-bar .cl-name { flex: 1 1 0; min-width: 0; font-size: 18px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#hud.cl-fit > :not(.cl-bar):not(#toasts):not(.toasts):not(#hint) { visibility: hidden; }
+#hud.cl-fit #hint { visibility: hidden; }
+/* the wardrobe: tabs of kinds down the left (across the top upright), tiles of what you own */
+.wd-panel { left: 50%; top: 50%; translate: -50% -50%; width: min(560px, calc(100vw - 20px)); max-height: calc(100vh - 20px); display: flex; gap: 10px; padding: 12px; }
+.wd-tabs { flex: none; display: flex; flex-direction: column; gap: 6px; }
+.wd-tab { width: 52px; height: 52px; padding: 8px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; cursor: pointer; box-shadow: 0 3px 0 rgba(43, 35, 64, 0.85); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.wd-tab .cl-ic { width: 100%; height: 100%; }
+.wd-tab[aria-selected="true"] { background: var(--gold); }
+.wd-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.wd-head { display: flex; align-items: center; gap: 8px; min-height: 36px; padding-right: 44px; }
+.wd-title { flex: 1; font: 700 22px/1 var(--font-head); }
+.wd-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; align-content: start; padding: 2px; }
+.wd-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px 8px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; cursor: pointer; box-shadow: 0 3px 0 rgba(43, 35, 64, 0.85); touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.wd-tile[aria-checked="true"] { background: #dff3ff; }
+.wd-tile .wd-pic { width: 84px; height: 84px; border-radius: 10px; background: #e9e0cf; overflow: hidden; display: grid; place-items: center; }
+.wd-tile .wd-pic canvas { width: 100%; height: 100%; display: block; }
+.wd-tile .wd-pic .cl-ic { width: 44px; height: 44px; }
+.wd-tile .wd-name { font: 700 12px/1.1 var(--font-body); text-align: center; }
+.wd-tile .wd-on { position: absolute; right: -6px; top: -6px; width: 26px; height: 26px; border-radius: 13px; background: var(--gold); border: 2px solid var(--ink); display: none; }
+.wd-tile[aria-checked="true"] .wd-on { display: block; }
+.wd-tile .wd-on svg { width: 100%; height: 100%; }
+.wd-empty { grid-column: 1 / -1; padding: 18px 8px; text-align: center; font: 600 14px var(--font-body); color: #6f6a7a; }
+#hud.wd-on > :not(.wd-panel):not(#toasts):not(.toasts) { visibility: hidden; }
+@media (max-width: 560px), (max-height: 460px) {
+  .wd-panel { flex-direction: column; width: calc(100vw - 16px); max-height: calc(100vh - 12px); padding: 8px; }
+  .wd-tabs { flex-direction: row; justify-content: center; }
+  .wd-tab { width: 46px; height: 46px; }
+  .wd-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
+  .wd-tile .wd-pic { width: 68px; height: 68px; }
+  .cl-pic { width: 128px; height: 128px; }
+}

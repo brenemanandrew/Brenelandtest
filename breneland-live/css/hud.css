@@ -1,0 +1,487 @@
+/* The gameplay HUD: Andrew's saved layouts, drawn like his mockup editors (docs/refs/hud-mockups/*.html). Where each piece
+   sits isn't in this file: hud-layout.js places every piece from the layout data (docs/refs/andrew-*-hud-layout*.json) and
+   writes --s on it (screen px per mockup px). This file draws the pieces at that scale: sizes are calc(var(--s) * the
+   mockup's px), text never below a floor, borders between 2 and 4 px. #hud[data-hud] = phone-portrait | phone-landscape |
+   tablet | pc | pad; data-layout = phone | pc | pad (the mini-games' CSS keys on it). TVs zoom #hud (style.css). */
+:root {
+  --hud-yellow: #ffd34d; --hud-sky: #8fd0ee; --hud-pink: #ff8fb8; --hud-purple: #b48cff; --hud-green: #a8e06b;
+  --hud-orange: #ff9f4a; --hud-navy: #2b2d55; --hud-red: #e0463c;
+  /* the mockups' own colours */
+  --mk-ink: #2b2340; --mk-paper: #fff8ec; --mk-orange: #f6a65a; --mk-sky: #8fd0ee; --mk-yellow: #ffd24a; --mk-green: #7dd36a;
+  --mk-pink: #f58ab0; --mk-purple: #b79cf0; --mk-lilac: #c8b1f5; --mk-red: #e0463c;
+}
+#hud { --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px); --safe-r: env(safe-area-inset-right, 0px); --safe-l: env(safe-area-inset-left, 0px); --u: 1; }
+.hud-safe-probe { position: absolute; width: 0; height: 0; padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l); visibility: hidden; pointer-events: none !important; }
+/* a border that follows the scale but stays a cartoon ink line */
+#hud { --bw: clamp(2px, calc(var(--u) * 2.5px), 4px); --bw3: clamp(2.5px, calc(var(--u) * 3px), 4.5px); }
+
+/* the containers cover the screen and let taps through; each piece inside is placed by hud-layout.js */
+#hud > .mm-block, #hud > #chat, #hud > .toolring, #hud > .currency, #hud > .quests { position: absolute; inset: 0; width: auto; height: auto; pointer-events: none; }
+#hud .hud-off { display: none !important; }
+#hud .hud-cx { translate: -50% 0; } /* (the translate property, not transform: a pill's own pop or press animates transform, and must not
+   throw a centred piece half its width sideways while it plays) */
+#hud :is(#minimap, #btn-help, #online, #place, #hud-time, #hud-wx, .qt-head, .qt-body, #chat-log, #chat-form, #mic-toggle, #tg-emotes, #btn-act, #tg-tools, #crosspad, #map, .cur, .pad-name, .pad-slot, .logoff, .quest-flare) { position: absolute; box-sizing: border-box; }
+#hud :is(#minimap, #btn-help, #online, #hud-time, #hud-wx, .qt-head, #chat-form, #mic-toggle, #tg-emotes, #btn-act, #tg-tools, .cur, .pad-slot, #map) { pointer-events: auto; }
+
+/* layering: the minimap, the big map over it, buttons and pills over both. The place name sits over the minimap's edge
+   (the piece with words wins) */
+#hud #minimap { z-index: 2; }
+#hud #place { z-index: 3; }
+#hud #map { z-index: 4; }
+#hud #chat-log { z-index: 4; }
+#hud :is(#btn-help, #online, .qt-head, .cur, #chat-form, #mic-toggle, #btn-act, #tg-emotes, .pad-name, .pad-slot) { z-index: 5; }
+#hud .qt-body { z-index: 6; }
+#hud #crosspad { z-index: 7; }
+#hud #tg-tools { z-index: 8; } /* (over its own radial: the radial turns about its middle) */
+#hud > .wheel, #hud .tool-pick { z-index: 9; }
+#hud .logoff, #hud .quest-flare { z-index: 9; }
+#hud #chat.open #chat-form { z-index: 10; }
+/* a piece with words under an open popout (the radial, the emote wheel, the big map, the quest list, the picker) steps aside
+   until it closes (hud-clear.js) */
+#hud .pop-under { visibility: hidden !important; }
+
+/* ================================================================ shared looks */
+.pill {
+  display: inline-flex; align-items: center; gap: 7px; height: 40px; font: 700 17px var(--font-head); color: var(--ink);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 99px; padding: 0 14px; box-shadow: 0 4px 0 var(--ink);
+  white-space: nowrap;
+}
+
+/* ---------- the minimap (116 x 84 in the mockup) ---------- */
+.minimap {
+  width: 240px; height: 176px; border: var(--bw3) solid var(--ink); border-radius: calc(var(--s, 1) * 18px); overflow: hidden;
+  background: #5fb3e6; box-shadow: 0 calc(var(--s, 1) * 3px) 0 var(--ink), 0 0 0 calc(var(--s, 1) * 3px) rgba(255, 248, 236, 0.85); cursor: pointer;
+}
+.minimap canvas { display: block; width: 100%; height: 100%; }
+.mm-north { position: absolute; left: calc(var(--s, 1) * 6px); top: calc(var(--s, 1) * 6px); width: max(16px, calc(var(--s, 1) * 18px)); height: max(16px, calc(var(--s, 1) * 18px)); border-radius: 50%; display: grid; place-items: center; font: 700 max(10px, calc(var(--s, 1) * 11px)) var(--font-head); color: #fff; background: var(--ink); border: 2px solid #fff; pointer-events: none; }
+.mm-open { position: absolute; inset: 0; width: 100%; height: 100%; background: transparent; border: 0; padding: 0; cursor: pointer; border-radius: inherit; }
+
+/* ---------- the time and the weather (hud-loose, Andrew 2026-11-05: "the time and weather should be pills"): two cream pills, the
+   place pill's height, side by side over the map's top-right corner (hud-layout.js keeps them to it, the pad's too). The clock:
+   a clock face and "1:00 pm", a tap opens the big map. The weather: its icon and "61°", its word on hover on a PC (hud-tips.js).
+   (hud3 had them in one strip along the map's top) ---------- */
+.mm-time { display: flex; align-items: stretch; height: max(22px, calc(var(--s, 1) * 28px)); border: var(--bw) solid var(--ink); border-radius: 99px; overflow: hidden;
+  background: var(--mk-paper); box-shadow: 0 calc(var(--s, 1) * 2px) 0 var(--ink); }
+.mm-time .pill { height: auto; background: transparent; color: var(--ink); border: 0; border-radius: 0; box-shadow: none; padding: 0 max(7px, calc(var(--s, 1) * 10px));
+  font: 700 max(12px, calc(var(--s, 1) * 13px)) var(--font-head); gap: max(4px, calc(var(--s, 1) * 5px)); font-variant-numeric: tabular-nums; }
+.mm-time .pill[hidden] { display: none; }
+#hud :is(#hud-time, #hud-wx) { z-index: 3; } /* (under the big map and its X, as the strip was) */
+#hud #hud-time { cursor: pointer; }
+#hud #hud-wx:has(> .wx[hidden]) { display: none; } /* (no forecast yet: no pill) */
+.clock-ic { position: relative; flex: none; width: max(11px, calc(var(--s, 1) * 13px)); height: max(11px, calc(var(--s, 1) * 13px)); border-radius: 50%; box-sizing: border-box;
+  border: 2px solid var(--ink); background: #fff; }
+.clock-ic::before, .clock-ic::after { content: ''; position: absolute; left: calc(50% - 1px); bottom: 50%; width: 2px; background: var(--ink); border-radius: 1px; transform-origin: 50% 100%; }
+.clock-ic::before { height: 32%; transform: rotate(-60deg); }
+.clock-ic::after { height: 42%; }
+.wx-ic { width: 22px; height: 18px; flex: none; background: var(--ink); transform: scale(min(1, max(0.75, calc(var(--s, 1) * 0.9)))); }
+.wx-ic.sun { width: 18px; border-radius: 50%; background: #ffc93a; box-shadow: 0 0 0 2px #ffe89a inset; border: 2px solid var(--ink); box-sizing: border-box; }
+.wx-ic.moon { width: 18px; border-radius: 50%; background: transparent; box-shadow: inset -6px -3px 0 0 #f2c230; transform: rotate(-20deg); }
+.wx-ic.cloud, .wx-ic.fog { background: #8f99ad; clip-path: path("M5 17 a5 5 0 0 1 0 -10 a7 7 0 0 1 13 1 a4.5 4.5 0 0 1 0 9 Z"); }
+.wx-ic.rain { background: #3f8fd9; clip-path: path("M5 11 a5 5 0 0 1 0 -9 a6 6 0 0 1 11 1 a4 4 0 0 1 0 8 Z M5 13 l-2 5 h2 l2 -5 Z M11 13 l-2 5 h2 l2 -5 Z M17 13 l-2 5 h2 l2 -5 Z"); }
+.wx-ic.storm { background: #e0a020; clip-path: path("M5 10 a5 5 0 0 1 0 -9 a6 6 0 0 1 11 1 a4 4 0 0 1 0 8 Z M12 10 l-5 6 h4 l-2 4 l7 -7 h-4 l2 -3 Z"); }
+.wx-ic.snow { background: #4f9fd8; clip-path: path("M10 0 h2 v18 h-2 Z M2.2 4.5 l1 -1.7 l15.6 9 l-1 1.7 Z M2.2 13.5 l15.6 -9 l1 1.7 l-15.6 9 Z"); }
+.wx-ic.wind { background: #6d6480; clip-path: path("M2 6 h12 a3 3 0 1 0 -3 -3 h-2 a5 5 0 1 1 5 5 h-12 Z M2 11 h16 a3 3 0 1 1 -3 3 h2 a1 1 0 1 0 1 -1 h-16 Z"); }
+
+/* ---------- ? (a purple round, 34) ---------- */
+.mm-help {
+  display: grid; place-items: center; padding: 0; border-radius: 50%; cursor: pointer;
+  background: var(--mk-purple); color: var(--ink); font: 700 max(16px, calc(var(--s, 1) * 18px)) var(--font-head);
+  border: var(--bw3) solid var(--ink); box-shadow: 0 calc(var(--s, 1) * 2.5px) 0 var(--ink);
+}
+/* ---------- the place name (a yellow pill, 24 high) ---------- */
+.mm-place {
+  display: flex; align-items: center; gap: max(3px, calc(var(--s, 1) * 4px)); height: max(22px, calc(var(--s, 1) * 28px)); padding: 0 max(8px, calc(var(--s, 1) * 10px));
+  font: 700 max(12px, calc(var(--s, 1) * 12px)) var(--font-head); color: var(--ink); background: var(--mk-yellow); border: var(--bw) solid var(--ink); border-radius: 99px;
+  white-space: nowrap; transition: opacity 0.3s; pointer-events: none; max-width: 60vw; overflow: hidden; text-overflow: ellipsis;
+}
+.mm-place::before { content: ""; flex: none; width: 10px; height: 13px; background: var(--ink); clip-path: path("M5 0 C2.2 0 0 2.2 0 4.9 C0 8.4 5 13 5 13 S10 8.4 10 4.9 C10 2.2 7.8 0 5 0 Z M5 7 a2 2 0 1 1 0 -4 a2 2 0 0 1 0 4 Z"); }
+/* ---------- who is here (a pink pill with a heart) ---------- */
+.mm-online {
+  display: flex; align-items: center; justify-content: center; gap: max(2px, calc(var(--s, 1) * 4px)); height: max(24px, calc(var(--s, 1) * 38px)); min-width: max(24px, calc(var(--s, 1) * 36px));
+  padding: 0 max(5px, calc(var(--s, 1) * 11px)) 0 max(4px, calc(var(--s, 1) * 9px)); border-radius: 99px; cursor: pointer; font: 700 max(14px, calc(var(--s, 1) * 15px)) var(--font-head); color: var(--ink);
+  background: var(--mk-pink); border: var(--bw) solid var(--ink); box-shadow: 0 calc(var(--s, 1) * 2.5px) 0 var(--ink);
+}
+.mm-online .dot { width: 15px; height: 13px; scale: clamp(0.75, var(--s, 1), 1.6); background: #fff; flex: none; clip-path: path("M7.5 13 L1.7 7.6 C-0.6 5.4 0.3 1.6 3.3 0.7 C5 0.2 6.6 0.9 7.5 2.1 C8.4 0.9 10 0.2 11.7 0.7 C14.7 1.6 15.6 5.4 13.3 7.6 Z"); transition: background 0.3s; }
+.mm-online.online .dot { background: var(--hud-red); }
+.mm-help:active, .mm-online:active { translate: 0 2px; box-shadow: 0 1px 0 var(--ink); }
+.who { position: absolute; min-width: 200px; padding: 10px 14px; z-index: 11; background: #fffdf5; pointer-events: auto; }
+.who-title { font: 700 13px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.who-row { display: flex; align-items: center; gap: 8px; font: 700 16px var(--font-head); padding: 2px 0; }
+.who-row i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); background: var(--c, #ffd34d); flex: none; }
+.who-row.me { color: var(--accent); }
+
+/* ---------- the big map: a popout over the minimap (288 x 214 in the mockup), under the top bar's buttons ---------- */
+#hud #map { display: block; border: var(--bw3) solid var(--ink); border-radius: calc(var(--s, 1) * 18px); overflow: hidden; background: #5fb3e6; box-shadow: 0 calc(var(--s, 1) * 4px) 0 var(--ink); animation: bm-in 0.18s cubic-bezier(.3, 1.4, .5, 1); }
+#hud #map[hidden] { display: none; }
+@keyframes bm-in { from { opacity: 0; scale: 0.92; } }
+#map canvas { display: block; width: 100%; height: 100%; }
+.bm-place { position: absolute; left: calc(var(--s, 1) * 8px); top: calc(var(--s, 1) * 8px); display: flex; align-items: center; height: max(22px, calc(var(--s, 1) * 24px)); padding: 0 max(8px, calc(var(--s, 1) * 10px)); font: 700 max(12px, calc(var(--s, 1) * 12px)) var(--font-head); color: var(--ink); background: var(--mk-yellow); border: var(--bw) solid var(--ink); border-radius: 99px; pointer-events: none; }
+.bm-place:empty { display: none; }
+.bm-close { position: absolute; right: calc(var(--s, 1) * 8px); top: calc(var(--s, 1) * 8px); display: grid; place-items: center; width: max(26px, calc(var(--s, 1) * 30px)); height: max(26px, calc(var(--s, 1) * 30px)); padding: 0; border-radius: 50%; cursor: pointer; background: var(--mk-paper); border: var(--bw) solid var(--ink); }
+.bm-x { width: 45%; height: 45%; background: var(--ink); clip-path: polygon(15% 0, 50% 35%, 85% 0, 100% 15%, 65% 50%, 100% 85%, 85% 100%, 50% 65%, 15% 100%, 0 85%, 35% 50%, 0 15%); }
+.bm-b { display: none; }
+/* the pad: "B Close" in the bottom-right corner instead of an X */
+#hud[data-hud="pad"] .bm-close { top: auto; bottom: calc(var(--s, 1) * 8px); width: auto; height: max(22px, calc(var(--s, 1) * 24px)); padding: 0 max(8px, calc(var(--s, 1) * 10px)) 0 max(3px, calc(var(--s, 1) * 4px)); border-radius: 99px; display: flex; gap: 5px; align-items: center; font: 700 max(12px, calc(var(--s, 1) * 12px)) var(--font-head); color: var(--ink); }
+#hud[data-hud="pad"] .bm-x { display: none; }
+#hud[data-hud="pad"] .bm-b { display: inline; }
+#hud[data-hud="pad"] .bm-close::before { content: "B"; display: grid; place-items: center; width: max(16px, calc(var(--s, 1) * 18px)); height: max(16px, calc(var(--s, 1) * 18px)); border-radius: 50%; border: 2px solid var(--ink); background: #f4a09a; font-size: 0.85em; }
+
+/* ---------- quests: the orange pill (34 high), its open list under it ---------- */
+.quests { display: block; }
+.qt-head {
+  display: flex; align-items: center; gap: max(4px, calc(var(--s, 1) * 7px)); max-width: min(60vw, 420px); margin: 0; padding: 0 max(7px, calc(var(--s, 1) * 10px)) 0 max(6px, calc(var(--s, 1) * 8px));
+  height: max(28px, calc(var(--s, 1) * 38px)); font: 700 max(14px, calc(var(--s, 1) * 14px)) var(--font-head); color: var(--ink); cursor: pointer;
+  background: var(--mk-orange); border: var(--bw) solid var(--ink); border-radius: 99px; box-shadow: 0 calc(var(--s, 1) * 2.5px) 0 var(--ink);
+}
+.qt-head::before { content: ""; width: max(13px, calc(var(--s, 1) * 16px)); height: max(13px, calc(var(--s, 1) * 16px)); flex: none; background: var(--ink); clip-path: path("M8 0 L10 5.6 L16 6.1 L11.4 10 L13 16 L8 12.9 L3 16 L4.6 10 L0 6.1 L6 5.6 Z"); transform: scale(min(1.4, max(0.8, var(--s, 1)))); }
+.qt-hcount { display: inline-grid; place-items: center; min-width: max(18px, calc(var(--s, 1) * 20px)); height: max(18px, calc(var(--s, 1) * 20px)); border-radius: 99px; border: 2px solid var(--ink); background: var(--mk-paper); font: 700 max(11px, calc(var(--s, 1) * 11px)) var(--font-head); padding: 0 3px; box-sizing: border-box; }
+.qt-hcount[hidden] { display: none; }
+.qt-top { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qt-top:empty { display: none; }
+.qt-htitle { display: none; }
+#hud[data-hud="phone-portrait"] .qt-htitle { display: inline; }
+#hud[data-hud="phone-portrait"] .qt-top { display: none; }
+.quests.collapsed .qt-top:empty + .qt-chev { margin-left: 0; }
+.qt-chev { width: max(7px, calc(var(--s, 1) * 8px)); height: max(7px, calc(var(--s, 1) * 8px)); border-right: 2.5px solid var(--ink); border-bottom: 2.5px solid var(--ink); transform: rotate(-135deg) translate(-2px, -2px); transition: transform 0.2s; flex: none; margin: 0 2px; }
+.quests.collapsed .qt-chev { transform: rotate(45deg) translate(-2px, -2px); }
+/* the open list: a paper panel (230 x 112 in the mockup), its lines with a green bar */
+.qt-body { width: calc(var(--s, 1) * 230px); min-width: min(220px, 70vw); max-width: calc(100vw - 20px); max-height: 60vh; overflow: hidden; background: var(--mk-paper); border: var(--bw3) solid var(--ink); border-radius: max(12px, calc(var(--s, 1) * 18px)); padding: max(4px, calc(var(--s, 1) * 6px)) max(10px, calc(var(--s, 1) * 12px)) max(6px, calc(var(--s, 1) * 8px)); display: grid; box-shadow: 0 calc(var(--s, 1) * 3px) 0 var(--ink); pointer-events: auto; }
+.quests.collapsed .qt-body { display: none; }
+.quests.popping .qt-line:not(.fresh), .quests.popping .qt-more { display: none; }
+.qt-line { display: grid; gap: 2px; padding: max(4px, calc(var(--s, 1) * 5px)) 0; border-top: 2px dashed rgba(43, 35, 64, 0.18); }
+.qt-body > .qt-line:nth-child(2) { border-top: 0; }
+.qt-title { font: 700 max(13px, calc(var(--s, 1) * 13px))/1.15 var(--font-head); display: flex; align-items: center; gap: 6px; }
+.qt-title::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--qc, var(--accent-2)); border: 2px solid var(--ink); flex: none; }
+.qt-text { font: 700 max(12px, calc(var(--s, 1) * 12px))/1.3 var(--font-body); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* (one line: the mockups show a title and a bar) */
+.qt-text:empty { display: none; }
+.qt-bar { height: max(8px, calc(var(--s, 1) * 8px)); border: 1.5px solid var(--ink); border-radius: 99px; background: #ead9b8; overflow: hidden; margin-top: 2px; }
+.qt-bar[hidden] { display: none; }
+.qt-fill { display: block; height: 100%; width: 0; background: var(--mk-green); transition: width 0.3s; }
+.qt-line.done { opacity: 0.75; }
+.qt-line.done .qt-title { text-decoration: line-through; }
+.qt-line.done .qt-title::before { background: #5fbf5a; }
+.qt-line.pop { animation: qt-pop 0.5s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes qt-pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } } /* (no sideways hop: the pill hugs the screen's edge in the phone layouts, and a hop took it off) */
+.quests.pop .qt-head { animation: qt-pop 0.5s cubic-bezier(.3, 1.8, .5, 1); }
+.qt-more { font: 700 12px var(--font-head); color: var(--muted); text-align: right; padding-top: 4px; }
+/* the pad's quest log (Select): the list as a panel with its own heading */
+.qt-loghead { display: none; }
+#hud[data-hud="pad"] .qt-loghead { display: flex; align-items: center; gap: 6px; font: 700 max(14px, calc(var(--s, 1) * 14px)) var(--font-head); margin-bottom: 2px; }
+#hud[data-hud="pad"] .qt-loghead::before { content: ""; width: 1em; height: 1em; background: var(--ink); clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 61%, 80% 100%, 50% 78%, 20% 100%, 30% 61%, 0 38%, 38% 35%); }
+#hud[data-hud="pad"] .qt-body { width: auto; min-width: 0; height: auto; max-height: 70vh; }
+#hud[data-hud="pad"] .quests.collapsed .qt-body, #hud[data-hud="pad"] .quests.popping .qt-body { display: none; }
+
+/* ---------- chat: the log (a dark glass card), the bar (CHAT + where you type), the mic beside it ---------- */
+#chat-log {
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; max-height: calc(var(--s, 1) * 51px * 2.2); overflow: hidden; pointer-events: none;
+  padding: max(5px, calc(var(--s, 1) * 6px)) max(8px, calc(var(--s, 1) * 10px)); transition: opacity 0.6s;
+  background: rgba(43, 35, 64, 0.62); border-radius: max(10px, calc(var(--s, 1) * 14px)); color: #fff;
+}
+#hud[data-hud="pad"] #chat-log { max-height: calc(var(--s, 1) * 72px * 1.6); }
+#chat.quiet:not(.open) #chat-log { opacity: 0; }
+#hud.picking #chat-log { visibility: hidden; opacity: 0; } /* (the tool picker's dome is up: no chat lines behind it) */
+#chat-log:empty { display: none; }
+.chat-line { max-width: 100%; font: 600 max(13px, calc(var(--s, 1) * 13px))/1.5 var(--font-head); color: #fff; overflow-wrap: anywhere; animation: pop-in 0.22s cubic-bezier(.3, 1.6, .5, 1); }
+.chat-line b { color: var(--c, var(--mk-yellow)); margin-right: 0.35em; font-weight: 700; filter: brightness(1.25) saturate(1.1); }
+.chat-line.sys { font-style: italic; color: rgba(255, 255, 255, 0.78); }
+#chat-form {
+  display: flex; align-items: stretch; gap: 0; background: var(--mk-sky); border: var(--bw) solid var(--ink); border-radius: 99px; overflow: hidden;
+  box-shadow: 0 calc(var(--s, 1) * 2.5px) 0 var(--ink); min-height: 30px;
+}
+.chat-tag { flex: none; display: grid; place-items: center; padding: 0 max(8px, calc(var(--s, 1) * 12px)); font: 700 max(12px, calc(var(--s, 1) * 13px)) var(--font-head); color: var(--ink); background: var(--mk-yellow); border-right: var(--bw) solid var(--ink); text-transform: uppercase; }
+#chat-input { flex: 1; min-width: 0; height: auto; border: 0; border-radius: 0; background: transparent; font: 600 max(14px, calc(var(--s, 1) * 13px)) var(--font-head); padding: 0 max(8px, calc(var(--s, 1) * 10px)); color: var(--ink); }
+#chat-input::placeholder { color: #2b4a68; opacity: 1; }
+#chat-input:focus { background: #fff; outline: none; }
+.chat-send { display: none; flex: none; padding: 0 max(10px, calc(var(--s, 1) * 14px)); border: 0; border-left: var(--bw) solid var(--ink); background: var(--mk-green); font: 700 max(13px, calc(var(--s, 1) * 14px)) var(--font-head); color: var(--ink); cursor: pointer; }
+/* typing: the bar swaps into the typing spot (hud-layout.js), the mic steps aside, Send appears */
+#chat.open .chat-send { display: block; }
+#chat.open #mic-toggle { display: none; }
+#chat.open #chat-input { background: #fff; }
+#hud[data-hud="phone-portrait"]:has(#chat.open) :is(#currency .cur, #btn-help) { visibility: hidden; } /* (the typing bar runs the whole width along the bottom) */
+#hud #mic-toggle { box-shadow: 0 calc(var(--s, 1) * 2.5px) 0 var(--ink); border-width: var(--bw3); }
+#hud #mic-toggle .mic-ic { transform: scale(max(0.7, min(1.6, calc(var(--s, 1) * 0.9)))); }
+
+/* ---------- the interact button: a round E (50), its words in a small pill above it; lit when there is something to use ---------- */
+#btn-act {
+  padding: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  color: #fff; background: var(--mk-red); border: var(--bw3) solid var(--ink); box-shadow: 0 calc(var(--s, 1) * 3px) 0 var(--ink);
+  transition: opacity 0.2s, filter 0.2s;
+}
+.act-key { display: block; font: 700 max(18px, calc(var(--s, 1) * 22px)) / 1 var(--font-head); text-shadow: 0 2px 0 rgba(43, 35, 64, 0.5); }
+.act-name {
+  position: absolute; left: 50%; bottom: calc(100% + max(5px, calc(var(--s, 1) * 6px))); transform: translateX(calc(-50% + var(--act-shift, 0px))); max-width: var(--act-max, calc(100vw - 8px)); width: max-content; z-index: 1;
+  padding: 0 max(8px, calc(var(--s, 1) * 9px)); height: max(20px, calc(var(--s, 1) * 22px)); display: flex; align-items: center; font: 700 max(13px, calc(var(--s, 1) * 12px)) var(--font-head); color: var(--ink); background: var(--mk-paper); border: var(--bw) solid var(--ink); border-radius: 99px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; box-sizing: border-box;
+}
+.act-name:empty { display: none; }
+/* short of room beside the jump and the tools (hud-clear.js): first less padding, then two lines growing upward; the text keeps its size */
+.act-name.act-tight { padding: 0 max(4px, calc(var(--s, 1) * 4px)); }
+.act-name.act-wrap { white-space: normal; overflow-wrap: anywhere; height: auto; min-height: max(20px, calc(var(--s, 1) * 22px)); padding-block: max(2px, calc(var(--s, 1) * 2px)); line-height: 1.15; text-align: center; justify-content: center; border-radius: max(10px, calc(var(--s, 1) * 11px)); }
+#hud.tools-open .act-name { display: none; } /* (the radial is open: its slots would chop the words; they come back when it closes) */
+/* hud3: beside the E, left of the cluster, its right end slid clear of the mic (hud-clear.js --act-shift), growing leftward */
+/* (where: the layout's 'words' piece, as --act-r, the right end's gap left of the E, and --act-dy, the middle's drop from the E's: hud-layout.js) */
+#hud:not([data-hud="pad"]) .act-name { left: auto; right: calc(100% + var(--act-r, 6px)); bottom: auto; top: calc(50% + var(--act-dy, 0px)); transform: translate(var(--act-shift, 0px), -50%); }
+#hud[data-hud="pc"] #btn-act { background: var(--mk-orange); color: var(--ink); }
+#hud[data-hud="pc"] .act-key { text-shadow: none; }
+#hud:not(.can-act) #btn-act { filter: saturate(0.45) brightness(1.08); opacity: 0.72; box-shadow: 0 2px 0 var(--ink); }
+/* (hud3: the E stays in the middle of the cluster on touch too, dim when there is nothing to use) */
+/* the glow: a ring that breathes a few times when something new comes in range, then holds still */
+#btn-act::after { content: ""; position: absolute; inset: calc(var(--s, 1) * -8px); border-radius: 50%; border: max(4px, calc(var(--s, 1) * 5px)) solid rgba(255, 211, 77, 0.85); opacity: 0; pointer-events: none; }
+#hud.can-act #btn-act::after { opacity: 0.9; transform: none; }
+#hud.can-act.act-pulse #btn-act::after { animation: act-ring 1.1s ease-in-out 3; }
+@keyframes act-ring { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 0.25; transform: scale(0.86); } }
+#btn-act:active { translate: 0 3px; box-shadow: 0 1px 0 var(--ink); }
+#hint.act { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* read aloud, not drawn: the button says it */
+/* the pad: an "A  Say hi to Nala" pill above the chat bar, only when something is near */
+#hud[data-hud="pad"] #btn-act { display: flex; align-items: center; gap: max(5px, calc(var(--s, 1) * 6px)); width: auto; height: max(28px, calc(var(--s, 1) * 34px)); border-radius: 99px; padding: 0 max(10px, calc(var(--s, 1) * 14px)) 0 max(4px, calc(var(--s, 1) * 6px)); background: var(--mk-paper); color: var(--ink); border-width: var(--bw); }
+#hud[data-hud="pad"] .act-key { display: grid; place-items: center; width: max(20px, calc(var(--s, 1) * 22px)); height: max(20px, calc(var(--s, 1) * 22px)); border-radius: 50%; border: 2px solid var(--ink); background: var(--mk-green); font-size: max(12px, calc(var(--s, 1) * 12px)); color: var(--ink); text-shadow: none; }
+#hud[data-hud="pad"] .act-name { position: static; transform: none; border: 0; padding: 0; height: auto; background: none; font-size: max(14px, calc(var(--s, 1) * 14px)); max-width: var(--act-max, 40vw); text-align: left; }
+#hud[data-hud="pad"] #btn-act:has(> .act-wrap) { height: auto; min-height: max(28px, calc(var(--s, 1) * 34px)); padding-block: max(3px, calc(var(--s, 1) * 4px)); border-radius: max(14px, calc(var(--s, 1) * 17px)); }
+#hud[data-hud="pad"] #btn-act::after { display: none; }
+#hud[data-hud="pad"]:not(.can-act) #btn-act { display: none; }
+
+/* ---------- the tools button (an orange round, 54) ---------- */
+.tg-tools {
+  display: grid; place-items: center; padding: 0; border-radius: 50%; cursor: pointer; background: var(--mk-orange);
+  border: var(--bw3) solid var(--ink); box-shadow: 0 calc(var(--s, 1) * 3px) 0 var(--ink); touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.tg-basket { width: 56%; height: 56%; display: block; pointer-events: none; }
+.tg-held { position: absolute; right: -10%; top: -10%; width: 46%; height: 46%; padding: 3px; border-radius: 50%; background: var(--mk-yellow); border: 2px solid var(--ink); display: none; box-sizing: border-box; pointer-events: none; }
+.tg-held svg { width: 100%; height: 100%; display: block; }
+.tg-tools.holding .tg-held { display: block; }
+#hud.tools-open .tg-tools { background: var(--mk-yellow); }
+.tg-tools:active { translate: 0 3px; box-shadow: 0 1px 0 var(--ink); }
+.tg-none { position: absolute; display: none; height: 34px; align-items: center; padding: 0 12px; font: 700 14px var(--font-head); color: var(--ink); background: var(--paper); border: 2.5px solid var(--ink); border-radius: 99px; box-shadow: 0 3px 0 var(--ink); white-space: nowrap; animation: wh-in 0.2s cubic-bezier(.3, 1.6, .5, 1); pointer-events: none; z-index: 9; }
+.tg-none:not([hidden]) { display: flex; }
+
+/* ---------- the tool radial: a half disc (104 x 208) tilted about its straight edge's middle, four slots (40) ---------- */
+#crosspad { display: none; pointer-events: none; }
+#hud.tools-open #crosspad { display: block; }
+/* (the slots' spots and the blur under them are vars set by hud-layout.js placeRadial(): the layout's numbers, or the HUD Editor's;
+   no half disc any more, hud3-wheels: the soft blur below hugs the four slots) */
+.cp-arm {
+  position: absolute; width: var(--tsl, calc(var(--s, 1) * 40px)); height: var(--tsl, calc(var(--s, 1) * 40px)); min-width: 24px; min-height: 24px; padding: max(3px, calc(var(--s, 1) * 5px)); border-radius: 50%; cursor: pointer; pointer-events: auto;
+  background: var(--mk-paper); border: var(--bw) solid var(--ink); box-sizing: border-box; transition: background 0.12s; rotate: calc(-1 * var(--a, 0deg)); touch-action: none; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
+  animation: wh-in 0.2s cubic-bezier(.3, 1.6, .5, 1) backwards;
+}
+.cp-arm[data-dir="up"] { left: var(--ax, calc(var(--s, 1) * 57px)); top: var(--ay, calc(var(--s, 1) * 19px)); }
+.cp-arm[data-dir="right"] { left: var(--ax, calc(var(--s, 1) * 19px)); top: var(--ay, calc(var(--s, 1) * 57px)); animation-delay: 0.03s; }
+.cp-arm[data-dir="down"] { left: var(--ax, calc(var(--s, 1) * 19px)); top: var(--ay, calc(var(--s, 1) * 111px)); animation-delay: 0.06s; }
+.cp-arm[data-dir="left"] { left: var(--ax, calc(var(--s, 1) * 57px)); top: var(--ay, calc(var(--s, 1) * 149px)); animation-delay: 0.09s; }
+.cp-arm.empty { border-style: dashed; background: rgba(255, 248, 236, 0.45); }
+.cp-arm.empty .cp-icon { opacity: 0.8; }
+.cp-arm.empty .cp-icon::before { content: ""; position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; translate: -50% -50%; background: var(--ink); clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%); }
+.cp-arm.on { border-color: var(--mk-yellow); box-shadow: 0 0 0 max(2px, calc(var(--s, 1) * 3px)) var(--ink); }
+.cp-arm.holding { background: var(--mk-yellow); transition: background 0.5s; }
+.cp-arm.pop { animation: cp-pop 0.6s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes cp-pop { 0% { transform: scale(0.3) rotate(-14deg); } 60% { transform: scale(1.3) rotate(6deg); } 100% { transform: none; } }
+.cp-icon { display: block; width: 100%; height: 100%; pointer-events: none; }
+.cp-icon svg { width: 100%; height: 100%; display: block; }
+.cp-count { position: absolute; right: -6px; bottom: -6px; min-width: 18px; text-align: center; font: 700 max(11px, calc(var(--s, 1) * 11px)) var(--font-head); background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 99px; padding: 0 4px; pointer-events: none; }
+.cp-count:empty { display: none; }
+.cp-key, .kc { position: absolute; display: none; align-items: center; justify-content: center; min-width: clamp(16px, calc(var(--u) * 11px), 24px); height: clamp(16px, calc(var(--u) * 11px), 24px); padding: 0 clamp(3px, calc(var(--u) * 3px), 6px); box-sizing: border-box; border-radius: clamp(4px, calc(var(--u) * 3px), 6px); border: 1.5px solid var(--ink); background: #fff; color: var(--ink); font: 700 clamp(11px, calc(var(--u) * 7.5px), 15px) var(--font-head); pointer-events: none; z-index: 2; line-height: 1; }
+.cp-key { left: -6px; top: -8px; }
+.cp-arrow, .cp-hub { display: none; }
+.crosspad.flash .cp-arm:not(.empty) { animation: cp-flash 0.6s ease-in-out 4; }
+@keyframes cp-flash { 50% { background: #ffe08a; box-shadow: 0 0 0 6px rgba(255, 224, 138, 0.6); } }
+/* the key hint caps: hud3 draws none (Andrew: "on PC the keys show on hover only": hud-tips.js, the tooltip below). Kept in the
+   markup, hidden, with their old spots for a layout that wants them back */
+#hud .cp-key:empty { display: none !important; }
+#btn-help .kc { left: -34%; top: -26%; }
+#minimap .kc { left: calc(var(--s, 1) * 6px); top: calc(var(--s, 1) * 6px); z-index: 3; }
+#tg-tools .kc { left: -8%; top: -14%; }
+#tg-emotes .kc { left: 52%; top: -16%; }
+.qt-head .kc { left: -6%; top: -26%; }
+
+/* the key tooltip (PC, a mouse over a button: its name and key; hud-tips.js places it, Settings > Controls switches it off) */
+#hud > .hud-tip { position: absolute; left: 0; top: 0; z-index: 12; display: flex; align-items: center; gap: 7px; padding: 4px 6px 4px 11px; pointer-events: none;
+  font: 700 14px var(--font-head); color: #fff8ec; background: rgba(43, 35, 64, 0.92); border-radius: 99px; white-space: nowrap; box-shadow: 0 2px 0 rgba(43, 35, 64, 0.35); }
+#hud > .hud-tip[hidden] { display: none; }
+#hud > .hud-tip kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 6px; font: 700 13px var(--font-head);
+  color: var(--ink); background: #fff8ec; border: 1.5px solid #fff8ec; box-shadow: inset 0 -2px 0 rgba(43, 35, 64, 0.25); }
+#hud > .hud-tip kbd:empty { display: none; }
+#hud > .hud-tip:has(kbd:empty) { padding-right: 11px; }
+
+/* ---------- the tool picker: a small dome of your tools out of a slot (hud-tools.js, hud-pad.js) ---------- */
+.tool-pick { position: absolute; width: 0; height: 0; pointer-events: none; }
+.tool-pick[hidden] { display: none; }
+/* (no dome, hud3-wheels: the soft blur below hugs its slots; hud-pad.js sets --pr, --ps and the arc, --b0 / --bs) */
+.tool-pick { --bro: calc(var(--pr) + var(--ps) / 2 + 8px); --bri: calc(var(--pr) - var(--ps) / 2 - 8px); }
+.tp-slot { position: absolute; left: calc(var(--x) * var(--pr) - var(--ps) / 2); top: calc(var(--y) * var(--pr) - var(--ps) / 2); width: var(--ps); height: var(--ps); padding: calc(var(--ps) * 0.14); box-sizing: border-box; border-radius: 50%; background: var(--mk-paper); border: var(--bw) solid var(--ink); cursor: pointer; pointer-events: auto; animation: wh-in 0.2s cubic-bezier(.3, 1.6, .5, 1) backwards; }
+.tp-slot.on { border-color: var(--mk-yellow); box-shadow: 0 0 0 max(2px, calc(var(--u) * 3px)) var(--ink); background: #fff3c4; }
+.tp-slot.none { border-style: dashed; background: rgba(255, 248, 236, 0.6); }
+.tp-slot.none::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; translate: -50% -50%; rotate: 45deg; background: var(--ink); clip-path: polygon(42% 0, 58% 0, 58% 42%, 100% 42%, 100% 58%, 58% 58%, 58% 100%, 42% 100%, 42% 58%, 0 58%, 0 42%, 42% 42%); } /* ("None": take it off) */
+.tp-slot svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+.tp-word { position: absolute; left: var(--wx, 0px); top: var(--wy, 0px); translate: -50% -50%; white-space: nowrap; font: 700 max(13px, calc(var(--u) * 12px)) var(--font-head); color: #fff; background: rgba(43, 35, 64, 0.82); border-radius: 99px; padding: 3px 10px; pointer-events: none; }
+
+/* ---------- emotes: the smiley (a lilac round, 40, in the cluster up-left of the E), the wheel ---------- */
+.tg-emotes {
+  display: block; padding: 0; cursor: pointer; border-radius: 50%; background: var(--mk-lilac); border: var(--bw3) solid var(--ink); box-shadow: 0 calc(var(--s, 1) * 3px) 0 var(--ink);
+  transition: translate 0.2s cubic-bezier(.3, 1.4, .5, 1); touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+.tg-face { position: absolute; left: 50%; top: 50%; width: 66%; height: 66%; translate: -50% -50%; border-radius: 50%; background: #ffd9a8; border: 2px solid var(--ink); box-sizing: border-box; }
+.tg-face:empty::before { content: ""; position: absolute; left: 26%; top: 30%; width: 14%; height: 14%; border-radius: 50%; background: var(--ink); box-shadow: calc(var(--s, 1) * 9px) 0 0 var(--ink); }
+.tg-face:empty::after { content: ""; position: absolute; left: 24%; top: 54%; width: 52%; height: 22%; border: 2px solid var(--ink); border-top: 0; border-radius: 0 0 99px 99px; box-sizing: border-box; }
+.tg-face:not(:empty) { border: 0; background: none; scale: 1.3; }
+.tg-face svg { width: 100%; height: 100%; display: block; }
+.tg-emotes.on { background: var(--mk-yellow); }
+.tg-emotes.fired .tg-face { animation: em-fire 0.5s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes em-fire { 0% { transform: scale(1); } 40% { transform: scale(1.25) rotate(-6deg); } 100% { transform: scale(1); } }
+
+/* a wheel: slots round a hub (hud-wheel.js); --R the slots' radius, --sl a slot, --hub the hub (set by hud-layout.js) */
+#hud > .wheel { position: absolute; left: 50%; top: 50%; width: 0; height: 0; --R: 128px; --sl: 74px; --hub: 60px; pointer-events: none; }
+.wheel[hidden] { display: none; }
+@keyframes wh-in { from { transform: scale(0.6); opacity: 0; } }
+/* No disc behind an open wheel (hud3-wheels, Andrew: "the big grey circle needs to be either small or gone with just a small blur
+   under where the wheel is"): the emote wheel, the tool radial and the tool picker each get a soft frosted ring that hugs their
+   slots, from just inside them to just outside, its ends just past the end slots, a faint tint so the slots read on any background,
+   no outline. --bro / --bri its outer and inner radius, --bx / --by its middle, --b0 / --bs its arc (0 = up, clockwise), --bf how soft
+   its ends are (hud-wheel.js, hud-layout.js placeRadial, hud-pad.js set them). */
+.wheel::before, #crosspad::before, .tool-pick::before {
+  content: ""; position: absolute; left: calc(var(--bx, 0px) - var(--bro)); top: calc(var(--by, 0px) - var(--bro)); width: calc(2 * var(--bro)); height: calc(2 * var(--bro));
+  border-radius: 50%; box-sizing: border-box; pointer-events: none; background: rgba(255, 248, 236, 0.2); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  mask-image: radial-gradient(circle at 50% 50%, transparent calc(var(--bri) - 7px), #000 var(--bri), #000 calc(var(--bro) - 7px), transparent var(--bro)),
+    conic-gradient(from var(--b0, 0deg), transparent 0deg, #000 var(--bf, 5deg), #000 calc(var(--bs, 360deg) - var(--bf, 5deg)), transparent var(--bs, 360deg));
+  mask-composite: intersect; animation: wh-in 0.18s ease-out;
+}
+#hud > .wheel { --bro: calc(var(--R) + var(--sl) / 2 + 8px); --bri: calc(var(--R) - var(--sl) / 2 - 8px); }
+/* the fan out of the smiley (phone, tablet, PC): the smiley is its hub, so no hub of its own; on the PC the name of the slot under the
+   mouse sits just outside it, away from the smiley */
+.wheel.fan.hinged:not(.side) .wh-key, .wheel.fan.hinged .wh-name { display: none !important; }
+.wheel.side .wh-hub, .wheel.fan .wh-hub { display: none; }
+.wheel.side .wh-slot.on::after { content: attr(aria-label); position: absolute; left: calc(50% + var(--x) * var(--sl) * 0.64); top: calc(50% + var(--y) * var(--sl) * 0.64); translate: calc(-50% + var(--x) * 50%) calc(-50% + var(--y) * 50%); scale: calc(1 / 1.08); padding: 2px 9px; white-space: nowrap; font: 700 14px var(--font-head); color: var(--ink); background: var(--paper, #fff8ec); border: 2px solid var(--ink); border-radius: 99px; box-shadow: 0 2px 0 var(--ink); pointer-events: none; }
+.wh-ring { position: absolute; left: 0; top: 0; }
+.wh-slot {
+  position: absolute; left: calc(var(--x) * var(--R) - var(--sl) / 2); top: calc(var(--y) * var(--R) - var(--sl) / 2); width: var(--sl); height: var(--sl); box-sizing: border-box;
+  padding: calc(var(--sl) * 0.1); border-radius: 50%; cursor: pointer; pointer-events: auto; background: var(--mk-paper);
+  border: var(--bw) solid var(--ink); transition: transform 0.1s; animation: wh-in 0.2s cubic-bezier(.3, 1.6, .5, 1);
+}
+.wh-slot.on { border-color: var(--mk-yellow); box-shadow: 0 0 0 max(2px, calc(var(--sl) * 0.075)) var(--ink); transform: scale(1.08); z-index: 1; }
+.wh-slot.empty { opacity: 0.5; border-style: dashed; background: rgba(255, 248, 236, 0.6); cursor: default; }
+.wh-icon { display: block; width: 100%; height: 100%; pointer-events: none; }
+.wh-icon svg { width: 100%; height: 100%; display: block; }
+.wh-key { position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); font: 700 11px var(--font-head); padding: 0 5px; border-radius: 5px; background: #fff; border: 1.5px solid var(--ink); display: none; }
+#hud[data-hud="pc"]:not(.no-kc) .wheel.side .wh-slot.on[data-key]:not([data-key=""])::after { content: attr(aria-label) "  " attr(data-key); } /* (the key with the name, on hover: no badges) */
+/* (the pad's ring keeps a small hub: it names the emote the stick points at) */
+.wh-hub { position: absolute; left: 0; top: 0; width: var(--hub); height: var(--hub); translate: -50% -50%; display: grid; place-items: center; text-align: center; border-radius: 50%; background: var(--mk-yellow); border: var(--bw) solid var(--ink); box-sizing: border-box; color: var(--ink); pointer-events: none; }
+.wh-name { font: 700 max(12px, calc(var(--hub) * 0.2))/1.05 var(--font-head); padding: 0 3px; }
+.wh-tip { display: none; }
+
+/* ---------- fish and treats (small pills: an icon and a number) ---------- */
+.cur { display: flex; align-items: center; gap: max(3px, calc(var(--s, 1) * 5px)); height: max(22px, calc(var(--s, 1) * 34px)); padding: 0 max(8px, calc(var(--s, 1) * 12px)) 0 max(5px, calc(var(--s, 1) * 8px)); border: var(--bw) solid var(--ink); border-radius: 99px; box-shadow: 0 calc(var(--s, 1) * 2px) 0 var(--ink); font: 700 max(13px, calc(var(--s, 1) * 15px)) var(--font-head); color: var(--ink); background: var(--mk-paper); cursor: default; white-space: nowrap; }
+.cur-ic { width: max(16px, calc(var(--s, 1) * 22px)); height: max(12px, calc(var(--s, 1) * 17px)); flex: none; }
+.cur-ic svg { width: 100%; height: 100%; display: block; }
+.cur-n { min-width: 1ch; text-align: center; }
+.cur.pop { animation: cur-pop 0.55s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes cur-pop { 0% { transform: scale(1); } 35% { transform: scale(1.2) rotate(-3deg); } 100% { transform: scale(1); } }
+.cur-float { position: absolute; left: 50%; top: -6px; transform: translate(-50%, 0); font: 700 16px var(--font-head); color: #fff; text-shadow: 0 2px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink), 0 -1px 0 var(--ink); pointer-events: none; animation: cur-float 1.1s ease-out forwards; }
+@keyframes cur-float { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -34px); } }
+.cur-tip { position: absolute; right: 0; top: calc(100% + 10px); display: none; width: max-content; max-width: 240px; padding: 6px 12px; font: 700 13px var(--font-body); color: #fff; background: var(--ink); border-radius: 12px; pointer-events: none; z-index: 3; white-space: normal; }
+.cur:hover .cur-tip, .cur:focus-visible .cur-tip, .cur.tip .cur-tip { display: block; }
+#hud .cur.tip-up .cur-tip { top: auto; bottom: calc(100% + 10px); }
+
+/* ---------- the gamepad's pieces: the name, the X and Y slots, the quest flare, the log off card ---------- */
+.pad-name { font: 600 max(22px, calc(var(--s, 1) * 32px))/1 var(--font-head); color: #fff; -webkit-text-stroke: max(3px, calc(var(--s, 1) * 5px)) var(--ink); paint-order: stroke fill; letter-spacing: 0.5px; white-space: nowrap; pointer-events: none; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; padding: 2px 4px; }
+.pad-slot { display: grid; place-items: center; padding: calc(var(--s, 1) * 8px); border-radius: 50%; background: var(--mk-paper); border: var(--bw3) solid var(--ink); box-shadow: 0 calc(var(--s, 1) * 2.5px) 0 var(--ink); }
+.pad-slot.empty { border-style: dashed; background: rgba(255, 248, 236, 0.7); }
+.pad-slot.empty .ps-icon::before { content: ""; position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; translate: -50% -50%; background: var(--ink); clip-path: polygon(40% 0, 60% 0, 60% 40%, 100% 40%, 100% 60%, 60% 60%, 60% 100%, 40% 100%, 40% 60%, 0 60%, 0 40%, 40% 40%); }
+.pad-slot.on { border-color: var(--mk-yellow); box-shadow: 0 0 0 max(2px, calc(var(--s, 1) * 3px)) var(--ink); }
+.pad-slot.hold { background: var(--mk-yellow); }
+.ps-icon { width: 100%; height: 100%; display: block; }
+.ps-icon svg { width: 100%; height: 100%; display: block; }
+.ps-chip { position: absolute; left: -13%; top: -13%; display: grid; place-items: center; width: 43%; height: 43%; border-radius: 50%; border: 2px solid var(--ink); background: var(--mk-yellow); font: 700 max(11px, calc(var(--s, 1) * 11px)) var(--font-head); color: var(--ink); box-sizing: border-box; }
+.ps-ring { position: absolute; inset: -12%; border-radius: 50%; pointer-events: none; background: conic-gradient(#e0463c calc(var(--p, 0) * 360deg), transparent 0); -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%); mask: radial-gradient(circle, transparent 62%, #000 63%); }
+.quest-flare { display: flex; align-items: center; gap: max(4px, calc(var(--s, 1) * 6px)); height: max(26px, calc(var(--s, 1) * 34px)); padding: 0 max(10px, calc(var(--s, 1) * 12px)) 0 max(7px, calc(var(--s, 1) * 8px)); font: 700 max(13px, calc(var(--s, 1) * 13px)) var(--font-head); color: var(--ink); background: #ffe68a; border: var(--bw) solid var(--ink); border-radius: 99px; box-shadow: 0 0 0 max(3px, calc(var(--s, 1) * 4px)) rgba(255, 230, 138, 0.55); pointer-events: none; white-space: nowrap; animation: qf-in 0.45s cubic-bezier(.3, 1.8, .5, 1); }
+#hud .quest-flare[hidden] { display: none; }
+@keyframes qf-in { from { opacity: 0; scale: 0.5; } }
+.qf-spark { width: max(14px, calc(var(--s, 1) * 18px)); height: max(14px, calc(var(--s, 1) * 18px)); background: var(--ink); clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); animation: qf-spin 1.2s ease-in-out infinite; }
+@keyframes qf-spin { 50% { rotate: 45deg; scale: 1.2; } }
+.logoff { min-width: max-content; height: auto; padding: max(10px, calc(var(--s, 1) * 12px)) max(12px, calc(var(--s, 1) * 14px)); text-align: center; background: var(--mk-paper); border: var(--bw3) solid var(--ink); border-radius: max(12px, calc(var(--s, 1) * 18px)); box-shadow: 0 calc(var(--s, 1) * 3px) 0 var(--ink); pointer-events: auto; }
+#hud .logoff[hidden] { display: none; }
+.lo-title { font: 700 max(18px, calc(var(--s, 1) * 19px))/1.1 var(--font-head); }
+.lo-sub { font: 600 max(13px, calc(var(--s, 1) * 12px)) var(--font-head); margin: 3px 0 10px; }
+.lo-btns { display: flex; gap: 8px; justify-content: center; white-space: nowrap; }
+.lo-btn, .lo-set { display: inline-flex; align-items: center; gap: 6px; height: max(28px, calc(var(--s, 1) * 30px)); padding: 0 max(10px, calc(var(--s, 1) * 12px)) 0 max(4px, calc(var(--s, 1) * 5px)); font: 700 max(13px, calc(var(--s, 1) * 13px)) var(--font-head); color: var(--ink); background: var(--mk-paper); border: var(--bw) solid var(--ink); border-radius: 99px; cursor: pointer; box-shadow: none; }
+.lo-go.btn.primary { background: var(--mk-orange); color: var(--ink); }
+.lo-set { margin-top: 8px; height: max(24px, calc(var(--s, 1) * 24px)); font-size: max(12px, calc(var(--s, 1) * 12px)); }
+.lo-chip { display: grid; place-items: center; width: max(18px, calc(var(--s, 1) * 20px)); height: max(18px, calc(var(--s, 1) * 20px)); border-radius: 50%; border: 2px solid var(--ink); font-size: 0.85em; box-sizing: border-box; }
+.lo-chip.a { background: var(--mk-green); } .lo-chip.b { background: #f4a09a; } .lo-chip.y { background: var(--mk-yellow); }
+.lo-btn:focus-visible, .lo-set:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+
+/* ---------- the HUD focus (a pad player points at the HUD's buttons) ---------- */
+body.hud-focus #hud :focus { outline: 4px solid #fff; outline-offset: 3px; box-shadow: 0 0 0 10px var(--accent-2); }
+body.hud-focus #hud .minimap:focus-within { box-shadow: 0 0 0 5px #fff, 0 0 0 11px var(--accent-2); }
+.hud-focus-tip { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 9; padding: 7px 16px; font: 700 15px var(--font-head); color: #fff; background: rgba(43, 35, 64, 0.85); border-radius: 99px; white-space: pre; pointer-events: none; }
+.hud-focus-tip[hidden] { display: none; }
+body.hud-focus #hud > #toasts { opacity: 0; }
+.mm-help:focus-visible, .mm-online:focus-visible, .minimap:focus-within, .mm-open:focus-visible, .qt-head:focus-visible, .cp-arm:focus-visible, .cur:focus-visible, #btn-act:focus-visible, .tg-tools:focus-visible, .tg-emotes:focus-visible, .wh-slot:focus-visible, .tp-slot:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; }
+
+/* "Put on" buttons in the pockets panel (inventory.js) */
+.fp-arms { display: flex; gap: 6px; align-items: center; margin-top: 8px; font: 700 12px var(--font-head); color: var(--muted); }
+.fp-arm { width: 34px; height: 34px; border-radius: 10px; border: 2.5px solid var(--ink); background: #fff; font: 700 16px var(--font-head); color: var(--ink); cursor: pointer; box-shadow: 0 3px 0 var(--ink); padding: 0; }
+.fp-arm.on { background: var(--hud-yellow); }
+.fp-arm:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+
+/* feature cards the quest tracker shows instead */
+#hud .garden-card, #hud .scouts-card { display: none; }
+
+/* ================================================================ around the layout: toasts, hints, cards (they keep clear of the
+   pieces through the engine's vars: --top-b = the bottom of the top band, --slot-* / --act-* / --chat-* = a piece's box) */
+#hud { --top: max(10px, var(--safe-t)); --mm-w: var(--map-w, 120px); --mm-h: var(--map-h, 90px); --slot: var(--slot-w, 60px); --act: var(--act-w, 60px); } /* (--slot-b, --act-b...: set by hud-layout.js) */
+#hud > #toasts { top: calc(var(--top-b, 60px) + 12px); }
+#hud > .hint, #hud > .prompt { bottom: calc(var(--chat-b, 16px) + var(--chat-h, 40px) + 80px); }
+#hud[data-hud^="phone"] > #toasts { left: 12px; right: 12px; transform: none; justify-items: center; }
+#hud[data-hud^="phone"] .hint { left: 12px; right: 12px; transform: none; max-width: none; white-space: normal; text-align: center; }
+#hud[data-hud="phone-portrait"] > .hint, #hud[data-hud="phone-portrait"] > .prompt { bottom: calc(var(--act-b, 200px) + var(--act-h, 50px) + 40px); }
+#hud[data-hud^="phone"] .stats { top: calc(var(--top-b, 60px) + 12px); right: 12px; left: auto; width: min(210px, 58vw); }
+#hud[data-hud^="phone"] .stats-kicker { display: none; } /* (the phone card is just the game, the numbers and when) */
+#hud:is([data-hud="pc"], [data-hud="tablet"], [data-hud="pad"]) .stats { top: calc(var(--top-b, 60px) + 16px); right: 16px; }
+#hud:has(.fish-card:not([hidden])) > #toasts { top: calc(var(--top-b, 60px) + 150px); }
+#hud > .fish-card { top: calc(var(--top-b, 60px) + 12px); }
+#hud[data-hud^="phone"]:has(> .fish-cue:not([hidden])) > .fish-card { top: calc(var(--top-b, 60px) + 56px); } /* (under the cue, which sits under the top band) */
+
+/* ================================================================ a feature's card is up (Mabel's poles and bait, a box in the game
+   store, Carol's wreath, the bocce team card, Kevin's Head back card): it has its own buttons, so the E, the tools and the emote
+   smiley step aside until it closes. Swimming: the smiley and the tools too */
+#hud:has(.shack-card:not([hidden]), .store-card:not([hidden]), .carol-card:not([hidden]), .bocce-card:not([hidden]), .crew-card:not([hidden])) #btn-act,
+#hud:has(.shack-card:not([hidden]), .store-card:not([hidden]), .carol-card:not([hidden]), .bocce-card:not([hidden]), .crew-card:not([hidden])) .tg-tools,
+#hud:has(.shack-card:not([hidden]), .store-card:not([hidden]), .carol-card:not([hidden]), .bocce-card:not([hidden]), .crew-card:not([hidden])) #crosspad,
+#hud:has(.shack-card:not([hidden]), .store-card:not([hidden]), .carol-card:not([hidden]), .bocce-card:not([hidden]), .crew-card:not([hidden])) .tg-emotes,
+#hud:has(> .swim-hud:not([hidden])) .tg-emotes, #hud:has(> .swim-hud:not([hidden])) .tg-tools, #hud:has(> .swim-hud:not([hidden])) #crosspad { display: none !important; }
+/* on a phone the card sits between the top band and the chat, scrolling inside if it must */
+#hud[data-hud^="phone"] :is(.shack-card, .store-card, .carol-card, .bocce-card) {
+  top: calc((var(--top-b, 120px) + 10px + 100% - var(--safe-b) - 116px) / 2); max-height: calc(100% - var(--top-b, 120px) - 10px - var(--safe-b) - 116px);
+  transform: translate(-50%, -50%); overflow-y: auto; box-sizing: border-box;
+}
+
+/* ---------- the mini-games' own big buttons take the slot over the cluster (fishing's cast, the dive, the maze's RUN, the tower's
+   grip: hud3, the jump's old place is gone) ---------- */
+#hud:is([data-hud^="phone"], [data-hud="tablet"]) .fish-touch-btn, #hud[data-layout="pc"] .fish-touch-btn { left: auto; right: calc(var(--slot-r, 16px) + var(--slot-w, 60px) / 2 - 33px); bottom: calc(var(--slot-b, 60px) + var(--slot-h, 60px) / 2 - 33px); width: 66px; height: 66px; font-size: 15px; }
+#hud.tools-open .fish-touch-btn { visibility: hidden; } /* (the tool radial fans up over it) */
+#hud .fish-cue { bottom: calc(var(--chat-b, 16px) + var(--chat-h, 40px) + 24px); }
+#hud[data-hud^="phone"] .fish-cue { top: calc(var(--top-b, 120px) + 10px); bottom: auto; left: 12px; right: 12px; width: auto; max-width: none; box-sizing: border-box; transform: none; white-space: normal; text-align: center; border-radius: 14px; padding: 6px 12px; font-size: 14px; }
+#hud[data-hud^="phone"] .fish-cue.alert { padding: 7px 12px; font-size: 19px; animation-name: fish-alert-phone; }
+#hud[data-hud^="phone"] .cue-bar { width: 100%; box-sizing: border-box; }
+@keyframes fish-alert-phone { from { transform: scale(1); } to { transform: scale(1.06); } }
+#hud[data-hud^="phone"]:has(> .fish-cue:not([hidden])) .quests.popping .qt-body { display: none; }
+#hud[data-hud^="phone"] .fish-dialog { bottom: 14px; }
+/* a phone on its side: Kevin's and Mabel's card ends left of the E and its words ("Skip ahead", "Next", "Done") */
+#hud[data-hud="phone-landscape"] .fish-dialog { left: auto; right: calc(var(--act-r, 16px) + var(--act-w, 72px) + 118px); transform: none; width: min(480px, calc(100% - var(--act-r, 16px) - var(--act-w, 72px) - 130px)); }
+#hud[data-hud="phone-landscape"] .fish-dialog.in { animation-name: fish-dlg-in-side; }
+@keyframes fish-dlg-in-side { from { transform: translateY(30px); opacity: 0; } }
+/* swimming: the breath bar under the top band, Dive round in the slot */
+#hud .swim-btn { position: fixed; right: var(--slot-r, 16px); bottom: var(--slot-b, 60px); width: var(--slot-w, 64px); height: var(--slot-h, 64px); min-width: 0; padding: 0; border-radius: 50%; font: 700 15px var(--font-head); color: var(--ink); background: var(--hud-sky); border: 4px solid var(--ink); box-shadow: 0 5px 0 var(--ink); }
+#hud .swim-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
+#hud[data-hud^="phone"] .swim-hud { top: calc(var(--top-b, 120px) + 10px); bottom: auto; left: 12px; right: 12px; width: auto; max-width: none; transform: none; text-align: left; }
+#hud[data-hud^="phone"] .swim-hud .swim-tips { display: none; }
+#hud[data-hud^="phone"]:has(> .swim-hud:not([hidden])) .quests.popping .qt-body { display: none; }
+#hud:is([data-hud="pc"], [data-hud="pad"], [data-hud="tablet"]) .swim-hud { left: 61%; bottom: 12px; } /* (right of the chat bar and its mic, under the swimmer) */
+/* (bocce places its own strip and bar on every layout: bocce.css, bocce-hud) */
+/* the tower: the grip in the slot */
+#hud:has(.tower-hud:not([hidden]) .tower-btns:not([hidden])) .tg-tools, #hud:has(.tower-hud:not([hidden]) .tower-btns:not([hidden])) #crosspad { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-arm.pop, .cur.pop, .qt-line.pop, .quests.pop .qt-head, .crosspad.flash .cp-arm, .chat-line, #hud.act-pulse #btn-act::after, .tg-emotes.fired .tg-face, .wheel::before, .wh-slot, .cp-arm, #crosspad::before, .tg-none, .tool-pick::before, .tp-slot, .quest-flare, .qf-spark, #hud #map { animation: none; }
+  .cur-float { animation-duration: 0.01ms; }
+  .tg-emotes { transition: none; }
+}

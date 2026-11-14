@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Breneland</title>
+  <meta name="description" content="Breneland - a little cel-shaded world where Andrew's games live. Walk up to a table to play.">
+  <meta name="theme-color" content="#f3dcc0">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&family=Special+Elite&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/hud.css">
+  <link rel="stylesheet" href="/css/cursors.css">
+  <link rel="stylesheet" href="/css/loading-collage.css">
+  <link rel="stylesheet" href="/css/tools-menu.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="scene" aria-label="Breneland 3D world"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+  <!-- speech balloons get their own layer above the HUD (the phone minimap hid them); name tags stay under it -->
+  <div id="bubbles" aria-hidden="true"></div>
+  <div id="fade"></div>
+
+  <div id="loading" class="center-card">
+    <div class="logo">Breneland</div>
+    <div class="loading-bar"><span></span></div>
+    <p id="loading-text">Planting the trees...</p>
+  </div>
+
+  <div id="start" class="overlay" hidden>
+    <div class="panel start-panel">
+      <div class="logo big">Breneland</div>
+      <p class="tag">A new day in the backyard. Wander over to a table to play.</p>
+      <label class="field">
+        <span>Your name</span>
+        <input id="name-input" maxlength="20" autocomplete="nickname" placeholder="What should folks call you?">
+      </label>
+      <div id="avatar-editor"></div>
+      <button id="go" class="btn primary huge">Step outside</button>
+      <p class="fine">Sound on for the full morning. <span class="keys">WASD / arrows to walk &middot; right-drag to look &middot; Enter to chat</span></p>
+    </div>
+  </div>
+
+  <div id="skip" hidden>Space to skip</div>
+  <div id="title-card" aria-live="polite">
+    <div class="logo big">Breneland</div>
+    <div id="title-sub"></div>
+  </div>
+
+  <!-- The gameplay HUD: Andrew's saved layouts (docs/refs/andrew-*-hud-layout*.json) for phone, tablet, PC and gamepad.
+       hud-layout.js picks one for the device and places every piece below from it; css/hud.css draws them. The containers
+       (#mm-block, #chat, #toolring, #currency, #quests) cover the screen and let taps through. -->
+  <div id="hud" hidden data-layout="pc">
+    <aside id="quests" class="quests" aria-label="Quests" hidden></aside>
+
+    <div id="mm-block" class="mm-block">
+      <div id="hud-time" class="mm-time"></div>
+      <div id="minimap" class="minimap" title="The map (N)">
+        <canvas id="minimap-canvas" aria-label="Minimap: where you are in Breneland"></canvas>
+        <span class="mm-north" aria-hidden="true">N</span>
+        <button id="minimap-open" class="mm-open" type="button" aria-label="Open the big map (N)"></button>
+        <kbd class="kc" aria-hidden="true">N</kbd>
+      </div>
+      <button id="btn-help" class="mm-help" type="button" title="Settings and controls (H)" aria-label="Settings and controls">?<kbd class="kc" aria-hidden="true">H</kbd></button>
+      <div id="place" class="mm-place" title="Where you are">Front Porch</div>
+      <button id="online" class="mm-online" type="button" title="Who is here right now" aria-label="Who is in Breneland right now"><i class="dot"></i><b>1</b></button>
+      <div id="who" class="panel who" hidden></div>
+    </div>
+
+    <!-- the big map: a popout over the minimap (N, a tap on the minimap, R2 on a pad); under the top bar's buttons -->
+    <div id="map" class="bigmap" role="dialog" aria-label="The map of Breneland" hidden>
+      <canvas id="map-canvas" aria-label="The map of Breneland"></canvas>
+      <span class="bm-place" aria-hidden="true"></span>
+      <button id="map-close" class="bm-close" type="button" aria-label="Close the map"><i class="bm-x" aria-hidden="true"></i><b class="bm-b">Close</b></button>
+    </div>
+
+    <!-- the gamepad's own pieces (hud-pad.js): the name, the X and Y tool slots, the quest update flare, the log off card -->
+    <div id="pad-name" class="pad-name" aria-hidden="true"></div>
+    <button id="pad-slot-x" class="pad-slot" type="button" tabindex="-1" aria-label="Tool slot X"><b class="ps-chip">X</b><span class="ps-icon"></span></button>
+    <button id="pad-slot-y" class="pad-slot" type="button" tabindex="-1" aria-label="Tool slot Y"><b class="ps-chip">Y</b><span class="ps-icon"></span></button>
+    <div id="quest-flare" class="quest-flare" role="status" hidden><i class="qf-spark" aria-hidden="true"></i>Quest updated</div>
+    <div id="logoff" class="logoff panel" role="dialog" aria-label="Log off" hidden>
+      <div class="lo-title">Log off?</div>
+      <div class="lo-sub">Your spot is saved.</div>
+      <div class="lo-btns">
+        <button class="lo-btn lo-stay" type="button"><b class="lo-chip b">B</b>Stay</button>
+        <button class="lo-btn lo-go btn primary" type="button"><b class="lo-chip a">A</b>Log off</button>
+      </div>
+      <button class="lo-set" type="button"><b class="lo-chip y">Y</b>Settings</button>
+    </div>
+    <!-- the tool picker: a small dome of your tools, out of an empty slot (hold it; the pad's X / Y open it) -->
+    <div id="tool-pick" class="tool-pick" role="menu" aria-label="Pick a tool for this slot" hidden></div>
+
+    <div id="hint" class="hint" hidden aria-live="polite"></div>
+
+    <div id="prompt" class="panel prompt" hidden>
+      <div class="prompt-kicker">Game table</div>
+      <div class="prompt-title"></div>
+      <div class="prompt-blurb"></div>
+      <div class="prompt-actions">
+        <button id="prompt-yes" class="btn primary">Play <kbd>E</kbd></button>
+        <button id="prompt-no" class="btn">Not now</button>
+      </div>
+    </div>
+
+    <aside id="stats" class="panel stats" hidden aria-live="polite">
+      <div class="stats-head"><span class="stats-kicker">Your stats</span><span class="stats-game"></span></div>
+      <div class="stats-active" hidden></div>
+      <dl class="stats-list"></dl>
+      <div class="stats-foot"></div>
+    </aside>
+
+    <!-- chat: the log over the bar; voice.js puts the mic toggle (#mic-toggle) beside the bar -->
+    <div id="chat" class="quiet">
+      <div id="chat-log" aria-live="polite"></div>
+      <form id="chat-form" autocomplete="off">
+        <span class="chat-tag" aria-hidden="true">Chat</span>
+        <input id="chat-input" maxlength="200" placeholder="Press Enter to chat" aria-label="Chat message">
+        <button id="chat-send" class="chat-send" type="submit" tabindex="-1">Send</button>
+      </form>
+    </div>
+
+    <!-- tools: the round tools button (a basket; the tool in hand when you hold one) opens the tilted half radial of your four
+         slots (Z X C V on a keyboard): tap a filled slot to take it out, hold an empty one to put a tool on it, hold a filled one
+         to take it off. A pad has its X and Y slots instead (hud-pad.js). -->
+    <div id="toolring" class="toolring">
+      <div id="crosspad" class="crosspad" role="toolbar" aria-label="Your tools"></div>
+      <button id="tg-tools" class="tg-tools" type="button" aria-label="Show or hide your tools" aria-expanded="false"><svg class="tg-basket" viewBox="0 0 32 32" aria-hidden="true"><path d="M5 13h22l-2.4 12.2a3 3 0 0 1-3 2.4H10.4a3 3 0 0 1-3-2.4z" fill="#fff3d6" stroke="#2b2340" stroke-width="2.4" stroke-linejoin="round"/><path d="M10 13l4-7M22 13l-4-7" fill="none" stroke="#2b2340" stroke-width="2.4" stroke-linecap="round"/><path d="M12 17v7M16 17v7M20 17v7" fill="none" stroke="#2b2340" stroke-width="2" stroke-linecap="round"/></svg><span class="tg-held" aria-hidden="true"></span><kbd class="kc" aria-hidden="true">Tab</kbd></button>
+      <span class="tg-none" role="status" hidden>Nothing yet</span>
+    </div>
+    <button id="btn-act" class="act" type="button" title="Interact (E)" aria-label="Interact" hidden><b class="act-key">E</b><span class="act-name"></span></button>
+    <!-- (no jump button since hud3: Space on a keyboard, a quick tap on the right half of a touch screen) -->
+
+    <!-- emotes: the smiley in the cluster opens the emote wheel, a fan up over the screen (G on a keyboard; 1-8 play one straight
+         away); a pad holds L2 for the same wheel -->
+    <button id="tg-emotes" class="tg-emotes" type="button" aria-label="Show or hide the emotes" aria-expanded="false"><i class="tg-face" aria-hidden="true"></i><kbd class="kc" aria-hidden="true">G</kbd></button>
+    <div id="emote-wheel" class="wheel" role="menu" aria-label="Emote wheel" hidden></div>
+
+    <div id="currency" class="currency" aria-live="polite"></div>
+    <div id="hud-focus-tip" class="hud-focus-tip" hidden></div>
+
+    <div id="toasts"></div>
+  </div>
+
+  <!-- Settings (js/settings.js, css/settings.css): a short top page, nested pages slide in with a Back button; Esc or B goes
+       back one level. The Controls page draws the device you use (js/settings-controls.js) from the game's own tables. -->
+  <div id="help" class="overlay" hidden>
+    <div class="panel help-panel settings" role="dialog" aria-modal="true" aria-label="Settings" data-at="top">
+      <section class="set-page" data-page="top">
+        <header class="set-head"><h2>Settings</h2><button class="set-x" type="button" aria-label="Close settings" data-close></button></header>
+        <div class="set-rows">
+          <div class="set-row" data-section="sound" style="--c: var(--hud-pink)">
+            <button class="set-open" type="button" data-open="sound"><i class="set-ic" data-icon="sound"></i><span class="set-txt"><b>Sound</b><small class="set-sum">Every level as mixed</small></span><i class="set-chev" aria-hidden="true"></i></button>
+            <button id="btn-sound" class="set-switch" data-mute type="button" role="switch" aria-checked="true" aria-label="Sound" title="Sound on or off (M)"><span>On</span></button>
+          </div>
+          <div class="set-row" data-section="graphics" style="--c: var(--hud-sky)">
+            <span class="set-label"><i class="set-ic" data-icon="graphics"></i><span class="set-txt"><b>Graphics</b><small class="set-sum">Fast is kind to older computers</small></span></span>
+            <div id="btn-quality" class="set-seg" role="radiogroup" aria-label="Graphics">
+              <button type="button" role="radio" data-q="low" aria-checked="false">Fast</button><button type="button" role="radio" data-q="high" aria-checked="true">High</button><button type="button" role="radio" data-q="max" aria-checked="false">Max</button>
+            </div>
+            <!-- what this device is and why the level was picked (main.js, js/gfx.js); Pick for me goes back to auto -->
+            <div id="gfx-auto" class="set-gfx"><small class="set-gfx-t" aria-live="polite"></small><button id="btn-gfx-auto" class="set-gfx-btn" type="button" aria-pressed="false">Pick for me</button></div>
+          </div>
+          <div class="set-row" data-section="fullscreen" style="--c: var(--hud-green)" hidden>
+            <span class="set-label"><i class="set-ic" data-icon="fullscreen"></i><span class="set-txt"><b>Full screen</b><small class="set-sum">Fill the whole screen</small></span></span>
+            <button id="btn-fullscreen" class="set-switch" type="button" role="switch" aria-checked="false" aria-label="Full screen" title="Full screen on or off"><span>Off</span></button>
+          </div>
+          <div class="set-row" data-section="controls" style="--c: var(--hud-yellow)">
+            <button class="set-open" type="button" data-open="controls"><i class="set-ic" data-icon="controls"></i><span class="set-txt"><b>Controls</b><small class="set-sum">Keyboard and mouse</small></span><i class="set-chev" aria-hidden="true"></i></button>
+          </div>
+          <!-- Voice: the voice piece fills this with ui.settings.addSection('voice', { title, summary }); hidden until then -->
+          <div class="set-row" data-section="voice" style="--c: var(--hud-green)" hidden>
+            <button class="set-open" type="button" data-open="voice"><i class="set-ic" data-icon="voice"></i><span class="set-txt"><b>Voice chat</b><small class="set-sum"></small></span><i class="set-chev" aria-hidden="true"></i></button>
+          </div>
+          <div class="set-row" data-section="you" style="--c: var(--hud-orange)">
+            <button class="set-open" type="button" data-open="you"><i class="set-ic" data-icon="you"></i><span class="set-txt"><b>You</b><small class="set-sum">Name, outfit and the tutorial</small></span><i class="set-chev" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <p class="set-tip"><b>How to play</b> <span class="set-tip-text">Walk up to a table to play a game. Say hi to everyone with E.</span></p>
+        <button id="help-close" class="btn primary set-done" type="button">Back outside</button>
+      </section>
+
+      <section class="set-page" data-page="sound" hidden>
+        <header class="set-head"><button class="set-back" type="button">Back</button><h2>Sound</h2><button class="set-x" type="button" aria-label="Close settings" data-close></button></header>
+        <div class="set-body"><div class="set-line"><span class="set-line-t"><b>Sound</b><small>M on the keyboard</small></span><button class="set-switch set-mute" type="button" role="switch" aria-checked="true" aria-label="Sound" data-mute><span>On</span></button></div><!-- audio-mixer.js mounts the sliders after this --></div>
+        <p class="set-tip set-credits" id="sound-credits"><b>Sound credits</b> <span class="set-tip-text">Dax and Nala bark with real dog recordings, cut and trimmed for the game: Joseph Sardin (BigSoundBank), Nicholas A. Judy, HaelDB, qubodup, bonebrah and Knites (CC0); Farag&oacute;, Pongr&aacute;cz, Mikl&oacute;si, Huber, Vir&aacute;nyi and Range, PLoS ONE 2010 (CC BY 2.5); congusbongus (CC BY 3.0); MichaeltheFox8621 (CC BY-SA 4.0) and 2C (CC BY-SA 3.0). The cub scouts giggle with real children's laughs: thatjeffcarter and morgantj on Wikimedia Commons (CC BY 3.0) and Joseph Sardin (BigSoundBank, CC0). Most other effects are cut from open-source packs on OpenGameArt by Kenney, rubberduck, AntumDeluge and Kresiek The Furry (CC0); the unicorns neigh with "Zebra Whinny" by AntumDeluge, from a video by Peet J van Eeden (CC BY 3.0). The catch sting is "The Reel Winner" by Memoraphile @ You're Perfect Studio (CC0). The music is our own, made for Breneland and played live by the game on recorded instruments: the Versilian Community Sample Library and VS Chamber Orchestra by Versilian Studios and FreePats' Spanish classical guitar (CC0), and the Fluid R3 GM SoundFont by Frank Wen (MIT), rendered note by note by Benjamin Gleitzman (CC BY 3.0).</span></p>
+      </section>
+
+      <section class="set-page" data-page="controls" hidden>
+        <header class="set-head"><button class="set-back" type="button">Back</button><h2>Controls</h2><button class="set-x" type="button" aria-label="Close settings" data-close></button></header>
+        <div class="ctl-tabs" role="tablist" aria-label="Which controls to show">
+          <button type="button" role="tab" data-dev="pad" aria-selected="false"><span>Controller</span></button>
+          <button type="button" role="tab" data-dev="kbm" aria-selected="true"><span>Keyboard<span class="opt"> and mouse</span></span></button>
+          <button type="button" role="tab" data-dev="touch" aria-selected="false"><span>Phone</span></button>
+        </div>
+        <div class="ctl-pic" role="tabpanel"></div>
+        <details class="ctl-more" hidden><summary>More: what to press around Breneland</summary><ul class="ctl-more-list"></ul></details>
+        <div class="set-line ctl-kc"><span class="set-line-t"><b>Key hints when you point</b><small>Point the mouse at a button to see its name and key</small></span><button id="btn-keyhints" class="set-switch" type="button" role="switch" aria-checked="true" aria-label="Key hints on the buttons"><span>On</span></button></div>
+      </section>
+
+      <section class="set-page" data-page="voice" hidden>
+        <header class="set-head"><button class="set-back" type="button">Back</button><h2>Voice chat</h2><button class="set-x" type="button" aria-label="Close settings" data-close></button></header>
+        <div class="set-body"></div>
+      </section>
+
+      <section class="set-page" data-page="you" hidden>
+        <header class="set-head"><button class="set-back" type="button">Back</button><h2>You</h2><button class="set-x" type="button" aria-label="Close settings" data-close></button></header>
+        <div class="set-body">
+          <div class="you-card"><i class="you-dot"></i><span class="you-txt"><b class="you-name">You</b><small class="you-status"></small></span></div>
+          <div class="you-actions">
+            <button id="btn-edit" class="btn" type="button">Change name and outfit</button>
+            <button id="btn-intro" class="btn" type="button">Replay the morning</button>
+            <button id="btn-tutorial" class="btn" type="button">Replay the tutorial</button>
+            <small class="you-tip">Or type /tutorial in the chat any time.</small>
+            <button id="btn-home" class="btn" type="button">Head home (log out)</button>
+          </div>
+          <!-- settings.js wires it (localStorage breneland.fewerScares); maze-ghoul.js reads it -->
+          <div class="set-line"><span class="set-line-t"><b>Fewer jump scares</b><small>Beneath Angell Street: a softer leap, no face filling the screen, a quieter shriek</small></span><button id="btn-scares" class="set-switch" type="button" role="switch" aria-checked="false" aria-label="Fewer jump scares"><span>Off</span></button></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="letter" class="overlay" hidden>
+    <div class="panel letter-panel">
+      <div class="letter-stamp">BRENELAND POST</div>
+      <h2>You've got mail</h2>
+      <div id="letter-body"></div>
+      <button id="letter-close" class="btn primary">Put it back</button>
+    </div>
+  </div>
+
+  <!-- asked once, the first time you are in the world (voice.js); the answer is remembered on your record -->
+  <div id="voice-ask" class="overlay voice-ask" role="dialog" aria-modal="true" aria-labelledby="va-title" hidden>
+    <div class="panel va-panel">
+      <i class="va-ic" aria-hidden="true"></i>
+      <h2 id="va-title">Use voice chat?</h2>
+      <p>Talk out loud with people near you, using your microphone. You can change this in Settings.</p>
+      <div class="va-btns"><button class="btn primary va-yes" type="button">Yes</button><button class="btn va-no" type="button">Not now</button></div>
+    </div>
+  </div>
+
+  <div id="joystick"><div></div></div>
+  <noscript><div class="center-card">Breneland needs JavaScript and WebGL.</div></noscript>
+  <script src="/js/boot-guard.js"></script>
+  <!-- Andrew's tools menu (the owner only): ahead of main.js so coming back from a tool (/?tools) shows it at once -->
+  <script type="module" src="/js/tools-menu.js"></script>
+  <script type="module" src="/js/main.js"></script>
+  <!-- the loading screen's photo collage: deferred, so it runs after main.js and its modules have been fetched -->
+  <script defer src="/js/loading-collage.js"></script>
+</body>
+</html>

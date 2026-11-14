@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Breneland World Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="/favicon.svg">
+<style>
+/* The World Editor (Breneland 2.0): a top-down map of the real layout. Ink-on-paper like the HUD; everything is a pill or
+   a card with the game's 3 px ink line. Phone first: the tools are a row of thumb-sized buttons, the inspector a sheet. */
+:root { --paper: #fff8ec; --ink: #2b2340; --muted: #6d6480; --card: #ffffff; --yellow: #ffd24a; --sky: #8fd0ee; --pink: #f58ab0; --green: #7dd36a; --lilac: #c8b1f5; --orange: #f6a65a; --red: #e0463c;
+  --font-head: 'Fredoka', system-ui, sans-serif; --font: 'Nunito', system-ui, sans-serif; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--paper); color: var(--ink); font: 500 14px var(--font); overflow: hidden; display: grid; grid-template-rows: auto 1fr auto; -webkit-user-select: none; user-select: none; }
+button, select, input { font: inherit; color: inherit; }
+button { border: 2.5px solid var(--ink); border-radius: 999px; background: var(--card); box-shadow: 0 3px 0 var(--ink); padding: 6px 12px; cursor: pointer; font-family: var(--font-head); font-weight: 600; line-height: 1.1; touch-action: manipulation; }
+button:active { translate: 0 2px; box-shadow: 0 1px 0 var(--ink); }
+button.on { background: var(--yellow); }
+button.danger { background: #ffd8d4; }
+button.small { padding: 4px 9px; font-size: 12.5px; box-shadow: 0 2px 0 var(--ink); }
+#top { display: flex; gap: 8px; align-items: center; padding: 8px 10px calc(8px); padding-top: calc(8px + env(safe-area-inset-top, 0px)); flex-wrap: wrap; border-bottom: 3px solid var(--ink); background: var(--card); }
+#top h1 { font: 700 18px var(--font-head); margin: 0 auto 0 0; white-space: nowrap; }
+#status { font-size: 12.5px; color: var(--muted); min-width: 0; flex: 1 1 100%; }
+#status.err { color: var(--red); }
+#wrap { position: relative; min-height: 0; display: grid; grid-template-rows: 1fr; }
+body.split #wrap { grid-template-rows: 1fr 1fr; }
+@media (min-width: 900px) { body.split #wrap { grid-template-rows: 1fr; grid-template-columns: 1fr 1fr; } }
+#mapwrap { position: relative; min-height: 0; }
+#view3d { display: none; position: relative; min-height: 0; border-top: 3px solid var(--ink); background: #1c1a2e; }
+@media (min-width: 900px) { #view3d { border-top: 0; border-left: 3px solid var(--ink); } }
+body.split #view3d { display: block; }
+#view3d iframe { width: 100%; height: 100%; border: 0; display: block; }
+#view3d .bar { position: absolute; left: 8px; right: 8px; top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; pointer-events: none; }
+#view3d .bar > * { pointer-events: auto; }
+#view3d .note { font-size: 12px; color: #fff; background: rgba(43,35,64,0.8); border-radius: 10px; padding: 4px 8px; }
+canvas { display: block; width: 100%; height: 100%; position: absolute; inset: 0; touch-action: none; cursor: crosshair; background: #a8e06b; }
+#tools { display: flex; gap: 6px; padding: 8px 10px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); overflow-x: auto; border-top: 3px solid var(--ink); background: var(--card); scrollbar-width: none; }
+#tools::-webkit-scrollbar { display: none; }
+#tools button { flex: 0 0 auto; }
+#palette { position: absolute; left: 8px; bottom: 44px; display: none; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 16px); padding: 8px; background: rgba(255, 248, 236, 0.92); border: 2.5px solid var(--ink); border-radius: 16px; }
+#palette.show { display: flex; }
+#insp { position: absolute; right: 8px; top: 8px; width: min(300px, calc(100% - 16px)); max-height: calc(100% - 16px); overflow: auto; background: rgba(255, 255, 255, 0.96); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 4px 0 var(--ink); padding: 10px 12px; display: none; }
+#insp.show { display: block; }
+#insp h2 { font: 700 16px var(--font-head); margin: 0 0 6px; }
+#insp .row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+#insp label { flex: 0 0 64px; font-size: 12.5px; color: var(--muted); }
+#insp input[type=range] { flex: 1; min-width: 0; }
+#insp input[type=text], #insp select, #insp input[type=number] { flex: 1; min-width: 0; border: 2px solid var(--ink); border-radius: 10px; padding: 4px 8px; background: var(--card); }
+#insp input[type=color] { width: 44px; height: 30px; border: 2px solid var(--ink); border-radius: 8px; padding: 0; background: none; }
+#insp .val { flex: 0 0 48px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+#insp .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+#hint { position: absolute; left: 8px; bottom: 8px; max-width: min(360px, calc(100% - 16px)); padding: 6px 10px; background: rgba(43, 35, 64, 0.85); color: #fff; border-radius: 12px; font-size: 12.5px; pointer-events: none; }
+#legend { position: absolute; right: 8px; bottom: 8px; display: none; display: flex; gap: 8px; font-size: 11.5px; color: var(--muted); background: rgba(255, 248, 236, 0.85); border-radius: 10px; padding: 3px 8px; pointer-events: none; }
+#jsonbox { position: absolute; inset: 8px; background: var(--card); border: 3px solid var(--ink); border-radius: 18px; padding: 10px; display: none; flex-direction: column; gap: 8px; }
+#jsonbox.show { display: flex; }
+#jsonbox textarea { flex: 1; min-height: 0; font: 12px ui-monospace, monospace; border: 2px solid var(--ink); border-radius: 10px; padding: 8px; resize: none; }
+#keyrow { display: none; gap: 6px; align-items: center; }
+#keyrow.show { display: flex; }
+#keyrow input { border: 2px solid var(--ink); border-radius: 10px; padding: 4px 8px; width: 160px; }
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>Breneland World Editor</h1>
+  <button id="undo" class="small" title="Undo">Undo</button>
+  <button id="toggle3d" class="small">3D view</button>
+  <button id="json" class="small">JSON</button>
+  <button id="save" class="small">Save to game</button>
+  <a class="small" href="/editor/hud.html" style="font: 600 12.5px var(--font-head); color: var(--ink); text-decoration: none; border: 2.5px solid var(--ink); border-radius: 999px; background: var(--card); box-shadow: 0 2px 0 var(--ink); padding: 4px 9px;">HUD Editor</a>
+  <div id="keyrow"><input id="key" type="password" placeholder="edit key" autocomplete="off"><button id="keyok" class="small">OK</button></div>
+  <div id="status">Loading the map...</div>
+</div>
+<div id="wrap">
+ <div id="mapwrap">
+  <canvas id="map"></canvas>
+  <div id="hint">Drag the map to pan, pinch or wheel to zoom. Pick a tool below.</div>
+  <div id="palette"></div>
+  <div id="insp"></div>
+  <div id="legend"><span>north is up</span><span>·</span><span>metres</span></div>
+  <div id="jsonbox">
+    <div style="display:flex;gap:6px;flex-wrap:wrap"><b style="font-family:var(--font-head)">The edits as JSON</b><span style="flex:1"></span><button id="copy" class="small">Copy</button><button id="paste" class="small">Load pasted</button><button id="closejson" class="small">Close</button></div>
+    <textarea id="jsontext" spellcheck="false"></textarea>
+  </div>
+ </div>
+ <div id="view3d">
+  <iframe id="game" title="3D view" allow="fullscreen"></iframe>
+  <div class="bar"><button id="edit3d" class="small on">Edit here</button><button id="rebuild" class="small">Rebuild</button><span class="note" id="note3d">Doodads update as you work. Roads, trails, ponds and ground need Rebuild.</span></div>
+ </div>
+</div>
+<div id="tools"></div>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<script type="module" src="/js/editor/world-editor.js"></script>
+<!-- tools-menu: "Back to Breneland" (to Andrew's tools menu) -->
+<script src="/js/tools-back.js" data-into="#top"></script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+/* Water tower climbing: the grip (stamina) bar bottom-centre, tips under it, touch buttons on the right */
+.tower-hud { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); transform: translateX(-50%); width: min(360px, 70vw); text-align: center; pointer-events: none; z-index: 6; font-family: 'Fredoka', 'Nunito', sans-serif; color: #fff4dc; text-shadow: 0 2px 0 rgba(0,0,0,0.45); }
+.tower-hud[hidden] { display: none; }
+.tower-label { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.tower-bar { height: 16px; border: 3px solid #2b2340; border-radius: 10px; background: rgba(20, 16, 30, 0.6); overflow: hidden; }
+.tower-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #7ddc7a, #c8e84a); transition: width 0.12s linear; }
+.tower-bar-fill.low { background: linear-gradient(90deg, #e0463c, #ff9f43); animation: tower-pulse 0.5s infinite alternate; }
+@keyframes tower-pulse { from { filter: brightness(1); } to { filter: brightness(1.6); } }
+.tower-tips { font-size: 12px; margin-top: 4px; opacity: 0.9; }
+.tower-btns { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 14px); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+.tower-btns[hidden] { display: none; }
+.tower-btn { min-width: 84px; padding: 10px 14px; font-size: 15px; }
+
+/* the stamina ring between the hands, the chalk timer inside it, and the grip note */
+.tower-hud { bottom: calc(env(safe-area-inset-bottom, 0px) + 96px); }
+.tower-ringwrap { width: 96px; height: 96px; margin: 0 auto 2px; }
+.tower-ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+.tower-ring circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+.tower-ring .tr-bg { stroke: rgba(20, 16, 30, 0.55); }
+.tower-ring .tr-fg { stroke: #9be070; stroke-dasharray: 251.3; stroke-dashoffset: 0; transition: stroke-dashoffset 0.12s linear, stroke 0.3s; }
+.tower-ring .tr-fg.low { stroke: #ff6b4a; animation: tower-pulse 0.5s infinite alternate; }
+.tower-ring .tr-chalk { stroke: #fff4dc; stroke-width: 4; stroke-dasharray: 207.3; stroke-dashoffset: 0; opacity: 0; transition: opacity 0.3s; }
+.tower-grip { font-size: 13px; font-weight: 700; min-height: 16px; letter-spacing: 0.02em; }
+.tower-grip.warn { color: #ff6b4a; animation: tower-pulse 0.3s infinite alternate; }
+.tower-btn.grip { width: 110px; height: 110px; padding: 0; font-size: 18px; border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tower-btn.grip.held { background: var(--accent); color: #fff; transform: translateY(2px); }
+
+/* ---- the climb's HUD in the doodle style of the rest of the HUD (ink outlines, paper, the chunky drop shadow), readable
+   on the scene behind it, and nothing on the phone under another control */
+.tower-ringwrap { position: relative; box-sizing: border-box; padding: 5px; border-radius: 50%; background: var(--paper, #fff8ec); border: 3px solid var(--ink, #2b2340); box-shadow: 0 4px 0 var(--ink, #2b2340); }
+.tower-ring .tr-bg { stroke: #e7dcc8; }
+.tower-ring .tr-fg { stroke: #5fbf5a; }
+.tower-ring .tr-chalk { stroke: #8fd0ee; }
+.tower-pct { position: absolute; inset: 0; display: grid; place-items: center; font: 700 22px var(--font-head, 'Fredoka', sans-serif); color: var(--ink, #2b2340); text-shadow: none; pointer-events: none; }
+.tower-pct::after { content: '%'; font-size: 12px; margin: 6px 0 0 1px; }
+.tower-pct { grid-auto-flow: column; justify-content: center; align-items: center; }
+.tower-label { display: inline-block; margin: 6px 0 2px; padding: 1px 11px; font: 700 14px var(--font-head, 'Fredoka', sans-serif); color: var(--ink, #2b2340); background: var(--paper, #fff8ec); border: 2.5px solid var(--ink, #2b2340); border-radius: 99px; box-shadow: 0 3px 0 var(--ink, #2b2340); text-shadow: none; }
+.tower-grip { font: 700 13px var(--font-head, 'Fredoka', sans-serif); text-shadow: 0 2px 0 var(--ink, #2b2340), 1px 0 0 var(--ink, #2b2340), -1px 0 0 var(--ink, #2b2340); }
+.tower-grip.warn { color: #ffd34d; animation: tower-blink 0.3s infinite alternate; }
+@keyframes tower-blink { from { opacity: 1; } to { opacity: 0.55; } }
+.tower-tips { display: inline-block; margin-top: 6px; padding: 4px 12px; font: 700 12px/1.45 var(--font-body, 'Nunito', sans-serif); color: #fff; background: rgba(43, 35, 64, 0.8); border-radius: 12px; white-space: pre-line; text-shadow: none; opacity: 1; }
+.tower-tips:empty { display: none; }
+/* the touch buttons: GRIP a big round button (it takes the cluster's slot on a phone), Lunge a pill like the swing's Hop off */
+.tower-btn.grip { color: var(--ink, #2b2340); background: var(--hud-sky, #8fd0ee); border: 4px solid var(--ink, #2b2340); box-shadow: 0 5px 0 var(--ink, #2b2340); font-family: var(--font-head, 'Fredoka', sans-serif); font-weight: 700; letter-spacing: 0.04em; }
+.tower-btn.grip.held { background: var(--hud-yellow, #ffd34d); color: var(--ink, #2b2340); transform: translateY(4px); box-shadow: 0 1px 0 var(--ink, #2b2340); }
+.tower-btn:not(.grip) { color: var(--ink, #2b2340); background: #fff; border: 3px solid var(--ink, #2b2340); border-radius: 12px; box-shadow: 0 4px 0 var(--ink, #2b2340); font-family: var(--font-head, 'Fredoka', sans-serif); font-weight: 700; }
+.tower-btn:not(.grip):active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink, #2b2340); }
+/* on the tower nothing is held and nobody waves: the tools and the emote smiley step aside until you are down */
+#hud:has(> .tower-hud:not([hidden])) > .toolring, #hud:has(> .tower-hud:not([hidden])) .tg-emotes, #hud:has(> .tower-hud:not([hidden])) #emote-wheel { display: none !important; }
+#hud[data-layout="pc"] .tower-hud { bottom: 90px; width: min(440px, 80vw); }
+/* phone: the grip ring small in the bottom-left over the chat; GRIP in the jump's place, the E (Let go / the view) over it
+   as everywhere, Lunge beside the E (clear of the chat bar and the mic) */
+#hud[data-layout="phone"] .tower-hud { width: auto; right: auto; text-align: left; }
+#hud[data-layout="phone"] .tower-ringwrap { width: 74px; height: 74px; margin: 0; padding: 4px; }
+#hud[data-layout="phone"] .tower-pct { font-size: 18px; }
+#hud[data-layout="phone"] .tower-label { font-size: 12px; padding: 1px 9px; margin-top: 5px; }
+#hud[data-layout="phone"] .tower-grip { font-size: 12px; }
+#hud[data-layout="phone"] .tower-btns { display: contents; }
+#hud[data-layout="phone"] .tower-btn.grip { position: fixed; right: calc(var(--safe-r) + 12px); bottom: calc(var(--safe-b) + 50px); width: 80px; height: 80px; font-size: 17px; pointer-events: auto; }
+#hud[data-layout="phone"] .tower-btn:not(.grip) { position: fixed; right: calc(var(--safe-r) + 16px + var(--act) + 14px); bottom: calc(var(--safe-b) + var(--slot-b) + var(--slot) + 16px + (var(--act) - 40px) / 2); min-width: 0; height: 40px; padding: 0 14px; font-size: 15px; pointer-events: auto; }
+.tower-btn.grip.idle:not(.held) { opacity: 0.55; }
+.tower-btn[hidden] { display: none !important; }
+
+/* ---- the climb: the grip as a bar at the bottom centre with the route's name and colour above it, a quiet message strip
+   (no toasts over the view), the minimal HUD while you climb (#hud.tw-climb), "Take in the view" hiding it all (#hud.tw-view),
+   the summit banner, and the climb stick resting faint where your thumb goes on a phone */
+.tower-hud { bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); width: min(440px, 64vw); }
+.tower-route { display: inline-block; padding: 2px 12px; border-radius: 99px; font: 700 13px var(--font-head, 'Fredoka', sans-serif); color: var(--ink, #2b2340); background: var(--paper, #fff8ec);
+  border: 2.5px solid var(--ink, #2b2340); box-shadow: inset 0 -4px 0 var(--route, #4fd27a); }
+.tower-bar { position: relative; height: 24px; margin-top: 6px; border: 3px solid var(--ink, #2b2340); border-radius: 12px; background: var(--paper, #fff8ec); box-shadow: 0 3px 0 var(--ink, #2b2340); overflow: hidden; }
+.tower-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: linear-gradient(90deg, var(--route, #4fd27a), #c8e84a); transition: width 0.12s linear; }
+.tower-bar.low .tower-bar-fill { background: linear-gradient(90deg, #e0463c, #ff9f43); animation: tower-pulse 0.5s infinite alternate; }
+.tower-bar-chalk { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: #8fd0ee; opacity: 0; transition: opacity 0.3s; }
+.tower-bar-txt { position: absolute; inset: 0; display: grid; place-items: center; font: 700 13px var(--font-head, 'Fredoka', sans-serif); color: var(--ink, #2b2340); }
+.tower-strip { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 74px); transform: translate(-50%, -6px); max-width: min(540px, 88vw); padding: 5px 14px; border-radius: 99px;
+  font: 700 14px var(--font-head, 'Fredoka', sans-serif); color: #fff8ec; background: rgba(43, 35, 64, 0.74); opacity: 0; transition: opacity 0.35s, transform 0.35s; pointer-events: none; text-align: center; }
+.tower-strip.on { opacity: 1; transform: translate(-50%, 0); }
+.tower-strip:empty { display: none; }
+#hud.tw-climb #quests, #hud.tw-climb #quest-flare, #hud.tw-climb #currency, #hud.tw-climb #tg-tools, #hud.tw-climb #tg-emotes,
+#hud.tw-climb #emote-wheel, #hud.tw-climb #pad-slot-x, #hud.tw-climb #pad-slot-y, #hud.tw-climb #pad-name, #hud.tw-climb #place, #hud.tw-climb #stats,
+#hud.tw-climb #online, #hud.tw-climb #toasts { display: none !important; }
+#hud.tw-view > *:not(#prompt):not(#hint):not(.tower-banner) { visibility: hidden !important; }
+.tower-banner { position: fixed; left: 50%; top: 20%; transform: translateX(-50%); z-index: 20; text-align: center; pointer-events: none; padding: 12px 34px 14px; border-radius: 18px;
+  background: var(--paper, #fff8ec); border: 4px solid var(--ink, #2b2340); box-shadow: 0 6px 0 var(--ink, #2b2340), inset 0 -8px 0 var(--route, #4fd27a); color: var(--ink, #2b2340); }
+.tower-banner[hidden] { display: none; }
+.tower-banner.go { animation: tower-banner 5s ease-out both; }
+@keyframes tower-banner { 0% { transform: translateX(-50%) scale(0.4) rotate(-6deg); opacity: 0; } 10% { transform: translateX(-50%) scale(1.08) rotate(2deg); opacity: 1; } 18% { transform: translateX(-50%) scale(1) rotate(0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.tb-title { font: 700 34px/1.1 var(--font-head, 'Fredoka', sans-serif); color: #e0574f; }
+.tb-sub { font: 600 15px var(--font-body, 'Nunito', sans-serif); margin-top: 4px; }
+#joystick.tw-rest { opacity: 0.45; }
+@media (prefers-reduced-motion: reduce) { .tower-banner.go { animation: none; } }
+
+/* ---- while you climb the chat's system lines stay out (they sat over the grip bar on the PC). On a phone the bar is narrower
+   and centred, and water-tower.js placeHud lifts it clear of the chat, the mic, the buttons and the climb stick and drops the
+   quiet strip below the minimap */
+#hud.tw-climb #chat-log .chat-line.sys { display: none; }
+#hud[data-layout="phone"] .tower-hud { width: min(230px, 60vw); text-align: center; }
+#hud[data-layout="phone"] .tower-btns[hidden] { display: none; } /* the buttons live beside the bar box, not in it */
+
+/* ---- no GRIP button (you hang on by yourself). On a phone one big button for the move of the moment where the jump is
+   (Lunge! under a missing brace, Jump at the top), shown only when it does something, and a small Let go up the right side.
+   The E steps aside while you're on the steel (#hud.tw-steel). The first climb's card says the three things that matter. */
+#hud.tw-steel #btn-act { display: none !important; }
+.tower-btn.move { width: 96px; height: 96px; padding: 0; border-radius: 50%; font-size: 19px; touch-action: none; user-select: none; -webkit-user-select: none;
+  color: var(--ink, #2b2340); background: var(--hud-yellow, #ffd34d); border: 4px solid var(--ink, #2b2340); box-shadow: 0 5px 0 var(--ink, #2b2340); }
+.tower-btn.move:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink, #2b2340); }
+.tower-btn.move.hot { animation: tower-hot 0.6s ease-in-out infinite alternate; }
+@keyframes tower-hot { from { transform: scale(1); } to { transform: scale(1.08); } }
+.tower-btn.letgo { min-width: 0; padding: 4px 12px; font-size: 13px; opacity: 0.85; }
+#hud[data-layout="phone"] .tower-btn.move { position: fixed; right: calc(var(--safe-r) + 12px); bottom: calc(var(--safe-b) + 48px); width: 84px; height: 84px; font-size: 18px; pointer-events: auto; }
+#hud[data-layout="phone"] .tower-btn.letgo { position: fixed; right: calc(var(--safe-r) + 10px); bottom: calc(var(--safe-b) + 300px); height: 32px; padding: 0 12px; font-size: 13px; pointer-events: auto; }
+.tower-card { position: fixed; left: 50%; top: 24%; transform: translateX(-50%); z-index: 19; width: max-content; max-width: min(440px, 86vw); padding: 10px 18px 12px; border-radius: 16px;
+  background: var(--paper, #fff8ec); border: 3px solid var(--ink, #2b2340); box-shadow: 0 5px 0 var(--ink, #2b2340), inset 0 -6px 0 var(--route, #4fd27a); color: var(--ink, #2b2340);
+  pointer-events: none; text-align: center; animation: tower-card-in 0.35s ease-out both; }
+.tower-card[hidden] { display: none; }
+.tc-title { font: 700 18px var(--font-head, 'Fredoka', sans-serif); margin-bottom: 4px; }
+.tc-line { font: 700 14px/1.45 var(--font-body, 'Nunito', sans-serif); }
+@keyframes tower-card-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#hud[data-layout="phone"] .tower-card { top: 30%; }
+#hud.tw-view .tower-card { display: none; }
+@media (prefers-reduced-motion: reduce) { .tower-btn.move.hot, .tower-card { animation: none; } }
+#hud[data-layout="phone"] .tower-card { top: 31%; max-width: 82vw; padding: 7px 12px 9px; }
+#hud[data-layout="phone"] .tc-title { font-size: 15px; margin-bottom: 2px; }
+#hud[data-layout="phone"] .tc-line { font-size: 12.5px; line-height: 1.35; }
+
+/* ---- hud3: the climb bar goes where the layout's 'climb' item is (hud-items.js; Andrew moves it in the HUD Editor): its middle
+   and its bottom (placeHud still lifts it clear of what it would cover). The big button of the moment and GRIP take the cluster's
+   slot on a phone, where Cast and Dive go */
+#hud[style*="--climb-l"] .tower-hud { left: calc(var(--climb-l) + var(--climb-w) / 2); bottom: var(--climb-b); }
+#hud[data-layout="phone"][style*="--slot-r"] .tower-btn.move { right: calc(var(--slot-r) + var(--slot-w) / 2 - 42px); bottom: calc(var(--slot-b) + var(--slot-h) / 2 - 42px); }
+#hud[data-layout="phone"][style*="--slot-r"] .tower-btn.grip { right: calc(var(--slot-r) + var(--slot-w) / 2 - 40px); bottom: calc(var(--slot-b) + var(--slot-h) / 2 - 40px); }
+
+/* ---- hud-loose: Let go and the first climb's card are HUD items (hud-items.js letgo, climbcard; Andrew moves them in the HUD
+   Editor), placed from --letgo-* (its right edge and bottom) and --climbcard-* (its middle and top). Size 1 is how they were: their
+   words go by the box's height. Let go is a child of #hud now (it was in .tower-btns), shown with the touch buttons (.on); on a
+   tablet the big button of the moment rides over it as it did in their column */
+.tower-btn.letgo:not(.on) { display: none !important; }
+#hud[style*="--letgo-l"] .tower-btn.letgo { position: absolute; left: auto; top: auto; right: var(--letgo-r); bottom: var(--letgo-b); height: var(--letgo-h); min-width: 0;
+  padding: 0 calc(var(--letgo-h) * 12 / 32); font-size: calc(var(--letgo-h) * 13 / 32); pointer-events: auto; }
+#hud[style*="--letgo-l"]:not([data-layout="phone"]) .tower-btn.letgo { padding: 0 calc(var(--letgo-h) * 12 / 30); font-size: calc(var(--letgo-h) * 13 / 30); }
+#hud[style*="--letgo-l"]:not([data-layout="phone"]) .tower-btns { right: var(--letgo-r); bottom: calc(var(--letgo-b) + var(--letgo-h) + 10px); }
+#hud[style*="--letgo-l"]:not([data-layout="phone"]):has(> .tower-btn.letgo[hidden]) .tower-btns { bottom: var(--letgo-b); }
+#hud[style*="--climbcard-l"] .tower-card { left: calc(var(--climbcard-l) + var(--climbcard-w) / 2); top: var(--climbcard-t); max-width: min(var(--climbcard-w), 86vw);
+  font-size: calc(var(--climbcard-h) * 14 / 110); padding: 0.714em 1.286em 0.857em; }
+#hud[style*="--climbcard-l"] .tower-card .tc-title { font-size: 1.286em; }
+#hud[style*="--climbcard-l"] .tower-card .tc-line { font-size: 1em; }
+#hud[style*="--climbcard-l"][data-layout="phone"] .tower-card { max-width: min(var(--climbcard-w), 82vw); font-size: calc(var(--climbcard-h) * 12.5 / 110); padding: 0.56em 0.96em 0.72em; }
+#hud[style*="--climbcard-l"][data-layout="phone"] .tower-card .tc-title { font-size: 1.2em; }

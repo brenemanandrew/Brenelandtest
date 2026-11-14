@@ -1,0 +1,117 @@
+/* The first-time tutorial (js/tutorial.js): a soft white wash with spotlights cut out round the controls, and a cartoon
+   speech card in the HUD's doodle style (thick ink outlines, Fredoka, the HUD's warm colours). Above the HUD (z 10), under
+   the fade and the menus (15, 20). Loaded only while the tutorial runs. */
+.tut { position: fixed; inset: 0; z-index: 14; pointer-events: none; }
+.tut[hidden] { display: none; }
+.tut-wash { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: auto; overflow: visible; }
+.tut.try .tut-wash { pointer-events: none; } /* try-it steps: your fingers and the mouse reach the yard */
+.tut-fog { fill: #fff; fill-opacity: 0.6; }
+.tut.try .tut-fog { fill-opacity: 0.42; }
+.tut-ring { fill: none; stroke: var(--hud-yellow, #ffd34d); stroke-width: 5; stroke-dasharray: 14 9; stroke-linecap: round; }
+.tut.try .tut-ring { stroke: var(--hud-green, #a8e06b); }
+@media (prefers-reduced-motion: no-preference) {
+  .tut-ring { animation: tut-march 1.4s linear infinite; }
+}
+@keyframes tut-march { to { stroke-dashoffset: -46; } }
+
+/* ---- the card */
+.tut-card {
+  --c: #ffd34d;
+  position: absolute; left: 0; top: 0; width: min(372px, calc(100vw - 20px)); box-sizing: border-box; pointer-events: auto;
+  padding: 14px 16px 14px; color: var(--ink); background: var(--paper, #fff8ec);
+  border: 4px solid var(--ink); border-radius: 24px; box-shadow: 0 6px 0 var(--ink), 0 14px 30px rgba(43, 35, 64, 0.22);
+  font-family: var(--font-head);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tut-card { transition: transform 0.34s cubic-bezier(0.34, 1.3, 0.5, 1); }
+  .tut-card .tut-icon { animation: tut-bob 2.2s ease-in-out infinite; }
+}
+@keyframes tut-bob { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg) translateY(-2px); } }
+/* a coloured band along the top in the step's colour */
+.tut-card::before { content: ""; position: absolute; left: 14px; right: 14px; top: -4px; height: 7px; border-radius: 0 0 8px 8px; background: var(--c); border: 3px solid var(--ink); border-top: 0; }
+
+.tut-head { display: flex; align-items: center; gap: 10px; margin: 2px 0 6px; }
+.tut-icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--c); border: 3px solid var(--ink); box-shadow: 0 3px 0 var(--ink); }
+.tut-icon svg { width: 26px; height: 26px; display: block; }
+.tut-title { flex: 1; min-width: 0; margin: 0; font: 700 21px/1.1 var(--font-head); letter-spacing: 0.01em; }
+.tut-count { flex: none; align-self: flex-start; font: 700 13px var(--font-head); padding: 2px 9px; border-radius: 99px; background: #fff; border: 2.5px solid var(--ink); font-variant-numeric: tabular-nums; }
+.tut-text { margin: 0 0 10px; font: 700 16px/1.38 var(--font-body); color: #3b3352; }
+
+.tut-keys { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: -2px 0 10px; }
+.tut-keys[hidden] { display: none; }
+.tut-keyrow { display: inline-flex; gap: 5px; }
+.tut-cap { margin: 0; min-width: 30px; height: 30px; padding: 0 7px; box-sizing: border-box; display: inline-grid; place-items: center; font: 700 15px var(--font-head); color: var(--ink); background: #fff; border: 2.5px solid var(--ink); border-radius: 8px; box-shadow: 0 3px 0 var(--ink); opacity: 1; }
+.tut-cap.wide { padding: 0 11px; }
+
+.tut-try { display: inline-flex; align-items: center; gap: 6px; margin: -2px 0 12px; padding: 4px 12px; font: 700 14px var(--font-head); border: 2.5px dashed var(--ink); border-radius: 99px; background: #fff; }
+.tut-try[hidden] { display: none; }
+.tut-try::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--hud-orange, #ff9f4a); border: 2px solid var(--ink); }
+.tut-try.done { border-style: solid; background: #e9f9d6; }
+.tut-try.done::before { background: var(--hud-green, #a8e06b); }
+
+.tut-btns { display: flex; align-items: center; gap: 8px; }
+.tut-fill { flex: 1; }
+.tut-skip[hidden] { display: none; }
+.tut-btns .btn { white-space: nowrap; }
+.tut-skip { white-space: nowrap; padding: 6px 4px; font: 700 14px var(--font-head); color: #6b6283; background: none; border: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tut-skip:hover { color: var(--ink); }
+.tut-skip:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 2px; border-radius: 6px; }
+.tut-back { padding: 8px 14px; }
+.tut-back[hidden] { display: none; }
+.tut-next { min-width: 112px; padding: 10px 22px; font-size: 19px; background: var(--hud-orange, #ff9f4a); color: #fff; text-shadow: 0 2px 0 rgba(43, 35, 64, 0.45); }
+.tut-k { font: 700 11px var(--font-body); padding: 0 5px; margin-left: 6px; vertical-align: 2px; border-width: 2px; border-radius: 5px; text-shadow: none; }
+.tut-k:empty { display: none; }
+.tut.try .tut-next:not(.ready) { background: #fff; color: var(--ink); text-shadow: none; }
+.tut-next.ready { background: var(--hud-green, #5fbf5a); }
+@media (prefers-reduced-motion: no-preference) {
+  .tut-next.ready { animation: tut-pop 0.5s cubic-bezier(0.34, 1.6, 0.5, 1); }
+}
+@keyframes tut-pop { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+/* the pointer: a rotated square on the edge facing the control (data-side = the card's edge it sits on) */
+.tut-tail { position: absolute; width: 18px; height: 18px; background: var(--paper, #fff8ec); border: 4px solid var(--ink); box-sizing: content-box; --at: 50%; }
+.tut-tail[hidden] { display: none; }
+.tut-card[data-side="top"] .tut-tail { top: -13px; left: calc(var(--at) - 13px); transform: rotate(45deg); border-right: 0; border-bottom: 0; border-radius: 4px 0 0 0; }
+.tut-card[data-side="bottom"] .tut-tail { bottom: -13px; left: calc(var(--at) - 13px); transform: rotate(45deg); border-left: 0; border-top: 0; border-radius: 0 0 4px 0; }
+.tut-card[data-side="left"] .tut-tail { left: -13px; top: calc(var(--at) - 13px); transform: rotate(45deg); border-right: 0; border-top: 0; border-radius: 0 0 0 4px; }
+.tut-card[data-side="right"] .tut-tail { right: -13px; top: calc(var(--at) - 13px); transform: rotate(45deg); border-left: 0; border-bottom: 0; border-radius: 0 4px 0 0; }
+/* (the coloured band stays clear of a pointer on the top edge) */
+.tut-card[data-side="top"]::before { left: auto; right: 14px; width: 30%; }
+
+/* ---- the phone's thumb that shows where to drag (walk: the left side, look: the right) */
+.tut-thumb { position: absolute; display: none; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); border: 4px solid var(--ink); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.7); pointer-events: none; }
+.tut-thumb.on { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .tut-thumb.walk { animation: tut-drag-walk 2.4s ease-in-out infinite; }
+  .tut-thumb.look { animation: tut-drag-look 2.4s ease-in-out infinite; }
+}
+@keyframes tut-drag-walk { 0%, 15% { transform: translate(0, 0); } 45% { transform: translate(0, -46px); } 70% { transform: translate(28px, -30px); } 90%, 100% { transform: translate(0, 0); } }
+@keyframes tut-drag-look { 0%, 15% { transform: translate(0, 0); } 45% { transform: translate(-52px, 0); } 75% { transform: translate(40px, 0); } 100% { transform: translate(0, 0); } }
+
+/* ---- the try-it steps: the HUD's buttons sleep (a stray tap must not jump or open things mid-tour) */
+body.tutorial-try #hud, body.tutorial-try #hud * { pointer-events: none !important; }
+
+/* a pad on the couch: bigger words (style.css body.pad grows the HUD the same way) */
+.tut[data-layout="pad"] .tut-card { width: min(470px, calc(100vw - 20px)); padding: 18px 20px; }
+.tut[data-layout="pad"] .tut-title { font-size: 26px; }
+.tut[data-layout="pad"] .tut-text { font-size: 19px; }
+.tut[data-layout="pad"] .tut-next { font-size: 22px; }
+
+/* small phones */
+@media (max-width: 380px) {
+  .tut-card { padding: 12px 13px; }
+  .tut-title { font-size: 19px; }
+  .tut-text { font-size: 15px; }
+  .tut-next { min-width: 96px; padding: 9px 16px; font-size: 17px; }
+}
+/* short screens (a phone on its side): a compact card */
+@media (max-height: 520px) {
+  .tut-card { width: min(330px, calc(100vw - 20px)); padding: 9px 12px 10px; border-radius: 20px; }
+  .tut-head { margin: 0 0 4px; gap: 8px; }
+  .tut-icon { width: 32px; height: 32px; } .tut-icon svg { width: 21px; height: 21px; }
+  .tut-title { font-size: 18px; }
+  .tut-text { font-size: 14px; line-height: 1.3; margin-bottom: 7px; }
+  .tut-try { margin-bottom: 7px; font-size: 13px; padding: 2px 10px; }
+  .tut-next { min-width: 90px; padding: 7px 16px; font-size: 17px; }
+  .tut-back { padding: 6px 12px; font-size: 15px; }
+}

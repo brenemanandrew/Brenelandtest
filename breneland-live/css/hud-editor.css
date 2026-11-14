@@ -1,0 +1,125 @@
+/* The HUD Editor (public/editor/hud.html): the game in a frame with its real HUD, the pieces outlined on top
+   to drag and size, in the editors' look (thick ink, paper panels, chunky pills; npc-editor.css). Phone first: the frame fills
+   the screen, the inspector is a sheet along the bottom, every handle a thumb's size. */
+:root {
+  --ink: #2b2340; --paper: #fff8ec; --paper-2: #fdf0d8; --card: #ffffff; --muted: #6d6480; --accent: #e8743a; --accent-2: #3f8fd9;
+  --yellow: #ffd34d; --sky: #8fd0ee; --pink: #ff8fb8; --purple: #b48cff; --green: #a8e06b; --red: #e0463c;
+  --font-head: "Fredoka", "Trebuchet MS", system-ui, sans-serif; --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --insp-w: 300px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #f3dcc0; color: var(--ink); font: 500 14px var(--font-body); -webkit-font-smoothing: antialiased; }
+body { overflow: hidden; -webkit-user-select: none; user-select: none; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+button, select, input { font: inherit; color: inherit; }
+.btn { border: 2.5px solid var(--ink); border-radius: 999px; background: var(--card); box-shadow: 0 3px 0 var(--ink); padding: 6px 12px; cursor: pointer; font: 600 14px/1.1 var(--font-head); touch-action: manipulation; white-space: nowrap; }
+.btn:active { translate: 0 2px; box-shadow: 0 1px 0 var(--ink); }
+.btn.small { padding: 5px 10px; font-size: 13px; box-shadow: 0 2px 0 var(--ink); }
+.btn.tog.on { background: var(--yellow); }
+.btn.primary { background: var(--green); }
+.btn.danger { background: #ffd8d4; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn:focus-visible, select:focus-visible, input:focus-visible, .he-box:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+
+#app { display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); height: 100%; }
+#top, .tools { min-width: 0; }
+/* ---------- the top bar ---------- */
+#top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top, 0px)); background: var(--paper); border-bottom: 3px solid var(--ink); }
+.brand { font: 700 22px var(--font-head); white-space: nowrap; }
+.pick select { border: 2.5px solid var(--ink); border-radius: 999px; background: var(--yellow); padding: 5px 30px 5px 12px; font: 600 14px var(--font-head); cursor: pointer; appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%); background-position: calc(100% - 16px) 55%, calc(100% - 11px) 55%; background-size: 5px 5px; background-repeat: no-repeat; box-shadow: 0 2px 0 var(--ink); }
+.tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sep { width: 2px; height: 22px; background: var(--ink); opacity: 0.25; border-radius: 2px; }
+#keyrow { display: flex; gap: 6px; align-items: center; }
+#keyrow input { border: 2px solid var(--ink); border-radius: 10px; padding: 4px 8px; width: 150px; background: var(--card); }
+#status { flex: 1 1 100%; font-size: 12.5px; color: var(--muted); min-height: 1.2em; }
+#status.err { color: var(--red); }
+#status.good { color: #2f7d32; }
+.links { display: flex; gap: 10px; font-size: 12.5px; margin-left: auto; }
+.links a { color: var(--accent-2); font-weight: 700; text-decoration: none; }
+.links a:hover { text-decoration: underline; }
+
+/* ---------- the stage: the game's frame scaled to fit, the overlay on it ---------- */
+#wrap { display: grid; grid-template-columns: 1fr var(--insp-w); min-height: 0; }
+#stage { position: relative; min-height: 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 10px; overflow: hidden; background: #e9cfae; }
+#frame { position: relative; border: 3px solid var(--ink); border-radius: 12px; box-shadow: 0 6px 0 rgba(43, 35, 64, 0.35); overflow: hidden; background: #1c1a2e; }
+#game { position: absolute; left: 0; top: 0; border: 0; transform-origin: 0 0; pointer-events: none; display: block; }
+#guide-layer { position: absolute; inset: 0; pointer-events: none; }
+#guide-layer svg { position: absolute; left: 0; top: 0; }
+#overlay { position: absolute; inset: 0; touch-action: none; cursor: default; }
+#frame.loading::after { content: "Starting the game..."; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font: 700 18px var(--font-head); background: rgba(28, 26, 46, 0.6); pointer-events: none; }
+/* a piece's box: a dashed outline with its name; the selected one solid with its handles */
+.he-box { position: absolute; border: 2px dashed rgba(255, 255, 255, 0.85); outline: 1.5px dashed rgba(43, 35, 64, 0.65); outline-offset: -1.5px; border-radius: 8px; cursor: grab; touch-action: none; box-shadow: 0 0 0 1px rgba(43, 35, 64, 0.2) inset; }
+.he-box:hover { border-color: var(--yellow); }
+.he-box.pop { border-style: dotted; }
+.he-box.sel { border: 2.5px solid var(--yellow); outline: 2px solid var(--ink); outline-offset: 0; cursor: grabbing; z-index: 2; box-shadow: 0 0 0 3px rgba(255, 211, 77, 0.35); }
+.he-box.fixed { cursor: default; }
+.he-tag { position: absolute; left: -2px; top: -2px; translate: 0 -100%; padding: 1px 7px; font: 700 11px var(--font-head); color: #fff; background: rgba(43, 35, 64, 0.85); border-radius: 7px 7px 7px 0; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.1s; }
+.he-box:hover .he-tag, .he-box.sel .he-tag { opacity: 1; }
+.he-box.sel .he-tag { background: var(--ink); }
+.he-box.low .he-tag { top: auto; bottom: -2px; translate: 0 100%; border-radius: 0 7px 7px 7px; }
+.he-handle { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: var(--yellow); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); touch-action: none; z-index: 3; }
+.he-handle.size { right: -11px; bottom: -11px; cursor: nwse-resize; }
+.he-handle.size::after { content: ""; position: absolute; left: 5px; top: 5px; width: 7px; height: 7px; border-right: 2.5px solid var(--ink); border-bottom: 2.5px solid var(--ink); }
+.he-dial { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--sky); border: 2.5px solid var(--ink); box-shadow: 0 2px 0 var(--ink); cursor: grab; touch-action: none; z-index: 3; }
+.he-dial::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--ink); }
+.he-dial-line { position: absolute; height: 0; border-top: 2px dashed var(--sky); transform-origin: 0 0; pointer-events: none; z-index: 2; }
+.he-pivot { position: absolute; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--sky); border: 2px solid var(--ink); pointer-events: none; z-index: 2; }
+/* the show chips (popouts) under the frame */
+.show { flex: none; display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.show:empty { display: none; }
+.show .chip { padding: 4px 11px; font: 600 12.5px var(--font-head); border: 2.5px solid var(--ink); border-radius: 999px; background: rgba(255, 248, 236, 0.92); box-shadow: 0 2px 0 var(--ink); cursor: pointer; }
+.show .chip.on { background: var(--purple); }
+.show .chip:active { translate: 0 2px; box-shadow: none; }
+
+/* ---------- the inspector ---------- */
+#insp { min-height: 0; overflow: auto; padding: 12px 14px; background: var(--paper); border-left: 3px solid var(--ink); }
+.insp-grip { display: none; }
+#insp h2 { font: 700 18px var(--font-head); margin: 0 0 6px; }
+#insp .muted { color: var(--muted); font-size: 12.5px; margin: 6px 0; }
+#insp .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+#insp .row label { flex: 0 0 62px; font-size: 12.5px; color: var(--muted); }
+#insp input[type=number] { width: 78px; border: 2px solid var(--ink); border-radius: 10px; padding: 5px 8px; background: var(--card); font-variant-numeric: tabular-nums; }
+#insp input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); }
+#insp .val { flex: 0 0 52px; text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+#insp h3 { font: 700 14px var(--font-head); margin: 14px 0 4px; }
+#insp .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+#insp .pair { display: flex; gap: 10px; }
+#insp .pair .row { flex: 1; min-width: 0; }
+#insp .pair .row label { flex: 0 0 14px; }
+#insp .pair input[type=number] { flex: 1; min-width: 0; width: auto; }
+
+/* ---------- a phone: the frame fills the screen, the inspector is a sheet along the bottom ---------- */
+@media (max-width: 760px) {
+  :root { --insp-w: 0px; }
+  #top { gap: 6px; padding: 6px 8px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); }
+  .brand { font-size: 18px; }
+  .tools { flex: 1 1 100%; width: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .tools::-webkit-scrollbar { display: none; }
+  .tools .btn { flex: 0 0 auto; }
+  .links { display: none; }
+  #status { font-size: 12px; }
+  #wrap { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  #stage { padding: 6px; }
+  #insp { border-left: 0; border-top: 3px solid var(--ink); max-height: 42vh; padding: 6px 12px calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .insp-grip { display: block; width: 44px; height: 5px; margin: 0 auto 6px; border-radius: 3px; background: rgba(43, 35, 64, 0.35); }
+  #insp.folded { max-height: 46px; overflow: hidden; }
+  #insp h2 { font-size: 16px; margin-bottom: 2px; }
+  .he-handle { width: 30px; height: 30px; }
+  .he-handle.size { right: -26px; bottom: -26px; } /* (all but a corner outside the piece: a small piece stays draggable by its middle) */
+  .he-handle.size::after { left: 8px; top: 8px; width: 9px; height: 9px; }
+  .he-dial { width: 34px; height: 34px; margin: -17px 0 0 -17px; }
+  .show { gap: 4px; }
+  .show .chip { padding: 3px 9px; font-size: 12px; }
+}
+/* a feature's place (Cast's spot, the climb bar, the view toggle): dotted, under the pieces (hud3) */
+.he-box.feat { border-style: dotted; border-color: rgba(143, 208, 238, 0.95); }
+.he-box.sel { z-index: 2 !important; } /* (the selected one on top, its handle too) */
+/* (hud3) a piece at the frame's right or bottom edge (the map, the ?) has its handle on the inside corner, where a finger can reach it */
+.he-handle.size.in-x { right: auto; left: -11px; cursor: nesw-resize; }
+.he-handle.size.in-y { bottom: auto; top: -11px; }
+.he-handle.size.in-x::after { left: 7px; border-right: 0; border-left: 2.5px solid var(--ink); }
+.he-handle.size.in-y::after { top: 7px; border-bottom: 0; border-top: 2.5px solid var(--ink); }
+@media (max-width: 760px), (pointer: coarse) { .he-handle.size.in-x { left: -26px; } .he-handle.size.in-y { top: -26px; } }
+/* hud-loose: which mode a piece shows in (the maze, the tower), in the inspector */
+#insp .mode { margin: 6px 0 2px; padding: 3px 9px; border-radius: 9px; background: var(--yellow, #ffd34d); font: 600 12.5px var(--font-head); }

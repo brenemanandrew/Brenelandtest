@@ -1,0 +1,148 @@
+/* Bocce: the team card, the score card, the aiming panel, the banners, the measuring labels and the confetti. */
+#hud > .bocce-hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+.bocce-hud [hidden] { display: none !important; }
+
+/* ---- the team card */
+.bocce-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -52%); width: min(470px, calc(100vw - 24px));
+  pointer-events: auto; display: grid; gap: 12px; animation: bocce-pop 0.28s cubic-bezier(.3, 1.5, .5, 1);
+}
+.bc-title { font: 700 30px var(--font-head); text-align: center; line-height: 1; }
+.bc-sub { font: 700 14px var(--font-body); color: var(--muted); text-align: center; margin-top: -6px; }
+.bc-teams { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bc-team { border: 3px solid var(--ink); border-radius: 14px; background: #fff; padding: 10px; display: grid; gap: 8px; align-content: start; }
+.bc-head { font: 700 20px var(--font-head); color: #fff; background: var(--tc); border: 3px solid var(--ink); border-radius: 10px; text-align: center; padding: 2px 0 3px; text-shadow: 0 2px 0 rgba(43, 35, 64, 0.45); }
+.bc-seats { display: grid; gap: 6px; }
+.bc-seat { font: 700 14px var(--font-body); padding: 6px 8px; border-radius: 9px; border: 2px dashed #cfc7dd; color: var(--muted); min-height: 20px; }
+.bc-seat.human { border: 2px solid var(--tc); color: var(--ink); background: color-mix(in srgb, var(--tc) 12%, #fff); }
+.bc-seat.bot { border: 2px solid #d9d2e6; color: var(--ink); background: #f6f2fb; }
+.bc-seat.me { font-weight: 800; box-shadow: inset 0 0 0 2px var(--tc); }
+.bc-join { font-size: 15px; padding: 7px 10px; }
+.bc-opts { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.bc-opt { font-size: 14px; padding: 6px 12px; }
+.bc-note { font: 700 13px/1.35 var(--font-body); color: var(--muted); text-align: center; }
+.bc-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.bocce-card .btn:disabled { opacity: 0.45; cursor: default; transform: none; box-shadow: 0 4px 0 var(--ink); }
+
+/* ---- the score strip (bocce-hud, 2026-11-07): one compact strip in the minimap's place (the map tucks away while you play or
+   watch; standing near without watching it sits under the top band). Red's balls left and score, the target and the frame,
+   Green's score and balls left; whose turn is that team's box lit in its colour with an arrow under it. */
+.bocce-score {
+  position: absolute; right: var(--map-r, 12px); top: calc(var(--top-b, 120px) + 6px);
+  display: flex; align-items: stretch; gap: 4px; padding: 4px; box-sizing: border-box;
+  background: var(--paper); border: 2.5px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink);
+  font: 700 12px var(--font-body); color: var(--ink);
+}
+#hud.bocce-play .bocce-score { top: var(--top, 10px); }
+.bs-team { position: relative; display: flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 10px; border: 2.5px solid transparent; background: color-mix(in srgb, var(--tc) 14%, #fff); }
+.bs-team.up { border-color: var(--ink); background: var(--tc); color: #fff; }
+.bs-team.bump .bs-num { animation: bocce-bump 0.6s cubic-bezier(.3, 1.8, .5, 1); }
+.bs-num { font: 700 24px/1 var(--font-head); color: var(--tc); min-width: 0.6em; text-align: center; }
+.bs-team.up .bs-num { color: #fff; text-shadow: 0 2px 0 rgba(43, 35, 64, 0.45); }
+.bs-dots { display: grid; grid-template-columns: repeat(2, 8px); gap: 2px; }
+.bs-dots i { width: 8px; height: 8px; box-sizing: border-box; border-radius: 50%; background: var(--tc); border: 1.5px solid var(--ink); }
+.bs-team.up .bs-dots i { background: #fff; }
+.bs-dots i.used, .bs-team.up .bs-dots i.used { background: transparent; border-color: color-mix(in srgb, var(--ink) 30%, transparent); }
+.bs-up { display: none; position: absolute; left: 50%; bottom: -11px; width: 14px; height: 9px; transform: translateX(-50%); background: var(--ink); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.bs-up::after { content: ""; position: absolute; left: 3px; top: 0; width: 8px; height: 5px; background: var(--tc); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+.bs-team.up .bs-up { display: block; }
+.bocce-score.mine .bs-team.up { animation: bocce-glow 0.9s ease-in-out infinite alternate; }
+.bs-clock { position: absolute; top: -9px; right: -6px; font: 800 10px/1 var(--font-body); color: #fff; background: #e0574f; border: 2px solid var(--ink); border-radius: 99px; padding: 2px 4px; }
+.bs-mid { display: grid; justify-items: center; align-content: center; gap: 1px; min-width: 30px; color: var(--muted); }
+.bs-to { display: flex; align-items: center; gap: 2px; font: 700 14px/1 var(--font-head); color: var(--ink); }
+.bs-to::before { content: ""; width: 10px; height: 12px; background: var(--ink); clip-path: polygon(0 0, 100% 15%, 20% 45%, 20% 100%, 0 100%); } /* a little flag: first to N */
+.bs-frame { font: 800 10px/1 var(--font-body); }
+.bs-frame::before { content: "#"; opacity: 0.7; }
+
+/* ---- aiming: a slim power bar right over the throw controls (touch: the arrows and BOWL, bottom right in the E's place; a
+   keyboard or a pad: the bar alone at the bottom middle), and one hint the first time ever. No card, no second title. */
+.bocce-aim {
+  position: absolute; left: 50%; bottom: calc(var(--safe-b) + 22px); width: min(280px, calc(100vw - 40px)); transform: translateX(-50%);
+  padding: 4px; box-sizing: border-box; background: rgba(255, 251, 240, 0.85); border: 2.5px solid var(--ink); border-radius: 99px; box-shadow: 0 3px 0 var(--ink);
+  animation: bocce-rise 0.3s cubic-bezier(.3, 1.4, .5, 1);
+}
+.ba-meter { position: relative; width: 100%; height: 10px; border-radius: 99px; background: linear-gradient(90deg, #cfe8c0, #f6e8ae 60%, #f4c4b9); }
+.ba-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 99px; background: linear-gradient(90deg, #5fbf5a, #f2c73a 60%, #e5533f); transform-origin: left; transform: scaleX(0.01); }
+.ba-meter.charging { box-shadow: 0 0 0 2px #ffd34d; }
+.ba-mark { position: absolute; top: -6px; width: 0; height: 22px; border-left: 2.5px solid var(--ink); transform: translateX(-1.25px); }
+.ba-mark::after { content: ""; position: absolute; left: -6px; top: -7px; width: 7px; height: 7px; border-radius: 50%; background: #fff; border: 2.5px solid var(--ink); } /* (the pallino on its tick) */
+.bocce-tip {
+  position: absolute; left: 50%; bottom: calc(var(--safe-b) + 58px); transform: translateX(-50%); white-space: nowrap;
+  font: 700 13px var(--font-body); color: #fff; background: rgba(43, 35, 64, 0.82); padding: 4px 12px; border-radius: 99px;
+}
+
+/* the arrows and BOWL, in a row: BOWL's middle on the E's middle (hud-layout.js --act-*: wherever the layout puts the E) */
+.bocce-hud { --bowl: 70px; --bt-r: max(calc(var(--safe-r) + 8px), calc(var(--act-r, 20px) + var(--act-w, 70px) / 2 - var(--bowl) / 2)); --bt-b: max(calc(var(--safe-b) + 8px), calc(var(--act-b, 20px) + var(--act-h, 70px) / 2 - var(--bowl) / 2)); }
+.bocce-touch { position: absolute; display: flex; gap: 8px; align-items: center; pointer-events: auto; right: var(--bt-r); bottom: var(--bt-b); }
+.bt-arrow, .bt-bowl { font: 700 20px var(--font-head); color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 50%; box-shadow: 0 4px 0 var(--ink); touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer; padding: 0; position: relative; }
+.bt-arrow { width: 46px; height: 46px; }
+.bt-arrow::before { content: ""; position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; border: solid var(--ink); border-width: 0 0 4px 4px; transform: translate(-30%, -50%) rotate(45deg); }
+.bt-arrow.r::before { transform: translate(-70%, -50%) rotate(-135deg); }
+.bt-bowl { width: var(--bowl); height: var(--bowl); font-size: 17px; background: var(--accent); color: #fff; text-shadow: 0 2px 0 rgba(43, 35, 64, 0.5); margin-left: 4px; }
+.bt-arrow.press, .bt-bowl.press { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+/* on a touch screen the bar sits right over the row, as wide as it, and the hint over the bar */
+.bocce-hud.touch .bocce-aim { left: auto; transform: none; width: calc(46px * 2 + 8px + 8px + 4px + var(--bowl)); right: var(--bt-r); bottom: calc(var(--bt-b) + var(--bowl) + 10px); }
+.bocce-hud.touch .bocce-tip { left: auto; transform: none; right: var(--bt-r); bottom: calc(var(--bt-b) + var(--bowl) + 38px); }
+
+/* ---- banners */
+.bocce-banner { position: absolute; left: 50%; top: 13%; transform: translateX(-50%); text-align: center; pointer-events: none; animation: bocce-banner 0.5s cubic-bezier(.2, 1.3, .4, 1); width: max-content; max-width: calc(100vw - 30px); }
+.bb-big {
+  font: 700 46px/1.05 var(--font-head); color: #fff; letter-spacing: 0.01em;
+  text-shadow: 0 4px 0 var(--ink), 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 -3px 0 var(--ink), 3px 3px 0 var(--ink), -3px 3px 0 var(--ink);
+}
+.bb-small { margin-top: 8px; display: inline-block; font: 700 16px var(--font-body); color: #fff; background: rgba(43, 35, 64, 0.78); padding: 4px 14px; border-radius: 99px; }
+.bocce-banner.t0 .bb-big { color: #ff8a7f; }
+.bocce-banner.t1 .bb-big { color: #8ee07a; }
+.bocce-banner.dead .bb-big { color: #e8e2f2; }
+.bocce-banner.small .bb-big { font-size: 32px; }
+.bocce-banner.big .bb-big { font-size: 60px; }
+
+/* ---- a distance label over a measured ball */
+.bocce-dist { position: absolute; left: 0; top: 0; transform-origin: 50% 100%; will-change: transform, opacity; font: 800 13px var(--font-head); color: #fff; padding: 1px 8px; border-radius: 99px; border: 2px solid var(--ink); white-space: nowrap; pointer-events: none; }
+.bocce-dist.t0 { background: #e0574f; }
+.bocce-dist.t1 { background: #3f9a4b; }
+
+/* ---- confetti */
+.bocce-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bocce-confetti i { position: absolute; top: -20px; width: 10px; height: 14px; border-radius: 2px; animation: bocce-fall linear forwards; }
+
+@keyframes bocce-pop { from { transform: translate(-50%, -48%) scale(0.85); opacity: 0; } }
+@keyframes bocce-rise { from { transform: translateY(20px); opacity: 0; } }
+@keyframes bocce-banner { 0% { transform: translate(-50%, 12px) scale(0.5); opacity: 0; } 60% { transform: translate(-50%, -4px) scale(1.08); opacity: 1; } 100% { transform: translate(-50%, 0) scale(1); } }
+@keyframes bocce-bump { 0% { transform: scale(1); } 40% { transform: scale(1.45); } 100% { transform: scale(1); } }
+@keyframes bocce-glow { from { box-shadow: 0 0 0 0 #ffd34d; } to { box-shadow: 0 0 0 3px #ffd34d; } }
+@keyframes bocce-fall { to { transform: translate(var(--dx), 105vh) rotate(var(--r)); } }
+
+@media (max-width: 640px) {
+  .bb-big { font-size: 34px; }
+  .bocce-banner.big .bb-big { font-size: 42px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bocce-card, .bocce-aim, .bocce-banner, .bs-team.bump .bs-num, .bocce-score.mine .bs-team.up { animation: none !important; }
+}
+
+/* ---- while you play or watch (#hud.bocce-play, bocce.js syncPlay): the rest of the HUD gets out of the way of the court. The
+   minimap block (map, clock, weather, place, heart, ?), the counters, the tools and the smiley tuck away; the quest list is folded
+   to its pill (quests.hold). On my turn the E steps aside too (BOWL is in its place), and the mic. All of it comes back by itself
+   when the class goes. */
+#hud.bocce-play > .mm-block, #hud.bocce-play > .currency, #hud.bocce-play > .toolring, #hud.bocce-play .tg-emotes { visibility: hidden !important; }
+#hud:has(.bocce-aim:not([hidden])) #btn-act, #hud:has(.bocce-aim:not([hidden])) > .toolring, #hud:has(.bocce-aim:not([hidden])) .tg-emotes,
+#hud:has(.bocce-score:not([hidden])) .tg-emotes { display: none !important; }
+#hud:has(.bocce-touch:not([hidden])) #mic-toggle { visibility: hidden; } /* (the mic sits in the cluster, where the bowl goes) */
+/* the name tags of everybody but the thrower fade and shrink (filter and scale add to the tag's own opacity and transform) */
+#labels.bocce-quiet .tag3d:not(.bocce-up) { filter: opacity(0.35); scale: 0.72; }
+#labels.bocce-quiet .tag3d.bocce-up { scale: 0.9; }
+#hud[data-layout="phone"] .bocce-banner { top: 11%; } /* (high, under the strip: the court below stays in view) */
+#hud[data-layout="phone"] .bocce-card { gap: 8px; padding: 12px 12px 14px; }
+#hud[data-layout="phone"] .bc-title { font-size: 24px; }
+#hud[data-layout="phone"] .bc-sub { margin-top: -4px; font-size: 12px; }
+#hud[data-layout="phone"] .bc-teams { gap: 8px; }
+#hud[data-layout="phone"] .bc-team { padding: 7px; gap: 6px; }
+#hud[data-layout="phone"] .bc-head { font-size: 17px; }
+#hud[data-layout="phone"] .bc-seats { gap: 4px; }
+#hud[data-layout="phone"] .bc-seat { font-size: 12px; padding: 3px 7px; min-height: 0; }
+#hud[data-layout="phone"] .bc-join { font-size: 14px; padding: 5px 8px; }
+#hud[data-layout="phone"] .bc-opt { font-size: 13px; padding: 4px 10px; }
+#hud[data-layout="phone"] .bc-note { font-size: 12px; }
+#hud[data-layout="phone"] .bc-row { gap: 8px; }
+#hud[data-layout="phone"] .bc-row .btn { font-size: 14px; padding: 7px 12px; }

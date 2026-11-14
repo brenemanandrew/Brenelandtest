@@ -1,0 +1,177 @@
+/* Fishing: the counter, hotbar, pockets panel, cue bar, bite "!", catch card, Old Gus's dialogue, hover card.
+   Uses the tokens from style.css (--ink, --paper, --accent ...). */
+
+/* nothing here may sit on top of the toasts or block the canvas by accident */
+#hud > .fish-counter, #hud > .fish-cue, #hud > .fish-bang, #hud > .fish-card, #hud > .fish-hover { pointer-events: none; }
+#toasts { top: 72px; }
+#hud:has(.fish-card:not([hidden])) #toasts { top: 214px; }
+
+/* ---------- the counter at the top ---------- */
+.fish-counter {
+  position: absolute; left: 50%; top: max(14px, env(safe-area-inset-top)); transform: translateX(-50%);
+  gap: 8px; padding: 4px 16px 4px 10px; z-index: 2; white-space: nowrap;
+}
+.fish-counter .fc-icon { width: 38px; height: 26px; display: inline-block; }
+.fish-counter .fc-icon svg, .fish-slot-icon svg, .fp-icon svg, .fp-dicon svg, .fh-ic svg, .fk-art svg, .fd-face svg { width: 100%; height: 100%; display: block; }
+.fish-counter .fc-num { font: 700 24px var(--font-head); min-width: 1ch; }
+.fish-counter .fc-next { font: 700 13px var(--font-body); color: var(--muted); }
+.fish-counter .fc-treat { font: 700 13px var(--font-head); background: #ffe08a; border: 2px solid var(--ink); border-radius: 99px; padding: 0 9px; }
+.fish-counter.pop { animation: fish-pop 0.5s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes fish-pop-left { 0% { transform: scale(1); } 35% { transform: scale(1.22) rotate(-2deg); } 100% { transform: scale(1); } }
+@keyframes fish-pop { 0% { transform: translateX(-50%) scale(1); } 35% { transform: translateX(-50%) scale(1.22) rotate(-2deg); } 100% { transform: translateX(-50%) scale(1); } }
+
+/* ---------- hotbar ---------- */
+.fish-hotbar {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  display: flex; gap: 8px; padding: 6px; border-radius: 18px; background: rgba(43, 35, 64, 0.32);
+}
+.fish-slot {
+  position: relative; width: 58px; height: 58px; padding: 5px; cursor: pointer;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 4px 0 var(--ink);
+  transition: transform 0.08s, background 0.12s;
+}
+.fish-slot:hover { transform: translateY(-2px); }
+.fish-slot:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.fish-slot:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.fish-slot.empty { opacity: 0.55; background: rgba(255, 248, 236, 0.6); border-style: dashed; box-shadow: none; cursor: default; }
+.fish-slot.on { background: #ffe08a; transform: translateY(-6px); box-shadow: 0 8px 0 var(--ink); }
+.fish-slot.pop { animation: fish-slot-pop 0.6s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes fish-slot-pop { 0% { transform: scale(0.3) rotate(-14deg); } 60% { transform: scale(1.3) rotate(6deg); } 100% { transform: none; } }
+.fish-hotbar.flash { animation: fish-flash 0.6s ease-in-out 4; }
+@keyframes fish-flash { 50% { background: rgba(255, 224, 138, 0.85); box-shadow: 0 0 0 6px rgba(255, 224, 138, 0.5); } }
+.fish-slot-icon { display: block; width: 100%; height: 100%; pointer-events: none; }
+.fish-slot-count {
+  position: absolute; right: -6px; bottom: -6px; min-width: 22px; text-align: center; font: 700 13px var(--font-head);
+  background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 99px; padding: 0 5px; pointer-events: none;
+}
+.fish-slot-count:empty { display: none; }
+.fish-slot-key { position: absolute; left: 4px; top: 1px; font: 700 11px var(--font-head); color: var(--muted); pointer-events: none; }
+
+/* ---------- cue bar ---------- */
+.fish-cue {
+  position: absolute; left: 50%; bottom: 94px; transform: translateX(-50%); z-index: 2;
+  display: grid; justify-items: center; gap: 6px; min-width: 120px;
+  font: 700 15px var(--font-head); color: #fff; background: rgba(43, 35, 64, 0.74);
+  padding: 7px 16px; border-radius: 99px; white-space: nowrap; max-width: calc(100vw - 24px);
+}
+.fish-cue.dim { background: rgba(43, 35, 64, 0.5); }
+.fish-cue.go { background: #3d8f4a; }
+.fish-cue.alert { background: #e0574f; font-size: 22px; padding: 9px 26px; animation: fish-alert 0.28s ease-in-out infinite alternate; }
+@keyframes fish-alert { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.08); } }
+.cue-bar { display: block; width: 180px; height: 12px; border: 2.5px solid #fff; border-radius: 99px; overflow: hidden; background: rgba(0, 0, 0, 0.3); }
+.cue-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7dff9a, #ffd23f); transition: width 0.08s linear; }
+
+/* ---------- the bite ---------- */
+.fish-bang {
+  position: absolute; left: 50%; top: 34%; z-index: 3; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%;
+  display: grid; place-items: center; font: 700 68px/1 var(--font-head); color: #fff; background: #e0574f;
+  border: 5px solid var(--ink); box-shadow: 0 7px 0 var(--ink); text-shadow: 0 3px 0 var(--ink);
+}
+.fish-bang.go { animation: fish-bang 0.5s cubic-bezier(.3, 2, .5, 1); }
+@keyframes fish-bang { 0% { transform: scale(0.2) rotate(-20deg); opacity: 0; } 50% { transform: scale(1.35) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+
+/* ---------- wind-up meter (pinned over your head by ui.js) ---------- */
+.fish-meter { position: absolute; left: 0; top: 0; will-change: transform, opacity; transform-origin: 50% 100%; pointer-events: none; text-align: center; }
+.fm-track { display: block; width: 104px; height: 16px; background: #fff; border: 3px solid var(--ink); border-radius: 99px; overflow: hidden; box-shadow: 0 3px 0 var(--ink); }
+.fm-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #7dff9a, #ffd23f 65%, #ff8a4a); }
+.fish-meter.bad .fm-fill { background: #ff8a70; }
+.fish-meter.full .fm-track { animation: fish-alert 0.2s ease-in-out infinite alternate; }
+.fm-label { display: inline-block; margin-top: 4px; font: 700 13px var(--font-head); color: #fff; background: rgba(43, 35, 64, 0.72); padding: 1px 9px; border-radius: 99px; }
+
+/* ---------- the catch card ---------- */
+.fish-card {
+  position: absolute; left: 50%; top: 74px; transform: translateX(-50%); z-index: 4; display: flex; align-items: center; gap: 14px;
+  width: min(360px, calc(100vw - 24px)); padding: 12px 18px 12px 12px; background: #fffdf2;
+}
+.fish-card.in { animation: fish-card-in 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes fish-card-in { from { transform: translateX(-50%) translateY(-30px) scale(0.6) rotate(-3deg); opacity: 0; } }
+.fish-card.record { border-color: #b8860b; background: linear-gradient(160deg, #fffbe0, #ffefb0); box-shadow: 0 5px 0 #b8860b, 0 0 0 5px rgba(255, 210, 63, 0.45); }
+.fish-card.junk { background: #efe9dd; }
+.fk-art { width: 126px; height: 82px; flex: none; background: linear-gradient(#bfe6f7, #8fd0ee); border: 3px solid var(--ink); border-radius: 12px; padding: 6px; }
+.fk-kicker { font: 700 12px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.fk-name { font: 700 24px/1.1 var(--font-head); }
+.fk-size { font: 700 19px var(--font-head); color: var(--accent); }
+.fk-note { font: 700 13px var(--font-body); color: #7a5a00; min-height: 0; }
+.fk-note:empty { display: none; }
+/* which water it came out of: a pill in the region's colour */
+.fk-where { display: inline-block; margin: 2px 0 2px; padding: 0 10px; font: 700 12px/1.5 var(--font-head); color: var(--ink); background: var(--rc, #3fb58a); border: 2px solid var(--ink); border-radius: 99px; }
+.fk-where[hidden] { display: none; }
+
+/* ---------- Old Gus's dialogue ---------- */
+.fish-dialog {
+  position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 6; display: flex; gap: 14px; align-items: stretch;
+  width: min(480px, calc(100vw - 24px)); padding: 12px 16px 12px 12px; cursor: pointer; background: #fffdf5;
+}
+.fish-dialog.in { animation: fish-dlg-in 0.3s cubic-bezier(.3, 1.5, .5, 1); }
+@keyframes fish-dlg-in { from { transform: translateX(-50%) translateY(30px); opacity: 0; } }
+.fd-face { width: 84px; height: 84px; flex: none; background: linear-gradient(#bfe6f7, #8fd0ee); border: 3px solid var(--ink); border-radius: 14px; align-self: flex-start; overflow: hidden; }
+.fd-face.talk svg { animation: fish-talk 0.22s ease-in-out infinite alternate; transform-origin: 50% 90%; }
+@keyframes fish-talk { from { transform: scale(1, 1); } to { transform: scale(1.03, 0.97) rotate(-1.5deg); } }
+.fd-box { display: grid; gap: 4px; align-content: start; min-width: 0; flex: 1; }
+.fd-name { font: 700 14px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.fd-text { font: 700 19px/1.32 var(--font-body); min-height: 3.9em; overflow-wrap: anywhere; }
+.fd-hint { font: 700 12px var(--font-head); color: var(--muted); text-align: right; }
+#hud:has(.fish-cue:not([hidden])) .hint { bottom: 166px; }
+#hud:has(.fish-dialog:not([hidden])) .fish-hotbar, #hud:has(.fish-dialog:not([hidden])) .fish-cue { visibility: hidden; }
+
+/* ---------- hover card ---------- */
+.fish-hover { position: absolute; left: 0; top: 0; z-index: 7; padding: 9px 14px 10px; min-width: 176px; font: 700 14px var(--font-body); background: #fffdf5; }
+.fh-name { font: 700 18px var(--font-head); padding-bottom: 3px; margin-bottom: 4px; border-bottom: 3px solid var(--c, #ffd34d); }
+.fh-row { display: flex; align-items: center; gap: 8px; color: var(--muted); line-height: 1.5; }
+.fh-row:first-of-type { color: var(--ink); }
+.fh-ic { width: 32px; height: 20px; flex: none; }
+
+/* ---------- pockets panel ---------- */
+.fish-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(430px, calc(100vw - 24px)); z-index: 8; background: #fffdf5; max-height: calc(100vh - 24px); overflow: auto; }
+.fp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.fp-head h2 { margin: 0; font: 700 26px var(--font-head); }
+.fp-close { font-size: 16px; }
+.fp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fp-cell {
+  position: relative; aspect-ratio: 1; padding: 8px; cursor: pointer; background: var(--paper-2); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink);
+}
+.fp-cell.empty { background: rgba(43, 35, 64, 0.06); border-style: dashed; box-shadow: none; cursor: default; }
+.fp-cell.sel { outline: 4px solid var(--accent-2); outline-offset: 2px; }
+.fp-cell.on { background: #ffe08a; }
+.fp-icon { display: block; width: 100%; height: 100%; pointer-events: none; }
+.fp-count { position: absolute; right: -4px; bottom: -6px; font: 700 13px var(--font-head); background: var(--accent); color: #fff; border: 2px solid var(--ink); border-radius: 99px; padding: 0 6px; }
+.fp-count:empty { display: none; }
+.fp-detail { display: flex; gap: 12px; align-items: center; margin-top: 12px; padding: 10px; border: 3px solid var(--ink); border-radius: 14px; background: #fff; }
+.fp-dicon { width: 58px; height: 58px; flex: none; }
+.fp-dtext { flex: 1; min-width: 0; }
+.fp-dname { font: 700 19px var(--font-head); }
+.fp-dtag { font: 700 11px var(--font-head); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.fp-dblurb { font: 700 13px/1.35 var(--font-body); color: var(--muted); margin-top: 2px; }
+.fp-equip { flex: none; padding: 7px 12px; font-size: 15px; }
+.fp-extra { margin-top: 10px; }
+.fp-stats { display: grid; gap: 3px; padding: 8px 12px; border-radius: 12px; background: #eaf6ff; border: 2px solid #8fd0ee; }
+.fp-row { display: flex; justify-content: space-between; font: 700 14px var(--font-body); }
+.fp-row span { color: var(--muted); }
+.fp-foot { margin-top: 10px; text-align: center; }
+
+/* ---------- touch ---------- */
+.fish-touch-btn {
+  position: absolute; right: 18px; bottom: 96px; z-index: 5; width: 96px; height: 96px; border-radius: 50%; cursor: pointer;
+  font: 700 20px var(--font-head); color: #fff; background: var(--accent); border: 4px solid var(--ink); box-shadow: 0 6px 0 var(--ink);
+  touch-action: none;
+}
+.fish-touch-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink); }
+
+@media (max-width: 640px) {
+  .fish-hotbar { left: auto; right: 10px; top: 338px; bottom: auto; transform: none; flex-direction: column; padding: 4px; gap: 6px; }
+  .fish-slot { width: 52px; height: 52px; }
+  .fish-cue { bottom: 100px; font-size: 14px; }
+  .fish-counter { left: 12px; top: 58px; transform: none; }
+  .fish-counter.pop { animation-name: fish-pop-left; }
+  #toasts { top: 108px; }
+  #hud:has(.fish-card:not([hidden])) #toasts { top: 230px; }
+  #hud:has(.fish-cue:not([hidden])) .hint { bottom: 152px; }
+  .fish-dialog { bottom: 14px; }
+  .fd-face { width: 60px; height: 60px; }
+  .fd-text { font-size: 16px; }
+  .fish-card { top: 104px; }
+  .fish-counter .fc-next { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fish-bang.go, .fish-card.in, .fish-dialog.in, .fish-counter.pop, .fish-slot.pop, .fish-hotbar.flash, .fish-cue.alert, .fd-face.talk svg, .fish-meter.full .fm-track { animation: none; }
+}

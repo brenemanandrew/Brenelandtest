@@ -1,0 +1,440 @@
+/* D&D night: the table's overlay in a tabletop skin. Tooled leather frames with a stitched edge and brass corners, the log and
+   the sheet on parchment in ink, round buttons in brass rings, the tools a red wax seal, the Roll a brass-rimmed d20 plate, gold
+   for the DM. Upright (.portrait) the 3D view fits the top of the screen and one solid panel holds the rest; sideways
+   (.landscape) the parts are boxes over the view (dnd.js). A serif, the device's own. */
+.dnd {
+  --parch: #f6e8ca; --parch2: #ead4a6; --parch-edge: #c9a66a; --ink: #2a1c10; --ink2: #5a4430; --ink3: #6b5640;
+  --leather: #74482a; --leather2: #4e2e18; --leather3: #2f1a0c; --stitch: rgba(238, 204, 146, 0.7); --cream: #f8ead0;
+  --brass: #d8b25a; --brass2: #9a7126; --brass3: #f6e3a6; --wax: #a8191e; --red: #7a2140; --red2: #9b2c2c;
+  --gold: #e3b04a; --gold2: #b8862b; --dm: #503207; --npc: #4b2a78; --ok: #2f7a45; --fail: #a3281f;
+  --sb: var(--safe-b, 0px); --st: var(--safe-t, 0px);
+  position: fixed; inset: 0; z-index: 40; pointer-events: none;
+  font-family: Georgia, "Times New Roman", serif; font-size: 15px; color: var(--ink);
+}
+#hud > .dnd { pointer-events: none; } /* (#hud > * catches taps: this layer covers the screen and must not) */
+.dnd[hidden], .dnd [hidden] { display: none !important; }
+.dnd button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.dnd-top, .dnd-tools, .dnd-settings, .dnd-modal, .dnd-panel > * { pointer-events: auto; }
+/* while you sit at the table the game's own HUD steps back (the table has its own Stand up, talk and dice); the view button stays */
+#hud.dnd-on > :not(.dnd):not(#toasts):not(.toasts):not(.lc-view) { visibility: hidden; }
+/* the fish and treat pills sit over the DM's face from a chair: gone while the table's up, seated or watching */
+#hud.dnd-open #currency .cur { visibility: hidden !important; }
+
+/* ---------------------------------------------------------------- the skin: leather, stitching, brass, parchment */
+.dnd-panel-bg, .dnd.landscape .dnd-log, .dnd.landscape .dnd-tools, .dnd.landscape .dnd-me, .dnd.landscape .dnd-talk, .dnd-settings, .dnd-ask, .dnd-result, .dnd.landscape .dnd-tray, .dnd.watching .dnd-log, .dnd-dmchip {
+  background: radial-gradient(120% 90% at 28% 0%, rgba(255, 214, 160, 0.17), transparent 62%), repeating-linear-gradient(118deg, rgba(0, 0, 0, 0.035) 0 2px, transparent 2px 6px), linear-gradient(var(--leather), var(--leather2));
+  border: 2px solid var(--leather3); border-radius: 8px; color: var(--cream);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 182, 0.28), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.dnd-ask, .dnd-result, .dnd-dmchip, .dnd-tray, .dnd-settings { position: relative; } /* (the regions are absolute: dnd-layout.js) */
+/* the stitched edge */
+.dnd-panel-bg::before, .dnd.landscape .dnd-log::before, .dnd.landscape .dnd-tools::before, .dnd.landscape .dnd-me::before, .dnd.landscape .dnd-talk::before, .dnd-settings::before, .dnd-ask::before, .dnd.watching .dnd-log::before {
+  content: ''; position: absolute; inset: 4px; border: 1.5px dashed var(--stitch); border-radius: 5px; pointer-events: none;
+}
+/* brass corners */
+.dnd-panel-bg::after, .dnd.landscape .dnd-log::after, .dnd.landscape .dnd-tools::after, .dnd.landscape .dnd-me::after, .dnd.landscape .dnd-talk::after, .dnd-settings::after, .dnd.watching .dnd-log::after {
+  content: ''; position: absolute; inset: -2px; pointer-events: none; z-index: 3;
+  --bc: var(--brass3), var(--brass) 28%, var(--brass2) 52%, rgba(0, 0, 0, 0.35) 54%, transparent 57%;
+  background: linear-gradient(135deg, var(--bc)) top left / 18px 18px no-repeat, linear-gradient(225deg, var(--bc)) top right / 18px 18px no-repeat,
+    linear-gradient(45deg, var(--bc)) bottom left / 18px 18px no-repeat, linear-gradient(315deg, var(--bc)) bottom right / 18px 18px no-repeat;
+}
+.dnd-parch, .dnd-narr, .dnd-me-strip, .dnd-full, .dnd-settings-body {
+  background: radial-gradient(ellipse at 50% 35%, #fcf3de 0%, var(--parch) 55%, var(--parch2) 100%);
+  border: 1px solid var(--parch-edge); border-radius: 5px; color: var(--ink);
+  box-shadow: inset 0 0 14px rgba(140, 95, 35, 0.26);
+}
+/* round buttons in brass rings */
+.dnd-tool, .dnd-dice-btn, .dnd-send, .dnd-sheet-close, .dnd-x, .dnd-mic {
+  display: inline-grid; place-items: center; flex: 0 0 auto; width: 48px; height: 48px; padding: 0; border-radius: 50%; cursor: pointer; color: var(--cream);
+  background: radial-gradient(circle at 38% 30%, #94603a, var(--leather2) 72%);
+  border: 3px solid var(--brass); box-shadow: 0 0 0 1.5px var(--leather3), inset 0 0 0 1.5px rgba(255, 236, 190, 0.35), 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+.dnd-tool:hover, .dnd-dice-btn:hover, .dnd-send:hover, .dnd-sheet-close:hover, .dnd-x:hover, .dnd-mic:hover,
+.dnd-tool:focus-visible, .dnd-dice-btn:focus-visible, .dnd-send:focus-visible, .dnd-sheet-close:focus-visible, .dnd-x:focus-visible, .dnd-mic:focus-visible { border-color: var(--brass3); outline: 2px solid var(--gold); outline-offset: 1px; }
+.dnd-tool:active, .dnd-dice-btn:active, .dnd-send:active { transform: scale(0.94); }
+.dnd-tool .dnd-ico, .dnd-dice-btn .dnd-ico, .dnd-send .dnd-ico, .dnd-mic .dnd-ico { width: 24px; height: 24px; }
+.dnd-sheet-close, .dnd-x { width: 44px; height: 44px; }
+.dnd-sheet-close .dnd-ico, .dnd-x .dnd-ico { width: 20px; height: 20px; }
+.dnd-tool.gold { background: radial-gradient(circle at 38% 30%, #f6d57e, #b8862b 75%); }
+.dnd-tool.dot::before { content: ''; position: absolute; top: -2px; right: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--gold); border: 2px solid var(--leather3); }
+.dnd-tool { position: relative; }
+/* the card's icons (dnd.js ICON): glyphs in the HUD's style (cream, a bold ink outline) */
+.dnd-ico { display: inline-block; flex: 0 0 auto; width: 22px; height: 22px; vertical-align: middle; }
+.dnd-ico svg { display: block; width: 100%; height: 100%; }
+.dnd-word { white-space: nowrap; }
+/* plain buttons (the host's tools, the pickers): brass-edged parchment */
+.dnd-btn:not(.dnd-tool):not(.dnd-dice-btn) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; font: 600 14px Georgia, "Times New Roman", serif; padding: 5px 12px; min-height: 44px; border-radius: 8px; border: 2px solid var(--gold2); background: #fff4d8; color: var(--ink); cursor: pointer; }
+.dnd-btn:not(.dnd-tool):not(.dnd-dice-btn):hover, .dnd-btn:not(.dnd-tool):not(.dnd-dice-btn):focus-visible { background: #fff; outline: 2px solid var(--gold); }
+.dnd-btn.gold:not(.dnd-tool) { background: linear-gradient(#f2cd72, var(--gold)); border-color: var(--gold2); }
+.dnd-btn.red:not(.dnd-tool) { background: linear-gradient(#93304e, var(--red)); color: #fbeacb; border-color: #3a1420; }
+.dnd-btn.big { font-size: 17px; padding: 10px 16px; }
+.dnd-sel { font: 14px Georgia, serif; padding: 6px; min-height: 44px; border-radius: 8px; border: 2px solid var(--gold2); background: #fffaf0; color: var(--ink); max-width: 46%; }
+.dnd-input { flex: 1 1 auto; min-width: 0; font: 16px Georgia, serif; padding: 8px 10px; min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 2px solid var(--brass2); background: #fffaf0; color: var(--ink); }
+.dnd-input.small { font-size: 14px; }
+.dnd-input.tiny { flex: 0 0 64px; width: 64px; font-size: 14px; }
+.dnd-h { font-size: 17px; font-weight: 700; color: var(--red); }
+.dnd-h.small { font-size: 13px; margin: 8px 0 3px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); }
+
+/* ---------------------------------------------------------------- the party strip (across the top of the view) */
+.dnd-top { display: flex; gap: 6px; align-items: stretch; overflow-x: auto; scrollbar-width: none; }
+.dnd-top::-webkit-scrollbar { display: none; }
+.dnd-dmchip { flex: 0 0 auto; display: flex; align-items: center; padding: 4px 12px; border-radius: 22px; border: 2px solid var(--brass); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); }
+.dnd-dmchip b { font-size: 14px; color: var(--brass3); white-space: nowrap; }
+.dnd-dmchip.away b { color: #e6d6bd; }
+.dnd-dmchip.busy b { animation: dnd-think 1.6s ease-in-out infinite; }
+@keyframes dnd-think { 50% { opacity: 0.6; } }
+.dnd-party { display: flex; gap: 6px; }
+.dnd-chip { flex: 0 0 auto; min-width: 66px; padding: 3px 8px 4px; border-radius: 8px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--ink);
+  background: linear-gradient(#fcf2dc, #efdcb2); border: 2px solid var(--c, #5b4a8a); border-top-width: 4px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
+.dnd-chip b { font-size: 13.5px; white-space: nowrap; color: var(--c, var(--ink)); }
+.dnd-chip.me { box-shadow: 0 0 0 2px var(--gold), 0 2px 6px rgba(0, 0, 0, 0.35); }
+.dnd-chip.turn { background: linear-gradient(#fff6c8, #f2dc90); }
+.dnd-chip .hp { display: block; height: 6px; border-radius: 3px; background: #d8c3a0; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
+.dnd-chip .fill { display: block; height: 100%; background: linear-gradient(90deg, #a3281f, #d24a3d); }
+.dnd-chip small { font-size: 11.5px; color: var(--ink2); }
+.dnd-chip .cond { font-size: 11px; font-style: normal; font-weight: 700; color: var(--red2); white-space: nowrap; }
+.dnd-chip.bot { border-style: dashed; }
+.dnd-chip.mon { --c: #3b3b3b; background: linear-gradient(#efe2c8, #ddc8a2); }
+.dnd-chip.mon.down { opacity: 0.5; text-decoration: line-through; }
+
+/* ---------------------------------------------------------------- the log (the module's title, the lines in their colours) */
+.dnd-log { display: flex; flex-direction: column; min-height: 0; }
+.dnd-log-head { display: flex; align-items: baseline; gap: 7px; padding: 3px 6px 5px; color: var(--brass3); }
+.dnd-log-head .dnd-ico { width: 18px; height: 18px; align-self: center; }
+.dnd-log-head b { font-size: 15px; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dnd-log-head small { font-size: 12px; color: #e4cfa6; white-space: nowrap; }
+.dnd-narr { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 11px; line-height: 1.4; scrollbar-width: thin; scrollbar-color: var(--parch-edge) transparent; }
+.dnd-line { margin: 0 0 7px; }
+.dnd-line.k-dm { font-size: 16px; color: var(--dm); border-left: 3px solid var(--gold); padding-left: 8px; margin-left: -2px; }
+.dnd-line.k-dm b { color: var(--gold2); }
+.dnd-line.k-dm.npc { color: var(--npc); border-left-color: #8c6cc0; }
+.dnd-line.k-dm.npc b { color: var(--npc); }
+.dnd-line.k-say { font-size: 15px; color: var(--c, var(--ink)); }
+.dnd-line.k-say b { color: var(--c, var(--ink)); }
+.dnd-line.k-say:not(.to-dm) { font-style: italic; }
+/* (dnd-said) a spoken line: who and how as a small header ("Old Croak whispers", "Mira asks the DM"), then the words in quotation
+   marks on their own line, in italic and the speaker's colour (a class colour, else the NPCs' purple). Narration stays plain */
+.dnd-line.spoken .dnd-said { display: block; font-size: 0.8em; font-weight: 700; font-style: normal; font-variant: small-caps; letter-spacing: 0.04em; line-height: 1.25; color: var(--c, var(--ink2)); }
+.dnd-line.spoken .dnd-words { display: block; font-style: italic; color: var(--c, var(--ink)); }
+.dnd-line.k-dm.spoken .dnd-said, .dnd-line.k-dm.spoken .dnd-words { color: var(--c, var(--npc)); }
+.dnd-line.k-dm.npc { border-left-color: var(--c, #8c6cc0); }
+.dnd-line.k-roll { font-size: 14px; color: var(--c, var(--ink2)); }
+.dnd-line.k-roll.ok, .dnd-line.k-roll.fail { font-weight: 700; }
+.dnd-line.k-roll.ok .dnd-d20 { background: var(--ok); }
+.dnd-line.k-roll.fail .dnd-d20 { background: var(--fail); }
+.dnd-line.k-sys, .dnd-line.k-turn, .dnd-line.k-hp, .dnd-line.k-item, .dnd-line.k-cond, .dnd-line.k-handout, .dnd-line.k-journal { font-size: 13.5px; font-style: italic; color: var(--ink3); }
+.dnd-line.k-ask { font-size: 14px; font-weight: 700; color: var(--red); }
+.dnd-line.k-combat, .dnd-line.k-scene { font-size: 14px; color: var(--red2); font-weight: 700; letter-spacing: 0.02em; }
+.dnd-d20 { display: inline-block; width: 12px; height: 12px; margin-right: 6px; background: var(--brass2); clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); vertical-align: -1px; }
+.dnd-watch { font-style: italic; color: var(--brass3); text-align: center; font-size: 14px; padding: 5px 4px 1px; }
+
+/* ---------------------------------------------------------------- the dice area: the Roll, the tray, a result */
+.dnd-pop { display: flex; align-items: center; gap: 8px; }
+.dnd-ask { display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 8px; border-color: var(--brass2); }
+.dnd-ask-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dnd-ask-text b { font-size: 18px; color: var(--brass3); }
+.dnd-ask-text span { font-size: 14.5px; color: var(--cream); }
+.dnd-ask-text small { font-size: 12px; color: #dcc59c; }
+/* the Roll: a brass-rimmed d20 plate, the modifier big over the die */
+.dnd-roll-big { flex: 0 0 auto; display: grid; place-items: center; width: 92px; height: 92px; padding: 0; border-radius: 50%; cursor: pointer; color: #fff3d0;
+  background: radial-gradient(circle at 40% 32%, #a83434, #651414 70%, #420b0b);
+  border: 5px solid var(--brass); box-shadow: 0 0 0 2px var(--leather3), inset 0 0 0 2px rgba(255, 230, 170, 0.5), inset 0 -6px 12px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5);
+  animation: dnd-pulse 1.6s ease-in-out infinite; }
+.dnd-roll-big > * { grid-area: 1 / 1; }
+.dnd-roll-big .dnd-ico { width: 74px; height: 74px; opacity: 0.32; }
+.dnd-roll-big .dnd-ico path { fill: var(--gold); }
+.dnd-roll-big .dnd-word { align-self: start; margin-top: 15px; font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass3); }
+.dnd-roll-big .dnd-roll-n { margin-top: 12px; font-size: 21px; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45); white-space: nowrap; }
+.dnd-roll-big:disabled { filter: saturate(0.6) brightness(0.85); }
+.dnd-roll-big:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+@keyframes dnd-pulse { 50% { box-shadow: 0 0 0 2px var(--leather3), 0 0 0 7px rgba(227, 176, 74, 0.45), inset 0 0 0 2px rgba(255, 230, 170, 0.5), 0 4px 10px rgba(0, 0, 0, 0.5); } }
+/* a roll lands: its number in a brass ring for a moment */
+.dnd-result { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-color: var(--brass2); animation: dnd-pop 0.25s ease-out; }
+.dnd-result-n { flex: 0 0 auto; display: grid; place-items: center; min-width: 52px; height: 52px; padding: 0 4px; box-sizing: border-box; border-radius: 26px; font-size: 24px; color: #fff3d0; background: radial-gradient(circle at 40% 32%, #8a5a34, var(--leather3)); border: 3px solid var(--brass); }
+.dnd-result.ok .dnd-result-n { border-color: #6fcf8a; }
+.dnd-result.fail .dnd-result-n { border-color: #f07a68; }
+.dnd-result.crit .dnd-result-n { background: radial-gradient(circle at 40% 32%, #f6d57e, #b8862b); color: var(--leather3); }
+.dnd-result span { font-size: 15px; color: var(--cream); }
+@keyframes dnd-pop { from { transform: scale(0.85); opacity: 0; } }
+.dnd-last { flex: 1 1 auto; min-width: 0; font-size: 13.5px; font-style: italic; color: #e4cfa6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 4px; }
+.dnd.asking .dnd-last, .dnd.result-on .dnd-last, .dnd.tray-open .dnd-last { display: none; }
+/* the free dice: a tray of six from the d20 at the area's edge, folded away after the throw */
+.dnd-tray { display: none; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.dnd.tray-open .dnd-tray { display: grid; animation: dnd-pop 0.18s ease-out; }
+.dnd-die { display: grid; place-items: center; padding: 0; font: 700 14px Georgia, serif; min-height: 48px; min-width: 44px; border-radius: 9px; border: 2px solid var(--brass); background: radial-gradient(circle at 40% 30%, #fff8e6, #ecd8ae); color: #fff3d0; cursor: pointer; box-shadow: 0 2px 3px rgba(0, 0, 0, 0.35); }
+.dnd-die .dnd-ico, .dnd-die .n { grid-area: 1 / 1; }
+.dnd-die .dnd-ico { width: 38px; height: 38px; }
+.dnd-die .dnd-ico path, .dnd-die .dnd-ico rect { fill: #9b2c2c; }
+.dnd-die .n { position: relative; line-height: 1; }
+.dnd-die[data-die="d4"] .n { margin-top: 10px; font-size: 13px; }
+.dnd-die[data-die="d10"] .n, .dnd-die[data-die="d12"] .n, .dnd-die[data-die="d20"] .n { font-size: 13px; }
+.dnd-die[data-die="d20"] { color: var(--leather3); }
+.dnd-die[data-die="d20"] .dnd-ico path { fill: var(--gold); }
+.dnd-die:hover, .dnd-die:focus-visible { outline: 2px solid var(--gold); }
+.dnd-die:active { transform: scale(0.94); }
+.dnd-dice-btn { background: radial-gradient(circle at 38% 30%, #f6d57e, #b8862b 75%); }
+.dnd.tray-open .dnd-dice-btn { background: radial-gradient(circle at 38% 30%, #fff8e6, #e3cfa4); }
+/* hold a die to throw further: the power fills it from the bottom and a gold ring grows */
+.dnd-die.charging, .dnd-roll-big.charging { background-image: linear-gradient(to top, rgba(227, 176, 74, 0.95) calc(var(--pow, 0) * 100%), transparent 0); box-shadow: 0 0 0 calc(2px + var(--pow, 0) * 7px) rgba(227, 176, 74, 0.7); }
+.dnd-roll-big.charging { background-color: #651414; }
+
+/* ---------------------------------------------------------------- your character: the strip, and the whole sheet */
+.dnd-me { display: flex; flex-direction: column; min-height: 0; }
+.dnd-card { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.dnd-me-strip { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 6px 10px; text-align: left; cursor: pointer; min-height: 48px; border-left: 6px solid var(--c, var(--brass2)); }
+.dnd-me-strip:hover, .dnd-me-strip:focus-visible { outline: 2px solid var(--gold); }
+.dnd-strip-top { display: flex; align-items: baseline; gap: 10px; }
+.dnd-me-strip .dnd-name { flex: 1 1 auto; min-width: 0; font-size: 17px; color: var(--c, var(--red)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dnd-me-strip .dnd-sub { font-size: 13px; color: var(--ink2); }
+.dnd-hp, .dnd-acv { flex: 0 0 auto; font-size: 15px; font-weight: 700; color: var(--ink); }
+.dnd-hp.low { color: var(--red2); }
+.dnd-mods { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.dnd-mini { display: flex; flex-direction: column; align-items: center; line-height: 1.05; padding: 2px 0; border-radius: 5px; background: rgba(255, 250, 236, 0.7); border: 1px solid rgba(154, 113, 38, 0.45); }
+.dnd-mini small { font-size: 10.5px; letter-spacing: 0.06em; color: var(--ink3); }
+.dnd-mini b { font-size: 15px; }
+.dnd-pick-now { font-weight: 700; color: var(--red); }
+.dnd-full { display: none; overflow-y: auto; padding: 10px 12px; scrollbar-width: thin; }
+.dnd.sheet-open .dnd-full { display: block; }
+.dnd-sheet-close { display: none; position: absolute; z-index: 4; }
+.dnd.sheet-open .dnd-sheet-close { display: inline-grid; }
+.dnd-card-head { padding: 2px 50px 6px 10px; border-left: 6px solid var(--c, var(--red)); }
+.dnd-card-head .dnd-name { font-size: 19px; font-weight: 700; color: var(--c, var(--red)); }
+.dnd-sub { font-size: 13.5px; color: var(--ink2); }
+.dnd-cond { font-size: 13px; color: var(--red2); font-weight: 700; }
+.dnd-stats { display: flex; gap: 6px; margin-top: 6px; }
+.dnd-stat { flex: 1; text-align: center; padding: 4px; background: #fff7e3; border: 2px solid var(--gold2); border-radius: 8px; }
+.dnd-stat small { display: block; font-size: 11px; letter-spacing: 0.08em; color: var(--ink3); }
+.dnd-stat b { font-size: 18px; }
+.dnd-stat.low b { color: var(--red2); }
+.dnd-abil { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.dnd-ab { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 52px; padding: 3px 0; border: 2px solid var(--parch-edge); background: #fffaf0; border-radius: 8px; cursor: pointer; color: var(--ink); }
+.dnd-ab small { font-size: 10.5px; letter-spacing: 0.08em; }
+.dnd-ab b { font-size: 16px; }
+.dnd-ab i { font-size: 10.5px; font-style: normal; opacity: 0.7; }
+.dnd-ab:hover, .dnd-act:hover, .dnd-skill:hover { background: #fff; outline: 2px solid var(--gold); }
+.dnd-acts { display: flex; flex-wrap: wrap; gap: 5px; }
+.dnd-act { flex: 1 1 45%; min-height: 44px; text-align: left; padding: 5px 9px; border: 2px solid var(--gold2); background: #fff4d8; border-radius: 8px; cursor: pointer; color: var(--ink); }
+.dnd-act b { display: block; font-size: 14px; }
+.dnd-act small { font-size: 12px; color: var(--ink2); }
+.dnd-skills { display: flex; flex-wrap: wrap; gap: 5px; }
+.dnd-skill { font: 13.5px Georgia, serif; min-height: 40px; padding: 4px 9px; border-radius: 7px; border: 1px solid var(--gold2); background: #fffaf0; cursor: pointer; color: var(--ink); }
+.dnd-list { font-size: 14px; color: #4a3a2a; margin: 3px 0; line-height: 1.35; }
+/* the host's tools (Andrew in the DM's chair), in the sheet's place */
+.dnd-host { display: flex; flex-direction: column; gap: 7px; }
+.dnd-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dnd-replies { display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.dnd-reply { background: #fff7e3; border-left: 4px solid var(--gold); padding: 4px 7px; border-radius: 6px; }
+
+/* ---------------------------------------------------------------- the chat bar */
+.dnd-talk { display: flex; gap: 6px; align-items: center; }
+.dnd-say { flex: 1 1 auto; min-width: 0; position: relative; display: flex; }
+.dnd-say .dnd-input { width: 100%; min-height: 48px; padding-left: 58px; padding-right: 54px; background: radial-gradient(ellipse at 50% 30%, #fffaf0, var(--parch)); }
+.dnd-say .dnd-mic { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; }
+.dnd-say .dnd-input:not(:has(~ .dnd-mic:not([hidden]))) { padding-right: 10px; }
+/* the DM / table pill on the text box's left edge (swords for the DM, a mug for table talk) */
+.dnd-to { position: absolute; left: 3px; top: 3px; bottom: 3px; z-index: 1; width: 50px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0; font: 700 11px Georgia, serif; line-height: 1; border-radius: 6px 3px 3px 6px; border: 0; background: #e8d3a6; color: var(--ink2); cursor: pointer; }
+.dnd-to .dnd-ico { width: 20px; height: 20px; }
+.dnd-to.on { background: linear-gradient(var(--leather), var(--leather2)); color: var(--brass3); box-shadow: inset 0 0 0 1.5px var(--brass2); }
+.dnd-mic { touch-action: none; user-select: none; -webkit-user-select: none; }
+.dnd-mic.on { background: radial-gradient(circle at 38% 30%, #e0544a, #8a1218 72%); border-color: #fff; box-shadow: 0 0 0 4px rgba(192, 57, 43, 0.35); }
+/* the mic shows the listening: green listening, amber waiting for your turn or a tap, grey off or blocked */
+.dnd-mic[data-listen="on"], .dnd-listen.on { border-color: #4fd27a; }
+.dnd-mic[data-listen="wait"], .dnd-mic[data-listen="tap"], .dnd-listen.wait, .dnd-listen.tap { border-color: var(--gold); }
+.dnd-mic[data-listen="off"], .dnd-mic[data-listen="blocked"], .dnd-listen.off, .dnd-listen.blocked { border-color: #9a8a74; }
+.dnd-mic[data-listen="on"] .dnd-ico rect, .dnd-listen.on .dnd-ico rect { fill: #4fd27a; }
+.dnd-listen.tap { animation: dnd-tap 1.6s ease-in-out infinite; }
+@keyframes dnd-tap { 50% { box-shadow: 0 0 0 1.5px var(--leather3), 0 0 0 6px rgba(227, 176, 74, 0.45); } }
+.dnd-listen[data-mode="always"] .dnd-ico circle { fill: #4fd27a; }
+.dnd-listen[data-mode="auto"] .dnd-ico circle { fill: var(--gold); }
+.dnd-send .dnd-ico { margin-left: -2px; }
+.dnd-heard { font-style: italic; font-size: 14px; color: var(--ink); background: #fff3cf; border: 1px solid var(--gold2); border-radius: 8px; padding: 4px 9px; }
+.dnd-heard.note { color: #6b4a12; }
+/* the wax seal: the tools */
+.dnd-seal { display: none; flex: 0 0 auto; width: 56px; height: 56px; padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45)); }
+.dnd-seal svg { display: block; width: 100%; height: 100%; }
+.dnd-seal:active { transform: scale(0.94) rotate(-8deg); }
+.dnd-seal:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; border-radius: 50%; }
+.dnd.tools-open .dnd-seal { transform: rotate(-20deg); }
+
+/* ---------------------------------------------------------------- Game settings */
+.dnd-settings { position: absolute; z-index: 6; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; width: min(330px, calc(100vw - 20px)); box-sizing: border-box; }
+.dnd-settings > .dnd-h { color: var(--brass3); padding-right: 46px; }
+.dnd-settings .dnd-x { position: absolute; top: 6px; right: 6px; }
+.dnd-settings .dnd-btn { justify-content: flex-start; width: 100%; }
+.dnd-settings .dnd-voice-sel { max-width: none; width: 100%; }
+.dnd-fill { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--cream); }
+.dnd-fill > span { flex: 1 0 100%; }
+.dnd-settings .dnd-fill .dnd-btn { width: auto; flex: 1 1 0; justify-content: center; }
+.dnd-fill .dnd-btn.on { background: var(--red); color: #fbeacb; border-color: #3a1420; }
+
+/* ---------------------------------------------------------------- the pickers, the map, handouts */
+.dnd-modal { position: absolute; z-index: 8; top: calc(var(--st) + 10px); bottom: calc(var(--sb) + 10px); left: 10px; right: 10px; max-width: 780px; margin: 0 auto; overflow-y: auto; padding: 14px;
+  background: radial-gradient(ellipse at 50% 30%, #fcf3de, var(--parch) 60%, var(--parch2)); color: var(--ink);
+  border: 7px solid var(--leather); border-radius: 10px; box-shadow: 0 0 0 2px var(--leather3), inset 0 0 0 2px var(--brass2), 0 10px 30px rgba(0, 0, 0, 0.55); }
+.dnd-close { position: absolute; top: 10px; right: 10px; }
+.dnd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.dnd-grid.one { grid-template-columns: 1fr; }
+.dnd-pick { text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 10px; border: 2px solid var(--c, var(--gold2)); border-left-width: 8px; background: #fff7e3; cursor: pointer; color: var(--ink); }
+.dnd-pick b { font-size: 15px; color: var(--red); }
+.dnd-pick small { font-size: 12.5px; color: var(--ink2); }
+.dnd-pick span { font-size: 13px; }
+.dnd-pick i { font-size: 12px; color: var(--ink3); }
+.dnd-pick.own { cursor: default; grid-column: 1 / -1; }
+.dnd-adv { display: flex; gap: 10px; padding: 8px; border: 2px solid var(--gold2); border-radius: 10px; background: #fff7e3; }
+.dnd-adv.on { box-shadow: 0 0 0 3px var(--gold); }
+.dnd-cover { width: 92px; height: 92px; object-fit: cover; border-radius: 8px; border: 2px solid #3a1420; flex: 0 0 auto; }
+.dnd-adv-text { display: flex; flex-direction: column; gap: 4px; }
+.dnd-adv-text b { font-size: 16px; color: var(--red); }
+.dnd-adv-text p { margin: 0; font-size: 14px; }
+.dnd-rating { font-weight: 700; font-size: 13px; color: #2f4f7a; }
+.dnd-notes { font-size: 13px; color: var(--red2); }
+.dnd-credit { display: block; font-size: 11px; color: var(--ink3); line-height: 1.3; }
+.dnd-adv-text .dnd-btn { align-self: flex-start; }
+.dnd-big { display: block; max-width: 100%; max-height: 70vh; margin: 34px auto 8px; border-radius: 8px; border: 3px solid #3a1420; }
+.dnd-cap { font-size: 15px; }
+
+/* ---------------------------------------------------------------- where everything sits: the layout's numbers (dnd-layout.js)
+   Every region is placed from CSS variables the layout sets on the table (--log-x, --log-y, --log-w, --log-h and so on, in % of
+   the screen), so Andrew moves and sizes them in the HUD Editor. */
+.dnd-panel { display: contents; }
+.dnd-top, .dnd-log, .dnd-pop, .dnd-me, .dnd-talk, .dnd-tools { position: absolute; box-sizing: border-box; }
+.dnd-top { left: var(--party-x); top: var(--party-y); width: var(--party-w); height: var(--party-h); }
+.dnd-log { left: var(--log-x); top: var(--log-y); width: var(--log-w); height: var(--log-h); }
+.dnd-pop { left: var(--pop-x); top: var(--pop-y); width: var(--pop-w); height: var(--pop-h); }
+.dnd-me { left: var(--me-x); top: var(--me-y); width: var(--me-w); height: var(--me-h); }
+.dnd-talk { left: var(--chat-x); top: var(--chat-y); width: var(--chat-w); height: var(--chat-h); }
+.dnd-tools { left: var(--tools-x); top: var(--tools-y); width: var(--tools-w); height: var(--tools-h); }
+/* (!important: the HUD layout places the button with inline left/top/right/bottom; seated, the table's layout wins) */
+#hud.dnd-on > .lc-view { left: var(--dnd-view-x, 10px) !important; top: var(--dnd-view-y, 8px) !important; right: auto !important; bottom: auto !important; }
+#hud.dnd-on > .lc-view .lc-key { display: none; } /* (seated the keys show on hover only: F on the view button) */
+@media (hover: hover) and (pointer: fine) { #hud.dnd-on:not(.no-kc) > .lc-view:hover .lc-key:not(:empty) { display: block; } }
+.dnd-narr { font-size: calc(var(--log-fs, 16px) - 1px); }
+.dnd-line.k-dm { font-size: var(--log-fs, 16px); }
+.dnd-line.k-say { font-size: calc(var(--log-fs, 16px) - 1px); }
+.dnd-line.k-roll, .dnd-line.k-ask, .dnd-line.k-combat, .dnd-line.k-scene { font-size: calc(var(--log-fs, 16px) - 2px); }
+.dnd-line.k-sys, .dnd-line.k-turn, .dnd-line.k-hp, .dnd-line.k-item, .dnd-line.k-cond, .dnd-line.k-handout, .dnd-line.k-journal { font-size: calc(var(--log-fs, 16px) - 2.5px); }
+.dnd-log { padding: 6px 7px 7px; }
+.dnd-me { display: flex; flex-direction: column; justify-content: flex-end; }
+.dnd-me .dnd-card { min-height: 0; }
+.dnd-talk { padding: 4px 6px; }
+
+/* ---------------------------------------------------------------- upright: the view on top, the solid panel under it */
+.dnd-panel-bg { display: none; }
+.dnd.portrait .dnd-panel-bg { display: block; position: absolute; left: 0; right: 0; top: var(--view-h); bottom: 0; border-radius: 14px 14px 0 0; border-bottom: 0; pointer-events: auto; box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.5); }
+.dnd.portrait .dnd-panel-bg::before { inset: 5px 5px -10px; border-radius: 10px 10px 0 0; }
+.dnd.portrait .dnd-panel-bg::after { background: linear-gradient(135deg, var(--bc)) top left / 18px 18px no-repeat, linear-gradient(225deg, var(--bc)) top right / 18px 18px no-repeat; }
+.dnd.portrait .dnd-log { padding: 0; }
+.dnd.portrait .dnd-pop { display: flex; align-items: center; gap: 8px; }
+.dnd.portrait .dnd-pop > .dnd-ask, .dnd.portrait .dnd-pop > .dnd-result { flex: 1 1 0; min-width: 0; align-self: stretch; }
+.dnd.portrait .dnd-ask .dnd-roll-big { width: 86px; height: 86px; align-self: center; }
+.dnd.portrait .dnd-ask .dnd-roll-big .dnd-roll-n, .dnd[data-form="phone"] .dnd-roll-big .dnd-roll-n { font-size: 18px; }
+.dnd.portrait .dnd-pop > .dnd-tray { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 5; padding: 7px; border-radius: 9px; background: linear-gradient(var(--leather), var(--leather2)); border: 2px solid var(--brass2); box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.45); }
+.dnd.portrait .dnd-dice-btn { margin-left: auto; }
+/* the Roll is taller than the dice area's strip: it grows up over the log's bottom while it's asked */
+.dnd.portrait.asking .dnd-pop, .dnd.portrait.result-on .dnd-pop { z-index: 2; top: auto; bottom: calc(100% - var(--pop-y) - var(--pop-h)); height: auto; min-height: var(--pop-h); }
+.dnd.portrait.asking .dnd-pop > .dnd-ask { box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.4); }
+.dnd.portrait .dnd-seal { display: block; position: absolute; left: calc(var(--seal-x) - var(--seal-s) / 2); top: calc(var(--seal-y) - var(--seal-s) / 2); width: var(--seal-s); height: var(--seal-s); pointer-events: auto; z-index: 8; }
+.dnd.portrait .dnd-heard { position: absolute; left: var(--chat-x); width: var(--chat-w); bottom: calc(100% - var(--chat-y) + 6px); box-sizing: border-box; z-index: 4; }
+/* the sheet opened: over the log, its corner circle folds it */
+.dnd.portrait.sheet-open .dnd-full { position: fixed; z-index: 3; left: var(--log-x); top: var(--log-y); width: var(--log-w); height: var(--log-h); box-sizing: border-box; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), inset 0 0 14px rgba(140, 95, 35, 0.26); }
+.dnd.portrait .dnd-sheet-close { position: fixed; left: calc(var(--log-x) + var(--log-w) - 52px); top: calc(var(--log-y) + 6px); }
+/* the tools wheel: round buttons on a quarter circle or two from the seal, a short label under each */
+.dnd.portrait .dnd-tools { left: var(--seal-x); top: var(--seal-y); width: 0; height: 0; z-index: 7; }
+.dnd.portrait .dnd-tools::before { content: ''; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at var(--seal-x) var(--seal-y), rgba(46, 24, 10, 0.95) 0, rgba(46, 24, 10, 0.9) 250px, rgba(46, 24, 10, 0.5) 330px, rgba(46, 24, 10, 0.3) 100%); opacity: 0; transition: opacity 0.18s ease; }
+.dnd.portrait.tools-open .dnd-tools::before { opacity: 1; }
+.dnd.portrait .dnd-tool { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; transform: translate(0, 0) scale(0.3); opacity: 0; visibility: hidden; transition: transform 0.2s ease var(--wd, 0s), opacity 0.16s ease var(--wd, 0s), visibility 0s linear 0.2s; }
+.dnd.portrait.tools-open .dnd-tool { transform: translate(var(--wx, 0), var(--wy, 0)); opacity: 1; visibility: visible; transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.5, 1) var(--wd, 0s), opacity 0.16s ease var(--wd, 0s), visibility 0s; }
+.dnd.portrait .dnd-tool .dnd-word { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%); font-size: 12.5px; font-weight: 700; line-height: 1.1; color: var(--brass3); text-shadow: 0 1px 2px #000, 0 0 4px #000; text-align: center; white-space: normal; width: 92px; pointer-events: none; }
+.dnd.portrait .dnd-settings { right: 8px; bottom: calc(100% - var(--chat-y) + 8px); }
+
+/* ---------------------------------------------------------------- sideways: boxes over the view */
+.dnd.landscape .dnd-top { justify-content: center; }
+.dnd.landscape .dnd-me { padding: 7px; }
+.dnd.landscape.sheet-open .dnd-me, .dnd.landscape.hosting .dnd-me { top: auto; height: auto; bottom: calc(100% - var(--me-y) - var(--me-h)); min-height: var(--me-h); max-height: calc(var(--me-y) + var(--me-h) - 12%); }
+.dnd.landscape.hosting .dnd-me { width: max(var(--me-w), 340px); left: auto; right: calc(100% - var(--me-x) - var(--me-w)); }
+.dnd.landscape .dnd-me .dnd-card { flex: 1 1 auto; }
+.dnd.landscape .dnd-full { order: -1; flex: 1 1 auto; min-height: 0; }
+.dnd.landscape.hosting .dnd-full { display: block; }
+.dnd.landscape .dnd-sheet-close { top: 12px; right: 12px; }
+.dnd.landscape.hosting .dnd-sheet-close, .dnd.landscape.hosting .dnd-me-strip { display: none; }
+.dnd.landscape .dnd-tools { display: flex; gap: 6px; align-items: center; justify-content: flex-end; padding: 4px 8px; }
+.dnd.landscape .dnd-tool { width: 44px; height: 44px; }
+.dnd.landscape .dnd-tool .dnd-ico { width: 22px; height: 22px; }
+.dnd.landscape .dnd-tool .dnd-word { display: none; }
+.dnd.landscape .dnd-pop { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; pointer-events: none; }
+.dnd.landscape .dnd-pop > * { pointer-events: auto; }
+.dnd.landscape .dnd-pop .dnd-last { display: none; }
+.dnd.landscape .dnd-ask, .dnd.landscape .dnd-result, .dnd.landscape .dnd-tray { width: 100%; box-sizing: border-box; }
+.dnd.landscape .dnd-tray { padding: 7px; border-radius: 9px; }
+.dnd.landscape .dnd-dice-btn { width: 44px; height: 44px; }
+.dnd.landscape .dnd-settings { right: calc(100% - var(--tools-x) - var(--tools-w)); bottom: calc(100% - var(--tools-y) + 8px); max-height: calc(var(--tools-y) - 4%); overflow-y: auto; }
+.dnd.landscape .dnd-heard { position: absolute; left: var(--chat-x); bottom: calc(100% - var(--chat-y) + 6px); max-width: 40vw; }
+/* a phone on its side: a little tighter, the targets still 44 px */
+.dnd[data-form="phone"] .dnd-log-head small, .dnd[data-form="phone"] .dnd-mods, .dnd[data-form="phone"] .dnd-ask-text small { display: none; }
+.dnd[data-form="phone"] .dnd-roll-big { width: 76px; height: 76px; }
+.dnd[data-form="phone"] .dnd-roll-big .dnd-ico { width: 60px; height: 60px; }
+.dnd[data-form="phone"] .dnd-roll-big .dnd-word { margin-top: 11px; }
+.dnd[data-form="phone"] .dnd-ask { padding: 5px 9px 5px 5px; gap: 8px; }
+.dnd[data-form="phone"] .dnd-ask-text b { font-size: 16px; }
+.dnd[data-form="phone"] .dnd-say .dnd-input { min-height: 44px; }
+.dnd[data-form="phone"] .dnd-chip { min-width: 58px; padding: 2px 6px 3px; }
+
+/* ---------------------------------------------------------------- just watching (standing in the room): the log alone */
+.dnd.watching .dnd-panel-bg, .dnd.watching .dnd-top, .dnd.watching .dnd-pop, .dnd.watching .dnd-me, .dnd.watching .dnd-talk, .dnd.watching .dnd-tools, .dnd.watching .dnd-seal, .dnd.watching .dnd-heard, .dnd.watching .dnd-settings { display: none !important; }
+/* (dnd-room-ui) the strip, docked on the chat bar (dnd.js placeStrip sets left, top and width): the book and the newest line, gold
+   for a moment when a line comes, a dot till you read it; a tap opens the reader */
+.dnd-wstrip { position: absolute; z-index: 2; pointer-events: auto; display: flex; align-items: center; gap: 9px; height: 46px; box-sizing: border-box; padding: 0 14px 0 11px; cursor: pointer;
+  font: 15px/1.2 Georgia, "Times New Roman", serif; color: var(--cream); text-align: left; border-radius: 23px; border: 2px solid var(--brass);
+  background: radial-gradient(120% 90% at 28% 0%, rgba(255, 214, 160, 0.17), transparent 62%), linear-gradient(var(--leather), var(--leather2));
+  box-shadow: 0 0 0 1.5px var(--leather3), inset 0 1px 0 rgba(255, 228, 182, 0.28), 0 4px 12px rgba(0, 0, 0, 0.45); }
+.dnd-wstrip .dnd-ico { width: 22px; height: 22px; }
+.dnd-wtext { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dnd-wdot { position: absolute; top: -3px; right: -3px; width: 13px; height: 13px; border-radius: 50%; background: var(--gold); border: 2px solid var(--leather3); }
+.dnd-wstrip:hover, .dnd-wstrip:focus-visible { border-color: var(--brass3); outline: 2px solid var(--gold); outline-offset: 1px; }
+.dnd-wstrip.fresh { animation: dnd-fresh 6s ease-out; }
+@keyframes dnd-fresh { 0%, 60% { border-color: var(--brass3); box-shadow: 0 0 0 1.5px var(--leather3), 0 0 0 5px rgba(227, 176, 74, 0.55), 0 4px 12px rgba(0, 0, 0, 0.45); } }
+.dnd.reading .dnd-wstrip { visibility: hidden; }
+/* the reader: the log as a sheet, big type, the newest DM line lit, a close in its corner. Folded away till the strip is tapped.
+   A PC: a column on the left; a phone upright: a sheet from the bottom; a phone on its side: a sheet down the left */
+.dnd.watching:not(.reading) .dnd-log { display: none !important; }
+.dnd.watching .dnd-log { --log-fs: 18px; z-index: 9; padding: 8px; left: 12px; right: auto; top: auto; bottom: 12px; width: min(580px, 46vw); height: min(66vh, 540px); animation: dnd-fade 0.18s ease-out; }
+@keyframes dnd-fade { from { opacity: 0; } } /* (a fade, not a scale: what it covers is measured as it opens) */
+.dnd.portrait.watching .dnd-log { left: 0; right: 0; bottom: 0; width: auto; height: min(64vh, 600px); border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: calc(8px + var(--sb)); }
+.dnd.watching[data-form="phone"] .dnd-log { left: 8px; top: calc(var(--st) + 8px); bottom: 8px; height: auto; width: min(600px, 66vw); }
+.dnd.watching .dnd-log-head { align-items: center; padding: 0 0 6px 6px; }
+.dnd.watching .dnd-log-head b { font-size: 17px; }
+.dnd.watching .dnd-narr { line-height: 1.5; padding: 10px 14px; }
+.dnd.watching .dnd-line { margin-bottom: 10px; }
+.dnd.watching .dnd-line.latest { border-left-width: 5px; padding: 4px 8px 4px 9px; border-radius: 0 6px 6px 0; background: linear-gradient(90deg, rgba(240, 196, 100, 0.34), rgba(240, 196, 100, 0.08)); }
+.dnd-rd-close { display: none !important; }
+.dnd.reading .dnd-rd-close { display: inline-grid !important; margin-left: auto; flex: 0 0 auto; }
+/* the HUD pieces under the open reader step back till it closes */
+#hud .dnd-under { visibility: hidden !important; }
+
+/* PC: the keys show on hover only */
+@media (hover: hover) and (pointer: fine) {
+  .dnd [data-key] { position: relative; }
+  .dnd [data-key]:hover::after { content: attr(data-key); position: absolute; z-index: 9; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); padding: 2px 7px; font: 700 12px/1.4 ui-monospace, Consolas, monospace; white-space: nowrap; color: var(--ink); background: var(--parch); border: 1.5px solid var(--brass2); border-radius: 5px; box-shadow: 0 2px 0 var(--brass2); pointer-events: none; }
+  .dnd.landscape .dnd-tool:hover .dnd-word, .dnd.landscape .dnd-tool:focus-visible .dnd-word { display: block; position: absolute; z-index: 9; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); padding: 3px 9px; font-size: 13px; color: var(--cream); background: var(--leather2); border: 1.5px solid var(--brass); border-radius: 6px; pointer-events: none; }
+}
+@media (hover: none), (pointer: coarse) { .dnd [data-key]::after { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .dnd-roll-big, .dnd-listen.tap, .dnd-dmchip.busy b { animation: none; }
+  .dnd-result, .dnd.tray-open .dnd-tray { animation: none; }
+  .dnd.portrait .dnd-tool, .dnd.portrait.tools-open .dnd-tool, .dnd.portrait .dnd-tools::before { transition: none; }
+}
+
+/* ---------------------------------------------------------------- in the room: the DM's bubble, the dice's numbers */
+/* in the room (seated or watching) the DM's words are in the log and the strip right there: his bubble steps back (it sat over the
+   party strip, and over the minimap and the place pill from where Andrew stood) */
+body:has(#hud.dnd-open) .bubble.dnd-dm-bubble { visibility: hidden; }
+.bubble.dnd-dm-bubble { font-family: Georgia, "Times New Roman", serif; background: #f6e9cc; color: #2b1a10; border: 2px solid #b8862b; max-width: 320px; pointer-events: auto; }
+/* the whole line in the bubble: six lines show, the rest scrolls by itself (or by your wheel / finger) */
+.dnd-bubble-text { max-height: 7.6em; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
+.dnd-bubble-text::-webkit-scrollbar { display: none; }
+.dnd-bubble-more { margin: 5px 0 0; }
+.dnd-dm-bubble .spoken .dnd-said { display: block; font-size: 0.78em; font-weight: 700; font-variant: small-caps; letter-spacing: 0.04em; color: var(--c, #4b2a78); }
+.dnd-dm-bubble .spoken .dnd-words { display: block; font-style: italic; color: var(--c, #3a2160); }
+/* the number a die landed on, over it: big enough to read from any chair on a PC or a phone */
+.bubble.dnd-dice-tag { font: 700 28px/1 Georgia, "Times New Roman", serif; min-width: 1.4em; background: #7a2140; color: #fff3d0; border: 3px solid #e3b04a; border-radius: 12px; padding: 5px 10px 6px; box-shadow: 0 3px 0 #3b0f20; }
+.bubble.dnd-dice-tag::after { background: #7a2140; border-right: 3px solid #e3b04a; border-bottom: 3px solid #e3b04a; width: 11px; height: 11px; bottom: -8px; }

@@ -1,0 +1,16 @@
+/* Carol's wreath stand: the card that shows the wreath on the tripod and buys it (buddy-carol.js) */
+.carol-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, 92vw); max-height: 92vh; overflow-y: auto; padding: 16px 18px; z-index: 8; font-family: 'Nunito', sans-serif; box-sizing: border-box; text-align: center; }
+.carol-card[hidden] { display: none; }
+.carol-title { font-family: 'Fredoka', sans-serif; font-size: 22px; font-weight: 700; }
+.carol-sub { font-size: 13px; opacity: 0.75; margin-bottom: 8px; }
+.carol-pic { display: block; width: 150px; height: 150px; margin: 4px auto 6px; border-radius: 50%; background: #f7efe0; box-shadow: inset 0 0 0 4px #e8dcc4; }
+.carol-name { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 17px; }
+.carol-price { font-size: 14px; font-weight: 700; color: var(--accent); margin: 2px 0 6px; }
+.carol-note { font-size: 13px; min-height: 18px; margin: 4px 0 10px; }
+.carol-btns { display: flex; gap: 8px; justify-content: center; }
+.carol-btns .btn { min-width: 120px; }
+@media (max-width: 420px), (max-height: 480px) {
+  .carol-card { padding: 12px; }
+  .carol-pic { width: 112px; height: 112px; }
+  .carol-title { font-size: 19px; }
+}

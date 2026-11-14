@@ -1,0 +1,157 @@
+/* The Pose Editor (pose-editor): the game's own look over the real town. Ink-on-paper cards, round pills, 44 px targets. */
+body.pose-mode #hud, body.pose-mode #labels, body.pose-mode #bubbles, body.pose-mode #toasts, body.pose-mode #joystick,
+body.pose-mode #start, body.pose-mode #loading, body.pose-mode #tools-menu, body.pose-mode #title-card, body.pose-mode #skip { display: none !important; }
+body.pose-mode #scene { cursor: grab; }
+body.pose-mode #scene.pose-picking { cursor: crosshair; }
+
+.pz { --ink: #2b2340; --paper: #fff8ec; --card: #ffffff; --muted: #6d6480; --yellow: #ffd24a; --pink: #f58ab0; --sky: #8fd0ee; --green: #7dd36a;
+  font: 500 13.5px 'Nunito', system-ui, sans-serif; color: var(--ink); position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+.pz * { box-sizing: border-box; }
+.pz button, .pz select, .pz input { font: inherit; color: inherit; pointer-events: auto; }
+.pz-left, .pz-right { position: absolute; top: 8px; bottom: 76px; width: 272px; overflow-y: auto; overflow-x: hidden; pointer-events: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 4px; scrollbar-width: thin; }
+.pz-left { left: 8px; }
+.pz-right { right: 8px; width: 300px; }
+.pz-card { background: rgba(255, 248, 236, 0.95); border: 2.5px solid var(--ink); border-radius: 16px; box-shadow: 0 3px 0 var(--ink); padding: 8px 10px; }
+.pz-card h2 { font: 700 15px 'Fredoka', system-ui, sans-serif; margin: 0 0 6px; }
+.pz-note { margin: 6px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.35; }
+.pz-select { width: 100%; min-height: 40px; border: 2px solid var(--ink); border-radius: 12px; background: var(--card); padding: 4px 8px; }
+.pz-select.size { width: auto; min-width: 120px; }
+.pz-pill { min-height: 36px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); padding: 4px 10px; cursor: pointer;
+  font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; box-shadow: 0 2px 0 var(--ink); display: inline-flex; align-items: center; gap: 4px; }
+.pz-pill.on, .pz-btn.on, .pz-ib.on { background: var(--yellow); }
+.pz-pill:active, .pz-btn:active, .pz-ib:active, .pz-shot:active { transform: translateY(2px); box-shadow: none; }
+.pz-pill.add svg { width: 16px; height: 16px; }
+.pz-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.pz-mine { display: inline-flex; align-items: center; gap: 2px; }
+.pz-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.pz-grid.four { grid-template-columns: repeat(4, 1fr); }
+.pz-grid .pz-pill { justify-content: center; min-height: 40px; }
+.pz-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pz-btn { min-height: 44px; border: 2px solid var(--ink); border-radius: 14px; background: var(--card); padding: 4px 10px; cursor: pointer; box-shadow: 0 2px 0 var(--ink);
+  font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.pz-btn svg { width: 22px; height: 22px; }
+.pz-btn[disabled] { opacity: 0.45; cursor: default; }
+.pz-ib { width: 44px; height: 44px; border: 2px solid var(--ink); border-radius: 14px; background: var(--card); cursor: pointer; box-shadow: 0 2px 0 var(--ink);
+  display: inline-grid; place-items: center; padding: 0; flex: 0 0 auto; }
+.pz-ib svg { width: 26px; height: 26px; }
+.pz-ib.tiny { width: 34px; height: 34px; border-radius: 10px; }
+.pz-ib.tiny svg { width: 18px; height: 18px; }
+.pz-ib[disabled] { opacity: 0.4; cursor: default; }
+.pz-row { display: grid; grid-template-columns: 96px 1fr 48px; align-items: center; gap: 6px; margin: 4px 0; font-size: 12.5px; }
+.pz-row span { color: var(--muted); }
+.pz-row output { text-align: right; font-variant-numeric: tabular-nums; }
+.pz-row input[type=range] { width: 100%; accent-color: #7a5cd6; min-height: 28px; }
+.pz-row input[type=color] { width: 44px; height: 32px; border: 2px solid var(--ink); border-radius: 8px; padding: 0; background: none; }
+.pz-cast { display: flex; flex-direction: column; gap: 6px; }
+.pz-whorow { display: flex; gap: 6px; align-items: center; }
+.pz-who { flex: 1; min-height: 44px; border: 2px solid var(--ink); border-radius: 14px; background: var(--card); display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+  cursor: pointer; text-align: left; font-family: 'Fredoka', system-ui, sans-serif; font-weight: 600; box-shadow: 0 2px 0 var(--ink); }
+.pz-who.on { background: var(--yellow); }
+.pz-who i svg { width: 22px; height: 22px; display: block; }
+.pz-addrow { display: flex; gap: 6px; margin-top: 8px; }
+.pz-addrow .pz-select { flex: 1; }
+.pz-tabs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; background: rgba(255, 248, 236, 0.95); border: 2.5px solid var(--ink); border-radius: 16px; padding: 4px; box-shadow: 0 3px 0 var(--ink); }
+.pz-tab { min-height: 48px; border: 0; border-radius: 12px; background: transparent; cursor: pointer; display: grid; place-items: center; gap: 0; padding: 2px; font-size: 10.5px; font-weight: 700; }
+.pz-tab svg { width: 24px; height: 24px; }
+.pz-tab.on { background: var(--yellow); }
+.pz-tab[disabled] { opacity: 0.35; cursor: default; }
+.pz-tabbody { display: flex; flex-direction: column; gap: 8px; }
+.pz-iks { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.pz-ikrow { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+.pz-ikrow span { flex: 1; font-size: 12.5px; }
+.pz-bar { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 62px; display: flex; align-items: center; gap: 6px; padding: 6px 8px; pointer-events: auto;
+  background: rgba(255, 248, 236, 0.95); border: 2.5px solid var(--ink); border-radius: 18px; box-shadow: 0 3px 0 var(--ink); overflow-x: auto; scrollbar-width: none; }
+.pz-sep { width: 2px; align-self: stretch; background: rgba(43, 35, 64, 0.2); margin: 4px 2px; }
+.pz-shot { min-height: 48px; border: 2.5px solid var(--ink); border-radius: 16px; background: var(--pink); color: var(--ink); cursor: pointer; box-shadow: 0 3px 0 var(--ink);
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 16px; font: 700 16px 'Fredoka', system-ui, sans-serif; flex: 0 0 auto; }
+.pz-shot svg { width: 26px; height: 26px; }
+.pz-strip { display: flex; gap: 6px; overflow-x: auto; flex: 1; min-width: 0; padding: 2px; scrollbar-width: thin; }
+.pz-thumb { flex: 0 0 auto; height: 44px; border: 2px solid var(--ink); border-radius: 8px; overflow: hidden; background: #222; display: block; }
+.pz-thumb img { height: 100%; display: block; }
+.pz-guide { position: absolute; border: 1.5px solid rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 1px rgba(20, 16, 34, 0.25); pointer-events: none; transition: outline-color 0.25s; outline: 9999px solid rgba(20, 16, 34, 0); }
+/* (pose-draw) the frame guide is a thin outline; the rest dims only while the Shot's size is being chosen */
+.pz-guide.choose { outline-color: rgba(20, 16, 34, 0.32); border: 2px dashed rgba(255, 255, 255, 0.85); }
+.pz-guide.thirds { background:
+  linear-gradient(90deg, transparent calc(33.333% - 0.75px), rgba(255, 255, 255, 0.55) calc(33.333% - 0.75px) calc(33.333% + 0.75px), transparent calc(33.333% + 0.75px) calc(66.667% - 0.75px), rgba(255, 255, 255, 0.55) calc(66.667% - 0.75px) calc(66.667% + 0.75px), transparent calc(66.667% + 0.75px)),
+  linear-gradient(180deg, transparent calc(33.333% - 0.75px), rgba(255, 255, 255, 0.55) calc(33.333% - 0.75px) calc(33.333% + 0.75px), transparent calc(33.333% + 0.75px) calc(66.667% - 0.75px), rgba(255, 255, 255, 0.55) calc(66.667% - 0.75px) calc(66.667% + 0.75px), transparent calc(66.667% + 0.75px)); }
+.pz-toast { position: absolute; left: 50%; top: 12px; transform: translate(-50%, -8px); background: var(--ink); color: #fff; border-radius: 14px; padding: 8px 14px; opacity: 0;
+  transition: opacity 0.2s, transform 0.2s; pointer-events: none; max-width: 60vw; text-align: center; }
+.pz-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.pz-help { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, 92vw); max-height: 86vh; overflow: auto; pointer-events: auto;
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; box-shadow: 0 5px 0 var(--ink); padding: 14px 18px; }
+.pz-help h2 { font: 700 20px 'Fredoka', system-ui, sans-serif; margin: 0 0 8px; }
+.pz-help dt { font: 700 14px 'Fredoka', system-ui, sans-serif; margin-top: 8px; }
+.pz-help dd { margin: 2px 0 0; line-height: 1.4; }
+.pz-help .pz-btn { margin-top: 12px; }
+.pz-sunpad { position: relative; width: 132px; height: 132px; margin: 6px auto; border-radius: 50%; border: 2.5px solid var(--ink); cursor: crosshair; touch-action: none;
+  background: radial-gradient(circle, #fff6d8 0 18%, #ffe7a8 19% 45%, #bfe0f5 46% 100%); }
+.pz-sunpad.off { filter: grayscale(0.8); opacity: 0.7; }
+.pz-sunpad:focus-visible { outline: 3px solid #3f8fd9; outline-offset: 2px; }
+.pz-sunpad b { position: absolute; top: 2px; left: 50%; transform: translateX(-50%); font: 700 11px 'Fredoka', sans-serif; }
+.pz-sundot { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #ffcf3a; border: 2.5px solid var(--ink); box-shadow: 0 0 0 4px rgba(255, 207, 58, 0.4); }
+.pz button:focus-visible, .pz select:focus-visible, .pz input:focus-visible, .pz a:focus-visible { outline: 3px solid #3f8fd9; outline-offset: 2px; }
+.pose-refuse { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; background: #fff8ec; color: #2b2340; z-index: 99;
+  font: 500 16px 'Nunito', system-ui, sans-serif; padding: 20px; }
+.pose-refuse b { font: 700 24px 'Fredoka', system-ui, sans-serif; }
+@media (max-width: 900px) {
+  .pz-left { width: 220px; }
+  .pz-right { width: 240px; }
+}
+/* ---------------------------------------------------------------- pose-draw */
+body.pose-mode #scene.pose-drawing { cursor: crosshair; }
+.pz-ink { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 49; opacity: 1; }
+.pz-ink.fade { opacity: 0; transition: opacity 0.6s ease-out; }
+.pz-chip { min-height: 40px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); padding: 2px 11px; cursor: pointer; font: 600 13px 'Fredoka', system-ui, sans-serif;
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.pz-chip svg { width: 18px; height: 18px; }
+.pz-chip.on { background: var(--yellow); }
+.pz-chip.add svg { width: 16px; height: 16px; }
+.pz-tabs { grid-template-columns: repeat(5, 1fr); }
+.pz-ib.tool.on { background: var(--yellow); }
+.pz-ib.sm { width: 44px; height: 44px; border-radius: 12px; box-shadow: none; }
+.pz-ib.sm svg { width: 22px; height: 22px; }
+.pz-lib { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.pz-libitem { background: rgba(255, 248, 236, 0.95); border: 2px solid var(--ink); border-radius: 12px; padding: 6px; display: grid; gap: 4px; justify-items: center; }
+.pz-libitem img, .pz-libitem > i { width: 72px; height: 96px; border-radius: 8px; border: 1.5px solid var(--ink); object-fit: cover; display: grid; place-items: center; background: #e9e2d4; }
+.pz-libitem > i svg { width: 36px; height: 36px; }
+.pz-libitem b { font: 600 13px 'Fredoka', system-ui, sans-serif; text-align: center; overflow-wrap: anywhere; }
+.pz-libbtns { display: flex; gap: 4px; }
+.pz-shots { display: flex; flex-direction: column; gap: 6px; }
+.pz-shotrow { display: grid; grid-template-columns: 22px 64px 1fr; gap: 6px; align-items: center; }
+.pz-shotrow img { width: 64px; height: 40px; object-fit: cover; border: 1.5px solid var(--ink); border-radius: 6px; }
+.pz-shotrow b { font: 700 15px 'Fredoka', system-ui, sans-serif; text-align: center; }
+.pz-menu { display: grid; grid-template-columns: repeat(auto-fill, 48px); gap: 8px; justify-content: start; margin-bottom: 8px; }
+.pz-row .pz-chips { margin: 0; }
+/* while the pen draws (or sculpts) the panels step aside: the whole picture is free */
+.pz .pz-left, .pz .pz-right, .pz .pz-sheet, .pz .pz-bar { transition: opacity 0.15s; }
+.pz.pz-drawing .pz-left, .pz.pz-drawing .pz-right, .pz.pz-drawing .pz-sheet, .pz.pz-drawing .pz-bar { opacity: 0; pointer-events: none; }
+/* ---- the phone: the view first; one panel at a time as a bottom sheet; one bar of icons */
+.pz-sheet { display: none; }
+.pz.pz-phone .pz-left, .pz.pz-phone .pz-right { display: none; }
+.pz.pz-phone .pz-bar { left: 6px; right: 6px; bottom: 6px; height: 56px; gap: 4px; padding: 4px 6px; justify-content: space-between; border-radius: 16px; }
+.pz.pz-phone .pz-bar .pz-ib { width: 44px; height: 44px; box-shadow: none; }
+.pz.pz-phone .pz-shot { min-height: 44px; padding: 4px 10px; border-radius: 14px; box-shadow: none; }
+.pz.pz-phone .pz-sheet:not([hidden]) { display: flex; flex-direction: column; position: absolute; left: 0; right: 0; bottom: 68px; max-height: 31vh; pointer-events: auto;
+  background: rgba(255, 248, 236, 0.97); border: 2.5px solid var(--ink); border-bottom: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -3px 0 rgba(43, 35, 64, 0.25);
+  animation: pz-up 0.18s ease-out; }
+@keyframes pz-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.pz-grip { flex: 0 0 auto; height: 22px; display: grid; place-items: center; cursor: grab; touch-action: none; }
+.pz-grip i { width: 44px; height: 5px; border-radius: 3px; background: rgba(43, 35, 64, 0.45); }
+.pz-pages { flex: 0 0 auto; display: flex; gap: 4px; overflow-x: auto; padding: 0 8px 6px; scrollbar-width: none; border-bottom: 1.5px solid rgba(43, 35, 64, 0.15); }
+.pz-pages .pz-ib { border-width: 0; background: transparent; }
+.pz-pages .pz-ib.on { background: var(--yellow); }
+.pz-sheetbody { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 10px 10px; }
+.pz-sheetbody .pz-card { border-width: 0; box-shadow: none; background: transparent; padding: 0 0 8px; }
+.pz-sheetbody .pz-tabbody { gap: 4px; }
+.pz.pz-phone .pz-grid .pz-pill, .pz.pz-phone .pz-pill { min-height: 38px; font-size: 13px; padding: 2px 8px; box-shadow: none; }
+.pz.pz-phone .pz-btn { min-height: 44px; box-shadow: none; }
+.pz.pz-phone .pz-row { grid-template-columns: 84px 1fr 40px; }
+.pz.pz-phone .pz-toast { max-width: 86vw; top: 8px; }
+.pz.pz-phone .pz-lib { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+/* a phone on its side: the bar is a rail down the right edge, the sheet beside it */
+@media (max-height: 520px) and (orientation: landscape) {
+  .pz.pz-phone .pz-bar { left: auto; top: 6px; bottom: 6px; right: 6px; width: 56px; height: auto; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+  .pz.pz-phone .pz-sheet:not([hidden]) { right: 68px; bottom: 0; max-height: 34vh; }
+}
+@media (prefers-reduced-motion: reduce) { .pz-toast { transition: none; } }

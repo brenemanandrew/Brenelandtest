@@ -1,0 +1,11 @@
+/* Scouts hide-and-seek: the progress card (top centre, under the HUD's top row) */
+.scouts-card {
+  position: absolute; top: calc(env(safe-area-inset-top, 0px) + 64px); left: 50%; transform: translateX(-50%);
+  background: rgba(255, 250, 240, 0.94); border: 3px solid #2b2340; border-radius: 16px; padding: 6px 16px;
+  font-family: 'Fredoka', 'Nunito', sans-serif; color: #2b2340; text-align: center; pointer-events: none;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.25); z-index: 5;
+}
+.scouts-card[hidden] { display: none; }
+.scouts-title { font-size: 13px; font-weight: 600; opacity: 0.8; }
+.scouts-count { font-size: 22px; font-weight: 700; line-height: 1.1; }
+@media (max-width: 600px) { .scouts-card { top: calc(env(safe-area-inset-top, 0px) + 100px); padding: 4px 12px; } .scouts-count { font-size: 18px; } }

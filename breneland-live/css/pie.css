@@ -1,0 +1,121 @@
+/* The pie eating contest (pie.js): the card with everyone's pies, the countdown and the clock, the big pie you're eating,
+   the BITE button in the E's place, the winner. Seated, the usual controls step aside. Watching from close by you see the
+   card and the clock only. */
+#hud > .pie-hud { position: absolute; inset: 0; pointer-events: none; z-index: 11; }
+.pie-hud[hidden], .pie-hud [hidden] { display: none !important; }
+
+.pie-card {
+  position: absolute; left: 50%; top: max(12px, var(--safe-t)); transform: translateX(-50%); width: 384px; box-sizing: border-box;
+  padding: 8px 12px 10px; background: var(--paper, #fff8ec); border: 3px solid var(--ink, #2b2340); border-radius: 16px;
+  box-shadow: 0 5px 0 var(--ink, #2b2340); pointer-events: auto; animation: pie-fade 0.3s ease-out; /* (a fade, not a rise: the eaters are framed just under its resting place) */
+}
+.pie-title { font: 700 17px var(--font-head, "Fredoka", sans-serif); color: #b8323a; text-align: center; letter-spacing: 0.02em; }
+.pie-title::before, .pie-title::after { content: ""; display: inline-block; width: 16px; height: 10px; margin: 0 7px 1px; border-radius: 50%; background: #e0a050; border: 2px solid #7a3a2a; vertical-align: middle; }
+.pie-sub { font: 700 13px var(--font-body, "Nunito", sans-serif); color: var(--muted, #6d6480); text-align: center; margin: 1px 0 6px; min-height: 1.2em; }
+.pie-hud[data-phase="done"] .pie-sub { color: var(--ink, #2b2340); font-size: 15px; }
+.pie-lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; }
+.pie-lane { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 7px; column-gap: 8px; align-items: center; padding: 3px 8px 4px; border-radius: 10px; background: #fff; border: 2px solid #e6dccb; font: 700 14px var(--font-head, "Fredoka", sans-serif); color: var(--ink, #2b2340); }
+.pie-lane .pl-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pie-lane .pl-count { color: #b8323a; font-size: 14px; }
+.pie-lane .pl-bar { grid-column: 1 / -1; height: 7px; border-radius: 99px; background: #f1e6d6; overflow: hidden; }
+.pie-lane .pl-fill { display: block; height: 100%; width: 100%; background: #e0a050; transform-origin: left; transform: scaleX(0); }
+.pie-lane.me { border-color: var(--ink, #2b2340); background: #fff3c4; }
+.pie-lane.bot .pl-name::after { content: " (bot)"; font: 600 11px var(--font-body, "Nunito", sans-serif); color: var(--muted, #6d6480); }
+.pie-lane.lead .pl-count::before { content: "\2605  "; color: #e6b84a; }
+.pie-lane.won { background: #ffe9a8; border-color: #e6b84a; animation: pie-pop 0.6s ease-out 2; }
+.pie-lane.empty { opacity: 0.55; font-weight: 600; font-style: italic; }
+.pie-leave { margin: 0; display: block; pointer-events: auto; font: 700 14px var(--font-head, "Fredoka", sans-serif); color: var(--ink, #2b2340); cursor: pointer; background: #fff; border: 3px solid var(--ink, #2b2340); border-radius: 12px; padding: 5px 14px; box-shadow: 0 4px 0 var(--ink, #2b2340); }
+.pie-leave:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink, #2b2340); }
+
+.pie-clock {
+  position: absolute; left: 50%; top: 30%; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+  font: 700 96px var(--font-head, "Fredoka", sans-serif); color: #fff; letter-spacing: 0.02em;
+  text-shadow: 0 5px 0 var(--ink, #2b2340), 4px 0 0 var(--ink, #2b2340), -4px 0 0 var(--ink, #2b2340), 0 -4px 0 var(--ink, #2b2340), 4px 4px 0 var(--ink, #2b2340), -4px 4px 0 var(--ink, #2b2340);
+}
+.pie-clock.go { color: #ffd34d; animation: pie-pop 0.5s cubic-bezier(.2, 1.4, .4, 1); }
+.pie-title .pt-time { margin-left: 8px; color: var(--ink, #2b2340); font-variant-numeric: tabular-nums; }
+
+.pie-big { position: absolute; left: 50%; bottom: 92px; width: 236px; transform: translateX(-50%); pointer-events: none; }
+.pie-svg { width: 100%; height: auto; display: block; overflow: visible; filter: none; }
+.pie-svg .pie-tin { fill: #c9ccd6; stroke: var(--ink, #2b2340); stroke-width: 3; }
+.pie-svg .pie-tin-in { fill: #d8c3a0; stroke: #b98a5a; stroke-width: 2; }
+.pie-svg .pie-crust-side { fill: #c8803a; stroke: var(--ink, #2b2340); stroke-width: 3; }
+.pie-svg .pie-crust { fill: #e8a856; stroke: var(--ink, #2b2340); stroke-width: 2.5; }
+.pie-svg .pie-fill { fill: #b8323a; }
+.pie-svg .pie-lattice { stroke: #f2c27a; stroke-width: 7; stroke-linecap: round; }
+.pie-svg .pie-cherry { fill: #7e1a24; }
+.pie-svg.wob { animation: pie-wob 0.16s ease-out; }
+.pie-svg.fresh { animation: pie-fresh 0.38s cubic-bezier(.2, 1.3, .5, 1); }
+.pie-big.shake { animation: pie-shake 0.3s linear; }
+.pie-big.off, .pie-btn.off { visibility: hidden; pointer-events: none; }
+.pie-crumbs { position: absolute; inset: 0; }
+.pie-crumb { position: absolute; width: 8px; height: 6px; border-radius: 3px; background: #e0a050; border: 1.5px solid #7a3a2a; animation: pie-crumb 0.6s ease-out forwards; }
+.pie-gulp {
+  position: absolute; left: 50%; top: -18px; transform: translateX(-50%); font: 700 40px var(--font-head, "Fredoka", sans-serif); color: #ffd34d; white-space: nowrap;
+  text-shadow: 0 4px 0 var(--ink, #2b2340), 3px 0 0 var(--ink, #2b2340), -3px 0 0 var(--ink, #2b2340), 0 -3px 0 var(--ink, #2b2340);
+  opacity: 0;
+}
+.pie-gulp.go { animation: pie-gulp 0.75s cubic-bezier(.2, 1.2, .4, 1) forwards; }
+.pie-foot { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 6px; }
+.pie-foot:not(:has(> :not([hidden]))) { display: none; }
+.pie-tip { width: fit-content; padding: 3px 12px; white-space: nowrap; font: 700 14px var(--font-body, "Nunito", sans-serif); color: #fff; background: #2b2340; border-radius: 10px; }
+.pie-btn {
+  position: absolute; pointer-events: auto; width: 96px; height: 96px; border-radius: 50%; padding: 0; cursor: pointer;
+  right: calc(var(--act-r, 22px) + var(--act-w, 60px) / 2 - 48px); bottom: calc(var(--act-b, 90px) + var(--act-h, 60px) / 2 - 48px);
+  border: 4px solid var(--ink, #2b2340); background: #e0463c; color: #fff; font: 700 21px/1 var(--font-head, "Fredoka", sans-serif);
+  text-shadow: 0 2px 0 rgba(43, 35, 64, 0.5); box-shadow: 0 6px 0 var(--ink, #2b2340); touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.pie-btn:active, .pie-btn.press { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink, #2b2340); }
+.pie-btn:focus-visible, .pie-leave:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 3px; }
+.pie-hud[data-phase="count"] .pie-btn { background: #c9a6a2; }
+
+.pie-win {
+  position: absolute; left: 50%; bottom: 120px; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; pointer-events: none;
+  padding: 12px 26px; background: #fff3c4; border: 4px solid var(--ink, #2b2340); border-radius: 20px; box-shadow: 0 6px 0 var(--ink, #2b2340);
+  animation: pie-rise 0.45s cubic-bezier(.2, 1.4, .4, 1);
+}
+.pie-win b { font: 700 34px var(--font-head, "Fredoka", sans-serif); color: #b8323a; white-space: nowrap; }
+.pie-win span { font: 700 18px var(--font-head, "Fredoka", sans-serif); color: var(--ink, #2b2340); }
+.pie-win.calm { animation: none; }
+.pie-confetti-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.pie-confetti { position: absolute; top: -16px; width: 9px; height: 14px; border-radius: 2px; animation: pie-confetti 2.4s ease-in forwards; }
+
+@keyframes pie-fade { from { opacity: 0; } }
+@keyframes pie-rise { from { transform: translate(-50%, 18px); opacity: 0; } }
+@keyframes pie-pop { 0% { transform: translateX(-50%) scale(0.5); } 60% { transform: translateX(-50%) scale(1.15); } 100% { transform: translateX(-50%) scale(1); } }
+.pie-lane.won { animation-name: pie-pop-lane; }
+@keyframes pie-pop-lane { 50% { transform: scale(1.05); } }
+@keyframes pie-wob { 0% { transform: scale(1) rotate(0); } 40% { transform: scale(0.95, 1.04) rotate(-2deg); } 100% { transform: scale(1) rotate(0); } }
+@keyframes pie-fresh { from { transform: translateY(40px) scale(0.6); opacity: 0; } }
+@keyframes pie-shake { 0% { translate: 0 0; } 25% { translate: -5px 2px; } 50% { translate: 5px -2px; } 75% { translate: -3px -2px; } 100% { translate: 0 0; } }
+@keyframes pie-crumb { to { transform: translate(var(--dx), var(--dy)) rotate(200deg); opacity: 0; } }
+@keyframes pie-gulp { 0% { transform: translate(-50%, 20px) scale(0.4); opacity: 0; } 20% { transform: translate(-50%, -4px) scale(1.2); opacity: 1; } 60% { transform: translate(-50%, -10px) scale(1); opacity: 1; } 100% { transform: translate(-50%, -40px) scale(1); opacity: 0; } }
+@keyframes pie-confetti { 0% { transform: translateY(0) rotate(0); opacity: 1; } 85% { opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pie-svg.wob, .pie-big.shake, .pie-crumb, .pie-confetti, .pie-svg.fresh { animation: none !important; }
+  .pie-crumb { display: none; }
+}
+
+/* seated: the E, the jump, the tools and the emote smiley step aside (BITE! is in the E's place) */
+#hud:has(> .pie-hud.seated:not([hidden])) #btn-act,
+#hud:has(> .pie-hud.seated:not([hidden])) .jump,
+#hud:has(> .pie-hud.seated:not([hidden])) > .toolring,
+#hud:has(> .pie-hud.seated:not([hidden])) .tg-emotes,
+#hud:has(> .pie-hud.seated:not([hidden])) #emote-wheel { display: none !important; }
+
+/* phones: the card under the top-right block, narrower; the pie lower left of the middle, BITE! in the E's place */
+#hud[data-layout="phone"] .pie-card { top: calc(var(--top-b, 120px) + 8px); width: calc(100vw - 24px); max-width: 360px; padding: 6px 10px 8px; border-width: 2.5px; }
+#hud[data-layout="phone"] .pie-lanes { grid-template-columns: 1fr 1fr; gap: 4px 6px; }
+#hud[data-layout="phone"] .pie-lane { font-size: 13px; padding: 2px 6px 3px; }
+#hud[data-layout="phone"] .pie-big { width: min(58vw, 250px); left: calc(50% - 40px); bottom: calc(var(--safe-b) + 118px); }
+#hud[data-layout="phone"] .pie-tip { font-size: 13px; }
+#hud[data-layout="phone"] .pie-clock { font-size: 80px; top: 44%; }
+#hud[data-layout="phone"] .pie-btn { width: 104px; height: 104px; font-size: 23px; right: calc(var(--safe-r) + 14px); bottom: calc(var(--safe-b) + 70px); }
+#hud[data-layout="phone"] .pie-win { bottom: calc(var(--safe-b) + 210px); max-width: calc(100vw - 24px); box-sizing: border-box; padding: 10px 16px; }
+#hud[data-layout="phone"] .pie-win b { font-size: 24px; }
+
+/* hud3: the big Eat button takes the slot over the cluster (where Cast and Dive go), clear of the mic left of the E and the pills and
+   the ? under it */
+#hud:not([data-layout="pad"])[style*="--slot-r"] .pie-btn { right: max(calc(var(--safe-r) + 8px), calc(var(--slot-r) + var(--slot-w) / 2 - 48px)); bottom: calc(var(--slot-b) + var(--slot-h) / 2 - 48px); }
+#hud[data-layout="phone"][style*="--slot-r"] .pie-btn { right: max(calc(var(--safe-r) + 8px), calc(var(--slot-r) + var(--slot-w) / 2 - 52px)); bottom: calc(var(--slot-b) + var(--slot-h) / 2 - 52px); }

@@ -1,0 +1,9 @@
+/* The game store's box card */
+.store-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(360px, 88vw); padding: 18px 20px; z-index: 8; text-align: center; font-family: 'Nunito', sans-serif; }
+.store-card[hidden] { display: none; }
+.store-title { font-family: 'Fredoka', sans-serif; font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.store-blurb { font-size: 15px; margin-bottom: 8px; }
+.store-when { font-size: 14px; font-weight: 800; margin-bottom: 6px; color: #2f6b4f; }
+.store-when[hidden] { display: none; }
+.store-stats { font-size: 13px; opacity: 0.75; min-height: 18px; margin-bottom: 10px; }
+.store-btns { display: flex; gap: 10px; justify-content: center; }

@@ -1,0 +1,132 @@
+/* Scenic views: the quiet HUD while you sit in a view, the camera button, the photo bar and preview, the photo
+   board's card. Pieces are placed in other pieces' places with hud-layout.js's variables (never by hand). */
+
+/* ---- in a view: the HUD goes quiet. The minimap block, the quests, fish and treats, the tools, the emote smiley and the jump
+   tuck away; the chat, the voice button and the E (Get up) stay. The camera button takes the minimap's place. */
+#hud.scenic-on > #mm-block, #hud.scenic-on > #quests, #hud.scenic-on > #currency, #hud.scenic-on > .toolring,
+#hud.scenic-on .tg-emotes, #hud.scenic-on #emote-wheel, #hud.scenic-on .jump, #hud.scenic-on #quest-flare,
+#hud.scenic-on > #pad-slot-x, #hud.scenic-on > #pad-slot-y, #hud.scenic-on > #map { display: none !important; }
+
+#hud > .scenic-hud { position: absolute; inset: 0; pointer-events: none; z-index: 5; } /* (#hud > * catches taps: this one covers the screen and must not) */
+.scenic-hud[hidden] { display: none; }
+.scenic-cam {
+  --cam: clamp(52px, calc(min(var(--map-w, 120px), var(--map-h, 90px)) * 0.62), 88px);
+  position: absolute; pointer-events: auto; box-sizing: border-box;
+  left: calc(var(--map-l, 0px) + var(--map-w, 120px) / 2 - var(--cam) / 2); top: calc(var(--map-t, 10px) + var(--map-h, 90px) / 2 - var(--cam) / 2);
+  width: var(--cam); height: var(--cam); border-radius: 50%; padding: 0; margin: 0; cursor: pointer;
+  background: #ffd34d; border: var(--bw3, 3px) solid var(--ink, #2b2340); box-shadow: 0 4px 0 var(--ink, #2b2340);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  transition: transform 0.12s;
+}
+.scenic-cam svg { width: 62%; height: 62%; margin-top: 4%; }
+.scenic-cam:hover { transform: translateY(-1px); }
+.scenic-cam:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink, #2b2340); }
+.scenic-cam:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 3px; }
+.scenic-cam .kc { right: -6%; top: -8%; }
+/* the word under the button (in its own pill, so it reads over sky or grass) */
+.scenic-cam-t {
+  position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font: 700 clamp(12px, calc(var(--u, 1) * 9px), 16px) var(--font-head, sans-serif); color: var(--ink, #2b2340);
+  background: #fff4dc; border: 2px solid var(--ink, #2b2340); border-radius: 99px; padding: 1px 9px 2px;
+}
+
+/* the "Take in the view" label over each view */
+.area3d.scenic-mark { font-size: 14px; background: rgba(43, 35, 64, 0.5); border-color: #ffe14f; padding: 3px 10px 4px 26px; }
+.area3d.scenic-mark::before {
+  content: ""; position: absolute; left: 8px; top: 50%; width: 12px; height: 12px; margin-top: -6px; background: #ffe14f;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+/* ---- the camera (scenic-photo.js): everything else on the HUD, the name tags and the balloons step out of the picture */
+#hud.photo-mode > *:not(.photo-bar):not(.photo-card):not(.photo-flash) { visibility: hidden !important; }
+body.photo-on #labels, body.photo-on #bubbles { visibility: hidden; }
+.photo-bar {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + var(--safe-b, 0px)); z-index: 9;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; box-sizing: border-box;
+  width: max-content; max-width: calc(100vw - 20px); padding: 10px 14px; pointer-events: auto;
+  background: rgba(255, 244, 220, 0.94); border: 3px solid var(--ink, #2b2340); border-radius: 22px; box-shadow: 0 4px 0 var(--ink, #2b2340);
+  font: 700 15px var(--font-head, sans-serif); color: var(--ink, #2b2340);
+}
+.photo-bar[hidden] { display: none; }
+.ph-group { display: flex; align-items: center; gap: 6px; }
+.photo-btn { font: inherit; color: inherit; cursor: pointer; border: 2.5px solid var(--ink, #2b2340); background: #fff; border-radius: 99px; box-shadow: 0 2px 0 var(--ink, #2b2340); }
+.photo-btn:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 2px; }
+.photo-btn:active { transform: translateY(2px); box-shadow: none; }
+.ph-arrow, .ph-close { width: 36px; height: 36px; padding: 6px; display: inline-flex; align-items: center; justify-content: center; }
+.ph-arrow svg, .ph-close svg { width: 100%; height: 100%; }
+.ph-pose { min-width: 74px; text-align: center; }
+.ph-opt { padding: 6px 12px; min-height: 36px; white-space: nowrap; }
+.ph-opt[aria-pressed="true"] { background: #ffd34d; }
+.ph-shutter { width: 62px; height: 62px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: #fff; border-width: 3.5px; }
+.ph-dot { width: 42px; height: 42px; border-radius: 50%; background: #e0463c; border: 3px solid var(--ink, #2b2340); box-sizing: border-box; }
+.ph-close { background: #f3e4c4; }
+/* a narrow screen: the options on their own row above the pose, the shutter and the close */
+@media (max-width: 640px) {
+  .photo-bar { gap: 8px 10px; padding: 8px 10px; font-size: 14px; }
+  .ph-opts { order: -1; flex-basis: 100%; justify-content: center; }
+  .ph-opt { padding: 5px 9px; }
+}
+#hud > .photo-flash { position: fixed; inset: 0; background: #fff; pointer-events: none; z-index: 13; opacity: 0; }
+.photo-flash[hidden] { display: none; }
+.photo-flash.go { animation: photo-flash 0.4s ease-out; }
+@keyframes photo-flash { from { opacity: 0.85; } to { opacity: 0; } }
+
+.photo-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; box-sizing: border-box;
+  width: min(600px, 94vw); max-height: 94vh; overflow-y: auto; padding: 14px; text-align: center; pointer-events: auto;
+}
+.photo-card[hidden] { display: none; }
+.pc-img { display: block; max-width: 100%; max-height: 56vh; margin: 0 auto; border: 3px solid var(--ink, #2b2340); border-radius: 12px; background: #000; }
+.pc-note { font: 600 14px var(--font-body, sans-serif); margin: 10px 4px; min-height: 18px; }
+.pc-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pc-btns .btn { min-width: 120px; }
+.pc-btns .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- the photo board's card (photo-board.js): one picture at a time, big; the generic buttons step aside like for the
+   other cards (hud.css) */
+.photo-view {
+  /* under the top band (the minimap, the pills) and above the chat bar: it covers none of their words */
+  position: absolute; left: 50%; transform: translateX(-50%); z-index: 8; box-sizing: border-box;
+  top: calc(var(--top-b, 64px) + 8px); max-height: calc(var(--chat-t, 100vh) - var(--top-b, 64px) - 18px);
+  width: min(620px, 94vw); overflow-y: auto; scroll-padding-bottom: 70px; padding: 12px 16px; text-align: center; pointer-events: auto;
+}
+.photo-view[hidden] { display: none; }
+.pv-title { font: 700 22px var(--font-head, sans-serif); }
+.pv-tabs { display: flex; gap: 6px; justify-content: center; margin: 6px 0 8px; }
+.pv-tab { font: 700 14px var(--font-head, sans-serif); padding: 4px 12px; border: 2px solid var(--ink, #2b2340); border-radius: 99px; background: #fff; color: var(--ink, #2b2340); cursor: pointer; }
+.pv-tab[aria-pressed="true"] { background: #ffd34d; }
+.pv-tab[hidden] { display: none; }
+.pv-tab:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 2px; }
+.pv-img { display: block; max-width: 100%; max-height: min(42vh, calc(var(--chat-t, 100vh) - var(--top-b, 64px) - 230px)); margin: 0 auto; border: 3px solid var(--ink, #2b2340); border-radius: 10px; background: #2b2340; }
+.pv-img[hidden] { display: none; }
+.pv-cap { font: 600 14px var(--font-body, sans-serif); margin: 8px 4px 2px; min-height: 18px; }
+.pv-msg { font: 700 13px var(--font-body, sans-serif); color: var(--accent, #e0463c); min-height: 17px; margin-bottom: 6px; }
+.pv-btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+.pv-btns .btn { min-width: 100px; }
+.pv-btns .btn[hidden] { display: none; }
+.pv-btns .btn[disabled] { opacity: 0.45; cursor: default; }
+#hud:has(> .photo-view:not([hidden])) #btn-act, #hud:has(> .photo-view:not([hidden])) .jump,
+#hud:has(> .photo-view:not([hidden])) > .toolring, #hud:has(> .photo-view:not([hidden])) .tg-emotes { display: none !important; }
+
+/* the community board's card: two parts (Announcements, Photos) and an admin's notice form */
+.pv-secs { display: flex; gap: 8px; justify-content: center; margin: 8px 0 6px; }
+.pv-sec { font: 700 16px var(--font-head, sans-serif); padding: 6px 16px; border: 2.5px solid var(--ink, #2b2340); border-radius: 99px; background: #fff; color: var(--ink, #2b2340); cursor: pointer; box-shadow: 0 2px 0 var(--ink, #2b2340); }
+.pv-sec[aria-pressed="true"] { background: #2f5a3a; color: #fff4dc; }
+.pv-sec:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 2px; }
+.pv-news[hidden], .pv-photos[hidden], .pv-post[hidden] { display: none; }
+.pv-notes { list-style: none; margin: 4px 0 0; padding: 0; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+.pv-note { background: #fffaf0; border: 2px solid var(--ink, #2b2340); border-left: 8px solid var(--c, #3f8fd9); border-radius: 10px; padding: 7px 10px; }
+.pv-note.posted { background: #fff7c9; }
+.pv-note.pv-empty { border-left-width: 2px; text-align: center; font: 600 14px var(--font-body, sans-serif); }
+.pv-note-t { font: 700 16px var(--font-head, sans-serif); }
+.pv-note-x { font: 600 14px var(--font-body, sans-serif); margin-top: 2px; }
+.pv-note-m { font: 600 12px var(--font-body, sans-serif); opacity: 0.7; margin-top: 3px; }
+.pv-note-del { margin-top: 6px; padding: 3px 10px; font-size: 13px; }
+.pv-post { margin-top: 10px; padding: 8px 10px; border: 2px dashed var(--ink, #2b2340); border-radius: 10px; text-align: left; display: flex; flex-direction: column; gap: 6px; }
+.pv-post-h { font: 700 15px var(--font-head, sans-serif); }
+.pv-in { font: 600 14px var(--font-body, sans-serif); padding: 5px 8px; border: 2px solid var(--ink, #2b2340); border-radius: 8px; background: #fff; color: var(--ink, #2b2340); resize: vertical; }
+.pv-post-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pv-until-l { font: 600 13px var(--font-body, sans-serif); }
+.pv-post-go { margin-left: auto; }
+/* the Close button stays in sight when the card scrolls */
+.photo-view > .pv-btns:last-child { position: sticky; bottom: -12px; margin: 8px -16px -12px; padding: 8px 0 10px; background: inherit; border-top: 2px solid rgba(43, 35, 64, 0.12); }

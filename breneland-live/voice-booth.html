@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Voice Booth</title>
+  <meta name="description" content="Andrew's voice booth: read a line, keep the good takes, and build the recordings for Breneland's DM voice.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fff6e4; --card: #fffdf6; --ink: #2b2433; --soft: #6b6170; --line: #2b2433; --chip: #f3ead6; --hi: #ff5d8f;
+      --go: #7bd389; --rec: #ff6f61; --warn: #ffcf6b; --bad: #ff8a7a; --info: #8fd0ee; --track: #efe5cf;
+      --font-head: 'Fredoka', system-ui, sans-serif; --font-body: 'Nunito', system-ui, sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { --bg: #1d1a24; --card: #29242f; --ink: #f4ecdf; --soft: #b9aebf; --line: #f4ecdf; --chip: #3a3342; --track: #3a3342; }
+    }
+    :root[data-theme="dark"] { --bg: #1d1a24; --card: #29242f; --ink: #f4ecdf; --soft: #b9aebf; --line: #f4ecdf; --chip: #3a3342; --track: #3a3342; }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 500 16px/1.4 var(--font-body); }
+    main { max-width: 760px; margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 16px 96px; }
+    [hidden] { display: none !important; }
+    h1 { font: 700 26px/1.1 var(--font-head); margin: 0; flex: 1 1 auto; white-space: nowrap; }
+    h2 { font: 700 21px/1.2 var(--font-head); margin: 22px 0 8px; }
+    h3 { font: 700 18px/1.2 var(--font-head); margin: 0 0 6px; }
+    p { margin: 0 0 8px; }
+    button, select, .btn { font: 700 16px var(--font-head); color: var(--ink); background: var(--card); border: 2.5px solid var(--line); border-radius: 14px;
+      min-height: 48px; padding: 8px 16px; cursor: pointer; box-shadow: 0 3px 0 var(--line); touch-action: manipulation; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+    select { box-shadow: none; padding: 8px 10px; max-width: 100%; min-width: 0; }
+    button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+    button:disabled { opacity: .45; cursor: default; transform: none; box-shadow: 0 3px 0 var(--line); }
+    button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--hi); outline-offset: 2px; }
+    button.primary { background: var(--go); color: #2b2433; }
+    .card { background: var(--card); border: 2.5px solid var(--line); border-radius: 18px; padding: 14px 16px; margin: 12px 0; min-width: 0; }
+    .soft { color: var(--soft); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .tag { display: inline-block; font: 700 13px var(--font-head); color: #2b2433; background: var(--c, var(--chip)); border: 2px solid var(--line); border-radius: 99px; padding: 1px 10px; white-space: nowrap; }
+
+    /* the bar: Back to Breneland, the title, the tabs */
+    .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 0 4px; }
+    .tabs { display: flex; gap: 6px; }
+    .tabs button { min-height: 40px; padding: 4px 14px; box-shadow: 0 2px 0 var(--line); }
+    .tabs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+    .gate { text-align: center; padding: 34px 18px; }
+    .gate .big { font: 700 24px/1.2 var(--font-head); margin-bottom: 8px; }
+    .banner { background: var(--warn); color: #2b2433; border: 2.5px solid var(--line); border-radius: 14px; padding: 8px 12px; margin: 10px 0; font-weight: 700; }
+
+    /* where you are */
+    .where { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font: 600 15px var(--font-head); margin: 6px 0 6px; }
+    .dots { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 2px; }
+    .dots button { width: 26px; height: 26px; min-height: 0; padding: 0; border-radius: 50%; border-width: 2px; box-shadow: none; background: var(--card); font: 700 11px var(--font-head); }
+    .dots button.kept { background: var(--go); color: #2b2433; }
+    .dots button.here { outline: 3px solid var(--hi); outline-offset: 1px; }
+
+    /* the line to read */
+    .prompt { box-shadow: inset 8px 0 0 var(--c, var(--chip)); padding-left: 22px; }
+    .ptop { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .ptext { font: 600 clamp(22px, 4.6vw, 30px)/1.3 var(--font-head); margin: 4px 0 8px; overflow-wrap: anywhere; }
+    .psay { font: 700 16px var(--font-body); color: var(--soft); margin: -2px 0 8px; }
+    .psay b { color: var(--ink); }
+    .phint { color: var(--soft); font-size: 15px; margin: 0; }
+    .kept-badge { font: 700 13px var(--font-head); background: var(--go); color: #2b2433; border: 2px solid var(--line); border-radius: 99px; padding: 2px 12px; min-height: 30px; box-shadow: none; }
+    .done-card { text-align: center; padding: 22px 16px; }
+    .done-card .big { font: 700 26px var(--font-head); margin-bottom: 6px; }
+
+    /* the deck: meter, record, review */
+    .deck { background: var(--card); border: 2.5px solid var(--line); border-radius: 18px; padding: 12px 16px 14px; margin: 12px 0; }
+    .meterrow { display: flex; align-items: center; gap: 10px; }
+    canvas.meter { flex: 1 1 auto; width: 100%; height: 26px; min-width: 0; border: 2px solid var(--line); border-radius: 10px; background: var(--track); display: block; }
+    .lvl { font: 700 14px var(--font-head); min-width: 74px; text-align: right; }
+    .mic { font-size: 14px; color: var(--soft); margin: 6px 0 0; overflow-wrap: anywhere; }
+    .mic.diff { color: var(--ink); }
+    .mic.diff::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--warn); border: 2px solid var(--line); margin-right: 6px; vertical-align: -1px; }
+    .recrow { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 14px 0 6px; }
+    .recrow .nav { width: 52px; height: 52px; padding: 0; border-radius: 50%; font-size: 26px; line-height: 1; }
+    .rec { width: 96px; height: 96px; border-radius: 50%; padding: 0; background: var(--rec); color: #fff; font: 700 17px var(--font-head); box-shadow: 0 5px 0 var(--line);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+    .rec .dot { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 2.5px solid var(--line); }
+    .rec.on { background: var(--ink); color: var(--bg); }
+    .rec.on .dot { border-radius: 4px; background: var(--rec); }
+    @media (prefers-reduced-motion: no-preference) { .rec.on { animation: pulse 1.1s ease-in-out infinite; } }
+    @keyframes pulse { 50% { box-shadow: 0 5px 0 var(--line), 0 0 0 10px rgba(255, 111, 97, .25); } }
+    .status { text-align: center; font: 600 15px var(--font-head); min-height: 22px; margin: 4px 0 0; }
+    .review { margin-top: 10px; border-top: 2px dashed var(--line); padding-top: 10px; }
+    canvas.wave { width: 100%; height: 76px; display: block; border-radius: 10px; background: var(--track); border: 2px solid var(--line); cursor: pointer; }
+    ul.checks { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 6px; }
+    ul.checks li { border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px 6px 34px; position: relative; background: var(--bg); font-weight: 700; font-size: 15px; }
+    ul.checks li::before { content: ''; position: absolute; left: 10px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; border: 2px solid var(--line); background: var(--c); }
+    ul.checks li.good { --c: var(--go); } ul.checks li.bad { --c: var(--bad); } ul.checks li.warn { --c: var(--warn); } ul.checks li.info { --c: var(--info); font-weight: 600; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; position: sticky; bottom: max(0px, env(safe-area-inset-bottom)); z-index: 2; background: var(--card); padding: 6px 0 4px; }
+    .deck.reviewing .recrow { margin: 8px 0 2px; }
+    .deck.reviewing .rec { width: 72px; height: 72px; font-size: 15px; box-shadow: 0 3px 0 var(--line); }
+    .deck.reviewing .rec .dot { width: 16px; height: 16px; }
+    .actions button { flex: 1 1 120px; }
+    .keys { text-align: center; font-size: 13px; color: var(--soft); margin: 6px 0 0; }
+    @media (pointer: coarse) { .keys { display: none; } }
+    details.opts { margin: 8px 0; }
+    details.opts summary { cursor: pointer; font: 700 15px var(--font-head); padding: 6px 0; }
+    .opts .row { margin: 6px 0; }
+    label.opt { display: inline-flex; gap: 8px; align-items: center; font-weight: 700; }
+    label.opt input { width: 22px; height: 22px; }
+
+    /* the mic check */
+    ol.steps { padding-left: 22px; margin: 6px 0; display: grid; gap: 10px; }
+    ol.steps li { padding-left: 4px; }
+    .testline { font: 600 21px/1.3 var(--font-head); margin: 6px 0; }
+
+    /* progress */
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+    .stat { background: var(--card); border: 2.5px solid var(--line); border-radius: 16px; padding: 10px 8px; text-align: center; min-width: 0; }
+    .stat b { display: block; font: 700 30px/1.1 var(--font-head); }
+    .stat span { font-size: 13px; color: var(--soft); }
+    .session { display: flex; gap: 14px; align-items: center; }
+    .session svg { flex: 0 0 auto; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+    .grid button { min-height: 72px; padding: 6px 8px 14px 14px; text-align: left; display: grid; gap: 1px; align-content: start; box-shadow: inset 6px 0 0 var(--c, var(--chip)), 0 2px 0 var(--line); position: relative; overflow: hidden; border-radius: 12px; }
+    .grid button::after { content: ''; position: absolute; left: 0; bottom: 0; height: 7px; width: calc(var(--f) * 100%); background: var(--go); border-top: 2px solid var(--line); }
+    .grid button.full { background: color-mix(in srgb, var(--go) 35%, var(--card)); }
+    .grid button.cur { outline: 3px solid var(--hi); outline-offset: 1px; }
+    .grid .bn { font: 700 15px var(--font-head); }
+    .grid .bs { font: 600 12px/1.2 var(--font-body); color: var(--soft); }
+    .grid .bc { font: 700 12px var(--font-head); }
+    .meterbar { height: 16px; border: 2px solid var(--line); border-radius: 99px; background: var(--track); overflow: hidden; margin: 6px 0; }
+    .meterbar i { display: block; height: 100%; background: var(--go); width: 0; }
+    .meterbar.warn i { background: var(--warn); }
+    .code { font: 700 30px var(--font-head); letter-spacing: 3px; margin: 8px 0 4px; }
+    pre.cmd { background: var(--bg); border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; }
+    .tips ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+    .toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg);
+      font: 700 15px var(--font-head); border-radius: 14px; padding: 10px 16px; max-width: calc(100vw - 32px); z-index: 10; text-align: center; }
+
+    @media (max-width: 520px) {
+      h1 { font-size: 22px; }
+      .rec { width: 104px; height: 104px; }
+      .stat b { font-size: 24px; }
+      .card, .deck { padding: 12px; }
+      .prompt { padding-left: 18px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="bar" id="bar">
+    <h1>Voice booth</h1>
+    <nav class="tabs" id="tabs" hidden aria-label="Booth pages">
+      <button type="button" data-tab="booth" aria-pressed="true">Record</button>
+      <button type="button" data-tab="progress" aria-pressed="false">Progress</button>
+    </nav>
+  </header>
+
+  <section id="gate" class="card gate" aria-live="polite">
+    <p class="big" id="gate-msg">Opening the booth...</p>
+    <p class="soft" id="gate-sub"></p>
+  </section>
+
+  <div id="warn" class="banner" hidden></div>
+
+  <!-- the mic check: first time on a device, or Options > Mic check -->
+  <section id="setup" hidden>
+    <h2>Mic check</h2>
+    <p class="soft">A minute now makes every take sound better.</p>
+    <div class="card">
+      <ol class="steps">
+        <li><b>Pick your mic.</b> Use the same one every session.
+          <div class="row" style="margin-top:6px"><select id="mic-pick" aria-label="Microphone"><option value="">The default mic</option></select>
+          <button type="button" id="mic-on">Turn on the mic</button></div>
+          <label class="row" style="margin-top:6px"><input type="checkbox" id="mic-headset"> Headset mode (a Bluetooth or plug-in headset on a phone: the phone only opens its mic in call mode)</label></li>
+        <li><b>Set the level.</b> Talk the way you will read: the bar should bounce in the green. Too low? Move closer or turn the mic up. Red? Back off.</li>
+        <li><b>Read this line, then hear it back.</b>
+          <p class="testline" id="test-line">Hello from the booth. One, two, three, this is my storyteller voice.</p></li>
+      </ol>
+    </div>
+    <div id="setup-slot"></div>
+    <div class="row"><button type="button" class="primary" id="setup-done">Start recording</button></div>
+    <div class="card tips" data-tips></div>
+  </section>
+
+  <!-- the booth -->
+  <section id="booth" hidden>
+    <div class="where"><span id="w-batch">Batch 1 of 30</span><span class="tag" id="w-style">Plain</span><span id="w-line" class="soft">Line 1 of 20</span></div>
+    <div class="dots" id="dots" aria-label="Lines in this batch"></div>
+    <article class="card prompt" id="prompt" aria-live="polite">
+      <div class="ptop"><span class="tag" id="p-tag">Plain</span><button type="button" class="kept-badge" id="p-kept" hidden aria-label="Kept. Play the kept take">Kept: play</button></div>
+      <p class="ptext" id="p-text"></p>
+      <p class="psay" id="p-say" hidden></p>
+      <p class="phint" id="p-hint"></p>
+    </article>
+    <article class="card done-card" id="done" hidden>
+      <p class="big" id="done-msg">Batch done!</p>
+      <p class="soft" id="done-sub"></p>
+      <div class="row" style="justify-content:center"><button type="button" class="primary" id="done-next">Next batch</button><button type="button" id="done-progress">See progress</button></div>
+    </article>
+    <div id="booth-slot"></div>
+    <details class="opts" id="opts">
+      <summary>Options</summary>
+      <div class="row"><label class="opt" for="opt-pause">Stop after a pause of</label>
+        <select id="opt-pause"><option value="0.8">0.8 s</option><option value="1.5">1.5 s</option><option value="2.5">2.5 s</option><option value="0">Never (tap Stop)</option></select></div>
+      <div class="row"><label class="opt"><input type="checkbox" id="opt-play" checked> Play each take back</label></div>
+      <div class="row"><button type="button" id="opt-micpick">Mic check</button><button type="button" id="opt-delete" hidden>Delete this line's take</button></div>
+    </details>
+  </section>
+
+  <!-- progress -->
+  <section id="progress" hidden>
+    <div class="stats">
+      <div class="stat"><b id="s-kept">0</b><span id="s-kept-of">takes kept of 800</span></div>
+      <div class="stat"><b id="s-min">0</b><span>minutes recorded</span></div>
+      <div class="stat"><b id="s-batch">0</b><span id="s-batch-of">batches done of 40</span></div>
+    </div>
+    <div class="card session">
+      <svg width="74" height="74" viewBox="0 0 74 74" aria-hidden="true"><circle cx="37" cy="37" r="30" fill="none" stroke="var(--track)" stroke-width="9"/>
+        <circle id="ring" cx="37" cy="37" r="30" fill="none" stroke="var(--go)" stroke-width="9" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5" transform="rotate(-90 37 37)"/></svg>
+      <div><h3>This session</h3><p id="sess-line">10 minutes is a good session.</p><p class="soft" id="sess-sub"></p></div>
+    </div>
+    <h2>Set 2: names and longer takes</h2>
+    <p class="soft" id="set2-line">Names said in one breath with the line, longer passages, and the characters speaking to someone by name.</p>
+    <div class="grid" id="grid2"></div>
+    <h2>Set 1</h2>
+    <p class="soft" id="set1-line">Each batch is 20 lines in one style. Tap one to record it.</p>
+    <div class="grid" id="grid"></div>
+    <div class="card"><h3>Space on the server</h3><div class="meterbar" id="store-bar"><i id="store-fill"></i></div><p class="soft" id="store-line"></p></div>
+    <div class="card"><h3>Get the takes onto the PC</h3>
+      <p>Make a code here, then run this in the Breneland folder on the PC. It fetches every take it does not have yet.</p>
+      <button type="button" id="pull-make">Make a pull code</button>
+      <p class="code" id="pull-code" hidden></p>
+      <pre class="cmd" id="pull-cmd" hidden></pre>
+    </div>
+    <div class="card tips" data-tips></div>
+  </section>
+
+  <!-- the deck (moves between the mic check and the booth) -->
+  <div class="deck" id="deck" hidden>
+    <div class="meterrow"><canvas class="meter" id="meter" aria-hidden="true"></canvas><span class="lvl" id="lvl">Mic off</span></div>
+    <p class="mic" id="mic-line">The mic turns on when you press Record.</p>
+    <div class="recrow">
+      <button type="button" class="nav" id="prev" aria-label="Previous line">&lsaquo;</button>
+      <button type="button" class="rec" id="rec" aria-label="Record"><span class="dot"></span><span id="rec-word">Record</span></button>
+      <button type="button" class="nav" id="next" aria-label="Next line">&rsaquo;</button>
+    </div>
+    <p class="status" id="status" aria-live="polite">Press Record (or Space) and read the line.</p>
+    <div class="review" id="review" hidden>
+      <canvas class="wave" id="wave" aria-label="The take's waveform"></canvas>
+      <ul class="checks" id="checks" aria-live="polite"></ul>
+      <div class="actions">
+        <button type="button" id="play">Play</button>
+        <button type="button" id="redo">Redo</button>
+        <button type="button" class="primary" id="keep">Keep</button>
+      </div>
+    </div>
+    <p class="keys" id="keys">Space: record or stop. Enter: keep. R: redo. P: play. Arrows: move.</p>
+  </div>
+</main>
+<div class="toast" id="toast" hidden role="status"></div>
+<script type="module" src="/js/voice-booth.js"></script>
+<script src="/js/tools-back.js" data-into="#bar"></script>
+</body>
+</html>

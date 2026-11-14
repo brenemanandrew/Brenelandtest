@@ -1,0 +1,12 @@
+/* Oyster Cove: the breath bar bottom-centre, the dive button on touch, the blue tint under water */
+.swim-hud { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); transform: translateX(-50%); width: min(360px, 70vw); text-align: center; pointer-events: none; z-index: 6; font-family: 'Fredoka', 'Nunito', sans-serif; color: #fff4dc; text-shadow: 0 2px 0 rgba(0,0,0,0.45); }
+.swim-hud[hidden] { display: none; }
+.swim-label { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.swim-bar { height: 16px; border: 3px solid #2b2340; border-radius: 10px; background: rgba(20, 16, 30, 0.6); overflow: hidden; }
+.swim-bar-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #6fd3ff, #8fe0ff); transition: width 0.12s linear; }
+.swim-bar-fill.low { background: linear-gradient(90deg, #e0463c, #ff9f43); animation: swim-pulse 0.5s infinite alternate; }
+@keyframes swim-pulse { from { filter: brightness(1); } to { filter: brightness(1.6); } }
+.swim-tips { font-size: 12px; margin-top: 4px; opacity: 0.9; }
+.swim-btn { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 14px); bottom: calc(env(safe-area-inset-bottom, 0px) + 150px); pointer-events: auto; min-width: 84px; padding: 10px 14px; font-size: 15px; }
+.swim-btn[hidden] { display: none; }
+.swim-tint { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgba(40, 120, 170, 0.35), rgba(10, 50, 90, 0.75)); pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 2; }

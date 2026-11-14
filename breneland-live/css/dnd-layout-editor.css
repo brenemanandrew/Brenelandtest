@@ -1,0 +1,64 @@
+/* The HUD Editor's "D&D table" screen (editor/dnd-layout-editor.js): the table's still copy scaled into a frame, a dashed box over
+   each region with a corner dot to size it, the inspector beside it (under it on a phone). In the editors' look (hud-editor.css). */
+#dnd-ed { display: grid; grid-template-columns: minmax(0, 1fr) var(--insp-w, 300px); min-height: 0; }
+#dnd-ed[hidden] { display: none !important; }
+.dl-stage { position: relative; min-height: 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; overflow: hidden; background: #e9cfae; }
+.dl-bar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
+.dl-bar .btn[hidden] { display: none; }
+.dl-frame { position: relative; flex: none; border: 3px solid var(--ink, #2b2340); border-radius: 12px; box-shadow: 0 6px 0 rgba(43, 35, 64, 0.35); overflow: hidden; background: #1c1a2e; box-sizing: content-box; }
+.dl-screen { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; pointer-events: none; }
+.dl-screen .dnd { position: absolute; inset: 0; z-index: 2; }
+/* the back room behind it: a dim wall, the felt, the DM where the camera puts his face */
+.dnd-mock-room { position: absolute; left: 0; top: 0; width: 100%; z-index: 0; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 30%, rgba(255, 190, 110, 0.35), transparent 60%), linear-gradient(#3a1414 0, #5a2418 55%, #2f5a35 56%, #1f4027 100%); }
+.dnd-mock-dm { position: absolute; left: 50%; width: 130px; height: 156px; transform: translate(-50%, -42%); }
+.dnd-mock-dm svg { width: 100%; height: 100%; display: block; }
+.dnd-mock-view { position: absolute; z-index: 3; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #d8d2e8; border: 3px solid #6b6090; box-sizing: border-box; }
+.dnd-mock-view svg { width: 26px; height: 26px; }
+.dl-over { position: absolute; inset: 0; z-index: 4; touch-action: none; }
+.dl-box { position: absolute; box-sizing: border-box; border: 2px dashed rgba(255, 255, 255, 0.9); outline: 1.5px dashed rgba(43, 35, 64, 0.7); outline-offset: -1.5px; border-radius: 6px; cursor: grab; touch-action: none; }
+.dl-box:hover { border-color: var(--yellow, #ffd34d); }
+.dl-box.sel { border: 2.5px solid var(--yellow, #ffd34d); outline: 2px solid var(--ink, #2b2340); outline-offset: 0; z-index: 2; box-shadow: 0 0 0 3px rgba(255, 211, 77, 0.35); }
+.dl-box:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); }
+.dl-box.k-view { z-index: 3; border: 0; outline: 0; cursor: ns-resize; background: repeating-linear-gradient(90deg, var(--yellow, #ffd34d) 0 12px, var(--ink, #2b2340) 12px 18px); height: 14px !important; background-size: 100% 4px; background-position: 0 5px; background-repeat: no-repeat; }
+.dl-box.k-view.sel { background-size: 100% 6px; background-position: 0 4px; box-shadow: none; }
+.dl-box.k-dot { border-radius: 50%; }
+.dl-box.k-wheel { border-radius: 50%; pointer-events: none; border-style: dotted; background: none; }
+.dl-tag { position: absolute; left: -2px; top: -2px; translate: 0 -100%; padding: 1px 7px; font: 700 11px var(--font-head, sans-serif); color: #fff; background: rgba(43, 35, 64, 0.88); border-radius: 7px 7px 7px 0; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity 0.1s; }
+.dl-box:hover .dl-tag, .dl-box.sel .dl-tag { opacity: 1; }
+.dl-box.k-view .dl-tag { opacity: 1; left: 8px; }
+.dl-box.k-wheel .dl-tag { opacity: 1; left: 50%; top: 50%; translate: -50% -50%; border-radius: 7px; }
+.dl-h { position: absolute; width: 24px; height: 24px; border-radius: 50%; background: var(--yellow, #ffd34d); border: 2.5px solid var(--ink, #2b2340); box-shadow: 0 2px 0 var(--ink, #2b2340); touch-action: none; z-index: 3; box-sizing: border-box; pointer-events: auto; }
+.dl-h.size { right: -12px; bottom: -12px; cursor: nwse-resize; }
+.dl-box:not(.sel):not(:hover) .dl-h.size { display: none; } /* (a region's corner dot once it's picked: fewer dots in the way) */
+.dl-h.a0, .dl-h.a1 { width: 26px; height: 26px; background: var(--sky, #8fd0ee); cursor: grab; }
+/* the inspector */
+.dl-insp { min-height: 0; overflow: auto; padding: 12px 14px; background: var(--paper, #fff8ec); border-left: 3px solid var(--ink, #2b2340); display: flex; flex-direction: column; gap: 10px; }
+.dl-insp h2 { font: 700 18px var(--font-head, sans-serif); margin: 0; }
+.dl-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.dl-chip { padding: 4px 10px; font: 600 12.5px var(--font-head, sans-serif); border: 2px solid var(--ink, #2b2340); border-radius: 999px; background: #fff; cursor: pointer; min-height: 32px; }
+.dl-chip.on { background: var(--yellow, #ffd34d); }
+.dl-fields { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.dl-field { display: grid; grid-template-columns: 90px 1fr 28px; align-items: center; gap: 6px; font-size: 13px; }
+.dl-field input { border: 2px solid var(--ink, #2b2340); border-radius: 8px; padding: 4px 6px; min-height: 34px; width: 100%; box-sizing: border-box; background: #fff; }
+.dl-font { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.dl-font b { min-width: 44px; text-align: center; }
+.dl-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.dl-key { display: flex; gap: 6px; }
+.dl-key[hidden] { display: none; }
+.dl-key input { border: 2px solid var(--ink, #2b2340); border-radius: 10px; padding: 4px 8px; width: 150px; background: #fff; }
+.dl-status { margin: 0; font-size: 12.5px; color: var(--muted, #6d6480); min-height: 1.2em; }
+.dl-status.err { color: var(--red, #e0463c); }
+.dl-status.good { color: #2f7d32; }
+#dnd-tab.on { background: #c9a2ff; }
+/* a phone: the frame on top, the inspector a sheet under it */
+@media (max-width: 760px) {
+  #dnd-ed { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+  .dl-insp { border-left: 0; border-top: 3px solid var(--ink, #2b2340); height: 34vh; /* (fixed: the frame keeps its scale as a region is picked) */ gap: 7px; padding: 8px 10px; }
+  .dl-insp h2 { font-size: 15px; }
+  .dl-insp .muted { display: none; }
+  .dl-chip { min-height: 30px; padding: 3px 8px; font-size: 12px; }
+  .dl-stage { padding: 6px; gap: 5px; }
+  .dl-h { width: 30px; height: 30px; }
+  .dl-h.size { right: -15px; bottom: -15px; }
+}

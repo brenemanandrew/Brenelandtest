@@ -1,0 +1,29 @@
+/* Walk with me: the hold card, a portrait of the dog with a ring that fills over the four seconds you hold E. A little
+   below the middle of the screen: under the toasts, over your own head, clear of the interact words, the chat and the
+   buttons on every layout. It lets taps through. */
+#hud > .walk-card {
+  position: absolute; left: 50%; top: 64%; translate: -50% -50%; z-index: 6;
+  display: grid; justify-items: center; gap: 4px; padding: 11px 20px 10px;
+  background: var(--mk-paper); border: var(--bw3, 3px) solid var(--ink); border-radius: 24px; box-shadow: 0 4px 0 var(--ink);
+  pointer-events: none; animation: walk-in 0.22s cubic-bezier(.3, 1.6, .5, 1);
+}
+#hud > .walk-card[hidden] { display: none; }
+.walk-face { position: relative; width: 104px; height: 104px; }
+.walk-pic { position: absolute; inset: 11px; border-radius: 50%; overflow: hidden; background: var(--mk-sky); border: 3px solid var(--ink); display: grid; place-items: center; }
+.walk-pic canvas { width: 118%; height: 118%; display: block; }
+.walk-pic.blank::before { content: ""; width: 46%; height: 46%; border-radius: 50%; background: var(--ink); opacity: 0.25; }
+.walk-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(var(--mk-orange) calc(var(--p, 0) * 360deg), rgba(43, 35, 64, 0.12) 0);
+  -webkit-mask: radial-gradient(circle, transparent 65%, #000 66%); mask: radial-gradient(circle, transparent 65%, #000 66%);
+}
+.walk-card.done .walk-ring { background: var(--mk-green); animation: walk-pop 0.5s ease-out; }
+.walk-card.done .walk-pic { animation: walk-pop 0.5s ease-out; }
+.walk-cap { font: 700 19px/1.1 var(--font-head); color: var(--ink); text-align: center; max-width: 60vw; }
+.walk-sub { font: 600 12.5px/1 var(--font-head); color: #6b6280; letter-spacing: 0.02em; }
+.walk-card.done .walk-sub { color: #3d8a2e; }
+#hud[data-hud="phone-portrait"] > .walk-card { top: 39%; scale: 0.9; }   /* (under the top block and a toast or two, above the E's words) */
+@media (max-height: 500px) { #hud > .walk-card { top: 72%; scale: 0.72; } }   /* (a phone on its side: small, low, clear of the E's words) */
+@keyframes walk-in { from { opacity: 0; scale: 0.6; } }
+@keyframes walk-pop { 30% { scale: 1.12; } }
+@media (prefers-reduced-motion: reduce) { #hud > .walk-card, .walk-card.done .walk-ring, .walk-card.done .walk-pic { animation: none; } }

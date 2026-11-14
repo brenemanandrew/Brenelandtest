@@ -1,0 +1,44 @@
+/* Beneath Angell Street: the board's card (E at the board in the Lovecraft hall), and the escape and taken
+   cards after a run (maze-result.js). Old brass, chalk on slate, candlelight: dark wood panels, cream words. */
+.mzb-card, .mzr-card {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; text-align: center;
+  width: min(400px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
+  background: linear-gradient(180deg, #2c2420, #1f1a18); color: #ece6d6; border: 3px solid #c9a24a; border-radius: 20px;
+  box-shadow: 0 5px 0 #120d0b, 0 0 28px rgba(233, 168, 74, 0.25); padding: 16px 18px; font-family: var(--font-body);
+}
+.mzb-card[hidden], .mzr-card[hidden] { display: none; }
+/* reading the board (a phone at it, or its card open): the Quests panel and the speech bubbles step aside */
+body.mzb-reading #quests, body.mzb-reading #bubbles { visibility: hidden; }
+.mzb-title, .mzr-kick { font: 700 15px 'Special Elite', serif; letter-spacing: 0.12em; text-transform: uppercase; color: #d6ae55; }
+.mzb-sub { font: 700 15px/1.35 var(--font-body); color: #d9cfb8; margin: 4px 0 10px; }
+.mzb-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.mzb-tab { flex: 1; border: 2.5px solid #c9a24a; border-radius: 99px; background: transparent; color: #ece6d6; padding: 6px 10px; font: 700 15px var(--font-head); cursor: pointer; }
+.mzb-tab[aria-selected="true"] { background: #c9a24a; color: #241c16; }
+.mzb-tab:focus-visible, .mzb-close:focus-visible, .mzr-ok:focus-visible { outline: 3px solid #f2cf7a; outline-offset: 2px; }
+.mzb-list { list-style: none; margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; background: #1f2622; border: 2px solid #3b2418; text-align: left; }
+.mzb-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font: 400 17px 'Special Elite', serif; border-bottom: 1px dashed rgba(236, 230, 214, 0.18); }
+.mzb-row:last-child { border-bottom: 0; }
+.mzb-n { flex: none; width: 28px; text-align: right; color: rgba(236, 230, 214, 0.6); }
+.mzb-row:nth-child(-n+3) .mzb-n { color: #d6ae55; }
+.mzb-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mzb-res { flex: none; color: #ece6d6; }
+.mzb-row.esc .mzb-res { color: #f2cf7a; }
+.mzb-empty { font: 400 16px 'Special Elite', serif; color: rgba(236, 230, 214, 0.7); padding: 10px 0; text-align: center; }
+.mzb-foot { font: 700 12px/1.3 var(--font-body); color: rgba(236, 230, 214, 0.65); margin-bottom: 10px; }
+.mzb-close, .mzr-ok { background: #c9a24a; color: #241c16; border-color: #120d0b; box-shadow: 0 4px 0 #120d0b; }
+
+/* the escape and the taken card */
+.mzr-title { font: 700 30px/1.1 'Special Elite', serif; color: #fff4dc; margin: 4px 0 6px; }
+.mzr-card.esc .mzr-title { color: #f6d98a; text-shadow: 0 0 18px rgba(246, 217, 138, 0.45); }
+.mzr-line { font: 700 15px/1.35 var(--font-body); color: #e6d6b2; margin: 0 0 8px; }
+.mzr-time { font: 700 40px/1 'Special Elite', serif; color: #fff4dc; }
+.mzr-time small { display: block; font: 700 12px var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: #b9a983; margin-top: 4px; }
+.mzr-stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.mzr-pill { border: 2px solid rgba(201, 162, 74, 0.7); border-radius: 99px; padding: 3px 10px; font: 700 13px var(--font-body); color: #ece6d6; }
+.mzr-fish { margin: 6px 0 10px; padding: 8px 10px; border-radius: 14px; background: rgba(201, 162, 74, 0.16); font: 700 15px/1.3 var(--font-body); color: #f6e3b0; }
+.mzr-fish.big { font: 700 22px var(--font-head); color: #ffe39a; }
+.mzr-bar { height: 10px; border-radius: 99px; background: #1f2622; border: 2px solid #3b2418; overflow: hidden; margin: 8px 6px 4px; }
+.mzr-bar i { display: block; height: 100%; background: linear-gradient(90deg, #8f6a2a, #e9b65a); }
+.mzr-tip { font: 700 13px/1.35 var(--font-body); color: #cbbd9c; margin: 8px 0 12px; }
+.mzr-ok { width: 100%; }
+@media (max-width: 520px) { .mzr-title { font-size: 26px; } .mzr-time { font-size: 34px; } }

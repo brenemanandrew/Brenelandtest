@@ -1,0 +1,62 @@
+/* Beneath Angell Street: the door's card, and the HUD below (the breath sliver, the distance line, a run button and a
+   view button on a phone; the yard's pieces step aside while you are down there: #hud.mz-below) */
+.mz-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, 88vw); padding: 18px 20px; z-index: 8; text-align: center; font-family: 'Nunito', sans-serif; }
+.mz-card[hidden] { display: none; }
+.mz-title { font-family: 'Special Elite', 'Fredoka', serif; font-size: 25px; font-weight: 700; margin-bottom: 6px; color: #2b2340; }
+.mz-blurb { font-size: 15px; margin-bottom: 8px; }
+.mz-when { font-size: 14px; font-weight: 800; margin-bottom: 10px; color: #2f6b4f; }
+.mz-when.closed { color: #8e2430; }
+.mz-btns { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.mz-btns .btn[disabled] { opacity: 0.55; cursor: default; }
+
+/* below: the yard's HUD pieces step aside; the chat, the E button, the menu button and the people pill stay */
+#hud.mz-below #mm-block, #hud.mz-below #quests, #hud.mz-below #quest-flare, #hud.mz-below #currency, #hud.mz-below #tg-tools,
+#hud.mz-below #tg-emotes, #hud.mz-below #emote-wheel, #hud.mz-below #pad-slot-x, #hud.mz-below #pad-slot-y, #hud.mz-below #pad-name, #hud.mz-below #place,
+#hud.mz-below #stats, #hud.mz-below #prompt, #hud.mz-below > .lc-view, #hud.mz-below #map { display: none !important; }
+#hud.mz-below #online { display: none; }
+.mz-hud { position: absolute; left: 50%; top: max(10px, env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; z-index: 4; }
+#hud.mz-below .mz-hud { display: flex; }
+#hud.mz-below .mz-breath { display: block; }
+.mz-hud { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 15px); } /* (the bar is its own piece now: the line where it was under it) */
+.mz-breath { position: absolute; left: 50%; top: max(10px, env(safe-area-inset-top, 0px)); transform: translateX(-50%); display: none; z-index: 4; pointer-events: none; width: min(220px, 40vw); height: 9px; border-radius: 99px; border: 2px solid #2b2340; background: rgba(10, 12, 20, 0.72); overflow: hidden; }
+.mz-breath-fill { height: 100%; width: 100%; background: #e9a84a; transition: width 0.12s linear; }
+.mz-breath.low .mz-breath-fill { background: #c9503a; }
+.mz-dist { font: 800 15px/1 'Nunito', sans-serif; color: #e8e0cc; text-shadow: 0 2px 0 #06070c, 0 0 8px rgba(0, 0, 0, 0.8); letter-spacing: 0.02em; }
+.mz-dist:empty { display: none; }
+/* the run button (touch only), in the cluster's slot over the E (hud3: where the jump was before it went); the view button under the top band on the right */
+.mz-run, .mz-view { display: none; position: absolute; z-index: 5; border: 3px solid #2b2340; background: rgba(18, 20, 30, 0.82); color: #e8e0cc; font: 900 15px/1 'Fredoka', 'Nunito', sans-serif; letter-spacing: 0.04em; }
+#hud.mz-below.mz-touch .mz-run { display: grid; place-items: center; width: var(--slot-w, 60px); height: var(--slot-h, 60px); left: var(--slot-l, auto); top: var(--slot-t, auto); border-radius: 50%; touch-action: none; user-select: none; -webkit-user-select: none; }
+#hud.mz-below.mz-touch .mz-run.on { background: #e9a84a; color: #2b2340; }
+#hud.mz-below .mz-view { display: grid; place-items: center; width: 38px; height: 38px; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(var(--top-b, 60px) + 10px); border-radius: 50%; opacity: 0.85; }
+.mz-view-ico { width: 18px; height: 11px; border-radius: 50%; border: 3px solid #e8e0cc; position: relative; }
+.mz-view-ico::after { content: ''; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: #e8e0cc; transform: translate(-50%, -50%); }
+.mz-view[data-view="tp"] .mz-view-ico { border-radius: 3px; width: 14px; height: 14px; }
+.mz-view[data-view="tp"] .mz-view-ico::after { width: 4px; height: 7px; border-radius: 1px; top: 60%; }
+#hud.mz-below:not(.mz-touch) .mz-view { display: none; }
+
+/* the E button below: away from anything to use it crouches ("E  Crouch" / "E  Stand up"), quietly: no ring, no pulse,
+   the words small and dim. On touch it wears a crouch icon instead of the E (an arrow up while crouched); near a gate or the landing
+   it is the interact E again, with its words */
+#hud.mz-below.mz-crouch-act #btn-act::after { opacity: 0 !important; animation: none !important; }
+#hud.mz-below.mz-crouch-act #btn-act { filter: saturate(0.6) brightness(0.92); }
+#hud.mz-below.mz-crouch-act .act-name { opacity: 0.6; font-size: max(11px, calc(var(--s, 1) * 10px)); }
+#hud.mz-below.mz-touch.mz-crouch-act .act-name { display: none; }
+#hud.mz-below.mz-touch.mz-crouch-act .act-key { color: transparent; text-shadow: none; width: 70%; height: 70%; background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='20' cy='7' r='3.6' fill='white' stroke='none'/%3E%3Cpath d='M18 12.5 L12.5 19.5 L19.5 21.5 L18 28.5'/%3E%3Cpath d='M12.5 19.5 L9.5 27.5'/%3E%3Cpath d='M16 15.5 L22.5 18'/%3E%3C/g%3E%3C/svg%3E"); }
+#hud.mz-below.mz-touch.mz-crouch-act.mz-crouched .act-key { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 27 V7'/%3E%3Cpath d='M8.5 14 L16 6.5 L23.5 14'/%3E%3C/g%3E%3C/svg%3E"); }
+
+/* the week's goal (w16-goals): a strip under the distance line with the party's count (the slots fill as the things are found) */
+.mz-goal { display: flex; align-items: center; gap: 8px; padding: 3px 11px; border-radius: 99px; border: 2px solid rgba(233, 168, 74, 0.55); background: rgba(10, 12, 20, 0.72); font: 800 13px/1.2 'Nunito', sans-serif; color: #f3e6c8; letter-spacing: 0.02em; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+.mz-goal[hidden] { display: none; }
+.mz-goal.open { border-color: rgba(159, 214, 192, 0.7); color: #d6f0e4; }
+.mz-goal-slots { font-size: 13px; letter-spacing: 0.12em; color: #f2cf7a; }
+.mz-goal-slots[hidden] { display: none; }
+#hud.mz-touch .mz-goal { font-size: 12px; padding: 2px 9px; }
+
+/* ---- hud-loose: the breath bar, the distance line (with the goal strip under it) and the view button are HUD items (hud-items.js
+   breath, distance, mazeview; Andrew moves them in the HUD Editor), placed from --breath-*, --distance-*, --mazeview-* (hud-layout.js:
+   the line keeps to the bar). Size 1 is how they were: the line's words are its box's height, the bar never thinner than 9 px.
+   The places above are only the fallback */
+#hud[style*="--breath-l"] .mz-breath { left: var(--breath-l); top: var(--breath-t); width: var(--breath-w); height: max(9px, var(--breath-h)); transform: none; }
+#hud[style*="--distance-l"] .mz-hud { left: calc(var(--distance-l) + var(--distance-w) / 2); top: var(--distance-t); }
+#hud[style*="--distance-h"] .mz-dist { font-size: max(10px, var(--distance-h)); }
+#hud[style*="--mazeview-l"].mz-below .mz-view { left: var(--mazeview-l); top: var(--mazeview-t); right: auto; width: var(--mazeview-w); height: var(--mazeview-h); }

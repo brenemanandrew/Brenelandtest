@@ -1,0 +1,54 @@
+/* The crossword on the cracker barrel (crib-crossword.js): a printed sheet over the view. Cream paper with the ink outline and a
+   hard shadow; the grid on the left (or on top, upright), the clues and (on a touch screen) a big letter keyboard beside it. */
+.cw-sheet {
+  --ink: #2b2340; --paper: #fbf6e8; --lead: #5d5a66;
+  position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
+  background: rgba(30, 24, 20, 0.45); font-family: var(--font-body); color: var(--ink);
+  -webkit-user-select: none; user-select: none;
+}
+.cw-sheet[hidden], .cw-sheet [hidden] { display: none !important; }
+#hud.cw-on > :not(.cw-sheet):not(#toasts):not(.toasts) { visibility: hidden; }
+.cw-paper {
+  position: relative; box-sizing: border-box; display: flex; gap: var(--pad); padding: var(--pad);
+  background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; box-shadow: 0 5px 0 rgba(43, 35, 64, 0.85);
+  overflow: hidden;
+}
+.cw-paper.tall { flex-direction: column; }
+.cw-gridwrap { flex: none; display: flex; align-items: flex-start; justify-content: center; }
+.cw-paper.tall .cw-gridwrap { order: 2; width: auto !important; }
+.cw-grid { display: block; touch-action: none; outline: none; cursor: pointer; }
+.cw-grid:focus-visible { outline: 3px solid #f2cf7a; outline-offset: 3px; }
+.cw-side { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.cw-paper.tall .cw-side { display: contents; }
+.cw-head { order: 1; display: flex; align-items: center; gap: 10px; min-height: 30px; }
+.cw-title { font: 700 22px/1 var(--font-head); letter-spacing: 0.08em; }
+.cw-theme { flex: 1; font: 600 15px var(--font-body); color: var(--lead); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-close { flex: none; width: 44px; height: 44px; margin: -6px -4px -6px 0; border: 0; background: transparent; cursor: pointer; padding: 8px; border-radius: 22px; }
+.cw-close svg { width: 100%; height: 100%; stroke: var(--ink); stroke-width: 3; stroke-linecap: round; fill: none; }
+.cw-close:focus-visible { outline: 3px solid #f2cf7a; }
+.cw-cluebar { order: 3; min-height: 36px; box-sizing: border-box; padding: 6px 10px; border-radius: 10px; background: #fff0a8; border: 2px solid var(--ink); font: 700 15px/1.25 var(--font-body); }
+.cw-lists { order: 4; flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; align-content: start; }
+.cw-colhead { font: 700 16px var(--font-head); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 2px solid var(--ink); margin-bottom: 2px; }
+.cw-ol { list-style: none; margin: 0; padding: 0; }
+.cw-clue { padding: 3px 4px; border-radius: 6px; font: 500 14px/1.25 var(--font-body); cursor: pointer; }
+.cw-clue b { font-weight: 800; }
+.cw-clue.on { background: #fff0a8; }
+.cw-clue.done span:first-of-type { color: #6f6a7a; }
+.cw-by { display: block; margin-left: 1.4em; font: italic 600 12px var(--font-body); color: #7a7684; }
+.cw-by::before { content: '- '; }
+.cw-kb { order: 5; flex: none; display: flex; flex-direction: column; gap: 5px; }
+.cw-kbrow { display: flex; gap: 4px; justify-content: center; }
+.cw-key {
+  flex: 1 1 0; max-width: 46px; height: 42px; padding: 0; border: 2px solid var(--ink); border-radius: 8px; background: #fff;
+  font: 700 19px var(--font-head); color: var(--ink); box-shadow: 0 3px 0 rgba(43, 35, 64, 0.85); cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.cw-key.wide { flex: 1.6 1 0; max-width: 70px; }
+.cw-key.down { transform: translateY(2px); box-shadow: 0 1px 0 rgba(43, 35, 64, 0.85); background: #fff0a8; }
+.cw-pencil { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; }
+@media (max-height: 430px) {
+  .cw-title { font-size: 18px; }
+  .cw-clue { font-size: 13px; }
+  .cw-key { height: 36px; }
+  .cw-cluebar { font-size: 14px; min-height: 30px; padding: 4px 8px; }
+}

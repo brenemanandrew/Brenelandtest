@@ -1,0 +1,21 @@
+/* The toy wind-up meter (dog-toys.js) and the porch swing tips. Kid-friendly, chunky, readable on a phone. */
+.toy-meter {
+  position: fixed; left: 0; top: 0; z-index: 6; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  margin: -20px 0 0 46px; width: 84px; will-change: transform; /* to the right of your body, at chest height */
+}
+.toy-meter-bar {
+  display: block; width: 76px; height: 14px; border-radius: 999px; overflow: hidden;
+  background: rgba(43, 35, 64, 0.55); border: 3px solid var(--ink, #2b2340); box-shadow: 0 2px 0 var(--ink, #2b2340);
+}
+.toy-meter-fill {
+  display: block; height: 100%; width: calc(var(--p, 0) * 100%); border-radius: 999px;
+  background: linear-gradient(90deg, #7ddc7a, #ffd34d 60%, #ff8a3a);
+}
+.toy-meter-word {
+  font: 700 13px/1 var(--font-head, "Fredoka", sans-serif); color: #fff;
+  text-shadow: 0 2px 0 var(--ink, #2b2340), 0 0 3px var(--ink, #2b2340);
+}
+.toy-meter.full .toy-meter-bar { animation: toy-full 0.35s ease-in-out infinite alternate; }
+@keyframes toy-full { from { transform: scale(1); } to { transform: scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { .toy-meter.full .toy-meter-bar { animation: none; } }

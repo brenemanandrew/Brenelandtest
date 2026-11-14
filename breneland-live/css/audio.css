@@ -1,0 +1,19 @@
+/* The Sound block in the ? panel (audio-mixer.js). */
+.help-panel { max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; }
+.mix { border-top: 2.5px dashed rgba(43, 35, 64, 0.25); margin-top: 6px; padding-top: 10px; }
+.mix-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.mix-head h3 { font: 700 20px var(--font-head); margin: 0; }
+.mix-reset {
+  font: 800 13px var(--font-body); color: var(--muted); background: none; border: 2px solid rgba(43, 35, 64, 0.3);
+  border-radius: 10px; padding: 3px 10px; cursor: pointer;
+}
+.mix-reset:hover { color: var(--ink); border-color: var(--ink); }
+.mix-reset:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.mix-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+.mix-cell { min-width: 0; }
+.mix-top { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
+.mix-top label { color: var(--ink); cursor: pointer; }
+.mix-val { color: var(--muted); font: 700 13px var(--font-body); font-variant-numeric: tabular-nums; }
+.mix-hint { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.mix input[type="range"] { width: 100%; margin: 2px 0 0; accent-color: var(--accent); height: 22px; cursor: pointer; }
+@media (max-width: 520px) { .mix-grid { grid-template-columns: 1fr; } }

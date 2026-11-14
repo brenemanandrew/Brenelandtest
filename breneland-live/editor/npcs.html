@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>NPC Editor - Breneland</title>
+  <meta name="description" content="Dress the dogs, the folk and the unicorns of Breneland. Everyone here is drawn by the game's own code.">
+  <meta name="theme-color" content="#f3dcc0">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/npc-editor.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/three.module.js" } }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <header class="top">
+      <div class="brand">NPC Editor</div>
+      <div class="pick">
+        <button id="prev-npc" class="btn small arrow" type="button" title="The one before" aria-label="The one before">&lsaquo;</button>
+        <button id="pick-btn" class="pick-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="picker">
+          <span class="pick-dot" id="pick-dot"></span>
+          <span class="pick-txt"><span id="pick-name" class="pick-name">Dax</span><span id="pick-group" class="pick-group">Dogs</span></span>
+          <span class="pick-caret" aria-hidden="true"></span>
+        </button>
+        <button id="next-npc" class="btn small arrow" type="button" title="The next one" aria-label="The next one">&rsaquo;</button>
+      </div>
+      <div class="who">
+        <span id="who-name" class="who-name"></span>
+        <button id="login-btn" class="btn small" type="button">Log in</button>
+      </div>
+    </header>
+    <div id="picker" class="picker" role="dialog" aria-label="Who to edit" hidden></div>
+
+    <main>
+      <section class="stage" aria-label="The character">
+        <canvas id="view" aria-label="The character, drawn by the game"></canvas>
+        <img id="photo" alt="" hidden draggable="false">
+        <div class="stage-top">
+          <div class="seg" role="group" aria-label="View">
+            <button class="seg-btn" data-view="side" type="button">Side</button>
+            <button class="seg-btn" data-view="front" type="button">Front</button>
+            <button class="seg-btn" data-view="three" type="button">3/4</button>
+            <button class="seg-btn" data-view="top" type="button">Top</button>
+            <button class="seg-btn" data-view="back" type="button">Back</button>
+          </div>
+          <div class="seg" role="group" aria-label="Motion">
+            <button id="turn-btn" class="seg-btn" type="button" aria-pressed="false">Turn</button>
+            <button id="pause-btn" class="seg-btn" type="button" aria-pressed="false">Pause</button>
+            <button id="compare-btn" class="seg-btn hold" type="button">Hold: game now</button>
+          </div>
+        </div>
+        <div class="pose-bar" id="pose-bar" role="group" aria-label="Pose"></div>
+        <div class="photo-bar">
+          <label class="photo-pick">
+            <span>Photo</span>
+            <select id="photo-select"></select>
+          </label>
+          <label class="photo-op"><span>See-through</span><input id="photo-opacity" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+          <button id="photo-move" class="seg-btn" type="button" aria-pressed="false">Move photo</button>
+          <button id="photo-flip" class="seg-btn" type="button">Flip</button>
+          <button id="photo-rot" class="seg-btn" type="button">Rotate</button>
+          <button id="photo-front" class="seg-btn" type="button" aria-pressed="false">On top</button>
+          <input id="photo-file" type="file" accept="image/*" hidden>
+        </div>
+        <div class="stage-hint" id="stage-hint">Drag to turn, pinch or scroll to zoom</div>
+      </section>
+
+      <aside class="panel" aria-label="Shape tools">
+        <div class="actions">
+          <button id="undo-btn" class="btn small" type="button" title="Undo">Undo</button>
+          <button id="redo-btn" class="btn small" type="button" title="Redo">Redo</button>
+          <span class="spacer"></span>
+          <button id="save-btn" class="btn primary" type="button">Save to the game</button>
+          <button id="more-btn" class="btn small" type="button" aria-haspopup="menu" aria-expanded="false">More</button>
+        </div>
+        <div id="more-menu" class="menu" role="menu" hidden>
+          <button role="menuitem" data-act="export" type="button">Export as a file</button>
+          <button role="menuitem" data-act="import" type="button">Import a file</button>
+          <button role="menuitem" data-act="code" type="button">Copy as code</button>
+          <button role="menuitem" data-act="builtin" type="button">Start from the built-in look</button>
+          <button role="menuitem" data-act="gamenow" type="button">Start from what the game shows</button>
+          <button role="menuitem" data-act="forget" type="button">Forget what was saved</button>
+        </div>
+        <p id="status" class="status"></p>
+        <div id="groups" class="groups"></div>
+        <input id="import-file" type="file" accept="application/json,.json" hidden>
+      </aside>
+    </main>
+
+    <dialog id="login" class="dlg">
+      <form method="dialog" id="login-form">
+        <h2>Who are you?</h2>
+        <p class="dlg-text">Your Breneland name and PIN. Saving the NPCs is for Andrew.</p>
+        <label class="field"><span>Name</span><input id="login-name" maxlength="20" autocomplete="nickname" required></label>
+        <label class="field"><span>PIN</span><input id="login-pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required></label>
+        <p id="login-msg" class="dlg-msg"></p>
+        <div class="dlg-row">
+          <button class="btn" type="button" id="login-cancel">Not now</button>
+          <button class="btn primary" type="submit" id="login-go">Log in</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="code" class="dlg wide">
+      <h2>As code</h2>
+      <p class="dlg-text" id="code-where">Paste this over the same look in the code.</p>
+      <textarea id="code-text" readonly spellcheck="false"></textarea>
+      <div class="dlg-row">
+        <button class="btn" type="button" id="code-close">Close</button>
+        <button class="btn primary" type="button" id="code-copy">Copy</button>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+  <script type="module" src="/js/editor/npc-editor.js"></script>
+  <!-- tools-menu: "Back to Breneland" (to Andrew's tools menu) -->
+  <script src="/js/tools-back.js" data-into=".top"></script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+/* Voice chat (voice.js): the mic pill in the HUD, the talking badge on name tags, the "Use voice chat?" card, the
+   Settings > Voice chat page and the who's-here mute buttons. Tokens from style.css and hud.css. */
+
+/* ---------- the mic toggle: right of the chat bar (Andrew's HUD drawings), always there when voice chat can work ---------- */
+.mic-toggle {
+  position: relative; flex: none; width: 46px; height: 46px; padding: 0; border-radius: 50%; cursor: pointer; display: grid; place-items: center;
+  background: var(--hud-green); border: 3px solid var(--ink); box-shadow: 0 4px 0 var(--ink); color: var(--ink);
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background 0.15s, transform 0.08s;
+}
+.mic-toggle[hidden] { display: none; }
+.mic-ic {
+  display: block; width: 16px; height: 22px; background: var(--ink);
+  clip-path: path("M8 0 a4.5 4.5 0 0 1 4.5 4.5 v6 a4.5 4.5 0 0 1 -9 0 v-6 A4.5 4.5 0 0 1 8 0 Z M1 9.5 h2 a5 5 0 0 0 10 0 h2 a7 7 0 0 1 -6 6.9 V19 h3 v3 h-8 v-3 h3 v-2.6 A7 7 0 0 1 1 9.5 Z");
+}
+/* the word is for screen readers (and the tests); the picture says it */
+.mic-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mic-bars { display: none; position: absolute; right: -9px; top: -9px; align-items: flex-end; gap: 2px; height: 22px; padding: 2px 4px; border-radius: 99px; background: var(--paper); border: 2px solid var(--ink); }
+.mic-bars i { width: 3px; border-radius: 2px; background: #3d8f4a; height: calc(3px + var(--lvl, 0) * 10px); transition: height 0.06s; }
+.mic-bars i:nth-child(2) { height: calc(3px + var(--lvl, 0) * 13px); }
+.mic-bars i:nth-child(3) { height: calc(2px + var(--lvl, 0) * 8px); }
+.mic-toggle.talking .mic-bars { display: inline-flex; }
+.mic-toggle.talking { box-shadow: 0 4px 0 var(--ink), 0 0 0 5px rgba(168, 224, 107, 0.55); }
+/* a slash for off, muted and blocked */
+.mic-toggle.off, .mic-toggle.muted, .mic-toggle.blocked { background: #e8e2f0; }
+.mic-toggle.muted { background: #ffb3b3; }
+.mic-toggle.off .mic-ic, .mic-toggle.blocked .mic-ic { background: #6d6480; }
+.mic-toggle.off::after, .mic-toggle.muted::after, .mic-toggle.blocked::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 30px; height: 4px; margin: -2px 0 0 -15px; border-radius: 2px;
+  background: #e0463c; box-shadow: 0 0 0 2px var(--paper); transform: rotate(-45deg);
+}
+.mic-toggle.asking { background: #ffe0b8; }
+.mic-toggle.ptt { background: #ffe0b8; }
+.mic-toggle.ptt.talking { background: var(--hud-green); }
+.mic-toggle:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+.mic-toggle:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 3px; }
+
+/* ---------- someone is talking: sound waves beside the name tag ---------- */
+.tag3d.talking { border-color: var(--hud-green, #a8e06b); box-shadow: 0 0 0 2px rgba(168, 224, 107, 0.45); }
+.tag3d.talking::after {
+  content: ""; position: absolute; right: -19px; top: 50%; width: 14px; height: 16px; margin-top: -8px; background: #a8e06b;
+  clip-path: path("M1 6 h3 v4 h-3 z M6 3 q4 5 0 10 l1.6 1.2 q5 -6.2 0 -12.4 z M9.6 0.2 q6.2 7.8 0 15.6 l1.6 1.2 q7.3 -9 0 -18 z");
+  animation: vc-wave 0.6s ease-in-out infinite alternate;
+}
+@keyframes vc-wave { from { opacity: 0.55; transform: translateX(-1px); } to { opacity: 1; transform: translateX(1px); } }
+@media (prefers-reduced-motion: reduce) { .tag3d.talking::after { animation: none; } }
+
+/* ---------- "Use voice chat?" (asked once) ---------- */
+.voice-ask { z-index: 30; }
+.va-panel { width: min(420px, 100%); text-align: center; background: #fffdf5; padding: 22px 22px 20px; }
+.va-panel h2 { font: 700 27px var(--font-head); margin: 4px 0 8px; }
+.va-panel p { font: 700 16px/1.4 var(--font-body); margin: 0 0 16px; color: var(--ink); }
+.va-ic {
+  display: block; margin: 0 auto; width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--ink); background: var(--hud-green);
+  box-shadow: 0 4px 0 var(--ink); position: relative;
+}
+.va-ic::before {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 22px; height: 31px; margin: -16px 0 0 -11px; background: var(--ink);
+  clip-path: path("M11 0 a6 6 0 0 1 6 6 v8 a6 6 0 0 1 -12 0 v-8 A6 6 0 0 1 11 0 Z M1.5 13 h2.6 a6.9 6.9 0 0 0 13.8 0 h2.6 a9.5 9.5 0 0 1 -8.2 9.4 V27 h4 v4 h-11 v-4 h4 v-4.6 A9.5 9.5 0 0 1 1.5 13 Z");
+}
+.va-btns { display: flex; gap: 10px; justify-content: center; }
+.va-btns .btn { min-width: 128px; font-size: 19px; padding: 11px 18px; }
+.va-btns .btn:focus { outline: 4px solid var(--accent-2); outline-offset: 3px; }
+
+/* ---------- Settings > Voice chat ---------- */
+.vc-line { flex-wrap: wrap; }
+.vc-line[hidden] { display: none; }
+.vc-line .set-line-t { min-width: 180px; }
+.vc-sens .set-line-t, .vc-vol .set-line-t { flex-basis: 100%; }
+.vc-sensbox, .vc-volbox { flex: 1 1 100%; display: grid; gap: 8px; }
+.vc-volbox { grid-template-columns: 1fr auto; align-items: center; }
+.vc-line input[type="range"] { width: 100%; margin: 0; height: 28px; accent-color: var(--accent); cursor: pointer; }
+.vc-volout { font: 700 16px var(--font-head); min-width: 48px; text-align: right; }
+.vc-meter { position: relative; height: 16px; border: 3px solid var(--ink); border-radius: 99px; background: #efe9f6; overflow: hidden; }
+.vc-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--hud-sky); }
+.vc-meter.open .vc-fill { background: var(--hud-green); }
+.vc-thr { position: absolute; top: -2px; bottom: -2px; width: 4px; margin-left: -2px; background: var(--ink); border-radius: 2px; }
+.vc-keys { font: 700 15px/1.35 var(--font-body); flex: 1 1 220px; }
+.vc-micbtn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; padding: 8px 14px; }
+.vc-status { margin: 0; padding: 9px 14px; border: 2.5px dashed rgba(43, 35, 64, 0.35); border-radius: 16px; font: 700 14px/1.35 var(--font-body); background: #fff3d6; }
+
+/* ---------- who is here: a mic for players with voice on, and a Mute button ---------- */
+.who-row .who-mic { width: 11px; height: 15px; border: 0; border-radius: 0; background: var(--ink); flex: none; margin-left: auto;
+  clip-path: path("M5.5 0 a3 3 0 0 1 3 3 v4 a3 3 0 0 1 -6 0 v-4 A3 3 0 0 1 5.5 0 Z M0.5 6.5 h1.4 a3.6 3.6 0 0 0 7.2 0 h1.4 a5 5 0 0 1 -4.3 4.9 V13 h2 v2 h-5.4 v-2 h2 v-1.6 A5 5 0 0 1 0.5 6.5 Z"); }
+.who-row .who-mic[hidden] { display: none; }
+.who-mute {
+  margin-left: 6px; font: 700 13px var(--font-head); padding: 3px 10px; border: 2.5px solid var(--ink); border-radius: 99px; background: #fff;
+  color: var(--ink); cursor: pointer; box-shadow: 0 2px 0 var(--ink);
+}
+.who-row .who-mic + .who-mute, .who-row .who-mic[hidden] + .who-mute { margin-left: auto; }
+.who-row .who-mic:not([hidden]) + .who-mute { margin-left: 6px; }
+.who-mute[aria-pressed="true"] { background: #ffb3b3; }
+.who-mute:focus-visible { outline: 3px solid var(--accent-2); outline-offset: 2px; }
+.who-row.muted span { text-decoration: line-through; opacity: 0.6; }

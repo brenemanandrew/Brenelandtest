@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>HUD Editor - Breneland</title>
+  <meta name="description" content="Move, size and tune the pieces of Breneland's HUD on every layout, and save it to the game.">
+  <meta name="theme-color" content="#f3dcc0">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/hud-editor.css">
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <div class="brand">HUD Editor</div>
+      <label class="pick"><span class="sr-only">Layout</span>
+        <select id="layout" aria-label="Which layout">
+          <option value="phone-portrait">Phone upright</option>
+          <option value="phone-landscape">Phone sideways</option>
+          <option value="tablet-ipad">Tablet (iPad)</option>
+          <option value="tablet-surface">Tablet (Surface)</option>
+          <option value="pc-16x10">PC 16:10</option>
+          <option value="pc-16x9">PC 16:9</option>
+          <option value="pad">Gamepad</option>
+        </select>
+      </label>
+      <!-- dnd-ui3: the D&D table's layout (js/editor/dnd-layout-editor.js) -->
+      <button id="dnd-tab" class="btn small tog" type="button" aria-pressed="false" title="Lay out the D&amp;D table (its own screen)">D&amp;D table</button>
+      <!-- table-games: the board games' overlay frame (js/editor/tg-layout-editor.js) -->
+      <button id="tg-tab" class="btn small tog" type="button" aria-pressed="false" title="Lay out the board games' overlay (Mexican Train and every table game)">Table games</button>
+      <div class="tools" id="toolbar">
+        <button id="undo" class="btn small" type="button" title="Undo (Ctrl+Z)">Undo</button>
+        <button id="redo" class="btn small" type="button" title="Redo (Ctrl+Y)">Redo</button>
+        <button id="snap" class="btn small tog on" type="button" aria-pressed="true" title="Snap to the edges and to the other pieces">Snap</button>
+        <button id="guides" class="btn small tog on" type="button" aria-pressed="true" title="The safe area">Guides</button>
+        <button id="kbd" class="btn small tog" type="button" aria-pressed="false" title="Where the on-screen keyboard sits">Keyboard</button>
+        <span class="sep"></span>
+        <button id="try" class="btn small" type="button" title="Open the game in a new tab with this layout, unsaved">Try it</button>
+        <button id="download" class="btn small" type="button" title="Download this layout as JSON (the docs/refs format)">Download JSON</button>
+        <button id="import" class="btn small" type="button" title="Load a layout JSON file into this layout">Import</button>
+        <input id="file" type="file" accept=".json,application/json" hidden>
+        <button id="reset" class="btn small danger" type="button" title="Every item back to the built-in layout (Save to make it so in the game)">Reset layout to built-in</button>
+        <button id="save" class="btn small primary" type="button">Save to game</button>
+      </div>
+      <div id="keyrow" hidden><input id="key" type="password" placeholder="edit key" autocomplete="off" aria-label="Edit key"><button id="keyok" class="btn small" type="button">OK</button></div>
+      <div id="status" role="status">Loading the game...</div>
+      <nav class="links"><a href="/editor/world.html">World Editor</a><a href="/editor/npcs.html">NPC Editor</a><a href="/">The game</a></nav>
+    </header>
+    <main id="wrap">
+      <section id="stage" aria-label="The HUD">
+        <div id="frame">
+          <iframe id="game" title="The game, with its HUD" allow="fullscreen"></iframe>
+          <div id="guide-layer" aria-hidden="true"></div>
+          <div id="overlay"></div>
+        </div>
+        <div id="show" class="show" aria-label="Popouts to show"></div>
+      </section>
+      <aside id="insp" aria-label="The selected piece">
+        <div class="insp-grip" aria-hidden="true"></div>
+        <div id="insp-body"><p class="muted">Tap a piece to move it. Drag its corner to size it. Arrow keys nudge 1 px.</p></div>
+      </aside>
+    </main>
+    <main id="dnd-ed" hidden aria-label="The D&amp;D table's layout"></main>
+    <main id="tg-ed" hidden aria-label="The table games' overlay layout"></main>
+  </div>
+  <script type="module" src="/js/editor/hud-editor.js"></script>
+  <script type="module" src="/js/editor/dnd-layout-editor.js"></script>
+  <script type="module" src="/js/editor/tg-layout-editor.js"></script>
+  <!-- tools-menu: "Back to Breneland" (to Andrew's tools menu) -->
+  <script src="/js/tools-back.js" data-into="#top"></script>
+</body>
+</html>

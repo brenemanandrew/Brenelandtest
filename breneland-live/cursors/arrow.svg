@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+<defs><g id="ar"><path d="M11 9 L11 64 Q11 68 14.5 65.5 L24 55 L32.5 73 Q34 76 37.5 74.5 L43.5 71.5 Q47 70 45.5 66.5 L37 49 L52 49 Q57 49 53.5 44.5 L15 9.5 Q11 5.5 11 9 Z"/></g></defs>
+<use href="#ar" transform="translate(1 5)" fill="#2b2340" stroke="#2b2340" stroke-width="9" stroke-linejoin="round" opacity="0.32"/>
+<use href="#ar" fill="#2b2340" stroke="#2b2340" stroke-width="9" stroke-linejoin="round"/>
+<use href="#ar" fill="#fff8ec" stroke="none"/><path d="M14.5 17 L14.5 59 L22 51.5 L27 46 Z" fill="#f1dfbd" opacity="0.9"/>
+</svg>

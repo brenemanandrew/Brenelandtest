@@ -1,0 +1,55 @@
+/* Beneath Angell Street, the investigators: the lineup of heads on the way down, the card a head opens, and below
+   the Librarian's map (bottom right) and the Mystic's heart */
+.mzi { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(700px, 96vw); max-height: 94vh; overflow: auto; padding: 18px 18px 14px; z-index: 9; text-align: center;
+  font-family: 'Nunito', sans-serif; color: #e8dcc0; border: 2px solid #6b5436; border-radius: 14px;
+  background: radial-gradient(ellipse at 50% 0%, rgba(233, 168, 74, 0.16), rgba(0, 0, 0, 0) 60%), radial-gradient(ellipse at 50% 120%, rgba(60, 120, 90, 0.12), rgba(0, 0, 0, 0) 55%), #15120e;
+  box-shadow: 0 0 0 4px #0b0907, 0 18px 50px rgba(0, 0, 0, 0.7), inset 0 0 60px rgba(0, 0, 0, 0.75); }
+.mzi[hidden] { display: none; }
+.mzi-title { font-family: 'Special Elite', 'Fredoka', serif; font-size: 27px; font-weight: 700; color: #e9c27a; letter-spacing: 0.03em; text-shadow: 0 0 14px rgba(233, 168, 74, 0.35); }
+.mzi-sub { font-family: 'Special Elite', serif; font-size: 13px; margin: 3px 0 14px; color: #a8987a; letter-spacing: 0.04em; }
+.mzi-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+/* each head an old photograph on card stock, a typed label under it */
+.mzi-head { width: 92px; padding: 6px 6px 7px; border: 0; border-radius: 3px; background: linear-gradient(#efe5cc, #ddd0b0); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-family: inherit; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(120, 90, 40, 0.25); transform: rotate(-1.4deg); transition: transform 0.15s, box-shadow 0.15s; }
+.mzi-head:nth-child(even) { transform: rotate(1.2deg); }
+.mzi-head:focus-visible, .mzi-head:hover { outline: none; transform: rotate(0deg) translateY(-3px) scale(1.04); box-shadow: 0 0 0 2px #e9a84a, 0 0 18px rgba(233, 168, 74, 0.55), 0 6px 14px rgba(0, 0, 0, 0.6); }
+.mzi-head.on { transform: rotate(0deg) translateY(-3px) scale(1.04); box-shadow: 0 0 0 3px #e9a84a, 0 0 22px rgba(233, 168, 74, 0.6); }
+.mzi-pic { position: relative; width: 80px; height: 92px; border-radius: 2px; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, #5c4a36, #1a140e 75%); display: grid; place-items: center; }
+.mzi-pic canvas { width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(0.35) contrast(1.06) saturate(0.85); }
+.mzi-pic::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 18px 6px rgba(20, 12, 4, 0.75); pointer-events: none; }
+.mzi-q { font: 400 42px/1 'Special Elite', serif; color: #e9c27a; text-shadow: 0 0 12px rgba(233, 168, 74, 0.6); }
+.mzi-name { font: 700 12px/1.1 'Special Elite', serif; color: #2a1f14; letter-spacing: 0.02em; }
+.mzi-by { font: 11px/1.1 'Special Elite', serif; color: #7a6448; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mzi-head.taken { cursor: default; }
+.mzi-head.taken .mzi-pic canvas { filter: grayscale(1) brightness(0.55); }
+.mzi-pic[data-stamp]::before { content: attr(data-stamp); position: absolute; z-index: 1; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-18deg); padding: 1px 6px; border: 2px solid #b0302a;
+  color: #c9403a; font: 700 15px/1.2 'Special Elite', serif; letter-spacing: 0.12em; text-transform: uppercase; background: rgba(240, 225, 200, 0.12); }
+/* the card a head opens: a typed case file */
+.mzi-info { margin: 16px auto 0; max-width: 540px; padding: 14px 18px 12px; border-radius: 2px; text-align: left; color: #2e2418;
+  background: repeating-linear-gradient(transparent 0 23px, rgba(110, 80, 40, 0.12) 23px 24px), linear-gradient(#f1e6c8, #e2d3ae);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(130, 95, 40, 0.25); transform: rotate(-0.4deg); }
+.mzi-info[hidden] { display: none; }
+.mzi-role { font-family: 'Special Elite', serif; font-size: 21px; color: #2a1f14; }
+.mzi-kind { font: 700 11px/1 'Special Elite', serif; letter-spacing: 0.18em; text-transform: uppercase; color: #8e2f2a; margin: 2px 0 6px; }
+.mzi-premise { font-size: 14px; font-style: italic; margin: 4px 0 8px; color: #4a3a26; }
+.mzi-line { font-size: 14px; margin: 3px 0; }
+.mzi-line b { font-family: 'Special Elite', serif; font-weight: 400; color: #6b3a1e; }
+.mzi-takenby { font: 13px 'Special Elite', serif; color: #a02c26; margin: 6px 0 0; }
+.mzi-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; flex-wrap: wrap; }
+.mzi .btn { background: #2a2118; color: #f0e2c0; border: 2px solid #8a6a3a; box-shadow: 0 3px 0 #0b0907; font-family: 'Special Elite', 'Fredoka', serif; }
+.mzi .btn.primary { background: #c98a3a; color: #1c140c; border-color: #f0c070; }
+.mzi .btn:focus-visible { outline: 2px solid #e9c27a; outline-offset: 2px; }
+.mzi-btns .btn[disabled] { opacity: 0.45; cursor: default; }
+.mzi-foot { margin-top: 14px; display: flex; justify-content: center; }
+
+/* below: the Librarian's map in the bottom-right corner (on a phone, up above the E and run buttons) */
+.mzi-map { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); z-index: 4; pointer-events: none; padding: 4px; border-radius: 10px; border: 2px solid #2b2340; background: rgba(10, 12, 20, 0.55); }
+#hud:not(.mz-below) .mzi-map, #hud:not(.mz-below) .mzi-heart { display: none; }
+#hud.mz-below.mz-touch .mzi-map { bottom: auto; top: calc(var(--top-b, 60px) + 58px); }
+.mzi-map canvas { display: block; width: 152px; height: 152px; image-rendering: pixelated; }
+.mzi-map-cap { font: 800 11px/1 'Nunito', sans-serif; color: #e8e0cc; text-align: center; margin-top: 3px; text-shadow: 0 1px 0 #06070c; }
+/* the Mystic's heart: faint until a ghoul is near, a thump on each beat */
+.mzi-heart { position: absolute; left: 50%; top: calc(max(10px, env(safe-area-inset-top, 0px)) + 44px); transform: translateX(-50%); z-index: 4; pointer-events: none; font: 900 22px/1 'Fredoka', sans-serif; color: #c9503a; opacity: 0; transition: opacity 0.4s; text-shadow: 0 0 8px rgba(0, 0, 0, 0.8); }
+.mzi-heart.on { opacity: 0.55; }
+.mzi-heart.beat { animation: mzi-thump 0.32s ease-out; }
+@keyframes mzi-thump { 0% { transform: translateX(-50%) scale(1); opacity: 1; } 35% { transform: translateX(-50%) scale(1.35); opacity: 1; } 100% { transform: translateX(-50%) scale(1); } }

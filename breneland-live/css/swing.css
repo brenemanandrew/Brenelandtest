@@ -1,0 +1,257 @@
+/* Tire swing HUD: the height gauge, grip bar, pump button, coach card and the pop-up words. */
+#hud > .swing-hud { position: absolute; inset: 0; pointer-events: none; z-index: 11; }
+.swing-hud[hidden] { display: none; }
+.swing-hud.fly .swing-gauge, .swing-hud.fly .swing-side, .swing-hud.fly .swing-coach { display: none; }
+
+.swing-gauge {
+  position: absolute; left: 50%; bottom: 18px; width: 268px; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 4px; padding: 10px 12px 10px;
+  background: var(--paper, #fff8ec); border: 3px solid var(--ink, #2b2340); border-radius: 22px 22px 16px 16px;
+  box-shadow: 0 5px 0 var(--ink, #2b2340);
+  animation: swing-rise 0.35s cubic-bezier(.3, 1.4, .5, 1);
+}
+.swing-gauge svg { width: 100%; height: auto; display: block; overflow: visible; }
+.swing-gauge.hot { animation: swing-shake 0.14s linear infinite; background: #ffe9df; }
+.swing-gauge.doomed { animation: swing-shake 0.08s linear infinite; background: #ffd9d0; }
+.swing-gauge .g-bg-green { fill: #cfe8c0; } .swing-gauge .g-bg-yellow { fill: #f6e8ae; } .swing-gauge .g-bg-red { fill: #f4c4b9; }
+.swing-gauge .g-green { fill: #5fbf5a; } .swing-gauge .g-yellow { fill: #f2c73a; } .swing-gauge .g-red { fill: #e5533f; }
+.swing-gauge .g-rim { fill: none; stroke: var(--ink, #2b2340); stroke-width: 3; stroke-linejoin: round; }
+.swing-gauge .g-tick { stroke: var(--ink, #2b2340); stroke-width: 2; stroke-linecap: round; }
+.swing-gauge .g-num { font: 700 11px var(--font-head, "Fredoka", sans-serif); fill: var(--muted, #6d6480); text-anchor: middle; }
+.swing-gauge .g-needle { stroke: var(--ink, #2b2340); stroke-width: 4.5; stroke-linecap: round; }
+.swing-gauge .g-hub { fill: var(--ink, #2b2340); }
+.swing-gauge .g-best { fill: #fff; stroke: var(--ink, #2b2340); stroke-width: 2.5; stroke-linejoin: round; }
+.swing-gauge .g-read { font: 700 30px var(--font-head, "Fredoka", sans-serif); fill: var(--ink, #2b2340); text-anchor: middle; }
+.swing-gauge .g-cap { font: 700 10px var(--font-head, "Fredoka", sans-serif); fill: var(--muted, #6d6480); text-anchor: middle; letter-spacing: 0.12em; }
+.swing-gauge.hot .g-cap, .swing-gauge.doomed .g-cap { fill: #d23a26; font-size: 12px; }
+
+.swing-stats { display: flex; justify-content: space-between; width: 100%; padding: 0 6px; font: 700 13px var(--font-head, "Fredoka", sans-serif); color: var(--muted, #6d6480); }
+.swing-stats b { color: var(--ink, #2b2340); font-size: 15px; }
+.swing-stats i { font-style: normal; }
+.swing-stats .sw-short { display: none; }
+#hud[data-layout="phone"] .swing-stats .sw-short { display: inline; }
+
+.swing-grip { width: 100%; display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font: 700 11px var(--font-head, "Fredoka", sans-serif); letter-spacing: 0.1em; color: var(--muted, #6d6480); transition: opacity 0.3s; }
+.swing-grip .bar { height: 12px; border: 2.5px solid var(--ink, #2b2340); border-radius: 99px; background: #fff; overflow: hidden; }
+.swing-grip .bar i { display: block; height: 100%; width: 100%; background: #5fbf5a; transform-origin: left; transition: background 0.15s; }
+.swing-grip.low .bar i { background: #f2a53a; }
+.swing-grip.crit .bar i { background: #e5533f; }
+.swing-grip.crit { color: #d23a26; animation: swing-shake 0.1s linear infinite; }
+.swing-grip.calm { opacity: 0.55; }
+
+.swing-side { position: absolute; right: 16px; bottom: 78px; display: grid; justify-items: center; gap: 10px; pointer-events: none; }
+.swing-pump {
+  pointer-events: auto; position: relative; width: 92px; height: 92px; border-radius: 50%;
+  border: 4px solid var(--ink, #2b2340); background: var(--accent, #e8743a); color: #fff; cursor: pointer; padding: 0;
+  font: 700 20px/1 var(--font-head, "Fredoka", sans-serif); letter-spacing: 0.04em; text-shadow: 0 2px 0 rgba(43, 35, 64, 0.5);
+  box-shadow: 0 6px 0 var(--ink, #2b2340); touch-action: manipulation; user-select: none;
+  transition: transform 0.06s, box-shadow 0.06s, background 0.12s;
+}
+.swing-pump small { display: block; margin-top: 3px; font: 700 11px var(--font-body, "Nunito", sans-serif); opacity: 0.85; text-shadow: none; letter-spacing: 0.05em; }
+.swing-pump:active, .swing-pump.press { transform: translateY(4px); box-shadow: 0 2px 0 var(--ink, #2b2340); }
+/* the ring is the timing cue: it swells and glows as the tire swoops through the bottom of the arc */
+.swing-pump::before {
+  content: ""; position: absolute; inset: -12px; border-radius: 50%; pointer-events: none;
+  border: 5px solid #ffd34d; opacity: calc(var(--q, 0) * 0.95); transform: scale(calc(1.18 - var(--q, 0) * 0.16));
+  box-shadow: 0 0 calc(var(--q, 0) * 22px) #ffd34d;
+}
+.swing-pump.now { background: #f2a53a; }
+.swing-hop {
+  pointer-events: auto; font: 700 15px var(--font-head, "Fredoka", sans-serif); color: var(--ink, #2b2340); cursor: pointer;
+  background: #fff; border: 3px solid var(--ink, #2b2340); border-radius: 12px; padding: 6px 14px; box-shadow: 0 4px 0 var(--ink, #2b2340);
+}
+.swing-hop:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink, #2b2340); }
+.swing-hop kbd { margin-left: 6px; }
+.swing-pump:focus-visible, .swing-hop:focus-visible { outline: 3px solid var(--accent-2, #3f8fd9); outline-offset: 3px; }
+
+.swing-coach {
+  position: absolute; left: 50%; bottom: 218px; transform: translateX(-50%); display: grid; gap: 4px; padding: 8px 14px;
+  font: 700 14px var(--font-body, "Nunito", sans-serif); color: #fff; background: rgba(43, 35, 64, 0.78); border-radius: 14px;
+  transition: opacity 0.6s; pointer-events: none; white-space: nowrap;
+}
+.swing-coach.off { opacity: 0; }
+.swing-coach kbd { margin: 0 8px 0 0; }
+
+.swing-flash {
+  position: absolute; left: 50%; top: 27%; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+  font: 700 40px var(--font-head, "Fredoka", sans-serif); color: #fff; letter-spacing: 0.02em;
+  text-shadow: 0 4px 0 var(--ink, #2b2340), 3px 0 0 var(--ink, #2b2340), -3px 0 0 var(--ink, #2b2340), 0 -3px 0 var(--ink, #2b2340), 3px 3px 0 var(--ink, #2b2340), -3px 3px 0 var(--ink, #2b2340);
+  animation: swing-flash 0.95s cubic-bezier(.2, 1.2, .4, 1) forwards;
+}
+.swing-flash.perfect { color: #ffd34d; font-size: 46px; }
+.swing-flash.good { color: #8ee070; }
+.swing-flash.meh { color: #e8e2f2; font-size: 30px; }
+.swing-flash.bad { color: #ff7a66; font-size: 32px; }
+.swing-flash.big { color: #ff6fa8; font-size: 54px; }
+
+@keyframes swing-rise { from { transform: translate(-50%, 24px); opacity: 0; } }
+@keyframes swing-flash {
+  0% { transform: translate(-50%, 16px) scale(0.4); opacity: 0; }
+  18% { transform: translate(-50%, -6px) scale(1.18); opacity: 1; }
+  32% { transform: translate(-50%, -2px) scale(1); }
+  100% { transform: translate(-50%, -54px) scale(1); opacity: 0; }
+}
+@keyframes swing-shake { 0% { translate: 0 0; } 25% { translate: -2px 1px; } 50% { translate: 2px -1px; } 75% { translate: -1px -2px; } 100% { translate: 0 0; } }
+
+/* ---- where it all sits, per HUD layout (ref: docs/refs/andrew-phone-swing-hud.jpg). The camera frames the swing between
+   the top of the HUD and the meter (swing-hud.js band()), so nothing here may reach into the middle of the screen. Seated,
+   the E, the jump, the tools and the emote smiley step aside, and come back when the swing HUD is hidden again. */
+#hud:has(> .swing-hud:not([hidden])) #btn-act,
+#hud:has(> .swing-hud:not([hidden])) .jump,
+#hud:has(> .swing-hud:not([hidden])) > .toolring,
+#hud:has(> .swing-hud:not([hidden])) .tg-emotes,
+#hud:has(> .swing-hud:not([hidden])) #emote-wheel { display: none !important; }
+
+/* PC: the meter a little smaller at the bottom centre, PUMP and Hop off in the E's place over fish and treats, the coach a
+   small banner at the top centre (it fades after a few seconds), the pop-up words over the meter */
+#hud[data-layout="pc"] .swing-gauge { width: 228px; padding: 8px 10px; left: 61%; } /* right of the chat bar and its mic */
+#hud[data-layout="pc"] .swing-side { right: 22px; bottom: 82px; }
+#hud[data-layout="pc"] .swing-coach, #hud[data-layout="pad"] .swing-coach { top: max(14px, var(--safe-t)); bottom: auto; padding: 6px 14px; font-size: 13px; }
+#hud[data-layout="pc"] .swing-flash, #hud[data-layout="pad"] .swing-flash { top: auto; bottom: 150px; font-size: 34px; }
+#hud[data-layout="pc"] .swing-flash.perfect, #hud[data-layout="pad"] .swing-flash.perfect { font-size: 40px; }
+#hud[data-layout="pad"] .swing-side { right: 16px; bottom: 270px; }
+
+/* phone: the meter about 75% of its old size in the bottom-left over the chat, PUMP in the jump's place with Hop off over
+   it, the coach a small card top-left beside the minimap, the pop-up words over the meter */
+#hud[data-layout="phone"] .swing-gauge { left: 12px; bottom: calc(var(--safe-b) + 118px); width: 172px; transform: none; padding: 5px 8px 7px; gap: 1px; border-width: 2.5px; border-radius: 18px 18px 13px 13px; box-shadow: 0 4px 0 var(--ink, #2b2340); animation-name: swing-rise-phone; }
+#hud[data-layout="phone"] .swing-gauge .g-num { font-size: 16px; }
+#hud[data-layout="phone"] .swing-gauge .g-read { font-size: 38px; }
+#hud[data-layout="phone"] .swing-gauge .g-cap { font-size: 14px; }
+#hud[data-layout="phone"] .swing-gauge.hot .g-cap, #hud[data-layout="phone"] .swing-gauge.doomed .g-cap { font-size: 16px; }
+#hud[data-layout="phone"] .swing-stats { font-size: 11px; padding: 0 2px; }
+#hud[data-layout="phone"] .swing-stats b { font-size: 13px; }
+#hud[data-layout="phone"] .swing-stats .sw-long { display: none; }
+#hud[data-layout="phone"] .swing-grip { font-size: 10px; gap: 6px; }
+#hud[data-layout="phone"] .swing-grip .bar { height: 10px; border-width: 2px; }
+#hud[data-layout="phone"] .swing-side { right: calc(var(--safe-r) + 12px); bottom: calc(var(--safe-b) + 52px); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#hud[data-layout="phone"] .swing-hop { order: -1; font-size: 15px; padding: 7px 14px; }
+#hud[data-layout="phone"] .swing-pump { width: 80px; height: 80px; font-size: 19px; }
+#hud[data-layout="phone"] .swing-coach { top: calc(var(--top-b, 120px) + 8px); bottom: auto; left: 12px; transform: none; width: calc(100vw - 24px); max-width: 360px; box-sizing: border-box; white-space: normal; gap: 3px; padding: 6px 10px; font-size: 12px; line-height: 1.3; border-radius: 12px; }
+/* the quest list opens in the same corner: a list you opened hides the coach; one that pops open by itself stays folded while
+   you swing (it would sit over the top of the screen) */
+#hud[data-layout="phone"]:has(.quests:not(.collapsed):not(.popping)) .swing-coach { display: none; }
+#hud[data-layout="phone"]:has(> .swing-hud:not([hidden])) .quests.popping .qt-body { display: none; }
+#hud[data-layout="phone"] .swing-flash { top: auto; left: calc(12px + 86px); bottom: calc(var(--safe-b) + 196px); font-size: 30px; }
+#hud[data-layout="phone"] .swing-flash.perfect { font-size: 34px; }
+#hud[data-layout="phone"] .swing-flash.big { font-size: 38px; }
+#hud[data-layout="phone"] .swing-flash.meh, #hud[data-layout="phone"] .swing-flash.bad { font-size: 26px; }
+@keyframes swing-rise-phone { from { transform: translateY(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .swing-gauge.hot, .swing-gauge.doomed, .swing-grip.crit { animation: none !important; }
+  .swing-flash { animation-duration: 0.6s !important; }
+}
+
+/* the "E Push Alice" hint lights up when a shove would land well */
+#hint.swing-go { background: var(--accent, #e8743a); box-shadow: 0 0 0 3px #ffd34d, 0 0 18px #ffd34d; animation: swing-pulse 0.5s ease-in-out infinite alternate; }
+@keyframes swing-pulse { from { transform: translateX(-50%) scale(1); } to { transform: translateX(-50%) scale(1.07); } }
+@media (prefers-reduced-motion: reduce) { #hint.swing-go { animation: none; } }
+
+/* ---- the beat arc over PUMP, the height tiers, the distance in the air and the landing's score pop ---- */
+/* the beat: the swing's own arc, a little tire riding it, the sweet spot at the bottom right over the PUMP button */
+.swing-beat { width: 156px; margin-bottom: -6px; pointer-events: none; }
+.swing-beat svg { display: block; width: 100%; height: auto; overflow: visible; }
+.swing-beat .b-rail-ink { fill: none; stroke: var(--ink, #2b2340); stroke-width: 13; stroke-linecap: round; }
+.swing-beat .b-rail { fill: none; stroke: #fff8ec; stroke-width: 7.5; stroke-linecap: round; }
+.swing-beat .b-zone { fill: none; stroke: #8ee070; stroke-width: 7.5; stroke-linecap: round; transition: stroke 0.08s; }
+.swing-beat .b-arrow { fill: #8ee070; stroke: var(--ink, #2b2340); stroke-width: 2.5; stroke-linejoin: round; transition: fill 0.08s; }
+.swing-beat .b-tire circle { fill: #3d3d4a; stroke: var(--ink, #2b2340); stroke-width: 2.5; }
+.swing-beat .b-tire circle.b-hole { fill: #fff8ec; stroke: none; }
+.swing-beat.now .b-zone { stroke: #ffd34d; }
+.swing-beat.now .b-arrow { fill: #ffd34d; animation: swing-beat-bob 0.22s ease-in-out infinite alternate; }
+.swing-beat.now .b-tire circle:not(.b-hole) { stroke: #ffb020; }
+.swing-beat.hit-perfect .b-zone { animation: swing-zone-burst 0.45s ease-out; }
+.swing-beat.hit-good .b-zone { animation: swing-zone-good 0.35s ease-out; }
+.swing-beat.hit-bad .b-rail { animation: swing-rail-miss 0.35s ease-out; }
+@keyframes swing-beat-bob { to { translate: 0 3px; } }
+@keyframes swing-zone-burst { 0% { stroke: #fff; stroke-width: 16; } 100% { stroke-width: 7.5; } }
+@keyframes swing-zone-good { 0% { stroke: #c8ffb0; stroke-width: 12; } 100% { stroke-width: 7.5; } }
+@keyframes swing-rail-miss { 0% { stroke: #ffb3a6; } 100% { stroke: #fff8ec; } }
+/* the button bounces on the beat (the scale property, so it never fights the press's transform) */
+.swing-pump.now { animation: swing-pump-beat 0.3s cubic-bezier(.3, 1.6, .5, 1) forwards; }
+@keyframes swing-pump-beat { 0% { scale: 1; } 45% { scale: 1.14; } 100% { scale: 1.06; } }
+
+/* the card warms up the higher you head: a glow round it, sunnier, then hot */
+.swing-gauge { transition: box-shadow 0.25s, background 0.25s; }
+.swing-gauge.tier1 { box-shadow: 0 5px 0 var(--ink, #2b2340), 0 0 0 4px #c8f0a8; }
+.swing-gauge.tier2 { box-shadow: 0 5px 0 var(--ink, #2b2340), 0 0 0 5px #ffe27a, 0 0 22px #ffd34d; background: #fff6d6; }
+.swing-gauge.tier3 { box-shadow: 0 5px 0 var(--ink, #2b2340), 0 0 0 6px #ff9a7a, 0 0 30px #ff7a66; }
+#hud[data-layout="phone"] .swing-gauge.tier1 { box-shadow: 0 4px 0 var(--ink, #2b2340), 0 0 0 3px #c8f0a8; }
+#hud[data-layout="phone"] .swing-gauge.tier2 { box-shadow: 0 4px 0 var(--ink, #2b2340), 0 0 0 4px #ffe27a, 0 0 16px #ffd34d; }
+#hud[data-layout="phone"] .swing-gauge.tier3 { box-shadow: 0 4px 0 var(--ink, #2b2340), 0 0 0 4px #ff9a7a, 0 0 20px #ff7a66; }
+.swing-flash.tier { color: #ffe27a; font-size: 44px; }
+
+/* in the air: the metres so far, counting up at the top of the screen (where the toasts start: toast-clear.js steps them below it) */
+.swing-dist { display: none; position: absolute; left: 50%; top: calc(var(--top-b, 60px) + 12px); transform: translateX(-50%); pointer-events: none;
+  font: 700 48px/1 var(--font-head, "Fredoka", sans-serif); color: #fff; white-space: nowrap;
+  text-shadow: 0 4px 0 var(--ink, #2b2340), 3px 0 0 var(--ink, #2b2340), -3px 0 0 var(--ink, #2b2340), 0 -3px 0 var(--ink, #2b2340), 3px 3px 0 var(--ink, #2b2340), -3px 3px 0 var(--ink, #2b2340); }
+.swing-dist span { font-size: 26px; }
+.swing-hud.fly .swing-dist { display: block; }
+.swing-hud.fly.landed .swing-dist { display: none; }
+
+/* the landing: the distance, stars and a word, popped big where the toasts start (toast-clear.js steps them below it) */
+#hud > .swing-score { position: absolute; left: 50%; top: calc(var(--top-b, 60px) + 12px); translate: -50% 0; z-index: 11; pointer-events: none;
+  display: grid; justify-items: center; gap: 2px; padding: 10px 26px 12px; border-radius: 22px; background: var(--paper, #fff8ec);
+  border: 3px solid var(--ink, #2b2340); box-shadow: 0 6px 0 var(--ink, #2b2340); animation: swing-score-pop 0.55s cubic-bezier(.25, 1.6, .45, 1); }
+#hud > .swing-score[hidden] { display: none; }
+.swing-score .stars { font-size: 30px; line-height: 1; letter-spacing: 2px; }
+.swing-score .stars i { font-style: normal; color: #d8cfc0; }
+.swing-score .stars i.on { color: #ffc21a; text-shadow: 0 2px 0 var(--ink, #2b2340); }
+.swing-score b { font: 700 46px/1.05 var(--font-head, "Fredoka", sans-serif); color: var(--ink, #2b2340); }
+.swing-score .rec { font: 700 16px var(--font-head, "Fredoka", sans-serif); color: #fff; background: #3f8fd9; border-radius: 99px; padding: 2px 12px; }
+.swing-score.record .rec { background: #ff6fa8; }
+@keyframes swing-score-pop { 0% { scale: 0.3; opacity: 0; } 60% { scale: 1.12; opacity: 1; } 100% { scale: 1; } }
+
+/* phone: the beat a little smaller over the smaller PUMP (Hop off above them), the numbers under the top band */
+#hud[data-layout="phone"] .swing-beat { width: 120px; margin-bottom: -10px; order: 0; }
+#hud[data-layout="phone"] .swing-pump { order: 1; }
+#hud[data-layout="phone"] .swing-dist { font-size: 40px; }
+#hud[data-layout="phone"] > .swing-score { padding: 8px 18px 10px; }
+#hud[data-layout="phone"] .swing-score b { font-size: 36px; }
+#hud[data-layout="phone"] .swing-score .stars { font-size: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  .swing-beat.now .b-arrow, .swing-pump.now, #hud > .swing-score { animation: none !important; }
+  .swing-beat.hit-perfect .b-zone, .swing-beat.hit-good .b-zone, .swing-beat.hit-bad .b-rail { animation: none !important; }
+}
+
+/* the pusher's card: the swing's arc again, the sweet spot at the back end where you stand; just left of the E
+   that pushes (level with it: its words sit above it), on every layout */
+#hud > .swing-push { position: absolute; z-index: 6; width: 150px; pointer-events: none;
+  right: calc(var(--act-r, 130px) + var(--act-w, 80px) + 14px); top: calc(var(--act-t, 560px) + var(--act-h, 80px) / 2); translate: 0 -50%; }
+#hud > .swing-push[hidden] { display: none; }
+.swing-push svg { display: block; width: 100%; height: auto; overflow: visible; }
+.swing-push .b-rail-ink { fill: none; stroke: var(--ink, #2b2340); stroke-width: 13; stroke-linecap: round; }
+.swing-push .b-rail { fill: none; stroke: #fff8ec; stroke-width: 7.5; stroke-linecap: round; }
+.swing-push .b-zone { fill: none; stroke: #6fb8ff; stroke-width: 7.5; stroke-linecap: round; transition: stroke 0.08s; }
+.swing-push .p-hand circle { fill: #ffd9b8; stroke: var(--ink, #2b2340); stroke-width: 2.5; }
+.swing-push .b-tire circle { fill: #3d3d4a; stroke: var(--ink, #2b2340); stroke-width: 2.5; }
+.swing-push .b-tire circle.b-hole { fill: #fff8ec; stroke: none; }
+.swing-push.now .b-zone { stroke: #ffd34d; }
+.swing-push.now .p-hand { animation: swing-hand-ready 0.2s ease-in-out infinite alternate; }
+.swing-push.hit-perfect .b-zone { animation: swing-zone-burst 0.45s ease-out; }
+.swing-push.hit-good .b-zone { animation: swing-zone-good 0.35s ease-out; }
+.swing-push.hit-bad .b-rail { animation: swing-rail-miss 0.35s ease-out; }
+@keyframes swing-hand-ready { to { translate: 4px 0; } }
+.swing-push .p-gain { position: absolute; left: 50%; top: -2px; translate: -50% 0; opacity: 0; white-space: nowrap;
+  font: 700 26px var(--font-head, "Fredoka", sans-serif); color: #8ee070;
+  text-shadow: 0 3px 0 var(--ink, #2b2340), 2px 0 0 var(--ink, #2b2340), -2px 0 0 var(--ink, #2b2340), 0 -2px 0 var(--ink, #2b2340); }
+.swing-push .p-gain.pop { animation: swing-gain 1.5s ease-out forwards; }
+@keyframes swing-gain { 0% { opacity: 0; translate: -50% -10px; scale: 0.5; } 15% { opacity: 1; translate: -50% 0; scale: 1.15; } 30% { scale: 1; } 80% { opacity: 1; } 100% { opacity: 0; translate: -50% 16px; } }
+#hud[data-layout="phone"] > .swing-push { width: 118px; }
+#hud[data-layout="pad"] > .swing-push { right: auto; left: 50%; top: calc(var(--top-b, 60px) + 70px); translate: -50% 0; } /* (no E on the screen with a pad: under the top band) */
+@media (prefers-reduced-motion: reduce) { .swing-push.now .p-hand, .swing-push .p-gain.pop { animation-duration: 0.01s !important; } .swing-push .p-gain.pop { opacity: 1; } }
+/* in the air the PUMP column goes on every layout (the phone's own display rule above outranked the plain .fly one) */
+#hud[data-layout] .swing-hud.fly .swing-side, #hud[data-layout] .swing-hud.fly .swing-gauge, #hud[data-layout] .swing-hud.fly .swing-coach { display: none; }
+
+/* ---- hud3: the cluster at the bottom right has the mic left of the E and the pills and the ? under it, so on the swing Pump takes
+   the slot over the cluster where Cast and Dive go (the E, the tools and the smiley step aside on the swing), Hop off with it, kept
+   on the screen; the pusher's card sits over the cluster instead of left of the E (the action words are there now) */
+#hud:not([data-layout="pad"])[style*="--slot-r"] .swing-side { translate: 50% 0; right: max(calc(var(--safe-r) + 8px + 78px), calc(var(--slot-r) + var(--slot-w) / 2)); bottom: calc(var(--slot-b) + var(--slot-h) / 2 - 46px - 54px); }
+#hud[data-layout="phone"][style*="--slot-r"] .swing-side { right: max(calc(var(--safe-r) + 8px + 62px), calc(var(--slot-r) + var(--slot-w) / 2)); bottom: calc(var(--slot-b) + var(--slot-h) / 2 - 40px); }
+#hud:not([data-layout="pad"])[style*="--tools-b"] > .swing-push { top: auto; translate: none; right: max(8px, calc(var(--act-r) + var(--act-w) / 2 - 75px)); bottom: calc(var(--tools-b) + var(--tools-h) + 10px); }
+/* (hud3-wheels: the PC's slot sits left of the cluster, low, as on Andrew's phone sideways: PUMP on it, Hop off over it, as on a
+   phone; and on an upright phone the coach card sits top left beside the map, under the quests pill, off the swinger) */
+#hud[data-layout="pc"][style*="--slot-r"] .swing-side { display: flex; flex-direction: column; align-items: center; gap: 12px; bottom: max(calc(var(--safe-b) + 8px), calc(var(--slot-b) + var(--slot-h) / 2 - 46px)); }
+#hud[data-layout="pc"][style*="--mic-r"] .swing-side { right: max(calc(var(--slot-r) + var(--slot-w) / 2), calc(var(--mic-r) + var(--mic-w) + 84px)); } /* (left of the mic, which stays on the swing) */
+#hud[data-layout="pc"][style*="--slot-r"] .swing-hop { order: -1; }
+#hud[data-hud="phone-portrait"][style*="--map-r"] .swing-coach { top: calc(var(--map-t) + 6px); right: calc(var(--map-r) + var(--map-w) + 10px); width: auto; max-width: none; }
+#hud[data-layout="phone"][style*="--tools-b"] > .swing-push { right: max(8px, calc(var(--act-r) + var(--act-w) / 2 - 59px)); }

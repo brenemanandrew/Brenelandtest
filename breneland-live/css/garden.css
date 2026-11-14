@@ -1,0 +1,14 @@
+/* The community garden's job list (left side, under the place pill) */
+.garden-card {
+  position: absolute; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 118px); max-width: 240px;
+  background: rgba(255, 250, 240, 0.94); border: 3px solid #2b2340; border-radius: 14px; padding: 8px 12px;
+  font-family: 'Nunito', sans-serif; color: #2b2340; pointer-events: none; box-shadow: 0 3px 0 rgba(0,0,0,0.25); z-index: 5;
+}
+.garden-card[hidden] { display: none; }
+.garden-title { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+.garden-list { list-style: none; margin: 0; padding: 0; font-size: 13px; font-weight: 700; }
+.garden-list li { padding: 2px 0 2px 20px; position: relative; }
+.garden-list li::before { content: ''; position: absolute; left: 2px; top: 5px; width: 11px; height: 11px; border: 2px solid #2b2340; border-radius: 4px; background: #fff; }
+.garden-list li.done { opacity: 0.55; text-decoration: line-through; }
+.garden-list li.done::before { background: #4caf50; }
+@media (max-width: 600px) { .garden-card { top: calc(env(safe-area-inset-top, 0px) + 150px); max-width: 190px; font-size: 12px; } }
