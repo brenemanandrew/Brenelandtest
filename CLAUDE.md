@@ -51,6 +51,12 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 - v2 (Andrew doodle): sleeves end at the elbows with cream cuffs (`SLEEVEEND`=0.03 m past the elbow), hem lowered to `HEMY`=0.985 with a 4 cm cream band (`BANDH`). Renders `out/blouse_blender_v2.png`. v1 (cuffs at wrists, hem at 1.03): `out/blouse_blender_v1.png`, `out/blouse_blender_v1_close.png` (with A-line skirt, plum tights, boots). Left: thin crease lines along the placket between the breasts, collar edge slightly rough, a small white sliver below the hem in side views (not found yet).
 - Render helper used: mkroot with top_f_wrap=out/clean/top_f_fallblouse3.glb, outfit {"top":"f_wrap","bottom":"f_skirt","legs":"f_tights_plum","shoes":"f_boots"}.
 
+## Character height and the main game (2026-11-14)
+- Andrew's decision: the new builder characters will REPLACE the main game's characters (not shipped yet; wait for his go).
+- Builder bodies (her and him, every build): 170.0 cm, feet at y=0, 1 unit = 1 m (measured on the fitting bodies).
+- Main game today (read from the live code at breneland.fly.dev, js/human.js bodyDims; not measured in a running game): procedural big-head characters, Height slider 0..1 gives about 168 / 181 / 193 cm (round head, no hair), player at scale 1, some NPCs scaled (1.1, 0.95). Head about 67 cm tall. So the world (doors, seats, tables, camera) was built round roughly 181 cm characters with different proportions.
+- Open when the swap happens: keep 170 cm or scale the new characters (181 cm = x1.065); seat heights, held items, name-tag height, camera and IK targets in the main game will need checking. Breneland-Next's repo is not attached to these sessions.
+
 ## Next steps (in order)
 Done 2026-11-14: (1) collar/button colour edges are cut along the region line (clean curves), (2) skirt side holes fixed, plus Andrew's markups: shoulders/upper back/upper sleeves sit on her (`HUG`, tops of shoulders closer with `HUGCTOP`), forearm puff reduced and cuff in to the wrist (`SLEEVEK`), sleeves 6 cm shorter (`SLEEVESHORT`), less flare at the skirt front (`FRONTK`). All in `scripts/build_fall_outfit.sh`. Back collar: `NECKCUT=0.85` cuts everything above the base of the neck at the sides and back (on every build, shoulder lift included); front collar untouched. Renders: `out/fall_outfit_markup_fixes.png` (before/after), `out/fall_outfit_v5.png`, `out/fall_blouse_neck_v5.png`.
 Custom cameras for shellrev: `SHOTS='[["stand",0,[tx,ty,tz],[cx,cy,cz],"close"],...]'`.
