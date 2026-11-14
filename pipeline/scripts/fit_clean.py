@@ -145,6 +145,23 @@ if slot=='bottom' and 'skirt' in key:
         rs=np.hypot(rel0[:,0],rel0[:,2]);wb=t<0.03;sc=np.median(hull[0])/max(np.median(rs[wb]),1e-6)*1.0
         r=np.maximum(rs*sc,hr+np.where(t<0.06,0.006,0.012))
         P=np.c_[MID+r*np.sin(th),y,CZ+r*np.cos(th)];fits[b]=P;print(name,b,'waist r %.3f hem r %.3f'%(np.median(r[t<0.02]),np.median(r[t>0.98])))
+# ---- shoes: a pair, one size for both, each set on its foot (heel to toe, sole on the floor), let out sideways if the foot is broad
+if slot=='shoes':
+    ys0=G0[:,1].min()
+    for b in BUILDS:
+        X=body_of(b);fw=jw(('Foot','Toe'));P=np.zeros_like(G0);sl=[]
+        parts={}
+        for side,sg in (('Left',1),('Right',-1)):
+            fv=X[(fw>0.6)&(sg*(X[:,0]-MID)>0)];m=sg*G0[:,0]>0;low=G0[m][G0[m][:,1]<ys0+0.3*gh]
+            parts[side]=(fv,m,low);sl.append((fv[:,2].max()-fv[:,2].min())*ENV('SHOEL',1.12)/(low[:,2].max()-low[:,2].min()))
+        s_=float(np.mean(sl));P=G0*s_
+        for side,sg in (('Left',1),('Right',-1)):
+            fv,m,low=parts[side];q=P[m];lo=q[q[:,1]<q[:,1].min()+0.3*gh*s_]
+            an=X[(sg*(X[:,0]-MID)>0)&(X[:,1]>0.07)&(X[:,1]<0.13)&(np.abs(X[:,0]-MID)<0.3)&(jw(('Leg','Foot'))>0.5)]
+            need=max(fv[:,0].max()-fv[:,0].min(),np.ptp(an[:,0]) if len(an) else 0)*1.12;have=np.ptp(lo[:,0]);sx=min(1.5,max(1.0,need/max(have,1e-6)))
+            cx=(lo[:,0].max()+lo[:,0].min())/2;q[:,0]=cx+(q[:,0]-cx)*sx
+            t=np.array([(fv[:,0].max()+fv[:,0].min())/2-(lo[:,0].max()+lo[:,0].min())/2,X[:,1].min()-q[:,1].min(),fv[:,2].max()+0.012-lo[:,2].max()]);q+=t;P[m]=q
+        bd=Body(X);P=push_out(P,bd,lambda Q:np.full(len(Q),0.004),2);fits[b]=P;print(name,b,'shoe scale %.3f, top at y %.3f'%(s_,P[:,1].max()))
 # ---- a solid Meshy garment has an inside wall: the push-out moves it more than the outside and it shows through as blotches.
 #      Faces that face the body (inner wall) are dropped; the builder draws the cloth two-sided, so one layer is enough
 if ENV('INNER',1):
@@ -169,6 +186,11 @@ if slot=='top':
     mv=Wg[:,lg].sum(1)*low;Wg[:,lg]*=(1-low)[:,None];Wg[:,h_]+=mv
     Wg=gsmooth(Wg,4)
     LF=(LIFT[kk]*w3).sum(1);LF=gsmooth(LF,6)
+elif slot=='shoes':   # rigid on the foot, the front on the toes
+    Wg=np.zeros((len(P0),NJ));LF=np.zeros(len(P0))
+    for side,sg in (('Left',1),('Right',-1)):
+        m=sg*(P0[:,0]-MID)>0;zt=JPOS['mixamorig:'+side+'ToeBase'][2];t=ss((P0[:,2]-(zt-0.015))/0.04)*(P0[:,1]<0.09)
+        Wg[m,ji(side+'Foot')]=(1-t)[m];Wg[m,ji(side+'ToeBase')]=t[m]
 else:
     a=np.clip((YT-0.05-P0[:,1])/max(0.05,YT-0.05-YB),0,1)*{'hip':0.5,'knee':0.65,'ankle':0.8}[LEN];ang=np.arctan2(P0[:,0]-MID,P0[:,2]-CZ);left=np.clip(0.5+0.75*np.sin(ang),0,1)
     Wg=np.zeros((len(P0),NJ));Wg[:,ji('Hips')]=1-a;Wg[:,ji('LeftUpLeg')]=a*left;Wg[:,ji('RightUpLeg')]=a*(1-left);LF=np.zeros(len(P0))
@@ -182,6 +204,7 @@ for b in BUILDS:
         if not c:continue
         D=P[c]-X[v];al=D@N[v];pp=np.linalg.norm(D-np.outer(al,N[v]),axis=1);h[v]=((al>0.002)&(pp<0.006+0.15*al)).any()
     if slot=='top':h&=jw(('Head','Neck','Hand'))<0.35
+    if slot=='shoes':h&=X[:,1]<P[:,1].max()-0.025
     if slot=='bottom':h&=(jw(('UpLeg','Leg','Foot'))<0.5)|(X[:,1]>ycr+0.01) if 'skirt' in key else h
     hidden&=h
 # drop single stragglers
@@ -208,7 +231,11 @@ else:   # no texture: BASE colour everywhere; ACCENT on the collar (COLLAR m bel
       Gs=gsmooth(G0,25);bump=((G0-Gs)*vnorm(G0,GF)).sum(1)*sc_;front=G0[:,2]>np.percentile(G0[:,2],60)
       acc_|=front&(np.abs(G0[:,0])<0.05/sc_)&(bump>ENV('BUMP',0.0025))
       acc_=gsmooth(acc_.astype(float),2)>0.5
-  col=np.where(acc_[:,None],ca,cb);print('  accent points',int(acc_.sum()))
+  if ENV('SOLE',0.0)>0:   # the sole: the bottom of each shoe in a dark colour
+      cs=np.array([float(x) for x in os.environ.get('SOLEC','70,45,35').split(',')]);sol=G0[:,1]<G0[:,1].min()+ENV('SOLE',0.0)*gh
+      col=np.where(acc_[:,None],ca,cb);col[sol]=cs
+  else:col=np.where(acc_[:,None],ca,cb)
+  print('  accent points',int(acc_.sum()))
 K=4;rk=np.random.default_rng(3);cen=[col[rk.integers(len(col))]]
 for _ in range(K-1):cen.append(col[np.argmax(np.min([((col-c)**2).sum(1) for c in cen],0))])
 cen=np.array(cen)
