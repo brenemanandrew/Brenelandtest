@@ -355,11 +355,41 @@ else:   # no texture: BASE colour everywhere; ACCENT regions; SOLE at the bottom
           xin=1-ss((np.abs(Pq[:,0]-MID)-ENV('NECKX',0.10))/0.04);t_=np.maximum(gsmooth(jw(('Neck','Head'))[kk_].mean(1),2)-ENV('NECKCUT',0.0),(Pq[:,1]+LF-(YSHT+ENV('NECKY',0.0)))*20*xin)
           fN=np.maximum(fN,t_*zf-0.5*(1-zf))
           if ENV('HANDCUT',0.0)>0:fN=np.maximum(fN,gsmooth(jw(('Hand',))[kk_].mean(1),2)-ENV('HANDCUT',0.0))   # sleeves end at the wrist: nothing lying on the hand
-  arrs=[G0,fA,fS,Wg,LF,fN]+[fits[b] for b in BL]
+  slv=np.zeros(len(G0))
+  if slot=='top':
+      for _s,(bb_,_u,_L,_f) in info[b0][1].items():slv[:len(bb_)]=np.maximum(slv[:len(bb_)],bb_)
+  arrs=[G0,fA,fS,Wg,LF,fN]+[fits[b] for b in BL]+[slv]
   for k_ in (1,2,5):
       f_=arrs[k_].copy();f_[np.abs(f_)<1e-9]=-1e-9;GF,arrs=cut(GF,f_,arrs)
-  G0,fA,fS,Wg,LF,fN=arrs[:6];fits={b:arrs[6+i] for i,b in enumerate(BL)};P0=fits[b0]
+  G0,fA,fS,Wg,LF,fN=arrs[:6];fits={b:arrs[6+i] for i,b in enumerate(BL)};slv=arrs[-1];P0=fits[b0]
   nk_=fN[GF].mean(1)>0;GF=GF[~nk_];print('  cut above the neck base: %d faces'%int(nk_.sum()))
+  if slot=='top' and ENV('BODYTORSO',0):   # Andrew (option 2): the blouse body is built from her skin; only the scan's sleeves, collar and buttons stay
+      tor_=(slv[GF].mean(1)<0.5)&(fA[GF].mean(1)<=0);Yh=ENV('HEMY',float(np.percentile(P0[np.unique(GF[tor_])][:,1],1.5)))
+      torpts={b:fits[b][np.unique(GF[tor_])] for b in BL};GF=GF[~tor_]
+      armw=jw(('Arm','ForeArm','Hand'));neckw=jw(('Neck','Head'));trk=(armw<0.5)&(neckw<0.6)&(BP[:,1]>Yh-0.04)
+      SF=BF[trk[BF].all(1)];fy=BP[:,1]-Yh;fk=ENV('BTNECK',0.35)-neckw;fa_=ENV('BTARM',0.45)-armw
+      def wn(X):
+          FW=binv[BF];XW=np.zeros((nwb,3));XW[binv]=X;fn=np.cross(XW[FW[:,1]]-XW[FW[:,0]],XW[FW[:,2]]-XW[FW[:,0]]);N=np.zeros((nwb,3))
+          for k in range(3):np.add.at(N,FW[:,k],fn)
+          return (N/np.linalg.norm(N,axis=1,keepdims=True).clip(1e-12))[binv]
+      def wsmooth(A,it):
+          for _ in range(it):
+              W=np.zeros((nwb,)+A.shape[1:]);c=np.zeros(nwb);np.add.at(W,binv,A);np.add.at(c,binv,1);W/=c.reshape(-1,*[1]*(A.ndim-1));nb=np.zeros_like(W);dg=np.zeros(nwb)
+              np.add.at(nb,BE[:,0],W[BE[:,1]]);np.add.at(nb,BE[:,1],W[BE[:,0]]);np.add.at(dg,BE[:,0],1);np.add.at(dg,BE[:,1],1);W=0.5*W+0.5*nb/np.maximum(dg,1).reshape(-1,*[1]*(A.ndim-1));A=W[binv]
+          return A
+      SP={}
+      for b in BL:
+          X_=body_of(b);N_=wn(X_);d_,_=cKDTree(torpts[b]).query(X_);off=np.clip(d_-ENV('BTIN',0.004),ENV('BTMIN',0.006),ENV('BTMAX',0.03))
+          off=np.maximum(wsmooth(off,ENV('BTSM',20)),0.006+ENV('HIPCLR',0.026)*ss((YH+0.16-X_[:,1])/0.08));SP[b]=X_+N_*off[:,None]
+      sarr=[np.tile([[0.0,-1e3,0.0]],(len(BP),1)),np.full(len(BP),-1.0),np.full(len(BP),-1.0),Wd,LIFT,np.full(len(BP),-1.0)]+[SP[b] for b in BL]+[np.zeros(len(BP)),fy,fk,fa_]
+      for k_ in (len(sarr)-3,len(sarr)-2,len(sarr)-1):
+          f_=sarr[k_].copy();f_[np.abs(f_)<1e-9]=-1e-9;SF,sarr=cut(SF,f_,sarr);ok_=sarr[k_][SF].mean(1)>0;SF=SF[ok_]
+      su=np.unique(SF);rm_=-np.ones(len(sarr[0]),int);rm_[su]=len(G0)+np.arange(len(su))
+      G0=np.r_[G0,sarr[0][su]];fA=np.r_[fA,sarr[1][su]];fS=np.r_[fS,sarr[2][su]];Wg=np.r_[Wg,sarr[3][su]];LF=np.r_[LF,sarr[4][su]];fN=np.r_[fN,sarr[5][su]];slv=np.r_[slv,np.zeros(len(su))]
+      for i,b in enumerate(BL):fits[b]=np.r_[fits[b],sarr[6+i][su]]
+      GF=np.r_[GF,rm_[SF]];P0=fits[b0]
+      inner=np.zeros(len(BP),bool);inner[(fy>0.01)&(fk>0.03)&(fa_>0.03)&trk]=True;hidden=(hidden&(armw>=0.5))|inner
+      print('  blouse body from her skin: %d faces (hem at y %.3f), scan torso dropped'%(len(SF),Yh))
   top4=np.argsort(-Wg,axis=1)[:,:4];w4=np.take_along_axis(Wg,top4,1);w4/=w4.sum(1,keepdims=True)
   GE=np.unique(np.sort(np.r_[GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],axis=1),axis=0)
   K=3;PAL=np.array([cb,ca,cs]);fc=lambda f:f[GF].mean(1)
