@@ -11,7 +11,7 @@ await p.goto('http://localhost:'+PORT+'/',{waitUntil:'load'});await p.waitForFun
 await p.evaluate(r=>document.querySelector('#who [data-r='+r+']').onclick(),RIG);await p.waitForFunction(r=>window.__x.C===window.__x.cache[r]&&document.getElementById('loading').hidden,{timeout:180000},RIG);
 await p.evaluate(()=>{window.__x.holder.visible=true;window.__x.holder.position.z=0;document.getElementById('creator').style.display='none';const f=document.getElementById('crfab');if(f)f.style.display='none';});
 const set=(id,v)=>p.evaluate((id,v)=>{const el=document.getElementById(id);if(!el)return;el.value=v;el.dispatchEvent(new Event('input'));el.dispatchEvent(new Event('change'));},id,v);
-await set('build',build);await wait(1200);
+await set('build',build);if(process.env.MUS)await set('muscle',+process.env.MUS);await wait(1200);
 await p.evaluate(f=>window.__setFeat(f),fit);
 if(process.env.MAG)await p.evaluate(()=>{window.__magOn=1;});
 await p.waitForFunction(s=>Object.entries(s).every(([sl,t])=>t==='none'||(window.__x.C.hair[sl+':'+t]&&window.__x.C.hair[sl+':'+t].length)),{timeout:120000},fit);await wait(2500);
