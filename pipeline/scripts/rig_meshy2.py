@@ -92,17 +92,19 @@ E=np.unique(np.sort(np.r_[F[:,[0,1]],F[:,[1,2]],F[:,[2,0]]],axis=1),axis=0);deg=
 for _ in range(ENV('WSM',12)):
     nb=np.zeros_like(W);np.add.at(nb,E[:,0],W[E[:,1]]);np.add.at(nb,E[:,1],W[E[:,0]]);W=0.5*W+0.5*nb/deg[:,None]
 HY=float(Z['heady']) if 'heady' in Z else ENV('HEADY',1.44)
-rad_=np.hypot(P[:,0]-JT['Head'][0],P[:,2]-JT['Neck'][2]);hd=ix['Head'];top=((P[:,1]>HY)&(np.abs(P[:,0]-SHX[0])<0.3))|(HAS&(P[:,1]>HY-ENV('SEAMDOWN',0.045))&(rad_<ENV('SEAMR',0.14)));   # the join (her neck and the stump's rim) moves with the head as one piece
+rad_=np.hypot(P[:,0]-JT['Head'][0],P[:,2]-JT['Neck'][2]);hd=ix['Head'];top=((P[:,1]>HY)&(np.abs(P[:,0]-SHX[0])<0.3))|(HAS&(P[:,1]>HY-ENV('SEAMDOWN',0.045))&(rad_<ENV('SEAMR',0.14))&(ENV('SEAMDOWN',0.045)>0));   # the join (her neck and the stump's rim) moves with the head as one piece
 W[top]=0;W[top,hd]=1   # the head is rigid: the face is drawn on it
 band=(P[:,1]>HY-ENV('NECKBAND',0.07)-(ENV('SEAMDOWN',0.045) if HAS else 0))&~top&(np.abs(P[:,0])<0.3)   # under the head: weights ease from the rigid head into the neck and shoulders
 for _ in range(ENV('NECKSM',10)):
     nb=np.zeros_like(W);np.add.at(nb,E[:,0],W[E[:,1]]);np.add.at(nb,E[:,1],W[E[:,0]]);W[band]=(0.5*W+0.5*nb/deg[:,None])[band]
+_,gi=np.unique(np.round(P*2e4).astype(np.int64),axis=0,return_inverse=True);gi=gi.ravel();Wg_=np.zeros((gi.max()+1,NJ));np.add.at(Wg_,gi,W);cg_=np.bincount(gi).astype(float);W=(Wg_/cg_[:,None])[gi]   # points split at texture seams move together
 t4=np.argsort(-W,axis=1)[:,:4];w4=np.take_along_axis(W,t4,1);w4/=w4.sum(1,keepdims=True);W=np.zeros_like(W);np.put_along_axis(W,t4,w4,1)
 # ---- re-pose T -> rest
 MB=np.array([M4(Rr[i],pR[i])@np.linalg.inv(M4(RT[i],pT[i])) for i in range(NJ)]);PR=np.einsum('vj,jab,vb->va',W,MB,np.c_[P,np.ones(len(P))])[:,:3]
 PR[:,1]-=min(0,PR[:,1].min());print('  rest pose: height %.3f, hands at y %.2f, hips joint y %.3f (old %.3f)'%(PR[:,1].max(),pR[ix['LeftHand'],1],pR[ix['Hips'],1],po[ix['Hips'],1]))
 # ---- colour: cut along the skin / underwear edge, two swatches
 f=white-0.5;f[np.abs(f)<1e-6]=-1e-6;pos=f[F]>0;n=pos.sum(1);mx=(n==1)|(n==2)
+if not mx.any():mx[0]=True   # (keeps the code below simple: one triangle split along nothing)
 Fm=F[mx];lone=np.where(n[mx]==1,np.argmax(pos[mx],1),np.argmin(pos[mx],1));r=np.arange(len(Fm));A_=Fm[r,lone];B_=Fm[r,(lone+1)%3];C_=Fm[r,(lone+2)%3]
 Es=np.sort(np.r_[np.c_[A_,B_],np.c_[A_,C_]],1);ue,inv=np.unique(Es,axis=0,return_inverse=True);inv=inv.ravel();i_,j_=ue[:,0],ue[:,1];t=np.clip(f[i_]/(f[i_]-f[j_]),1e-3,1-1e-3)[:,None]
 lerp=lambda X:np.r_[X,X[i_]+(X[j_]-X[i_])*t];nid=len(P)+np.arange(len(ue));p_=nid[inv[:len(Fm)]];q_=nid[inv[len(Fm):]]
@@ -142,7 +144,8 @@ pr={'attributes':{'POSITION':add(V.astype(np.float32),5126,'VEC3',True),'NORMAL'
     'JOINTS_0':add(t4.astype(np.uint16),5123,'VEC4'),'WEIGHTS_0':add(w4.astype(np.float32),5126,'VEC4')},'indices':add(NF.astype(np.uint32).reshape(-1),5125,'SCALAR'),'material':0}
 TN=[]
 if HAS:
-    TN=[str(x) for x in Z['tnames']];pr['targets']=[{'POSITION':add(pad(Z['T'][k].astype(float))[src].astype(np.float32),5126,'VEC3',True)} for k in range(len(TN))]
+    TN=[str(x) for x in Z['tnames']]
+    if TN:pr['targets']=[{'POSITION':add(pad(Z['T'][k].astype(float))[src].astype(np.float32),5126,'VEC3',True)} for k in range(len(TN))]
 ibm=add(IBM.reshape(-1,16),5126,'MAT4')
 k_h=pR[ix['Hips'],1]/po[ix['Hips'],1];anims=[];tcache={}
 for a in OJ['animations']:
