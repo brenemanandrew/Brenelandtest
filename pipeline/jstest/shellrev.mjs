@@ -14,7 +14,7 @@ const set=(id,v)=>p.evaluate((id,v)=>{const el=document.getElementById(id);if(!e
 await set('build',build);if(process.env.MUS)await set('muscle',+process.env.MUS);await wait(1200);
 await p.evaluate(f=>window.__setFeat(f),fit);
 if(process.env.MAG)await p.evaluate(()=>{window.__magOn=1;});
-await p.waitForFunction(s=>Object.entries(s).every(([sl,t])=>t==='none'||(window.__x.C.hair[sl+':'+t]&&window.__x.C.hair[sl+':'+t].length)),{timeout:120000},fit);await wait(2500);
+await p.waitForFunction(s=>Object.entries(s).filter(([sl])=>['top','bottom','legs','shoes'].includes(sl)).every(([sl,t])=>t==='none'||(window.__x.C.hair[sl+':'+t]&&window.__x.C.hair[sl+':'+t].length)),{timeout:120000},fit);await wait(2500);
 if(process.env.MAG)await p.evaluate(()=>{for(const ms of Object.values(window.__x.C.hair))for(const m of ms){const u=m.userData.under;if(u){u.material.color.setHex(0xff00ff);u.material.gradientMap=null;u.material.needsUpdate=true;}}});
 if(process.env.HIDEBODY)await p.evaluate(()=>{window.__x.C.mesh.visible=false;});
 const cam=(t,c)=>p.evaluate((t,c,ro)=>{const{camera,orbit}=window.__dbg;document.querySelector('#stage canvas').dispatchEvent(new Event('pointerdown'));camera.clearViewOffset();camera.updateProjectionMatrix();orbit.autoRotate=false;orbit.minPolarAngle=0;orbit.maxPolarAngle=3.1;orbit.minAzimuthAngle=-Infinity;orbit.maxAzimuthAngle=Infinity;orbit.target.set(...t);camera.position.set(...c);orbit.update();window.__room.g.visible=ro;},t,c,!!process.env.ROOMON);
