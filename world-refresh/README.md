@@ -13,7 +13,7 @@ Replace existing game assets with Meshy models that have high visual impact and 
 3. Larger props - `sheets/03-large-props.md`
 4. Set pieces and game areas - `sheets/04-set-pieces.md`
 
-Each sheet lists every asset to replace, what it is in the game today, its size and triangle budget, and the exact Meshy description to paste.
+**All Meshy prompts, ready to paste, are in `MESHY.md`.** Each sheet lists every asset to replace, what it is in the game today, its size and triangle budget, and the exact Meshy description to paste.
 
 ## Rules
 - Style: `STYLE.md`. Cel shaded, simple Animal Crossing style textures, slightly watercoloured like the concept art. Every Meshy prompt starts with the style block from that file.
