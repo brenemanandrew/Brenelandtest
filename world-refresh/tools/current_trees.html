@@ -1,0 +1,21 @@
+<!doctype html><html><body style="margin:0;background:#f3ead8">
+<script type="importmap">{"imports":{"three":"/breneland-live/vendor/three/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { addTree } from '/breneland-live/js/world-trees.js';
+import { mulberry32 } from '/breneland-live/js/util.js';
+// minimal stand-in for the game's batcher: every add() becomes a toon mesh
+function shim(group){ return { add(geo, mat, o={}){
+  let color = typeof mat==='string'?mat:(mat&&mat.color?'#'+mat.color.getHexString():'#888');
+  const m=new THREE.Mesh(geo,new THREE.MeshToonMaterial({color,side:THREE.DoubleSide}));
+  if(o.matrix){m.applyMatrix4(o.matrix);} else {m.position.set(o.x||0,o.y||0,o.z||0);m.scale.set(o.sx||1,o.sy||1,o.sz||1);m.rotation.set(o.rx||0,o.ry||0,o.rz||0);}
+  group.add(m);} }; }
+const out={};
+for(const kind of ['oak','maple','birch','pine','palm']){
+  const g=new THREE.Group(); addTree(shim(g),0,0,kind,mulberry32(7),1,{y:0.05}); g.updateMatrixWorld(true);
+  const bb=new THREE.Box3().setFromObject(g); const s=bb.getSize(new THREE.Vector3());
+  out[kind]={w:+Math.max(s.x,s.z).toFixed(2),h:+bb.max.y.toFixed(2)};
+  window['g_'+kind]=g;
+}
+window.SIZES=out; window.THREE=THREE; window.READY=1;
+</script></body></html>
