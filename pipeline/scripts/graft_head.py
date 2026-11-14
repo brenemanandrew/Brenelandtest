@@ -58,7 +58,7 @@ UVh=UVh*[1,H/(H+ST)];vS=(H+ST/2)/(H+ST)
 # ---- together
 nb=len(P);PP=np.r_[P,Xh];FF=np.r_[Fb,Fh+nb];head=np.r_[np.zeros(nb,bool),np.ones(len(Xh),bool)]
 jt=lambda v:(np.array(v)*S+sh).round(4).tolist()
-JN={'Hips':[0,0.88,-0.02],'Spine':[0,0.97,-0.02],'Spine1':[0,1.07,-0.025],'Spine2':[0,1.17,-0.03],'Shoulder':[0.05,1.30,-0.02],'Arm':[0.27,1.295,-0.01],'ForeArm':[0.50,1.285,-0.012],'Hand':[0.70,1.287,-0.018],'HandEnd':[0.852,1.287,-0.03],
+JN=json.loads(os.environ['JOINTS_BODY']) if os.environ.get('JOINTS_BODY') else {'Hips':[0,0.88,-0.02],'Spine':[0,0.97,-0.02],'Spine1':[0,1.07,-0.025],'Spine2':[0,1.17,-0.03],'Shoulder':[0.05,1.30,-0.02],'Arm':[0.27,1.295,-0.01],'ForeArm':[0.50,1.285,-0.012],'Hand':[0.70,1.287,-0.018],'HandEnd':[0.852,1.287,-0.03],
     'UpLeg':[0.15,0.80,-0.02],'Leg':[0.14,0.50,-0.01],'Foot':[0.12,0.115,-0.03],'ToeBase':[0.12,0.03,0.12],'Toe_End':[0.12,0.025,0.245]}
 JO={k:(np.array(v)*S).round(4).tolist() for k,v in JN.items()}
 JO.update({'Neck':[0,1.23,-0.02+sh[2]],'Head':[0,1.289,-0.004],'HeadTop_End':[0,1.69,0.025],'headfront':[0,1.289,0.173]})
