@@ -256,46 +256,67 @@ if OLD:
 P0l=P0+np.c_[np.zeros(len(P0)),LF,np.zeros(len(P0))]
 if OLD:
   _,qi=cKDTree(Q).query(P0l);col=TX[np.clip((QUV[qi,1]*TH).astype(int),0,TH-1),np.clip((QUV[qi,0]*TW).astype(int),0,TW-1)];col=gsmooth(col,3)
-else:   # no texture: BASE colour everywhere; ACCENT on the collar (COLLAR m below the top, near the neck) and on buttons (bumps on the centre front)
+else:   # no texture: BASE colour everywhere; ACCENT regions; SOLE at the bottom. Each region is a signed field (>0 inside),
+  # and triangles crossing a region's edge are cut along it, so the colour edge is a clean line, not big triangles' jagged steps
   cb=np.array([float(x) for x in os.environ.get('BASE','196,98,58').split(',')]);ca=np.array([float(x) for x in os.environ.get('ACCENT','243,229,203').split(',')])
-  acc_=np.zeros(len(G0),bool);sc_=0.6/gh   # scan units to roughly metres
-  if ENV('COLLAR',0.0)>0:
-      ytop=G0[:,1].max();acc_|=(G0[:,1]>ytop-ENV('COLLAR',0.0)/sc_)&(np.abs(G0[:,0])<ENV('COLLARW',0.11)/sc_)
-  for c_ in [c for c in os.environ.get('ACIRC','').split(';') if c]:   # x,y,r[,front|back|both] in scan units, from a front view
-      cx_,cy_,cr_=[float(v) for v in c_.split(',')[:3]];side_=(c_.split(',')+['front'])[3]
-      zc_=(G0[:,2].max()+G0[:,2].min())/2;sel_=(G0[:,2]>zc_) if side_=='front' else (G0[:,2]<zc_) if side_=='back' else np.ones(len(G0),bool)
-      acc_|=sel_&(np.hypot(G0[:,0]-cx_,G0[:,1]-cy_)<cr_)
-  for b_ in [c for c in os.environ.get('ABOX','').split(';') if c]:   # x0,x1,y0,y1[,front|back|both]
-      x0_,x1_,y0_,y1_=[float(v) for v in b_.split(',')[:4]];side_=(b_.split(',')+['both'])[4]
-      zc_=(G0[:,2].max()+G0[:,2].min())/2;sel_=(G0[:,2]>zc_) if side_=='front' else (G0[:,2]<zc_) if side_=='back' else np.ones(len(G0),bool)
-      acc_|=sel_&(G0[:,0]>x0_)&(G0[:,0]<x1_)&(G0[:,1]>y0_)&(G0[:,1]<y1_)
-  if ENV('BUTTONS',0)>0:
+  cs=np.array([float(x) for x in os.environ.get('SOLEC','70,45,35').split(',')]);sc_=0.6/gh   # scan units to roughly metres
+  def accfield(G):
+      fa=np.full(len(G),-1e9);zc_=(G0[:,2].max()+G0[:,2].min())/2
+      def side(sd_):return (G[:,2]-zc_) if sd_=='front' else (zc_-G[:,2]) if sd_=='back' else np.full(len(G),1e9)
+      if ENV('COLLAR',0.0)>0:
+          ytop=G0[:,1].max();fa=np.maximum(fa,np.minimum(G[:,1]-(ytop-ENV('COLLAR',0.0)/sc_),ENV('COLLARW',0.11)/sc_-np.abs(G[:,0])))
+      for c_ in [c for c in os.environ.get('ACIRC','').split(';') if c]:   # x,y,r[,front|back|both] in scan units, from a front view
+          cx_,cy_,cr_=[float(v) for v in c_.split(',')[:3]];sd_=(c_.split(',')+['front'])[3]
+          fa=np.maximum(fa,np.minimum(cr_-np.hypot(G[:,0]-cx_,G[:,1]-cy_),side(sd_)))
+      for b_ in [c for c in os.environ.get('ABOX','').split(';') if c]:   # x0,x1,y0,y1[,front|back|both]
+          x0_,x1_,y0_,y1_=[float(v) for v in b_.split(',')[:4]];sd_=(b_.split(',')+['both'])[4]
+          fa=np.maximum(fa,np.minimum.reduce([G[:,0]-x0_,x1_-G[:,0],G[:,1]-y0_,y1_-G[:,1],side(sd_)]))
+      return fa
+  fA=accfield(G0)
+  if ENV('BUTTONS',0)>0:   # bumps on the centre front (no closed form: a smoothed indicator, cut at its 0.5 line)
       Gs=gsmooth(G0,25);bump=((G0-Gs)*vnorm(G0,GF)).sum(1)*sc_;front=G0[:,2]>np.percentile(G0[:,2],60)
-      acc_|=front&(np.abs(G0[:,0])<0.05/sc_)&(bump>ENV('BUMP',0.0025))
-      acc_=gsmooth(acc_.astype(float),2)>0.5
-  if ENV('SOLE',0.0)>0:   # the sole: the bottom of each shoe in a dark colour
-      cs=np.array([float(x) for x in os.environ.get('SOLEC','70,45,35').split(',')]);sol=G0[:,1]<G0[:,1].min()+ENV('SOLE',0.0)*gh
-      col=np.where(acc_[:,None],ca,cb);col[sol]=cs
-  else:col=np.where(acc_[:,None],ca,cb)
-  print('  accent points',int(acc_.sum()))
-K=4;rk=np.random.default_rng(3);cen=[col[rk.integers(len(col))]]
-for _ in range(K-1):cen.append(col[np.argmax(np.min([((col-c)**2).sum(1) for c in cen],0))])
-cen=np.array(cen)
-for _ in range(20):
-    lab=np.argmin(((col[:,None]-cen[None])**2).sum(2),1)
-    for k in range(K):
-        if (lab==k).any():cen[k]=col[lab==k].mean(0)
-cnt=np.bincount(lab,minlength=K)
-for k in np.argsort(cnt):
-    for j in np.argsort(-cnt):
-        if j!=k and cnt[j]>cnt[k] and np.abs(cen[k]-cen[j]).max()<60:lab[lab==k]=j;cnt=np.bincount(lab,minlength=K);break
-for _ in range(10):
-    V=np.zeros((len(P0),K));np.add.at(V,(GE[:,0],lab[GE[:,1]]),1);np.add.at(V,(GE[:,1],lab[GE[:,0]]),1);V[np.arange(len(P0)),lab]+=1.5;lab=V.argmax(1)
-cnt=np.bincount(lab,minlength=K)
-if os.environ.get('ONECOL')=='1' or ('skirt' in key and OLD):lab[:]=cnt.argmax()
-PAL=np.array([np.median(col[lab==k],0) if (lab==k).any() else [0,0,0] for k in range(K)])
-print('  colours',[(tuple(int(x) for x in PAL[k]),int(c)) for k,c in enumerate(np.bincount(lab,minlength=K)) if c])
-flab=np.array([np.bincount(lab[t],minlength=K).argmax() for t in GF])
+      fA=np.maximum(fA,(gsmooth((front&(np.abs(G0[:,0])<0.05/sc_)&(bump>ENV('BUMP',0.0025))).astype(float),2)-0.5)*0.01/sc_)
+  fS=(G0[:,1].min()+ENV('SOLE',0.0)*gh-G0[:,1]) if ENV('SOLE',0.0)>0 else np.full(len(G0),-1.0)
+  def cut(F,f,arrs):
+      """cut every triangle that crosses f=0 into three along the line; new points interpolated in every per-point array"""
+      pos=f[F]>0;n=pos.sum(1);mx=(n==1)|(n==2)
+      if not mx.any():return F,arrs
+      Fm=F[mx];lone=np.where(n[mx]==1,np.argmax(pos[mx],1),np.argmin(pos[mx],1));r=np.arange(len(Fm))
+      A_=Fm[r,lone];B_=Fm[r,(lone+1)%3];C_=Fm[r,(lone+2)%3]
+      E=np.r_[np.c_[A_,B_],np.c_[A_,C_]];Es=np.sort(E,1);ue,inv=np.unique(Es,axis=0,return_inverse=True);inv=inv.ravel()
+      i_,j_=ue[:,0],ue[:,1];t=np.clip(f[i_]/(f[i_]-f[j_]),1e-3,1-1e-3);nv=len(f);nid=nv+np.arange(len(ue))
+      out=[np.r_[X_,X_[i_]+(X_[j_]-X_[i_])*(t.reshape(-1,*[1]*(X_.ndim-1)))] for X_ in arrs]
+      p=nid[inv[:len(Fm)]];q=nid[inv[len(Fm):]]
+      return np.r_[F[~mx],np.c_[A_,p,q],np.c_[p,B_,C_],np.c_[p,C_,q]],out
+  BL=list(fits)
+  arrs=[G0,fA,fS,Wg,LF]+[fits[b] for b in BL]
+  for k_ in (1,2):
+      f_=arrs[k_].copy();f_[np.abs(f_)<1e-9]=-1e-9;GF,arrs=cut(GF,f_,arrs)
+  G0,fA,fS,Wg,LF=arrs[:5];fits={b:arrs[5+i] for i,b in enumerate(BL)};P0=fits[b0]
+  top4=np.argsort(-Wg,axis=1)[:,:4];w4=np.take_along_axis(Wg,top4,1);w4/=w4.sum(1,keepdims=True)
+  GE=np.unique(np.sort(np.r_[GF[:,[0,1]],GF[:,[1,2]],GF[:,[2,0]]],axis=1),axis=0)
+  K=3;PAL=np.array([cb,ca,cs]);fc=lambda f:f[GF].mean(1)
+  flab=np.where(fc(fS)>0,2,np.where(fc(fA)>0,1,0));lab=np.zeros(len(G0),int)
+  print('  colour faces',[(tuple(int(x) for x in PAL[k]),int(c)) for k,c in enumerate(np.bincount(flab,minlength=K)) if c],'(%d faces after cutting)'%len(GF))
+if OLD:
+  K=4;rk=np.random.default_rng(3);cen=[col[rk.integers(len(col))]]
+  for _ in range(K-1):cen.append(col[np.argmax(np.min([((col-c)**2).sum(1) for c in cen],0))])
+  cen=np.array(cen)
+  for _ in range(20):
+      lab=np.argmin(((col[:,None]-cen[None])**2).sum(2),1)
+      for k in range(K):
+          if (lab==k).any():cen[k]=col[lab==k].mean(0)
+  cnt=np.bincount(lab,minlength=K)
+  for k in np.argsort(cnt):
+      for j in np.argsort(-cnt):
+          if j!=k and cnt[j]>cnt[k] and np.abs(cen[k]-cen[j]).max()<60:lab[lab==k]=j;cnt=np.bincount(lab,minlength=K);break
+  for _ in range(10):
+      V=np.zeros((len(P0),K));np.add.at(V,(GE[:,0],lab[GE[:,1]]),1);np.add.at(V,(GE[:,1],lab[GE[:,0]]),1);V[np.arange(len(P0)),lab]+=1.5;lab=V.argmax(1)
+  cnt=np.bincount(lab,minlength=K)
+  if os.environ.get('ONECOL')=='1' or ('skirt' in key and OLD):lab[:]=cnt.argmax()
+  PAL=np.array([np.median(col[lab==k],0) if (lab==k).any() else [0,0,0] for k in range(K)])
+  print('  colours',[(tuple(int(x) for x in PAL[k]),int(c)) for k,c in enumerate(np.bincount(lab,minlength=K)) if c])
+  flab=np.array([np.bincount(lab[t],minlength=K).argmax() for t in GF])
 vid={};NV=[];NF=np.zeros_like(GF)
 for ti,t in enumerate(GF):
     for c in range(3):
