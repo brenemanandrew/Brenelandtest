@@ -18,6 +18,7 @@ Replace existing game assets with Meshy models that have high visual impact and 
 ## Rules
 - Style: `STYLE.md`. Cel shaded, simple hand painted textures, slightly watercoloured, matching the concept art and the live game's look (not modelled on any other game). Every Meshy prompt starts with the style block from that file.
 - How a model gets into the game: `SWAP.md`.
+- Never break a game: places that are or hold games (water tower, game store, Lovecraft house, maze, bocce, and others) are reskins around what their code needs. See `SWAP.md`.
 - Nothing ships to the live game (breneland.fly.dev, repo Breneland-Next) until Andrew says so.
 - Writing for Andrew: never use em dashes, answer first and short, no claims without evidence.
 

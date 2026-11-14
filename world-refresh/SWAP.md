@@ -18,3 +18,11 @@ Facts about the live game, read from its code at breneland.fly.dev on 2026-11-14
 - Colour: bake Meshy textures to vertex colours so models drop into the existing toon batch. A textured batch for a stronger watercolour wash can come later.
 
 - Water tower (Andrew, 2026-11-14): it is a game, not scenery. Any new look must keep its geometry, size, ladder, colliders and every play spot exactly as water-tower.js has them. Treat the Meshy water tower as a paint/style reference only until the code has been read.
+
+## Rule: never break a game (Andrew, 2026-11-14)
+Many places are games or hold games, not just scenery: the water tower, the game store and the rest of the strip mall, the Lovecraft house, the maze, bocce, picnic, firepit, fish shack, rowboats, the garden jobs, the swing. For anything that hosts a game or interaction:
+1. Read its code first and list everything the game relies on: interiors, doors, walls, colliders, floors and heights, seats, anchors, triggers, NPC spots, camera spots, hidden or named meshes the code looks up, and anything animated.
+2. The new model is a reskin around that list. It never moves, removes or resizes any of it. Interiors stay as they are unless Andrew says otherwise.
+3. If the new look cannot fit without changing the game, stop and ask Andrew.
+4. Before and after the swap, play each game through in a test build (same steps, screenshots, console errors) and compare. Nothing ships until both match and Andrew says so.
+5. Always keep the old code path as the fallback, switchable in one place.
