@@ -1,18 +1,42 @@
 {
  "welcome_sign.glb": {
   "id": "L1",
-  "preview": "01a1dc18-cd66-700e-98f3-70b4fd42dbd1"
+  "preview": "01a1dc18-cd66-700e-98f3-70b4fd42dbd1",
+  "refine": "01a1dc19-a0c5-76e0-9293-da86d5ef3313",
+  "done": true,
+  "credits": 10
  },
  "porch_swing.glb": {
   "id": "L2",
-  "preview": "01a1dc18-d85c-76ce-a85d-bf622b34ce7c"
+  "preview": "01a1dc18-d85c-76ce-a85d-bf622b34ce7c",
+  "refine": "01a1dc19-a5ba-7027-a429-ec8a1b2e81f8",
+  "done": true,
+  "credits": 10
  },
  "shelter.glb": {
   "id": "L3",
-  "preview": "01a1dc18-e34a-720e-8a0b-c91029248af8"
+  "preview": "01a1dc18-e34a-720e-8a0b-c91029248af8",
+  "refine": "01a1dc1a-00de-77ec-a360-e7f7eea01e6b",
+  "done": true,
+  "credits": 10
  },
  "tree_swing.glb": {
   "id": "L4",
-  "preview": "01a1dc18-ed44-7420-b16c-65534ba5f3f9"
+  "preview": "01a1dc18-ed44-7420-b16c-65534ba5f3f9",
+  "refine": "01a1dc19-ab7f-72d7-91a2-6c6a76454aa9",
+  "done": true,
+  "credits": 10
+ },
+ "rowboat.glb": {
+  "id": "L5",
+  "preview": "01a1dc1a-af2c-7399-b723-8ec384637a8f"
+ },
+ "dock.glb": {
+  "id": "L6",
+  "preview": "01a1dc1a-bc0f-7106-a175-28288946c2e4"
+ },
+ "garden_cart.glb": {
+  "id": "L7",
+  "preview": "01a1dc1a-c747-7695-95a9-5067d39fbd9a"
  }
 }
