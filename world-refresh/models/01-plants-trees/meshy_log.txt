@@ -1,0 +1,37 @@
+preview oak.glb 01a1dbee-4868-7012-bcd8-39599d192cc1
+preview maple.glb 01a1dbee-51cd-70a9-b715-aa943ed4dba7
+preview birch.glb 01a1dbee-5ed8-74c5-a51f-6bdaf47d6ff9
+preview pine.glb 01a1dbee-69b7-72ef-937f-df455b4b78bd
+preview hedge_section.glb 01a1dbee-743c-701b-8a69-dd7aa179b930
+preview flower_patch.glb 01a1dbee-7e50-72c4-9373-69589ebe7a58
+preview mossy_rock_small_large.glb 01a1dbee-8818-722d-9e61-7b44c49c5fb1
+preview raised_garden_bed_empty_soil.glb 01a1dbee-9512-7318-a4f9-29f25209ccb0
+preview lettuce_row.glb 01a1dbee-a00b-77e9-9214-92be9eead52d
+preview tomato_plants_on_stakes.glb 01a1dbee-a995-713c-8dfa-4fd346d166c6
+preview pumpkin_vines_with_pumpkins.glb 01a1dbee-b3be-75f1-a524-16b7301dad2c
+preview sunflowers.glb 01a1dbee-bef4-76b8-a800-6371beb83759
+refine birch.glb
+refine maple.glb
+DONE birch.glb
+refine pine.glb
+refine mossy_rock_small_large.glb
+refine raised_garden_bed_empty_soil.glb
+refine pumpkin_vines_with_pumpkins.glb
+refine sunflowers.glb
+refine oak.glb
+DONE maple.glb
+DONE pine.glb
+refine flower_patch.glb
+DONE raised_garden_bed_empty_soil.glb
+refine tomato_plants_on_stakes.glb
+DONE pumpkin_vines_with_pumpkins.glb
+DONE sunflowers.glb
+DONE oak.glb
+DONE mossy_rock_small_large.glb
+refine lettuce_row.glb
+DONE flower_patch.glb
+DONE tomato_plants_on_stakes.glb
+refine hedge_section.glb
+DONE lettuce_row.glb
+DONE hedge_section.glb
+ALL FINISHED 12 done, 0 failed

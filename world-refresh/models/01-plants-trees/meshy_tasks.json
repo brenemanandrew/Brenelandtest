@@ -1,0 +1,86 @@
+{
+ "oak.glb": {
+  "id": "T1",
+  "preview": "01a1dbee-4868-7012-bcd8-39599d192cc1",
+  "refine": "01a1dbef-a32d-735f-aedc-25383cb5d905",
+  "done": true,
+  "credits": 10
+ },
+ "maple.glb": {
+  "id": "T2",
+  "preview": "01a1dbee-51cd-70a9-b715-aa943ed4dba7",
+  "refine": "01a1dbef-299f-71fa-bf3f-b414bbc47083",
+  "done": true,
+  "credits": 10
+ },
+ "birch.glb": {
+  "id": "T3",
+  "preview": "01a1dbee-5ed8-74c5-a51f-6bdaf47d6ff9",
+  "refine": "01a1dbee-ce55-737f-a4e3-ec7edafa9eeb",
+  "done": true,
+  "credits": 10
+ },
+ "pine.glb": {
+  "id": "T4",
+  "preview": "01a1dbee-69b7-72ef-937f-df455b4b78bd",
+  "refine": "01a1dbef-359e-7602-a9dd-74457f473172",
+  "done": true,
+  "credits": 10
+ },
+ "hedge_section.glb": {
+  "id": "P1",
+  "preview": "01a1dbee-743c-701b-8a69-dd7aa179b930",
+  "refine": "01a1dbf0-cabc-740b-9df4-fc8553bb43e5",
+  "done": true,
+  "credits": 10
+ },
+ "flower_patch.glb": {
+  "id": "P3",
+  "preview": "01a1dbee-7e50-72c4-9373-69589ebe7a58",
+  "refine": "01a1dbef-afe3-7423-b24a-fdeff524bb1a",
+  "done": true,
+  "credits": 10
+ },
+ "mossy_rock_small_large.glb": {
+  "id": "P6",
+  "preview": "01a1dbee-8818-722d-9e61-7b44c49c5fb1",
+  "refine": "01a1dbef-3dd1-744c-a66d-7b0debc9f1ec",
+  "done": true,
+  "credits": 10
+ },
+ "raised_garden_bed_empty_soil.glb": {
+  "id": "G1",
+  "preview": "01a1dbee-9512-7318-a4f9-29f25209ccb0",
+  "refine": "01a1dbef-4492-7723-8b67-782eebbd0142",
+  "done": true,
+  "credits": 10
+ },
+ "lettuce_row.glb": {
+  "id": "G2",
+  "preview": "01a1dbee-a00b-77e9-9214-92be9eead52d",
+  "refine": "01a1dbf0-1d1a-7441-8786-ae57b66ee677",
+  "done": true,
+  "credits": 10
+ },
+ "tomato_plants_on_stakes.glb": {
+  "id": "G5",
+  "preview": "01a1dbee-a995-713c-8dfa-4fd346d166c6",
+  "refine": "01a1dbef-baa3-720b-97fb-d7b36fa1d769",
+  "done": true,
+  "credits": 10
+ },
+ "pumpkin_vines_with_pumpkins.glb": {
+  "id": "G6",
+  "preview": "01a1dbee-b3be-75f1-a524-16b7301dad2c",
+  "refine": "01a1dbef-4b01-729f-abf1-fd4a8bfbfdea",
+  "done": true,
+  "credits": 10
+ },
+ "sunflowers.glb": {
+  "id": "G7",
+  "preview": "01a1dbee-bef4-76b8-a800-6371beb83759",
+  "refine": "01a1dbef-5008-76a8-9c37-c92378930f00",
+  "done": true,
+  "credits": 10
+ }
+}
