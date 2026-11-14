@@ -16,7 +16,9 @@ exec(open(HERE+'/fit_clean.py').read().split('def fit_top')[0])
 ENV=lambda k,d:type(d)(os.environ.get(k,d))
 BL=['plus','average','slim','athletic']
 ORANGE=[int(x) for x in os.environ.get('BASE','196,98,58').split(',')];CREAM=[int(x) for x in os.environ.get('ACCENT','243,229,203').split(',')]
-HEMY=ENV('HEMY',1.03)            # hem on the waistline (the skirt's waistband is at 1.058, so the blouse just covers it)
+HEMY=ENV('HEMY',1.03)
+SLEND=ENV('SLEEVEEND',0.03)   # >=0: sleeves end this far past the elbow joint (Andrew: cuffs at the elbows); <0: at the wrists
+BANDH=ENV('BANDH',0.04)       # >0: a cream band this tall round the hem            # hem on the waistline (the skirt's waistband is at 1.058, so the blouse just covers it)
 # ---- weld the body (UV seams split points) so the cloth has no cracks
 _,binv=np.unique(np.round(BP*1e5).astype(np.int64),axis=0,return_inverse=True);binv=binv.ravel();nwb=binv.max()+1
 def weld(A):W=np.zeros((nwb,)+A.shape[1:]);W[binv]=A;return W
@@ -51,7 +53,8 @@ cut((0,HEMY,0),(0,-1,0),lambda P,A:A.mean()<0.5)
 # wrists: a plane across each forearm just before the hand
 for s,sg in (('Left',1),('Right',-1)):
     Ej,Hj=JPOS['mixamorig:'+s+'ForeArm'],JPOS['mixamorig:'+s+'Hand'];d=(Hj-Ej)/np.linalg.norm(Hj-Ej)
-    cut(tuple(Hj-d*ENV('CUFFBACK',0.012)),tuple(d),lambda P,A,sg=sg:(A.mean()>0.3)&(sg*(P[:,0].mean()-MID)>0.08))
+    co_=(Ej+d*SLEND) if SLEND>=0 else (Hj-d*ENV('CUFFBACK',0.012))
+    cut(tuple(co_),tuple(d),lambda P,A,sg=sg:(A.mean()>0.3)&(sg*(P[:,0].mean()-MID)>0.08))
 # neckline: a plane through the base of the neck, a little lower at the front
 FY,BY=ENV('NECKF',1.283),ENV('NECKB',1.300);F_=np.array([MID,FY,0.06]);B_=np.array([MID,BY,-0.10]);n_=np.cross(B_-F_,[1,0,0]);n_/=np.linalg.norm(n_);n_=n_ if n_[1]>0 else -n_
 cut(tuple(F_),tuple(n_),lambda P,A:P[:,1].max()>FY-0.08)
@@ -89,9 +92,12 @@ def armu(P):   # 0 at the shoulder joint .. 1 at the wrist, along the arm bones
         t1=np.clip((P-Sj)@(Ej-Sj)/Lu**2,0,1);t2=np.clip((P-Ej)@(Hj-Ej)/Lf**2,0,1);d1=np.linalg.norm(P-(Sj+np.outer(t1,Ej-Sj)),axis=1);d2=np.linalg.norm(P-(Ej+np.outer(t2,Hj-Ej)),axis=1)
         us=np.where(d1<d2,t1*Lu,Lu+t2*Lf)/(Lu+Lf);u=np.where(sg*(P[:,0]-MID)>0,us,u)
     return u
-U=armu(P0);a=np.clip(sm(Av,6),0,1)
+U=armu(P0)
+Lu_=np.linalg.norm(JPOS['mixamorig:LeftForeArm']-JPOS['mixamorig:LeftArm']);Lf_=np.linalg.norm(JPOS['mixamorig:LeftHand']-JPOS['mixamorig:LeftForeArm'])
+UEND=(Lu_+SLEND)/(Lu_+Lf_) if SLEND>=0 else 1.0;CU=ENV('CUFFU',UEND-ENV('CUFFW',0.05)/(Lu_+Lf_)) if SLEND>=0 else CU
+a=np.clip(sm(Av,6),0,1)
 o_t=ENV('OT',0.009)+ENV('FLARE',0.012)*ss((HEMY+0.05-P0[:,1])/0.05)
-bump=ss((U-0.15)/0.35)*(1-ss((U-ENV('CUFFU',0.86)+0.06)/0.08))
+bump=ss((U-0.15)/0.35)*(1-ss((U-CU+0.06)/0.08))
 o_s=ENV('OS',0.010)+ENV('PUFF',0.03)*bump
 pit=np.exp(-((a-0.5)/0.18)**2)   # the armpit: arm and trunk meet, keep the cloth close so they do not cut into each other
 o=sm(o_t*(1-a)+o_s*a,8);o=o*(1-0.5*pit)
@@ -112,7 +118,8 @@ bv=np.unique(BE_);neckline=bv[P0[bv,1]>FY-0.04];dneck=cKDTree(P0[neckline]).quer
 # Peter Pan collar: a band round the neck, two rounded lobes at the front, split at the centre front
 lob=np.max([ENV('LOBR',0.06)-np.hypot(np.abs(P0[:,0]-MID)-ENV('LOBX',0.05),dneck-ENV('LOBD',0.015)) for _ in (0,)],0)
 fcol=np.where(front>0.35,np.maximum(lob,0.016-dneck),ENV('COLW',0.050)-dneck);fcol=np.minimum(fcol,np.where(front>0.35,np.abs(P0[:,0]-MID)-0.004-ENV('VGAP',0.5)*dneck,1.0));fcol=np.minimum(fcol,0.5-a)
-fcuff=U-ENV('CUFFU',0.86);fcuff=np.where(a>0.5,fcuff,-1.0)
+fband=np.where(a<0.5,(HEMY+BANDH)-P0[:,1],-1.0) if BANDH>0 else np.full(len(P0),-1.0)
+fcuff=U-CU;fcuff=np.where(a>0.5,fcuff,-1.0)
 fpl=np.minimum(ENV('PLW',0.019)-np.abs(P0[:,0]-MID),front-0.6);fpl=np.minimum(fpl,0.5-a)
 def cutf(Fc,f,arrs):
     f=f.copy();f[np.abs(f)<1e-9]=-1e-9;pos=f[Fc]>0;n=pos.sum(1);mx=(n==1)|(n==2)
@@ -122,9 +129,9 @@ def cutf(Fc,f,arrs):
     t=np.clip(f[i_]/(f[i_]-f[j_]),1e-3,1-1e-3);nid=len(f)+np.arange(len(ue))
     out=[np.r_[X,X[i_]+(X[j_]-X[i_])*t.reshape(-1,*[1]*(X.ndim-1))] for X in arrs];p=nid[inv[:len(Fm)]];q=nid[inv[len(Fm):]]
     return np.r_[Fc[~mx],np.c_[A_,p,q],np.c_[p,B_,C_],np.c_[p,C_,q]],out
-arrs=[S[b] for b in BL]+[NB[b] for b in BL]+[o,Wv,LFv,fcol,fcuff,fpl]
-for k in (len(arrs)-3,len(arrs)-2,len(arrs)-1):F,arrs=cutf(F,arrs[k],arrs)
-S={b:arrs[i] for i,b in enumerate(BL)};NB={b:arrs[4+i] for i,b in enumerate(BL)};o,Wv,LFv,fcol,fcuff,fpl=arrs[8:]
+arrs=[S[b] for b in BL]+[NB[b] for b in BL]+[o,Wv,LFv,fcol,fcuff,fpl,fband]
+for k in (len(arrs)-4,len(arrs)-3,len(arrs)-2,len(arrs)-1):F,arrs=cutf(F,arrs[k],arrs)
+S={b:arrs[i] for i,b in enumerate(BL)};NB={b:arrs[4+i] for i,b in enumerate(BL)};o,Wv,LFv,fcol,fcuff,fpl,fband=arrs[8:]
 for b in BL:NB[b]/=np.linalg.norm(NB[b],axis=1,keepdims=True).clip(1e-12)
 fcen=lambda f:f[F].mean(1)
 # cloth bridges hollows (between and under the breasts) instead of following the skin into them: smooth the outer surface, never closer than OMIN
@@ -174,10 +181,11 @@ def layer(Fl,extra,col,rim=True,rimD=False):
 layer(F,0.0,0)                                              # the blouse
 layer(F[fcen(fpl)>0],ENV('PLUP',0.003),0,rimD=True)                   # the placket, raised
 layer(F[fcen(fcuff)>0],ENV('CUFFUP',0.010),1,rimD=True)               # cream cuffs, standing out from the gathered sleeve
+if BANDH>0:layer(F[fcen(fband)>0],ENV('BANDUP',0.008),1,rimD=True)   # cream band round the hem
 layer(F[fcen(fcol)>0],ENV('COLUP',0.007),1,rimD=True)                 # cream Peter Pan collar
 # buttons: three domed discs down the placket
 P0=S['plus'];front=np.cos(np.arctan2(P0[:,0]-MID,P0[:,2]-zc));col_=np.where((np.abs(P0[:,0]-MID)<0.006)&(front>0.8))[0]
-ys=np.linspace(FY-ENV('BTOP',0.05),HEMY+ENV('BBOT',0.03),3)   # top button just under the collar's V, bottom one at the hem
+ys=np.linspace(FY-ENV('BTOP',0.05),HEMY+BANDH+ENV('BBOT',0.03),3)   # top button just under the collar's V, bottom one at the hem
 R_=ENV('BR',0.0155);NS=16;ang=np.linspace(0,2*np.pi,NS,endpoint=False)
 for yk in ys:
     i=col_[np.argmin(np.abs(P0[col_,1]-yk))];base=nv[0]
@@ -200,7 +208,7 @@ for b in BL:
     X=body_of(b);_,ii=cKDTree(V[b][CL==0]).query(X);d=np.linalg.norm(X-V[b][CL==0][ii],axis=1);inside|=(d<ENV('COVD',0.04))
 inside&=(Xb[:,1]>HEMY+0.01)&((Xb-F_)@n_<-0.008)&(jw(('Hand','Head'))<0.05)&(jw(('Neck',))<0.5)&(jw(('UpLeg','Leg','Foot'))<0.5)
 for s,sg in (('Left',1),('Right',-1)):
-    Ej,Hj=JPOS['mixamorig:'+s+'ForeArm'],JPOS['mixamorig:'+s+'Hand'];d=(Hj-Ej)/np.linalg.norm(Hj-Ej);inside&=~((sg*(Xb[:,0]-MID)>0.08)&(Wb>0.3)&((Xb-(Hj-d*0.025))@d>0))
+    Ej,Hj=JPOS['mixamorig:'+s+'ForeArm'],JPOS['mixamorig:'+s+'Hand'];d=(Hj-Ej)/np.linalg.norm(Hj-Ej);inside&=~((sg*(Xb[:,0]-MID)>0.08)&(Wb>0.3)&((Xb-((Ej+d*(SLEND-0.015)) if SLEND>=0 else (Hj-d*0.025)))@d>0))
 cover=np.where(inside)[0];print('  hides %d skin points'%len(cover))
 # ---- write (same layout as fit_clean.py)
 from PIL import Image
