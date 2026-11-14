@@ -10,20 +10,20 @@ Z=np.load(H+'/../in_sd/%s.npz'%n);P=Z['P'].astype(float);UV=Z['UV'].astype(float
 s=ENV('HEIGHT',1.80)/np.ptp(P[:,1]);P=P*s;P[:,1]-=P[:,1].min();P[:,0]-=(P[:,0].max()+P[:,0].min())/2
 # ---- Meshy embossed its painted face into the surface (rings round the old eyes, cheek marks): smooth the front of the head flat
 _,wi=np.unique(np.round(P*2e4).astype(np.int64),axis=0,return_inverse=True);wi=wi.ravel();nwv=wi.max()+1;FWd=wi[F];Ew=np.unique(np.sort(np.r_[FWd[:,[0,1]],FWd[:,[1,2]],FWd[:,[2,0]]],axis=1),axis=0);Ew=Ew[Ew[:,0]!=Ew[:,1]]
-if ENV('SMOOTHFACE',40):
+if ENV('SMOOTHFACE',45):
     NKs=ENV('NECKY',1.36);PW=np.zeros((nwv,3));PW[wi]=P;fzs=PW[(PW[:,1]>NKs+0.1)&(np.abs(PW[:,0])<0.04),2].max()
     mk=np.clip((PW[:,2]-(fzs-ENV('SMD',0.15)))/0.04,0,1)*np.clip((PW[:,1]-(NKs+0.01))/0.03,0,1)*(np.abs(PW[:,0])<ENV('SMW',0.21));dg=np.zeros(nwv);np.add.at(dg,Ew[:,0],1);np.add.at(dg,Ew[:,1],1);dg=np.maximum(dg,1)
-    for _ in range(ENV('SMOOTHFACE',40)):
+    for _ in range(ENV('SMOOTHFACE',45)):
         nb=np.zeros_like(PW);np.add.at(nb,Ew[:,0],PW[Ew[:,1]]);np.add.at(nb,Ew[:,1],PW[Ew[:,0]]);PW=PW+(0.5*mk)[:,None]*(nb/dg[:,None]-PW)
     P=PW[wi]
 # ---- profile (Andrew's side-view markup): a real nose, lips and chin stand out from the face; the eyes sit a little in
 if ENV('PROFILE',1):
     EYp=ENV('EYEY',1.555);K=ENV('FK',1.0);fz=float(P[(np.abs(P[:,1]-EYp)<0.03)&(np.abs(P[:,0])<0.04),2].max());fr=np.clip((P[:,2]-(fz-0.10*K))/(0.06*K),0,1)*(P[:,1]>ENV('NECKY',1.36))
     gb=lambda x0,y0,rx,ry:np.exp(-(((np.abs(P[:,0])-x0)/(rx*K))**2+((P[:,1]-(EYp+y0*K))/(ry*K))**2))
-    dz=ENV('NOSE',0.034)*gb(0,-0.062,0.02,0.024)+0.012*gb(0,-0.045,0.016,0.035)     # the tip, and the bridge running up to the brow
-    dz+=ENV('LIPS',0.009)*gb(0,-0.115,0.045,0.016)+ENV('CHIN',0.014)*gb(0,-0.165,0.045,0.03)
-    dz+=0.006*gb(0,0.05,0.12,0.02)-ENV('SOCKET',0.0)*gb(0.105,0.0,0.05,0.035)-0.006*gb(0,-0.092,0.03,0.008)   # brow, eye sockets, the dip under the nose
-    P[:,2]+=dz*K*fr;print('  profile: nose stands %.1f cm out'%(ENV('NOSE',0.034)*K*100))
+    dz=ENV('NOSE',0.042)*gb(0,-0.062,0.02,0.024)+0.012*gb(0,-0.045,0.016,0.035)     # the tip, and the bridge running up to the brow
+    dz+=ENV('LIPS',0.009)*gb(0,-0.10,0.045,0.016)+ENV('CHIN',0.014)*gb(0,-0.165,0.045,0.03)
+    dz+=0.006*gb(0,0.05,0.12,0.02)-ENV('SOCKET',0.0)*gb(0.105,0.0,0.05,0.035)-0.006*gb(0,-0.083,0.03,0.007)   # brow, eye sockets, the dip under the nose
+    P[:,2]+=dz*K*fr;print('  profile: nose stands %.1f cm out'%(ENV('NOSE',0.042)*K*100))
 T=Image.open(H+'/../in_sd/%s.jpg'%n).convert('RGB');TW,TH=T.size;A=np.asarray(T).astype(float)
 col=A[np.clip((UV[:,1]%1*TH).astype(int),0,TH-1),np.clip((UV[:,0]%1*TW).astype(int),0,TW-1)]
 # ---- face: where it is (dark paint on the front of the head), then paint it out
