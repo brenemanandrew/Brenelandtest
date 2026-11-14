@@ -9,55 +9,92 @@
  "swing_tree.glb": {
   "id": "T7",
   "preview": "01a1dc01-226c-7338-a007-3e6b4feb5c8b",
-  "refine": "01a1dc02-18f1-7736-a854-f24c4f38dcce"
+  "refine": "01a1dc02-18f1-7736-a854-f24c4f38dcce",
+  "done": true,
+  "credits": 10
  },
  "hedge_end.glb": {
   "id": "P2",
-  "preview": "01a1dc01-2edb-736b-a630-6c0152dc85bd"
+  "preview": "01a1dc01-2edb-736b-a630-6c0152dc85bd",
+  "refine": "01a1dc02-1fdf-70b9-a45c-eb5902474f70",
+  "done": true,
+  "credits": 10
  },
  "fern.glb": {
   "id": "P4",
   "preview": "01a1dc01-37af-7633-a681-3cf75702209c",
-  "refine": "01a1dc01-b84f-7206-9a97-8260e734b126"
+  "refine": "01a1dc01-b84f-7206-9a97-8260e734b126",
+  "done": true,
+  "credits": 10
  },
  "mushrooms.glb": {
   "id": "P5",
-  "preview": "01a1dc01-41c0-7314-bd09-b78e27b47aa8"
+  "preview": "01a1dc01-41c0-7314-bd09-b78e27b47aa8",
+  "refine": "01a1dc02-95dd-77dc-977d-0973b107c083",
+  "done": true,
+  "credits": 10
  },
  "log.glb": {
   "id": "P7",
-  "preview": "01a1dc01-4c7b-72c6-aa3b-ab2678e40fb0"
+  "preview": "01a1dc01-4c7b-72c6-aa3b-ab2678e40fb0",
+  "refine": "01a1dc02-2660-772e-9be4-3c34d8c35347",
+  "done": true,
+  "credits": 10
  },
  "shore_rock.glb": {
   "id": "P8",
-  "preview": "01a1dc01-5942-73b7-bad6-02a89dd91864"
+  "preview": "01a1dc01-5942-73b7-bad6-02a89dd91864",
+  "refine": "01a1dc02-2b0b-7038-9097-5a943ce42078",
+  "done": true,
+  "credits": 10
  },
  "grass_tuft.glb": {
   "id": "P9",
-  "preview": "01a1dc01-6328-76ca-98b5-a6daee82d736"
+  "preview": "01a1dc01-6328-76ca-98b5-a6daee82d736",
+  "refine": "01a1dc02-9eea-705d-b7af-e1a9f0afa70b",
+  "done": true,
+  "credits": 10
  },
  "carrots.glb": {
   "id": "G3",
-  "preview": "01a1dc01-6eec-765f-b994-198f77b08cca"
+  "preview": "01a1dc01-6eec-765f-b994-198f77b08cca",
+  "refine": "01a1dc03-6a43-7473-8b10-f3c2d0bbcf19",
+  "done": true,
+  "credits": 10
  },
  "strawberries.glb": {
   "id": "G4",
-  "preview": "01a1dc01-7a07-7663-b811-6afa020f70da"
+  "preview": "01a1dc01-7a07-7663-b811-6afa020f70da",
+  "refine": "01a1dc02-31c3-7552-a796-0b9310aab594",
+  "done": true,
+  "credits": 10
  },
  "herb_pot.glb": {
   "id": "G8",
-  "preview": "01a1dc01-8318-7573-ac6c-89c769b0681c"
+  "preview": "01a1dc01-8318-7573-ac6c-89c769b0681c",
+  "refine": "01a1dc05-0b80-7170-89b2-43f6819b3bdd",
+  "done": true,
+  "credits": 10
  },
  "weed.glb": {
   "id": "G9",
-  "preview": "01a1dc01-8cec-7652-9560-525188d7fb1c"
+  "preview": "01a1dc01-8cec-7652-9560-525188d7fb1c",
+  "refine": "01a1dc02-3835-776b-ab42-a0054877b639",
+  "done": true,
+  "credits": 10
  },
  "rose_arch.glb": {
   "id": "G10",
-  "preview": "01a1dc01-9a8a-7302-a533-4e5cf71ceb9a"
+  "preview": "01a1dc01-9a8a-7302-a533-4e5cf71ceb9a",
+  "refine": "01a1dc02-a875-77f7-b988-f13c3707c26e",
+  "done": true,
+  "credits": 10
  },
  "trellis.glb": {
   "id": "G11",
-  "preview": "01a1dc01-a5f7-77a8-a558-86e736a5b123"
+  "preview": "01a1dc01-a5f7-77a8-a558-86e736a5b123",
+  "refine": "01a1dc02-b17f-762e-9565-f3212fe21d8f",
+  "done": true,
+  "credits": 10
  }
 }
