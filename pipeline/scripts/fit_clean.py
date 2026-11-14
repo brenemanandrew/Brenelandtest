@@ -123,6 +123,27 @@ if slot=='top':
     for b in order:
         bd=Body(body_of(b));P,s,WA=fit_top(bd,SY);SY=SY or s
         if not KEEP:P=push_out(P,bd,mcf)
+        if ENV('HUG',0.0)>0:   # Andrew's markup: shoulders and upper sleeves sit down on her (no raised shoulder, no hump at the back); forearm puffs and cuffs keep their shape
+            X_=body_of(b);zw=np.zeros(len(BP))
+            for side in ('Left','Right'):   # along the arm from the shoulder joint: full at the cap, gone by HUGEND of the upper arm (the puff below keeps its shape)
+                Sj,Ej=JPOS['mixamorig:'+side+'Arm'],JPOS['mixamorig:'+side+'ForeArm'];Lu=np.linalg.norm(Ej-Sj);u=(X_-Sj)@((Ej-Sj)/Lu)
+                zw=np.maximum(zw,jw((side+'Shoulder',side+'Arm',side+'ForeArm'))*(1-ss((u/Lu-ENV('HUGFULL',0.35))/(ENV('HUGEND',0.8)-ENV('HUGFULL',0.35)))))
+            CZb=JPOS['mixamorig:Spine2'][2];bk=ss((CZb-X_[:,2])/0.04)*ss((X_[:,1]-(YSHT-ENV('HUGBACKY',0.24)))/0.05)*(jw(('Spine','Shoulder'))>0.3)   # upper back, shoulder blades
+            zw=np.maximum(zw,ENV('HUGBACK',1.0)*bk)
+            zw*=(jw(('Neck','Head'))<ENV('HUGNECKW',0.3))*ss((np.abs(X_[:,0]-MID)-ENV('HUGNECK',0.05))/0.03)   # not right at the neck (the collar stands there)
+            for _ in range(ENV('HUGIT',6)):
+                d,i=bd.sd(P);w_=zw[bd.src[i]]*ENV('HUG',0.0);m=(d>ENV('HUGC',0.012))&(d<ENV('HUGMAX',0.08))
+                D=np.where(m[:,None],-bd.SN[i]*((d-ENV('HUGC',0.012))*w_)[:,None],0.0);P=P+gsmooth(D,ENV('HUGSM',4))
+            if ENV('SLEEVEK',0.0)>0:   # Andrew: sleeves from the elbow down too big: keep SLEEVEK of the puff, the cuff closes in to the wrist (SLEEVEKC)
+                z2=np.zeros(len(BP));kz=np.ones(len(BP))
+                for side in ('Left','Right'):
+                    Sj,Ej,Hj=[JPOS['mixamorig:'+side+k] for k in ('Arm','ForeArm','Hand')];Lu=np.linalg.norm(Ej-Sj);u=(X_-Sj)@((Ej-Sj)/Lu)
+                    z2=np.maximum(z2,jw((side+'ForeArm',side+'Hand'))+jw((side+'Arm',))*ss((u/Lu-0.35)/0.45))
+                    dh=np.linalg.norm(X_-Hj,axis=1);kz=np.minimum(kz,np.where(jw((side+'Arm',side+'ForeArm',side+'Hand'))>0.3,ENV('SLEEVEKC',0.15)+(ENV('SLEEVEK',0.0)-ENV('SLEEVEKC',0.15))*ss((dh-0.03)/0.12),1))
+                z2=np.clip(z2,0,1);c_=ENV('HUGC',0.012);d0,i0=bd.sd(P);src0=bd.src[i0];w2=z2[src0];T=c_+(np.minimum(d0,0.25)-c_)*kz[src0]
+                for _ in range(ENV('SLEEVEIT',10)):
+                    d,i=bd.sd(P);mv=np.where((d>T)&(w2>0.01),(d-T)*w2,0.0);P=P+gsmooth(-bd.SN[i]*mv[:,None],3)
+            d,_=bd.sd(P);print('  %s hug: points within 2 cm of skin in the shoulder zone %.0f%%'%(b,100*np.mean(d[zw[bd.src[bd.sd(P)[1]]]>0.5]<0.02)))
         if ENV('SETTLE',1) and not KEEP:   # cloth over the tops of the shoulders rests on them instead of floating; spread smoothly
             for _ in range(3):
                 d,i=bd.sd(P);n_=bd.SN[i];m=(n_[:,1]>0.45)&(d>0.007)&(d<ENV('SETTLED',0.07))&(P[:,1]>YSHT-0.16)
@@ -165,6 +186,7 @@ if slot=='bottom' and 'skirt' in key:
         # the scan's own radius, scaled so its waistband sits on her waist; then never inside the hull
         rs=np.hypot(rel0[:,0],rel0[:,2]);wb=t<0.03;sc=np.median(hull[0])/max(np.median(rs[wb]),1e-6)*1.0
         r=np.maximum(rs*sc,hr+np.where(t<0.06,0.006,0.012))
+        fl=hr+np.where(t<0.06,0.006,0.012);r=fl+(r-fl)*(1-ENV('FRONTK',0.0)*np.clip(np.cos(th),0,1)**2)   # less flare at the front (Andrew)
         P=np.c_[MID+r*np.sin(th),y,CZ+r*np.cos(th)];fits[b]=P;print(name,b,'waist r %.3f hem r %.3f'%(np.median(r[t<0.02]),np.median(r[t>0.98])))
 # ---- shoes: a pair, one size for both, each set on its foot (heel to toe, sole on the floor), let out sideways if the foot is broad
 if slot=='shoes':
@@ -186,7 +208,9 @@ if slot=='shoes':
 # ---- a solid Meshy garment has an inside wall: the push-out moves it more than the outside and it shows through as blotches.
 #      Faces that face the body (inner wall) are dropped; the builder draws the cloth two-sided, so one layer is enough
 if ENV('INNER',1):
-    bdi=Body(body_of(BUILDS[0]));Pb=fits[BUILDS[0]];cf=Pb[GF].mean(1);_,ii=bdi.t.query(cf);out_=cf-bdi.S[ii];out_/=np.linalg.norm(out_,axis=1,keepdims=True).clip(1e-9)
+    bdi=Body(body_of(BUILDS[0]));Pb=fits[BUILDS[0]];cf=Pb[GF].mean(1);_,ii=bdi.t.query(cf);out_=cf-bdi.S[ii]
+    if slot=='bottom' and 'skirt' in key:out_=np.c_[cf[:,0]-MID,np.zeros(len(cf)),cf[:,2]-CZ]   # a skirt's outside is straight out from its axis (low on a flare the nearest skin is up at the hips)
+    out_/=np.linalg.norm(out_,axis=1,keepdims=True).clip(1e-9)
     fnm=np.cross(Pb[GF[:,1]]-Pb[GF[:,0]],Pb[GF[:,2]]-Pb[GF[:,0]]);fnm/=np.linalg.norm(fnm,axis=1,keepdims=True).clip(1e-12)
     keepF=(fnm*out_).sum(1)>ENV('INDOT',-0.15)
     # small islands left behind go too
