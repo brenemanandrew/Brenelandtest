@@ -84,6 +84,17 @@ def take(dst,src):
     si=np.where(src)[0];dd,kk=cKDTree(Xp[si]).query(P[dst],k=4);w=1/(dd+1e-3);w/=w.sum(1,keepdims=True);W[dst]=(Wod[si[kk]]*w[:,:,None]).sum(1)
 HY=float(Z['heady']) if 'heady' in Z else ENV('HEADY',1.44);E=np.unique(np.sort(np.r_[F[:,[0,1]],F[:,[1,2]],F[:,[2,0]]],axis=1),axis=0);deg=np.zeros(len(P));np.add.at(deg,E[:,0],1);np.add.at(deg,E[:,1],1);deg=np.maximum(deg,1)
 if 'W' in Z:W=Z['W'].astype(float)   # weights that came with the model (Meshy's own rig), already on our bones
+if 'W' in Z and ENV('FINGERS',1):   # Meshy's rig stops at the hand: share each hand's weight out to our finger bones, by the nearest finger segment
+    for side in ('Left','Right'):
+        hi=ix[side+'Hand'];hv=np.where(W[:,hi]>0.02)[0];segs=[]
+        for f_ in ('Thumb','Index','Middle','Ring','Pinky'):
+            j=[ix[side+'Hand'+f_+str(k)] for k in (1,2,3,4)];segs+=[(pT[hi],pT[j[0]],hi),(pT[j[0]],pT[j[1]],j[0]),(pT[j[1]],pT[j[2]],j[1]),(pT[j[2]],pT[j[3]],j[2])]
+        D_=np.zeros((len(hv),len(segs)))
+        for k,(a_,b_,_) in enumerate(segs):
+            ab=b_-a_;t_=np.clip(((P[hv]-a_)@ab)/max(ab@ab,1e-12),0,1);D_[:,k]=np.linalg.norm(P[hv]-(a_+np.outer(t_,ab)),axis=1)
+        w_=np.exp(-((D_-D_.min(1,keepdims=True))/ENV('FINGSIG',0.006))**2);w_/=w_.sum(1,keepdims=True);sh_=W[hv,hi].copy();W[hv,hi]=0
+        for k,(_,_,bone) in enumerate(segs):W[hv,bone]+=sh_*w_[:,k]
+    print('  fingers: hand weights shared out to %d finger bones'%int((W[:,[i for i,n in enumerate(short) if 'Hand' in n and n[-1].isdigit()]].max(0)>0.2).sum()))
 else:
     KS=float(np.linalg.norm(np.array(J['HandEnd'])-np.array(J['Hand']))/0.152) if 'joints' in Z else 1.0;AX=ENV('ARMX',0.33)*KS;LY=ENV('LEGY',0.74)*KS
     for side,sg in (('Left',1),('Right',-1)):

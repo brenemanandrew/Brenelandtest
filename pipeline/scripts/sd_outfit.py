@@ -25,7 +25,7 @@ zf=float(P[(np.abs(P[:,1]-ey)<0.02)&(np.abs(P[:,0])<0.03),2].max())
 fc=P[F].mean(1);fm=(fc[:,1]>NK+ENV('FACELO',-0.02))&(fc[:,1]<ey+ENV('FACEUP',0.2))&(np.abs(fc[:,0])<ENV('FACEW',0.235))&(fc[:,2]>zf-ENV('FACED',0.17))
 D=ImageDraw.Draw(T);sk=tuple(int(x) for x in skin)
 for tri in F[fm]:
-    D.polygon([(UV[i,0]%1*TW,UV[i,1]%1*TH) for i in tri],fill=sk,outline=sk)
+    pts=[(UV[i,0]%1*TW,UV[i,1]%1*TH) for i in tri];D.polygon(pts,fill=sk,outline=sk);D.line(pts+[pts[0]],fill=sk,width=ENV('ERASEW',9))   # (a wide edge: the soft rim of the old paint goes too)
 print('  %s: scale %.4f, face: eye line y %.3f, eyes at x +-%.3f, front z %.3f, skin %s, %d face triangles painted out'%(n,s,ey,ex,zf,sk,int(fm.sum())))
 # ---- joints
 JF={'Hips':[0,0.80,-0.01],'Spine':[0,0.92,0.0],'Spine1':[0,1.02,0.01],'Spine2':[0,1.12,0.01],'Neck':[0,1.31,-0.02],'Head':[0,1.37,0.0],'HeadTop_End':[0,1.80,0.0],'headfront':[0,1.37,0.25],
