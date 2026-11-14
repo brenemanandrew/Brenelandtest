@@ -22,18 +22,19 @@ def mk(J,B):
     return acc
 ss=lambda t:np.clip(t,0,1)**2*(3-2*np.clip(t,0,1))
 # ---- body
-BJ,BB=glb(R+'/'+{'m':'male-body-final.glb','f':'base-plus-build.glb'}[body_id]);ba=mk(BJ,BB);bp=BJ['meshes'][0]['primitives'][0]
+BODY=os.environ.get('BODY')   # another rigged body (Andrew's Meshy figures): one build, no shoulder lift, midline 0
+BJ,BB=glb(BODY if BODY else R+'/'+{'m':'male-body-final.glb','f':'base-plus-build.glb'}[body_id]);ba=mk(BJ,BB);bp=BJ['meshes'][0]['primitives'][0]
 BP=ba(bp['attributes']['POSITION']).astype(float);BF=ba(bp['indices']).reshape(-1,3).astype(int)
 BJn=ba(bp['attributes']['JOINTS_0']).astype(int);BW=ba(bp['attributes']['WEIGHTS_0']).astype(float)
-tnames=BJ['meshes'][0]['extras']['targetNames'];BT={n:ba(bp['targets'][i]['POSITION']).astype(float) for i,n in enumerate(tnames)}
+tnames=BJ['meshes'][0]['extras']['targetNames'];BT={} if BODY else {n:ba(bp['targets'][i]['POSITION']).astype(float) for i,n in enumerate(tnames)}
 jn=[BJ['nodes'][j]['name'] for j in BJ['skins'][0]['joints']];NJ=len(jn);ji=lambda n:jn.index('mixamorig:'+n)
 Wd=np.zeros((len(BP),NJ));np.add.at(Wd,(np.repeat(np.arange(len(BP)),4),BJn.ravel()),BW.ravel())
 IBM=ba(BJ['skins'][0]['inverseBindMatrices']).astype(float);JPOS={n_:np.linalg.inv(IBM[i].reshape(4,4).T)[:3,3] for i,n_ in enumerate(jn)}
-MID={'f':0.0175,'m':0.0}[body_id]
+MID=float(os.environ.get('MIDX',0.0)) if BODY else {'f':0.0175,'m':0.0}[body_id]
 jw=lambda keys:Wd[:,[i for i,n_ in enumerate(jn) if any(k in n_ for k in keys)]].sum(1)
 # her shoulder lift (4 cm, arms fully, collar 70%), as the game does it at load; clothes carry it baked in
 LIFT=np.zeros(len(BP))
-if body_id=='f':
+if body_id=='f' and not BODY:
     wt=np.zeros(NJ)
     for i_,n_ in enumerate(jn):
         if any(k in n_ for k in ('Arm','Hand')):wt[i_]=1
@@ -57,6 +58,7 @@ class Body:
     def sd(s,Q):
         d,i=s.t.query(Q);v=Q-s.S[i];sg=np.sign((v*s.SN[i]).sum(1));sg[sg==0]=1;return d*sg,i
 BUILDS={'f':['plus','average','slim','athletic'],'m':['average','slim','heavy','athletic']}[body_id]   # the first is the base
+if BODY:BUILDS=['base']
 def body_of(b):return BP+(BT[b] if b in BT else 0)
 # ---- the scan
 Z=np.load(INP);G0=Z['P'].astype(float);GF=Z['F'].astype(int)
@@ -70,7 +72,7 @@ def gsmooth(A,it,lam=0.5):
 gy0,gy1=G0[:,1].min(),G0[:,1].max();gh=gy1-gy0
 def rot_to(a,b):
     v=np.cross(a,b);c=float(a@b);K=np.array([[0,-v[2],v[1]],[v[2],0,-v[0]],[-v[1],v[0],0]]);return np.eye(3)+K+K@K/(1+c)
-sh_=(jw(('LeftShoulder','RightShoulder','LeftArm','RightArm'))>0.5)&(np.abs(BP[:,0]-MID)<0.25);YSHT=float((BP[sh_,1]+LIFT[sh_]).max());print('  shoulder top %.3f'%YSHT)
+sh_=(jw(('LeftShoulder','RightShoulder','LeftArm','RightArm'))>0.5)&(np.abs(BP[:,0]-MID)<0.25);YSHT=float(os.environ.get('YSHT',(BP[sh_,1]+LIFT[sh_]).max()));print('  shoulder top %.3f'%YSHT)
 def fit_top(bd,sy=None):
     # 1. size and place: trunk points just outside the skin
     core=np.where((np.abs(G0[:,0])<0.16*gh/0.6*0.6)&(G0[:,1]>gy0+0.3*gh)&(G0[:,1]<gy0+0.8*gh))[0]
@@ -210,7 +212,7 @@ if slot=='bottom' and 'skirt' not in key:
     for sg in (1,-1):
         m=(sg*G0[:,0]>0)&(G0[:,1]<ycs);cx=prof(G0[:,0],lg_s,np.mean,m);cz=prof(G0[:,2],lg_s,np.mean,m)
         r=np.hypot(G0[:,0]-at(cx,lg_s),G0[:,2]-at(cz,lg_s));Sl[sg]=(cx,cz,sm_(prof(r,lg_s,np.mean,m),6))
-    legw=jw(('UpLeg','Leg','Foot','Toe'));trw=jw(('Hips','Spine'))+legw;ycr=BP[(legw>0.3)&(np.abs(BP[:,0]-MID)<0.02),1].max();ank=JPOS['mixamorig:LeftFoot'][1]
+    legw=jw(('UpLeg','Leg','Foot','Toe'));trw=jw(('Hips','Spine'))+legw;ycr=float(os.environ.get('YCR',BP[(legw>0.3)&(np.abs(BP[:,0]-MID)<0.02),1].max()));ank=JPOS['mixamorig:LeftFoot'][1]
     YT=ENV('YT',1.06);YB=ank+ENV('HEMUP',0.035);K_=ENV('EASE',1.05);bl_=ss((G0[:,1]-(ycs-0.05*gh))/(0.10*gh))   # 1 = seat mapping, 0 = leg mapping
     for b in BUILDS:
         X=body_of(b);tb=trw>0.6;ub=np.clip((YT-X[:,1])/(YT-ycr),0,1);lb=np.clip((ycr-X[:,1])/(ycr-YB),0,1);hi=tb&(X[:,1]>=ycr-0.01)&(X[:,1]<=YT+0.02)
@@ -482,7 +484,8 @@ def add(arr,comp,typ,mm=False):
     if mm:a['min']=[float(x) for x in arr.min(0)];a['max']=[float(x) for x in arr.max(0)]
     accs.append(a);return len(accs)-1
 pr={'attributes':{'POSITION':add(V.astype(np.float32),5126,'VEC3',True),'NORMAL':add(VN.astype(np.float32),5126,'VEC3'),'TEXCOORD_0':add(VUV.astype(np.float32),5126,'VEC2'),'JOINTS_0':add(top4[src].astype(np.uint16),5123,'VEC4'),'WEIGHTS_0':add(w4[src].astype(np.float32),5126,'VEC4')},
-    'indices':add(NF.astype(np.uint32).reshape(-1),5125,'SCALAR'),'material':1,'targets':[{'POSITION':add(TG[b].astype(np.float32),5126,'VEC3',True)} for b in names]}
+    'indices':add(NF.astype(np.uint32).reshape(-1),5125,'SCALAR'),'material':1}
+if names:pr['targets']=[{'POSITION':add(TG[b].astype(np.float32),5126,'VEC3',True)} for b in names]
 cv=add(np.where(hidden)[0].astype(np.uint32),5125,'SCALAR')
 buf=io.BytesIO();Image.fromarray(TEXI).save(buf,'PNG');IMG=buf.getvalue()
 while len(BIN)%4:BIN.append(0)
