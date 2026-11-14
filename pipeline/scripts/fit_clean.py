@@ -116,16 +116,31 @@ if slot=='top':
     mcf=lambda P:0.006+ENV('HIPCLR',0.026)*ss((YH+0.16-P[:,1])/0.08)   # over the hips a top clears whatever bottom is worn (a skirt's yoke sits ~2 cm out)   # a top hangs outside whatever is worn at the waist
 else:
     mcf=lambda P:np.full(len(P),0.006)
+KEEP=ENV('KEEP',0)   # 1: the garment keeps its own designed shape (shoulders, puffs); skin that would show through is hidden instead
 fits={};info={}
 if slot=='top':
     order=[b for b in BUILDS if b=='average']+[b for b in BUILDS if b!='average'];SY=None
     for b in order:
-        bd=Body(body_of(b));P,s,WA=fit_top(bd,SY);SY=SY or s;P=push_out(P,bd,mcf)
-        if ENV('SETTLE',1):   # cloth over the tops of the shoulders rests on them instead of floating; spread smoothly
+        bd=Body(body_of(b));P,s,WA=fit_top(bd,SY);SY=SY or s
+        if not KEEP:P=push_out(P,bd,mcf)
+        if ENV('SETTLE',1) and not KEEP:   # cloth over the tops of the shoulders rests on them instead of floating; spread smoothly
             for _ in range(3):
                 d,i=bd.sd(P);n_=bd.SN[i];m=(n_[:,1]>0.45)&(d>0.007)&(d<ENV('SETTLED',0.07))&(P[:,1]>YSHT-0.16)
                 D=np.where(m[:,None],-n_*(d-0.006)[:,None],0.0);P=P+gsmooth(D,6)
             P=push_out(P,bd,mcf,2)
+        if ENV('DROP',1) and not KEEP:   # straight down: cloth over the shoulders and the tops of the arms rests on them (puffed sleeve heads included)
+            X_=body_of(b)+np.c_[np.zeros(len(BP)),LIFT,np.zeros(len(BP))]*0;up=X_[:,1]>YSHT-0.30;Xu=X_[up];tu=cKDTree(Xu[:,[0,2]])
+            def gaps(Q):
+                g=np.full(len(Q),np.nan);zone=Q[:,1]>YSHT-ENV('DROPZ',0.14)
+                for k_,nb_ in zip(np.where(zone)[0],tu.query_ball_point(Q[zone][:,[0,2]],r=0.015)):
+                    if not nb_:continue
+                    yy=Xu[nb_,1];yy=yy[yy<Q[k_,1]+0.003]
+                    if len(yy):g[k_]=Q[k_,1]-yy.max()
+                return g
+            g0=gaps(P);print('  %s shoulder gap before: median %.1f mm, 90%% %.1f mm'%(b,np.nanmedian(g0)*1000,np.nanpercentile(g0,90)*1000))
+            for _ in range(ENV('DROPIT',7)):
+                g=gaps(P);D=np.zeros_like(P);m=np.isfinite(g)&(g>0.008);D[m,1]=-(g[m]-0.006);P=P+gsmooth(D,ENV('DROPSM',6))
+            P=push_out(P,bd,mcf,2);g1=gaps(P);print('  %s shoulder gap after:  median %.1f mm, 90%% %.1f mm'%(b,np.nanmedian(g1)*1000,np.nanpercentile(g1,90)*1000))
         fits[b]=P;info[b]=(s,WA,bd);print(name,b,'scale %.3f'%s,'y %.2f..%.2f'%(P[:,1].min(),P[:,1].max()))
 # ---- skirt: one tube from the waist; per build the radius at each height and angle clears the hull of the hips and legs
 if slot=='bottom' and 'skirt' in key:
@@ -209,10 +224,16 @@ for b in BUILDS:
         c=cand[v]
         if not c:continue
         D=P[c]-X[v];al=D@N[v];pp=np.linalg.norm(D-np.outer(al,N[v]),axis=1);h[v]=((al>0.002)&(pp<0.006+0.15*al)).any()
+    if KEEP:   # skin that pokes out through the cloth: cloth right behind it
+        cand2=t.query_ball_point(X-N*0.02,r=0.024)
+        for v in np.where(~h)[0]:
+            c=cand2[v]
+            if c:
+                D=P[c]-X[v];al=D@N[v];pp=np.linalg.norm(D-np.outer(al,N[v]),axis=1);h[v]=((al<0)&(al>-0.04)&(pp<0.012)).any()
     if slot=='top':h&=jw(('Head','Neck','Hand'))<0.35
     if slot=='shoes':h&=X[:,1]<P[:,1].max()-0.025
     if slot=='bottom':h&=(jw(('UpLeg','Leg','Foot'))<0.5)|(X[:,1]>ycr+0.01) if 'skirt' in key else h
-    hidden&=h
+    hidden=(hidden&h) if not KEEP else (h if b==BUILDS[0] else hidden|h)
 # drop single stragglers
 _,binv=np.unique(np.round(BP*1e5).astype(np.int64),axis=0,return_inverse=True);binv=binv.ravel();nwb=binv.max()+1
 hw=np.zeros(nwb,bool);hw[binv[hidden]]=True
