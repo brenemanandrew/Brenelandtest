@@ -47,11 +47,12 @@ def neutral(img):
     g = np.clip(0.55 + (lum - lum[leaf].mean()) * 1.2, 0, 1) if leaf.any() else lum   # pale, keeps the wash light/dark
     out = a.copy()
     for c, tint in enumerate((0.97, 1.0, 0.95)): out[..., c] = np.where(leaf, g * tint, a[..., c])
-    return Image.fromarray((out * 255).astype(np.uint8))
+    return Image.fromarray((out * 255).astype(np.uint8)), Image.fromarray((leaf * 255).astype(np.uint8))
 def run(name, src, mode, tgt, o):
     m = L.load(src)
     tex = m.visual.material.baseColorTexture
-    if o.get('neutral'): tex = neutral(tex)
+    leafmask = None
+    if o.get('neutral'): tex, leafmask = neutral(tex)
     v = m.vertices.copy()
     ext = v.max(0) - v.min(0)
     if o.get('long') and ext[2] > ext[0]: v = v[:, [2, 1, 0]] * [1, 1, -1]; ext = v.max(0) - v.min(0)
@@ -65,12 +66,15 @@ def run(name, src, mode, tgt, o):
     uv = m.visual.uv
     mat = trimesh.visual.material.PBRMaterial(baseColorTexture=tex, metallicFactor=0, roughnessFactor=1)
     t = trimesh.Trimesh(v, faces, visual=trimesh.visual.TextureVisuals(uv=uv, material=mat), process=False)
-    t.export(f'{R}converted/tex/{name}.glb')
+    t.export(f'{R}converted/tex/{name}.glb', include_normals=True)
     small = tex.convert('RGB').resize((512, 512))                  # bake: sample per vertex (soft blur, the wash survives a bit)
     a = np.asarray(small); hh, ww = a.shape[:2]
     x = np.clip((uv[:, 0] % 1) * (ww - 1), 0, ww - 1).astype(int); y = np.clip((1 - uv[:, 1] % 1) * (hh - 1), 0, hh - 1).astype(int)
-    col = np.c_[a[y, x], np.full(len(x), 255)].astype(np.uint8)
-    vc = trimesh.Trimesh(v, faces, vertex_colors=col, process=False); vc.export(f'{R}converted/vc/{name}.glb')
+    alpha = np.full(len(x), 255)
+    if leafmask is not None:                                       # alpha 128 = leaf: the game tints these by season
+        lm = np.asarray(leafmask.resize((512, 512))); alpha = np.where(lm[y, x] > 127, 128, 255)
+    col = np.c_[a[y, x], alpha].astype(np.uint8)
+    vc = trimesh.Trimesh(v, faces, vertex_colors=col, process=False); vc.export(f'{R}converted/vc/{name}.glb', include_normals=True)
     e = v.max(0) - v.min(0)
     return {'name': name, 'source': src, 'size_m': [round(float(x), 2) for x in e], 'tris': int(len(faces))}
 os.makedirs(R + 'converted/tex', exist_ok=True); os.makedirs(R + 'converted/vc', exist_ok=True)

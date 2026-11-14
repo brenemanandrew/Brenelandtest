@@ -1,0 +1,32 @@
+<!doctype html><html><body style="margin:0;background:#cfe6f2">
+<script type="importmap">{"imports":{"three":"/breneland-live/vendor/three/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from '/world-refresh/tools/vendor/loaders/GLTFLoader.js';
+import { addTree, LEAF } from '/breneland-live/js/world-trees.js';
+import { mulberry32 } from '/breneland-live/js/util.js';
+const P = new URLSearchParams(location.search), season = P.get('season') || 'summer';
+const KINDS = (P.get('kinds') || 'oak,maple,birch,pine,palm').split(',');
+const TINT = { summer: { oak: LEAF.summer[0], maple: LEAF.summer[1], birch: LEAF.birch[0] }, autumn: { oak: LEAF.woodFall[0], maple: LEAF.autumn ? LEAF.autumn[0] : '#e8893a', birch: LEAF.birchAutumn[0] } }[season];
+const grad = new THREE.DataTexture(new Uint8Array([110, 190, 255]), 3, 1, THREE.RedFormat); grad.minFilter = grad.magFilter = THREE.NearestFilter; grad.needsUpdate = true;
+function shim(group){ return { add(geo, mat, o={}){ const color = typeof mat==='string'?mat:(mat&&mat.color?'#'+mat.color.getHexString():'#888');
+  const m=new THREE.Mesh(geo,new THREE.MeshToonMaterial({color,gradientMap:grad,side:THREE.DoubleSide}));
+  if(o.matrix) m.applyMatrix4(o.matrix); else { m.position.set(o.x||0,o.y||0,o.z||0); m.scale.set(o.sx||1,o.sy||1,o.sz||1); m.rotation.set(o.rx||0,o.ry||0,o.rz||0); }
+  group.add(m);} }; }
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#cfe6f2');
+sc.add(new THREE.HemisphereLight(0xffffff, 0x88aa77, 1.2)); const dl = new THREE.DirectionalLight(0xffffff, 2.4); dl.position.set(-6, 10, 8); sc.add(dl);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 60), new THREE.MeshToonMaterial({ color: '#7fbf5a', gradientMap: grad })); ground.rotation.x = -Math.PI / 2; sc.add(ground);
+const ld = new GLTFLoader(); const gap = 7.5; let x = -(KINDS.length * 2 - 1) * gap / 2;
+for (const k of KINDS) {
+  const g = new THREE.Group(); addTree(shim(g), 0, 0, k, mulberry32(7), 1, { y: 0.05 }); g.position.x = x; sc.add(g); x += gap;
+  const gl = await new Promise((res, rej) => ld.load(`/world-refresh/models/converted/vc/${k}.glb`, res, undefined, rej));
+  const tint = new THREE.Color(TINT[k] || '#ffffff');
+  gl.scene.traverse(o => { if (!o.isMesh) return; const c = o.geometry.attributes.color;
+    if (c && c.itemSize === 4 && TINT[k]) { for (let i = 0; i < c.count; i++) if (c.getW(i) < 0.75) c.setXYZ(i, Math.min(1, c.getX(i) * tint.r * 1.9), Math.min(1, c.getY(i) * tint.g * 1.9), Math.min(1, c.getZ(i) * tint.b * 1.9)); c.needsUpdate = true; }
+    o.material = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad, side: THREE.DoubleSide }); });
+  gl.scene.position.x = x; sc.add(gl.scene); x += gap;
+}
+const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 500); cam.position.set(0, 4.5, 46); cam.lookAt(0, 3.4, 0);
+r.render(sc, cam); window.DBG = []; sc.traverse(o => { if (o.isMesh && o.geometry.attributes.color) { const c = o.geometry.attributes.color; let g = 0, n = c.count, lo = 0; for (let i = 0; i < n; i++) { if (c.getY(i) > c.getX(i) + 0.08) { g++; if (g < 4) window.DBG.push([c.getX(i), c.getY(i), c.getZ(i), c.getW(i)]); } if (c.getW(i) < 0.75) lo++; } window.DBG.push([n, g, lo, c.array.constructor.name, c.normalized]); } }); window.READY = 1;
+</script></body></html>
