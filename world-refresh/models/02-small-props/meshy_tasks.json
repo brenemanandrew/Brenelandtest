@@ -1,0 +1,104 @@
+{
+ "street_lamp.glb": {
+  "id": "S1",
+  "preview": "01a1dc08-a655-75e5-bd72-095126a096cc",
+  "refine": "01a1dc09-40c7-715d-8613-fd02011075fc",
+  "done": true,
+  "credits": 10
+ },
+ "post_lantern.glb": {
+  "id": "S2",
+  "preview": "01a1dc08-b242-702d-a60f-595fdf94c9f2",
+  "refine": "01a1dc09-480a-74ad-8f3a-f51c4bf177af",
+  "done": true,
+  "credits": 10
+ },
+ "dock_lantern.glb": {
+  "id": "S3",
+  "preview": "01a1dc08-c06e-758a-b7e3-55d095ba84dd",
+  "refine": "01a1dc09-4d9d-7403-833f-5a93543df98d",
+  "done": true,
+  "credits": 10
+ },
+ "wall_lantern.glb": {
+  "id": "S4",
+  "preview": "01a1dc08-cc39-7202-b862-0083255757e1",
+  "refine": "01a1dc09-b290-77cd-8c8c-5d0472e275ed",
+  "done": true,
+  "credits": 10
+ },
+ "pendant_lamp.glb": {
+  "id": "S5",
+  "preview": "01a1dc08-d69b-7676-8477-28de3466bee2",
+  "refine": "01a1dc09-5542-75f2-b799-b9901ff68d3a",
+  "done": true,
+  "credits": 10
+ },
+ "camp_lantern.glb": {
+  "id": "S6",
+  "preview": "01a1dc08-e428-7038-8828-60d190529a95",
+  "refine": "01a1dc09-b803-77b7-8a1d-7767a7a87896",
+  "done": true,
+  "credits": 10
+ },
+ "bus_stop_sign.glb": {
+  "id": "S7",
+  "preview": "01a1dc0a-0c73-7612-90d9-f5a0b3c76702",
+  "refine": "01a1dc0a-9ae5-761b-822a-ea5e8da59faa",
+  "done": true,
+  "credits": 10
+ },
+ "van_stop_sign.glb": {
+  "id": "S8",
+  "preview": "01a1dc0a-1644-73dd-8436-4510d7c6e08b",
+  "refine": "01a1dc0a-9ff6-74d1-a8cd-271a1fed011f",
+  "done": true,
+  "credits": 10
+ },
+ "planter_box.glb": {
+  "id": "S9",
+  "preview": "01a1dc0a-7882-7193-9e85-b2f0b15ef9dc",
+  "refine": "01a1dc0b-c107-7290-a1ac-28f97fa50bb6",
+  "done": true,
+  "credits": 10
+ },
+ "planter_brick.glb": {
+  "id": "S10",
+  "preview": "01a1dc0a-81a4-7570-84c6-2f8a33e09a3a",
+  "refine": "01a1dc0d-42b2-748a-90e0-a8db41502fbd"
+ },
+ "planter_pot.glb": {
+  "id": "S11",
+  "preview": "01a1dc0a-8cff-75dc-80ed-6c676fefa9d3",
+  "refine": "01a1dc0d-480e-70d2-b23d-3fc9bcf09201"
+ },
+ "bench_plank.glb": {
+  "id": "S12",
+  "preview": "01a1dc0a-f667-7165-92b1-2e9b6f89c40f",
+  "refine": "01a1dc0b-c7a3-7507-8835-e5b34826754c",
+  "done": true,
+  "credits": 10
+ },
+ "bench_park.glb": {
+  "id": "S13",
+  "preview": "01a1dc0b-ac34-76b7-9429-cfd5235a83ea",
+  "refine": "01a1dc0c-79bb-738e-8882-16d4cda3c3ac",
+  "done": true,
+  "credits": 10
+ },
+ "picnic_table.glb": {
+  "id": "S14",
+  "preview": "01a1dc0b-b6a6-7565-9e51-f8a255fd197b",
+  "refine": "01a1dc0c-7f1d-74f8-bd04-5b4723b2f692",
+  "done": true,
+  "credits": 10
+ },
+ "picnic_table_long.glb": {
+  "id": "S15",
+  "preview": "01a1dc0c-d59a-7583-9edc-c0810b070fba"
+ },
+ "board.glb": {
+  "id": "S16",
+  "preview": "01a1dc0c-e13b-7186-97a5-3e3c0341d373"
+ }
+}
