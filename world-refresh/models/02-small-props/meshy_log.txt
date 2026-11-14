@@ -53,3 +53,57 @@ DONE board.glb
 refine mailbox.glb
 refine picket_fence.glb
 preview wheelbarrow.glb 01a1dc0e-e95c-75dd-b2b5-597ebb9b64be
+preview water_butt.glb 01a1dc0e-f474-715b-8fbf-9e7bb12ac44d
+DONE mailbox.glb
+DONE picket_fence.glb
+refine garden_gate.glb
+refine watering_can.glb
+preview bird_feeder.glb 01a1dc0f-63c0-76fb-a83f-c1d96d10415b
+preview scarecrow.glb 01a1dc0f-6d1a-7605-b1da-4b4bed1d531f
+DONE watering_can.glb
+refine wheelbarrow.glb
+preview compost_bin.glb 01a1dc0f-d035-758b-ab92-2fa494967661
+DONE garden_gate.glb
+DONE wheelbarrow.glb
+refine water_butt.glb
+preview seed_crate.glb 01a1dc10-3966-70c4-9524-c2198ef50c75
+preview trug_basket.glb 01a1dc10-467c-7481-b9b4-c52b8c8e9aea
+refine bird_feeder.glb
+refine scarecrow.glb
+DONE water_butt.glb
+DONE bird_feeder.glb
+refine compost_bin.glb
+preview chalkboard.glb 01a1dc11-0e0f-7404-87ab-2c99194d17bd
+preview dog_bed.glb 01a1dc11-1832-7487-b419-fbf886360dcc
+DONE scarecrow.glb
+refine seed_crate.glb
+refine trug_basket.glb
+preview dog_ball.glb 01a1dc11-8377-7127-8619-885aa5113a23
+DONE compost_bin.glb
+refine chalkboard.glb
+preview dog_bone.glb 01a1dc11-eaf6-726d-951e-24414bd47119
+DONE seed_crate.glb
+DONE trug_basket.glb
+refine dog_bed.glb
+preview dog_rope.glb 01a1dc12-5126-738f-9e5a-eb65ad7081ef
+preview fishing_rod.glb 01a1dc12-5b30-735a-9495-f73b4d482750
+DONE chalkboard.glb
+refine dog_ball.glb
+refine dog_bone.glb
+preview tackle_box.glb 01a1dc12-cae4-7639-905a-a259c808c31c
+DONE dog_bed.glb
+refine fishing_rod.glb
+preview balloons.glb 01a1dc13-2e9f-71be-8f21-e7024ab54406
+DONE dog_ball.glb
+DONE dog_bone.glb
+refine dog_rope.glb
+DONE fishing_rod.glb
+preview fire_ring.glb 01a1dc13-9af6-70df-8f7f-56f729c30160
+refine tackle_box.glb
+refine balloons.glb
+DONE dog_rope.glb
+DONE tackle_box.glb
+DONE balloons.glb
+refine fire_ring.glb
+DONE fire_ring.glb
+ALL FINISHED 36 done, 0 failed

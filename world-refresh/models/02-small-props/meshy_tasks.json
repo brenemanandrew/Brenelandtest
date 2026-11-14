@@ -114,23 +114,141 @@
  "mailbox.glb": {
   "id": "S17",
   "preview": "01a1dc0d-a286-7615-b4e6-f7811aef2676",
-  "refine": "01a1dc0e-8ee9-7720-8ae4-59e860372fce"
+  "refine": "01a1dc0e-8ee9-7720-8ae4-59e860372fce",
+  "done": true,
+  "credits": 10
  },
  "picket_fence.glb": {
   "id": "S18",
   "preview": "01a1dc0d-adb6-7382-b38d-f3a5ea9a864b",
-  "refine": "01a1dc0e-93dc-748d-8d5b-71ddd52c5ce1"
+  "refine": "01a1dc0e-93dc-748d-8d5b-71ddd52c5ce1",
+  "done": true,
+  "credits": 10
  },
  "garden_gate.glb": {
   "id": "S19",
-  "preview": "01a1dc0e-7145-7107-ae4d-9f46fbbf8960"
+  "preview": "01a1dc0e-7145-7107-ae4d-9f46fbbf8960",
+  "refine": "01a1dc0f-097a-76b8-a3f7-a2b0b900619a",
+  "done": true,
+  "credits": 10
  },
  "watering_can.glb": {
   "id": "S20",
-  "preview": "01a1dc0e-7a17-7379-96e5-3851c543f7f0"
+  "preview": "01a1dc0e-7a17-7379-96e5-3851c543f7f0",
+  "refine": "01a1dc0f-0e78-724f-817b-8360ddb92574",
+  "done": true,
+  "credits": 10
  },
  "wheelbarrow.glb": {
   "id": "S21",
-  "preview": "01a1dc0e-e95c-75dd-b2b5-597ebb9b64be"
+  "preview": "01a1dc0e-e95c-75dd-b2b5-597ebb9b64be",
+  "refine": "01a1dc0f-7ae6-75e9-b1c9-f92121ddb397",
+  "done": true,
+  "credits": 10
+ },
+ "water_butt.glb": {
+  "id": "S22",
+  "preview": "01a1dc0e-f474-715b-8fbf-9e7bb12ac44d",
+  "refine": "01a1dc0f-e272-7522-8a97-e2d4773d96c4",
+  "done": true,
+  "credits": 10
+ },
+ "bird_feeder.glb": {
+  "id": "S23",
+  "preview": "01a1dc0f-63c0-76fb-a83f-c1d96d10415b",
+  "refine": "01a1dc10-527e-7293-8bc4-83a10834d8f6",
+  "done": true,
+  "credits": 10
+ },
+ "scarecrow.glb": {
+  "id": "S24",
+  "preview": "01a1dc0f-6d1a-7605-b1da-4b4bed1d531f",
+  "refine": "01a1dc10-571a-77d4-b5d9-7ae25211f9cc",
+  "done": true,
+  "credits": 10
+ },
+ "compost_bin.glb": {
+  "id": "S25",
+  "preview": "01a1dc0f-d035-758b-ab92-2fa494967661",
+  "refine": "01a1dc10-b5c4-7412-898a-d631f9341479",
+  "done": true,
+  "credits": 10
+ },
+ "seed_crate.glb": {
+  "id": "S26",
+  "preview": "01a1dc10-3966-70c4-9524-c2198ef50c75",
+  "refine": "01a1dc11-270a-77f3-821e-21fa20f9b0b4",
+  "done": true,
+  "credits": 10
+ },
+ "trug_basket.glb": {
+  "id": "S27",
+  "preview": "01a1dc10-467c-7481-b9b4-c52b8c8e9aea",
+  "refine": "01a1dc11-2bfa-777c-a263-097662462848",
+  "done": true,
+  "credits": 10
+ },
+ "chalkboard.glb": {
+  "id": "S28",
+  "preview": "01a1dc11-0e0f-7404-87ab-2c99194d17bd",
+  "refine": "01a1dc11-95b2-76f6-95ad-f67232756826",
+  "done": true,
+  "credits": 10
+ },
+ "dog_bed.glb": {
+  "id": "S29",
+  "preview": "01a1dc11-1832-7487-b419-fbf886360dcc",
+  "refine": "01a1dc11-fb97-7011-9581-f695837efe2f",
+  "done": true,
+  "credits": 10
+ },
+ "dog_ball.glb": {
+  "id": "S30a",
+  "preview": "01a1dc11-8377-7127-8619-885aa5113a23",
+  "refine": "01a1dc12-6a52-7742-b560-4bcb0cc76051",
+  "done": true,
+  "credits": 10
+ },
+ "dog_bone.glb": {
+  "id": "S30b",
+  "preview": "01a1dc11-eaf6-726d-951e-24414bd47119",
+  "refine": "01a1dc12-7263-7574-ba9b-797ab2b3a7d4",
+  "done": true,
+  "credits": 10
+ },
+ "dog_rope.glb": {
+  "id": "S30c",
+  "preview": "01a1dc12-5126-738f-9e5a-eb65ad7081ef",
+  "refine": "01a1dc13-4221-73ec-959c-ea09abd69fed",
+  "done": true,
+  "credits": 10
+ },
+ "fishing_rod.glb": {
+  "id": "S31a",
+  "preview": "01a1dc12-5b30-735a-9495-f73b4d482750",
+  "refine": "01a1dc12-da64-711c-a378-acb3aaefea56",
+  "done": true,
+  "credits": 10
+ },
+ "tackle_box.glb": {
+  "id": "S31b",
+  "preview": "01a1dc12-cae4-7639-905a-a259c808c31c",
+  "refine": "01a1dc13-a72c-773c-8ebc-723ac81a1423",
+  "done": true,
+  "credits": 10
+ },
+ "balloons.glb": {
+  "id": "S32",
+  "preview": "01a1dc13-2e9f-71be-8f21-e7024ab54406",
+  "refine": "01a1dc13-ad96-7149-b8d1-fb4620162f68",
+  "done": true,
+  "credits": 10
+ },
+ "fire_ring.glb": {
+  "id": "S33",
+  "preview": "01a1dc13-9af6-70df-8f7f-56f729c30160",
+  "refine": "01a1dc14-5f4f-749c-a2e5-5f7f6e2791e1",
+  "done": true,
+  "credits": 10
  }
 }
