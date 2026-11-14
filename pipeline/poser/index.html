@@ -1690,6 +1690,8 @@ function crBabble(){try{const AC=window.AudioContext||window.webkitAudioContext;
     crReact({open:0.5,smile:0.4});}catch(e){}}
 function crConfetti(){if(calm())return;const st=$('stage'),cols=['#ffd24a','#7dd36a','#ff8fb8','#3f8fd9','#e0574f','#9b51e0'];for(let k=0;k<60;k++){const d=crEl('i','confetti');d.style.left=Math.random()*100+'%';d.style.background=cols[k%cols.length];d.style.animationDelay=Math.random()*0.5+'s';d.style.animationDuration=1.6+Math.random()*1.4+'s';d.style.transform=`rotate(${Math.random()*360}deg)`;st.append(d);setTimeout(()=>d.remove(),3800);}}
 function crBuild(){const root=$('creator');root.textContent='';CR.groups=[];CR.syncers=[];CR.panels={};
+  {const sdR=!!(R&&R.faceMore&&R.faceMore.sd),h0=String({...featDefault(),...(S.feat||{})}.hair);if(h0!=='none'&&sdR!==h0.startsWith('sd_')){S.feat={...(S.feat||{}),hair:sdR?'sd_bob':featDefault().hair};applyHair();}}   // the whole-outfit models have their own hairstyles
+
   const steps=crEl('div','ed-steps'),body=crEl('div','ed-body');steps.setAttribute('aria-label','Steps');root.append(steps,body);
   STEPS.forEach(([id,label,ico],i)=>{const b=crEl('button','ed-step');b.type='button';b.title=label;b.append(crEl('span','ico',ico),crEl('span','word',label));b.onclick=()=>crGo(i);steps.append(b);CR.panels[id]=crEl('div','ed-panel');CR.panels[id].hidden=true;body.append(CR.panels[id]);});
   const next=crEl('button','ed-next','✓');next.id='crnext';next.type='button';next.hidden=true;next.title='Next';next.setAttribute('aria-label','Next page');next.onclick=()=>crGo(CR.step+1);
@@ -1735,11 +1737,11 @@ function crBuild(){const root=$('creator');root.textContent='';CR.groups=[];CR.s
     tiles(p,'face','Details',null,[['freckles','Freckles'],['blush','Blush'],['mark','Beauty mark']],()=>['freckles','blush','mark'].filter(k=>ftNow()[k]),k=>crSet(k,!ftNow()[k]),'head',k=>({feat:{[k]:true}}));
     slider(p,'Age lines','None','Deep','age',()=>window._ageName(ftNow().age||0)); }
   { const p=CR.panels.hair;
-    tiles(p,'hair','Hair style','hair',Object.entries(HAIRS).map(([k,v])=>[k,v[0]]),ft('hair'),fset('hair'),'hair',fvar('hair'));
+    tiles(p,'hair','Hair style','hair',Object.entries(HAIRS).filter(([k])=>k==='none'||k.startsWith('sd_')===!!(R&&R.faceMore&&R.faceMore.sd)).map(([k,v])=>[k,v[0]]),ft('hair'),fset('hair'),'hair',fvar('hair'));
     swatches(p,'Hair color','hairColor',E(HAIR_COLORS),ft('hairColor'),fset('hairColor'));
     const fb=tiles(p,'hair','Facial hair',null,E(BEARDS),ft('beard'),fset('beard'),'head',fvar('beard'));CR.syncers.push(()=>{fb.hidden=!(C&&C.face&&C.face.decals.BD);}); }
   { const p=CR.panels.body;
-    const f=field(p,'Body frame'),w=crEl('div','chips');for(const[k,l]of [['plus','Feminine'],['male','Masculine'],['m2plus','Plus (new figure)'],['m2avg','Average (new figure)'],['sd_french','Fall outfit, French tuck'],['sd_untucked','Fall outfit, untucked'],['sd_base','Base figure']]){const b=crEl('button','chip wide',l);b.type='button';b.onclick=()=>crBody(k);w.append(b);CR.syncers.push(()=>b.classList.toggle('on',S.rig===k));}f.append(w);CR.syncers.push(()=>{f.hidden=false;});   // shown to everyone while the new figures are being tried
+    const f=field(p,'Body frame'),w=crEl('div','chips');for(const[k,l]of [['plus','Feminine'],['male','Masculine'],['m2plus','Plus (new figure)'],['m2avg','Average (new figure)'],['sd_french','NEW: Fall outfit, French tuck'],['sd_untucked','NEW: Fall outfit, untucked'],['sd_base','NEW: Base figure']]){const b=crEl('button','chip wide',l);b.type='button';b.onclick=()=>crBody(k);w.append(b);CR.syncers.push(()=>b.classList.toggle('on',S.rig===k));}f.append(w);CR.syncers.push(()=>{f.hidden=false;});   // shown to everyone while the new figures are being tried
     {const f=field(p,'Build'),w=crEl('div','chips');w.setAttribute('role','radiogroup');   // four fixed bodies (no in-between builds): every piece can be fitted and checked on each
       for(const[l,bv,mu]of [['Thin',-100,0],['Average',0,0],['Athletic',0,100],['Plus',100,0]]){const bt=crEl('button','chip wide',l);bt.type='button';
         bt.onclick=()=>{if(busy)return;$('build').value=bv;$('muscle').value=mu;for(const id of ['build','muscle']){$(id).dispatchEvent(new Event('input'));$(id).dispatchEvent(new Event('change'));}crSync();crRefresh();};

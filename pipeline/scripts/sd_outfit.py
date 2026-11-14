@@ -47,8 +47,8 @@ if ENV('PROFILE',1):
     Qn=np.load(H+'/../in_sd/oldnose_pts.npy').astype(float);qx=Qn[:,0]-0.0175;qy=Qn[:,1]-1.4556;outn=(np.abs(qx)>0.03)|(qy>0.05)|(qy<-0.038)
     A_=lambda x,y:np.c_[np.ones(len(x)),x,y,x*x,y*y,x*y];cf=np.linalg.lstsq(A_(qx[outn],qy[outn]),Qn[outn,2],rcond=None)[0]
     winq=np.clip((0.042-np.abs(qx))/0.012,0,1)*np.clip((0.062-qy)/0.014,0,1)*np.clip((qy+0.046)/0.01,0,1);rel=np.clip(Qn[:,2]-A_(qx,qy)@cf,-0.003,None)*winq   # how far her nose stands off her face
-    kn=ENV('NOSEK',1.15)*K;u_=P[:,0]/kn;v_=(P[:,1]-(EYp-ENV('NOSEY',0.066)*K))/kn;dd,ii=cKDTree(np.c_[qx,qy]).query(np.c_[u_,v_],k=4);ww=1/(dd+1e-4)**2;ww/=ww.sum(1,keepdims=True)
-    dz=(rel[ii]*ww).sum(1)*kn*ENV('NOSEH',0.5)/K*np.clip((0.03-dd[:,0])/0.01,0,1)     # our basic head's nose: bridge, tip and wings
+    kn=ENV('NOSEK',1.35)*K;u_=P[:,0]/kn;v_=(P[:,1]-(EYp-ENV('NOSEY',0.066)*K))/kn;dd,ii=cKDTree(np.c_[qx,qy]).query(np.c_[u_,v_],k=4);ww=1/(dd+1e-4)**2;ww/=ww.sum(1,keepdims=True)
+    dz=(rel[ii]*ww).sum(1)*kn*ENV('NOSEH',0.6)/K*np.clip((0.03-dd[:,0])/0.01,0,1)     # our basic head's nose: bridge, tip and wings
     dz+=ENV('LIPS',0.009)*gb(0,-0.10,0.045,0.016)+ENV('CHIN',0.014)*gb(0,-0.165,0.045,0.03)
     dz+=0.006*gb(0,0.05,0.12,0.02)-ENV('SOCKET',0.0)*gb(0.105,0.0,0.05,0.035)-0.006*gb(0,-0.083,0.03,0.007)   # brow, eye sockets, the dip under the nose
     P[:,2]+=dz*K*fr;print('  profile: nose from our basic head, relief up to %.1f cm'%(dz.max()*K*100))
