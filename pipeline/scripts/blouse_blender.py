@@ -190,7 +190,52 @@ layer(F[fcen(fseam)>0],ENV('SEAMUP',0.002),2,rimD=True)   # sleeve seam         
 tc=np.clip((U-CU)/max(UEND-CU,1e-6),0,1);layer(F[fcen(fcuff)>0],ENV('CUFFUP',0.012)+0*tc,1,rimD=True)   # rolled cuff               # cream cuffs, standing out from the gathered sleeve
 tb=np.clip((HEMY+BANDH-S['plus'][:,1])/max(BANDH,1e-6),0,1)
 if BANDH>0:layer(F[fcen(fband)>0],ENV('BANDUP',0.010)+0*tb,ENV('BANDCOL',1),rimD=True)   # rolled hem   # cream band round the hem
-layer(F[fcen(fcol)>0],ENV('COLUP',0.009),1,rimD=True)                 # cream Peter Pan collar
+if not ENV('COLLAR3D',1):layer(F[fcen(fcol)>0],ENV('COLUP',0.009),1,rimD=True)   # old: collar painted on the blouse surface
+else:   # Peter Pan collar as its own solid piece: a ring on the neckline, flatter than her shoulders, two rounded lobes meeting at the centre front
+    ecn={}
+    for f in F:
+        for i,j in ((f[0],f[1]),(f[1],f[2]),(f[2],f[0])):k=(min(i,j),max(i,j));ecn[k]=ecn.get(k,0)+1
+    bvv=np.unique(np.array([k for k,c in ecn.items() if c==1]).ravel());Pp=S['plus']
+    nl=bvv[(Pp[bvv,1]>FY-0.05)&(np.abs(Pp[bvv,0]-MID)<0.12)]
+    th_=np.arctan2(Pp[nl,0]-MID,Pp[nl,2]-zc);o_=np.argsort(th_);nl=nl[o_];th_=th_[o_]
+    NR=ENV('CNR',120);TH=np.linspace(-np.pi,np.pi,NR,endpoint=False)+np.pi/NR
+    def ring(A):   # resample a per-point array round the neck by angle
+        A=np.asarray(A,float);A2=A.reshape(len(A),-1);thx=np.r_[th_-2*np.pi,th_,th_+2*np.pi];Ax=np.r_[A2,A2,A2]
+        return np.stack([np.interp(TH,thx,Ax[:,c]) for c in range(A2.shape[1])],1).reshape((NR,)+A.shape[1:])
+    at=np.abs(TH)   # 0 at the centre front, pi at the back
+    WB,WF=ENV('CWB',0.032),ENV('CWF',0.052)
+    w_=WB+(WF-WB)*ss((np.cos(TH)+0.1)/0.9)
+    w_=w_*np.sqrt(np.clip(at/ENV('CTH0',0.55),0,1))*(0.35+0.65*np.clip(at/ENV('CTH0',0.55),0,1))+ENV('CMIN',0.004)   # rounded lobes that meet at the front
+    DROP=np.tan(np.radians(ENV('CDROP',20)+ENV('CDROPF',38)*ss((np.cos(TH)-0.2)/0.7)));TK=ENV('CTK',0.006);UP=ENV('CUP',0.004)   # front lobes lie on the chest, sides stay flat;TK=ENV('CTK',0.006);UP=ENV('CUP',0.004)
+    Wn=ring(Wv[nl]);sh_=[j for j in range(NJ) if any(k in jn[j] for k in ('Shoulder','Arm'))];sp2=ji('Spine2')
+    Wn[:,sp2]+=Wn[:,sh_].sum(1);Wn[:,sh_]=0   # on the neck and upper back only: her shoulder lift cannot tilt it
+    Ln=ring(LFv[nl])
+    RW=ENV('CROWS',7);tr_=np.linspace(0,1,RW)
+    for b in BL:
+        Pn=ring(D[b][nl]);Nn=ring(NS_[b][nl]);Nn/=np.linalg.norm(Nn,axis=1,keepdims=True)
+        out=np.c_[np.sin(TH),np.zeros(NR),np.cos(TH)];c0=Pn+Nn*UP+np.c_[np.zeros(NR),np.full(NR,0.002),np.zeros(NR)]
+        ww=np.minimum(w_,np.maximum(ENV('CXMAX2',0.095)-np.abs(c0[:,0]-MID),0.004)/np.maximum(np.abs(np.sin(TH)),0.3))   # ends before the shoulders
+        tD=cKDTree(D[b]);top=[];
+        for t_ in tr_:   # rows from the neck to the edge; each kept CCLR outside the blouse (drapes on the chest, flat over the shoulders)
+            q_=c0+out*(ww*t_)[:,None]-np.c_[np.zeros(NR),ww*t_*DROP,np.zeros(NR)]
+            for _ in range(3):
+                _,ii_=tD.query(q_);nn_=NS_[b][ii_];h_=((q_-D[b][ii_])*nn_).sum(1);h_=np.where(np.isin(ii_,bvv),9.0,h_);q_=q_+nn_*np.clip(ENV('CCLR',0.009)*(t_>0)+0.002-h_,0,ENV('CPMAX',0.02))[:,None]
+            top.append(q_)
+        top=np.array(top);Ntop=[]
+        for r in range(RW):
+            _,ii_=tD.query(top[r]);Ntop.append(NS_[b][ii_])
+        Ntop=np.array(Ntop);bot=top-Ntop*TK
+        OUTV[b].append(np.r_[top.reshape(-1,3),bot.reshape(-1,3)])
+    OUTW.append(np.tile(Wn,(2*RW,1)));OUTL.append(np.tile(Ln,2*RW));OUTC.append(np.full(2*RW*NR,1));base=nv[0];nv[0]+=2*RW*NR
+    idx=lambda layer_,r,k:base+layer_*RW*NR+r*NR+(k%NR)
+    fs=[]
+    for k in range(NR):
+        for r in range(RW-1):
+            for L_ in (0,1):
+                a0,a1,b0_,b1=idx(L_,r,k),idx(L_,r,k+1),idx(L_,r+1,k),idx(L_,r+1,k+1);fs+=[[a0,b0_,b1],[a0,b1,a1]] if L_==0 else [[a0,b1,b0_],[a0,a1,b1]]
+        for r in (0,RW-1):   # close the inner and outer edges
+            a0,a1,b0_,b1=idx(0,r,k),idx(0,r,k+1),idx(1,r,k),idx(1,r,k+1);fs+=[[a0,b0_,b1],[a0,b1,a1]]
+    OUTF.append(np.array(fs));print('  collar: own piece, %d ring points, width back %.0f mm front %.0f mm'%(NR,WB*1000,WF*1000))
 # centre strip: its own ribbon laid down the front of the blouse (straight edges whatever the cloth does)
 P0=S['plus'];fr2=np.cos(np.arctan2(P0[:,0]-MID,P0[:,2]-zc));cand=np.where((fr2>0.8)&(np.abs(P0[:,0]-MID)<ENV('PLW',0.026)+0.01))[0]
 ytopP=FY-ENV('PLTOP',0.035);ybot=HEMY+BANDH;rows=np.linspace(ytopP,ybot,ENV('PLROWS',40));PW=ENV('PLW',0.026);RB={};okr=[]
