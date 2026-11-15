@@ -3,7 +3,7 @@
 //   findMoves(board, rack, onMove, budgetMs?) -> every placement (anchor squares + cross-checks over the trie)
 //   bestScore(board, rack) -> the top score this rack can make now (for the hints setting)
 // Levels:
-//   easy    a short, low-scoring word (2-3 tiles, small score); stuck: swaps a few tiles or passes
+//   easy    a short, low-scoring word (up to 4 tiles, 16 points); stuck: swaps a few tiles or passes
 //   normal  the best score from a random half of the moves it finds
 //   hard    the best score plus a rack-leave guess (keep blanks and an S, vowels and consonants in balance, no Q without U,
 //           no doubles); swaps when its best is poor and the bag allows
@@ -211,7 +211,7 @@ export function chooseMove(v, level = 'normal', rng) {
         if (!best && score < lowV) { lowV = score; low = { score, tiles: tiles() }; }
       } else {
         // easy: a random short, small word (reservoir pick), else the lowest seen
-        if (placed <= 3 && score <= 14) { seen++; if (R() * seen < 1) best = { score, tiles: tiles() }; }
+        if (placed <= 4 && score <= 16) { seen++; if (R() * seen < 1) best = { score, tiles: tiles() }; }
         if (score < lowV) { lowV = score; low = { score, tiles: tiles() }; }
       }
     });

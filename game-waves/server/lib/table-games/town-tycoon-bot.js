@@ -67,9 +67,28 @@ export function chooseMove(v, level = 'normal') {
   // roll / manage: build or unmortgage first, then roll or end
   if (lv !== 'easy') {
     const bm = pickBuild(v, lv, cash); if (bm) return bm;
+    if (lv === 'hard') { const fm = pickFund(v, cash); if (fm) return fm; }
     const um = pickUnmortgage(v, lv, cash); if (um) return um;
   }
   return has('roll') || has('end') || moves[0];
+}
+
+// hard: mortgage a lone street (one that will never make a pair for it) to pay for cottages on a pair still under 3
+function pickFund(v, cash) {
+  const me = v.seat, builds = v.moves.filter(m => m.type === 'build' && v.lvl[m.space] < 3);
+  if (!builds.length) return null;
+  const c = Math.min(...builds.map(m => buildCost(v, m.space)));
+  const reserve = Math.max(60, Math.min(500, danger(v, me) * 0.8, 0.6 * maxRent(v, me) + 60));
+  let best = null, bestV = Infinity;
+  for (const m of v.moves) {
+    if (m.type !== 'mortgage') continue;
+    const b = v.board[m.space];
+    if (b.kind === 'street' && !groupSpaces(v, b.group).some(j => v.owner[j] >= 0 && v.owner[j] !== me)) continue; // could still pair up
+    const val = Math.floor(b.price / 2);
+    if (cash + val - c < reserve) continue;
+    if (val < bestV) { bestV = val; best = m; }
+  }
+  return best;
 }
 
 const unowned = v => v.board.filter(b => b.price && b.kind !== 'tax' && v.owner[b.i] < 0).length;
@@ -104,8 +123,8 @@ function wantBuy(v, i, b, cash, lv) {
   return left >= reserve;
 }
 
-// building: normal keeps B200 spare; hard keeps a reserve tied to the worst rent ahead, and races to 3 cottages on the hottest
-// groups first
+// building: normal keeps B200 spare; hard keeps a reserve tied to the worst rent ahead, and races every pair to 3 cottages
+// (hottest groups first) before going higher
 function pickBuild(v, lv, cash) {
   const builds = v.moves.filter(m => m.type === 'build');
   if (!builds.length) return null;
@@ -117,7 +136,6 @@ function pickBuild(v, lv, cash) {
   for (const m of builds) {
     const i = m.space, b = v.board[i], c = buildCost(v, i), l = v.lvl[i];
     if (cash - c < reserve) continue;
-    if (lv === 'hard' && l >= 3 && cash - c < reserve + 400) continue; // past 3 only when rich
     const gain = b.rents[l + 1] - (l === 0 ? b.rents[0] * 2 : b.rents[l]);
     let s = gain / c;
     if (lv === 'hard') { s *= HEAT[b.group]; if (l < 3) s += 2; }

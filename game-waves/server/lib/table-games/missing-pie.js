@@ -20,7 +20,7 @@ export const DWELL = {
 };
 
 export const SETTINGS = [
-  { key: 'reveal', kind: 'toggle', label: 'Helper notebook (fills in clues for you)', default: false },
+  { key: 'reveal', kind: 'toggle', label: 'Helper notebook (fills in hints for you)', default: false },
 ];
 
 function seed32(seed) {

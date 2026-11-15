@@ -18,7 +18,7 @@ export const NAME = 'Town Tycoon';
 export const SEATS = [2, 4];
 export const SIZE = 28;
 export const START_SPACE = 0, WOODS = 7, PICNIC = 14, WRONG = 21;
-export const PASS_PAY = 200;      // collected passing (or landing on) Town Square
+export const PASS_PAY = 150;      // collected passing (or landing on) Town Square
 export const WOODS_FEE = 50;      // pay to walk out of the woods
 export const WOODS_TRIES = 3;     // tries for a double, then you pay and walk
 export const FUND = 100;          // the Dog Treat Fund
@@ -28,7 +28,7 @@ export const TOOL_RATE = 6;                   // Tool Crib Rentals: the dice x t
 
 export const DWELL = {
   turn: 300, roll: 900, move: 900, buy: 1100, skip: 500, rent: 1300, card: 2200, tax: 1100, build: 700, sell: 700,
-  mortgage: 700, unmortgage: 700, woods: 1500, owe: 1400, bankrupt: 2500, pass: 700, gameOver: 9000,
+  mortgage: 700, unmortgage: 700, woods: 1500, owe: 1400, pay: 1100, bankrupt: 2500, gameOver: 9000,
 };
 
 export const SETTINGS = [
@@ -56,33 +56,33 @@ export const GROUPS = [
 const st = (name, short, group, price, rents) => ({ kind: 'street', name, short, group, price, rents });
 export const BOARD = [
   { kind: 'start', name: 'Town Square', short: 'Town Square' },
-  st('Maple Ave', 'Maple Ave', 0, 60, [4, 20, 55, 150, 220, 300]),
+  st('Maple Ave', 'Maple Ave', 0, 60, [4, 25, 70, 195, 285, 390]),
   { kind: 'lucky', name: 'Lucky Find', short: 'Lucky Find' },
-  st('Acorn Way', 'Acorn Way', 0, 70, [5, 25, 65, 170, 240, 320]),
-  st('Pier Walk', 'Pier Walk', 1, 100, [7, 35, 95, 260, 360, 460]),
+  st('Acorn Way', 'Acorn Way', 0, 70, [5, 30, 85, 220, 310, 415]),
+  st('Pier Walk', 'Pier Walk', 1, 100, [7, 45, 125, 340, 470, 600]),
   { kind: 'tax', name: 'Dog Treat Fund', short: 'Dog Treat Fund', price: FUND },
-  st('Bait Shop Row', 'Bait Shop Row', 1, 110, [8, 40, 105, 280, 380, 480]),
+  st('Bait Shop Row', 'Bait Shop Row', 1, 110, [8, 50, 135, 365, 495, 625]),
   { kind: 'woods', name: 'Lost in the Woods', short: 'Lost in the Woods' },
-  st('Strickler Park Lane', 'Strickler Park', 2, 140, [10, 50, 140, 380, 480, 580]),
+  st('Strickler Park Lane', 'Strickler Park', 2, 140, [10, 65, 180, 495, 625, 755]),
   { kind: 'tool', name: 'Tool Crib Rentals', short: 'Tool Crib', price: 140 },
-  st('Duck Pond Path', 'Duck Pond', 2, 150, [11, 55, 150, 400, 500, 600]),
+  st('Duck Pond Path', 'Duck Pond', 2, 150, [11, 70, 195, 520, 650, 780]),
   { kind: 'transit', name: 'Bus Route 7', short: 'Bus Route 7', price: 180 },
-  st('Angell St', 'Angell St', 3, 180, [14, 70, 190, 480, 600, 720]),
-  st('Bakery Corner', 'Bakery Corner', 3, 190, [15, 75, 200, 500, 620, 740]),
+  st('Angell St', 'Angell St', 3, 180, [14, 90, 245, 625, 780, 935]),
+  st('Bakery Corner', 'Bakery Corner', 3, 190, [15, 100, 260, 650, 805, 960]),
   { kind: 'picnic', name: 'Picnic Break', short: 'Picnic Break' },
-  st('Lake Rufallia Shore', 'Lake Rufallia', 4, 220, [18, 90, 240, 600, 720, 840]),
+  st('Lake Rufallia Shore', 'Lake Rufallia', 4, 220, [18, 115, 310, 780, 935, 1090]),
   { kind: 'notice', name: 'Town Notice', short: 'Town Notice' },
-  st('Boathouse Bend', 'Boathouse Bend', 4, 230, [19, 95, 250, 620, 740, 860]),
-  st('Summit Rd', 'Summit Rd', 5, 260, [21, 105, 290, 680, 820, 950]),
+  st('Boathouse Bend', 'Boathouse Bend', 4, 230, [19, 125, 325, 805, 960, 1120]),
+  st('Summit Rd', 'Summit Rd', 5, 260, [21, 135, 375, 885, 1065, 1235]),
   { kind: 'lucky', name: 'Lucky Find', short: 'Lucky Find' },
-  st('Lookout Point', 'Lookout Point', 5, 270, [22, 110, 300, 700, 840, 980]),
+  st('Lookout Point', 'Lookout Point', 5, 270, [22, 145, 390, 910, 1090, 1275]),
   { kind: 'wrong', name: 'Wrong Turn!', short: 'Wrong Turn!' },
-  st('Breneland Rd', 'Breneland Rd', 6, 300, [25, 125, 340, 780, 930, 1080]),
-  st('Market Square', 'Market Square', 6, 310, [26, 130, 350, 800, 950, 1100]),
+  st('Breneland Rd', 'Breneland Rd', 6, 300, [25, 160, 440, 1015, 1210, 1405]),
+  st('Market Square', 'Market Square', 6, 310, [26, 170, 455, 1040, 1235, 1430]),
   { kind: 'transit', name: 'Mail Van Run', short: 'Mail Van Run', price: 180 },
   { kind: 'notice', name: 'Town Notice', short: 'Town Notice' },
-  st('Water Tower Hill', 'Water Tower Hill', 7, 340, [28, 140, 380, 860, 1020, 1180]),
-  st('Clocktower Plaza', 'Clocktower Plaza', 7, 380, [32, 160, 420, 940, 1100, 1260]),
+  st('Water Tower Hill', 'Water Tower Hill', 7, 340, [28, 180, 495, 1120, 1325, 1535]),
+  st('Clocktower Plaza', 'Clocktower Plaza', 7, 380, [32, 210, 545, 1220, 1430, 1640]),
 ];
 BOARD.forEach((b, i) => { b.i = i; });
 export const OWNABLE = BOARD.filter(b => b.price && b.kind !== 'tax').map(b => b.i);
@@ -100,7 +100,7 @@ export const CARDS = {
     { text: 'Your dog finds a lost wallet and the owner says thanks - collect B50.', money: 50 },
     { text: 'You win the pie contest at the fair - collect B100.', money: 100 },
     { text: 'Hop on the next town bus - ride to the nearest Bus Route or Mail Van stop.', nearest: 'transit' },
-    { text: 'A tailwind on your bike - zoom to Town Square and collect B200.', to: 0 },
+    { text: 'A tailwind on your bike - zoom to Town Square and collect B150.', to: 0 },
     { text: 'Your lemonade stand sells out - collect B40.', money: 40 },
     { text: 'Your kite is stuck on the water tower - pay B30 to the climbing crew.', money: -30 },
     { text: 'Catch a ride on the Mail Van to Water Tower Hill.', to: 26 },
