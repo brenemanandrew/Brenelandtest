@@ -20,7 +20,10 @@ class H(http.server.SimpleHTTPRequestHandler):
         if s.path.startswith('/ws') : return s._json({'ok': False}, 404)
         return super().do_GET()
     def do_POST(s):
-        n = int(s.headers.get('content-length') or 0); s.rfile.read(n); s._json({'ok': True})
+        n = int(s.headers.get('content-length') or 0); s.rfile.read(n)
+        if s.path.startswith('/api/account/'):   # test site: no accounts, so the name screen points people at the guest link
+            return s._json({'state': 'offline', 'message': 'Test site: tap "Just visiting? Come in as a guest" below.'})
+        s._json({'ok': True})
     do_PUT = do_DELETE = do_PATCH = do_POST
 socketserver.ThreadingTCPServer.allow_reuse_address = True
 socketserver.ThreadingTCPServer(('0.0.0.0', PORT), H).serve_forever()
