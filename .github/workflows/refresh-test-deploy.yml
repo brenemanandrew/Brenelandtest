@@ -1,0 +1,26 @@
+# World Refresh test site: builds the test copy of the game with the new models and deploys it to its own Fly app
+# (brenelandtest-refresh.fly.dev). Never touches the live game or the character builder app. Uses the repo secret FLY_API_TOKEN.
+name: Refresh test site
+on:
+  push:
+    branches: [claude/here-zudse5]
+    paths: ['world-refresh/**', 'breneland-live/**', '.github/workflows/refresh-test-deploy.yml']
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency: refresh-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the test game
+        run: |
+          python3 world-refresh/tools/make_testgame.py build/www
+          cp world-refresh/tools/testserver.py world-refresh/deploy/Dockerfile world-refresh/deploy/fly.toml build/
+          du -sh build/www
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl status --app brenelandtest-refresh >/dev/null 2>&1 || flyctl apps create brenelandtest-refresh
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - run: flyctl deploy build --config build/fly.toml --remote-only --ha=false
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
