@@ -58,7 +58,7 @@ s = s.replace(old, new, 1)
 open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
-SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
+SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
 for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
 open(os.path.join(OUT, 'js/refresh-models.js'), 'w').write("""// world-refresh test: converted Meshy models for the props that are swapped (see world-refresh/tools/make_testgame.py).
 // ?oldworld (or ?oldtrees) turns every swap off; a model that fails to load leaves the old code-made prop in place.
@@ -124,13 +124,26 @@ lines = t.split('\n')
 for i, l in enumerate(lines):
     if "new THREE.TorusGeometry(1.08, 0.07, 6, 16, Math.PI)" in l or ("for (let k = 0; k <= 12; k++) { const f = (k / 12) * Math.PI;" in l): lines[i] = l.replace('b.add(', 'ab.add(')
 t = '\n'.join(lines)
+# scarecrow, water butt + can, wheelbarrow: the section's code pieces go to a muted batcher (b is reassigned for the section, so
+# put() follows), colliders stay, the model goes in at the same spot
+def section(t, start, end, model_js):
+    assert t.count(start) == 1 and t.count(end) >= 1, start[:40]
+    i = t.index(start); j = t.index(end, i) + len(end)
+    return t[:i] + "  { const __b = b; if (" + model_js[0] + ") b = MUTE;\n" + t[i:j] + "\n  b = __b; " + model_js[1] + " }" + t[j:]
+t = section(t, "  { const [sx, sz] = W(PLAN.scarecrow.u, PLAN.scarecrow.v)", "colliders.push({ type: 'circle', x: sx, z: sz, r: 0.35 }); }",
+  ("RM.scarecrow", "{ const [sx, sz] = W(PLAN.scarecrow.u, PLAN.scarecrow.v); rput(b, 'scarecrow', sx, H(sx, sz) - 0.02, sz, { ry: Math.PI / 2 }); }"))
+t = section(t, "  { const p = PLAN.butt;", "put(GEO.box, '#3fa06a', c.u, 0.45, c.v, { sx: 0.03, sy: 0.12, sz: 0.2 }); }",
+  ("RM.water_butt && RM.watering_can", "{ const [bx, bz] = W(PLAN.butt.u, PLAN.butt.v), [cx, cz] = W(PLAN.can.u, PLAN.can.v); rput(b, 'water_butt', bx, H(bx, bz) - 0.02, bz, { ry: -Math.PI / 2 }); rput(b, 'watering_can', cx, H(cx, cz) - 0.01, cz, { ry: 2.4 }); }"))
+t = section(t, "  { const p = PLAN.barrow, yaw = -0.5", "    disc(p.u, p.v, 0.6); }",
+  ("RM.wheelbarrow", "{ const [wx, wz] = W(PLAN.barrow.u, PLAN.barrow.v); rput(b, 'wheelbarrow', wx, H(wx, wz) - 0.02, wz, { ry: -0.5 + Math.PI / 2 }); }"))
 open(os.path.join(OUT, 'js/garden-build.js'), 'w').write(IMP + t)
 # hedges
 patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });",
   "      if (RM.hedge_box) { rput(b, 'hedge_box', x, y + 0.02, zc, { sx: (L - 0.05) / 3.3, sy: h / 1.5, sz: d / 0.92, ry: 0 }); continue; }\n      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });")])
 # shore rocks
 patch('world.js', [("    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z });",
-  "    if (RM.shore_rock) { rput(b, 'shore_rock', r.x, y - 0.05, r.z, { s: r.s * 1.1, ry: r.x }); rput(b, 'shore_rock', x2, y2 - 0.03, z2, { s: r.s * 0.5, ry: r.z }); } else {\n    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z }); }")])
+  "    if (RM.shore_rock) { rput(b, 'shore_rock', r.x, y - 0.05, r.z, { s: r.s * 1.1, ry: r.x }); rput(b, 'shore_rock', x2, y2 - 0.03, z2, { s: r.s * 0.5, ry: r.z }); } else {\n    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z }); }"),
+  ("function buildMailbox(b) {\n  const { x, z } = MAILBOX;\n  const y = terrainHeight(x, z);", "function buildMailbox(b) {\n  const { x, z } = MAILBOX;\n  const y = terrainHeight(x, z);\n  if (RM.mailbox) { rput(b, 'mailbox', x, y - 0.02, z, { ry: Math.PI / 2 }); return; }")])
 
 # ---- the static props (props-static.js reads models/props.json): swap the good sheet 02/03 shapes
 sys.path.insert(0, HERE); import props_swap

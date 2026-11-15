@@ -14,3 +14,16 @@ def face_rgb(m):
     return tex[y, x].astype(float)
 def keep(m, mask):
     m = m.copy(); m.update_faces(mask); m.remove_unreferenced_vertices(); return m
+def flat_colours(v, f, rgb_face, k=4, smooth=6, seed=0):
+    """A few clean flat colours per model: cluster the per-face colours, then let each face take its neighbours' majority
+    (merges Meshy's painted brush strokes into solid areas). Returns one colour per face."""
+    import numpy as np, trimesh
+    from scipy.cluster.vq import kmeans2
+    cent, lab = kmeans2(rgb_face.astype(float), k, seed=np.random.default_rng(seed), minit='++')
+    adj = trimesh.Trimesh(v, f, process=True).face_adjacency
+    for _ in range(smooth):
+        votes = np.zeros((len(f), k))
+        for a, b in ((adj[:, 0], adj[:, 1]), (adj[:, 1], adj[:, 0])): np.add.at(votes, (a, lab[b]), 1)
+        votes[np.arange(len(f)), lab] += 1.5
+        lab = votes.argmax(1)
+    return cent[lab]

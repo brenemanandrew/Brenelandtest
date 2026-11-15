@@ -15,7 +15,7 @@ SWAP = {
  'bench_park':        (M + '/02-small-props/bench_park.glb', 'box', {'back': -1, 'colours': 3}),
  'picnic_table':      (M + '/02-small-props/picnic_table.glb', 'box', {}),
  'picnic_table_long': (M + '/02-small-props/picnic_table_long.glb', 'box', {}),
- 'shelter':           (M + '/03-large-props/shelter.glb', 'box', {'roof': {'eave': 2.6, 'roof_h': 1.5}}),   # Andrew: squat -> posts up to the 2.6 m eave
+ 'shelter':           (M + '/03-large-props/shelter.glb', 'box', {'roof': {'eave': 2.6, 'roof_h': 1.5, 'straight': 1}}),   # Andrew: squat -> posts up to the 2.6 m eave
 }
 def vertex_rgb(m):
     tex = np.asarray(m.visual.material.baseColorTexture.convert('RGB').resize((512, 512))); uv = m.visual.uv
@@ -49,6 +49,30 @@ def run(src, dst):
                 split = np.percentile(cy[under], 10) if under.any() else 0.6 * H0
                 base_h = o['roof']['eave']; head_h = o['roof']['roof_h'] * (H0 - split) / max(H0 - split, 1e-6)
                 v[:, [0, 2]] *= (oe[[0, 2]] / e[[0, 2]])
+            if o.get('roof') and o['roof'].get('straight'):   # Andrew: Meshy's posts are bent trunks -> straight square posts in their place
+                import trimesh
+                cyv = v[f][:, :, 1].max(1); low = cyv < split * 0.97
+                from scipy.cluster.vq import kmeans2
+                P = v[np.unique(f[low])]; cent, lab = kmeans2(P[:, [0, 2]], 8, seed=np.random.default_rng(1), minit='++')
+                posts = []
+                for c in range(8):          # a post: a cluster of low points that runs most of the way up to the eave
+                    Q = P[lab == c]
+                    if len(Q) > 20 and np.ptp(Q[:, 1]) > 0.6 * split and all(np.hypot(*(cent[c] - np.array(q))) > 0.25 * e[0] for q in posts): posts.append(tuple(cent[c]))
+                if len(posts) > 4:   # one post per corner: the furthest out in each quadrant
+                    q = {}
+                    for (px, pz) in posts:
+                        k2 = (px > 0, pz > 0)
+                        if k2 not in q or px * px + pz * pz > q[k2][0] ** 2 + q[k2][1] ** 2: q[k2] = (px, pz)
+                    posts = list(q.values())
+                keep = ~low; f = f[keep]; rgb_post = rgb[m.faces[low]].mean((0, 1)) if low.any() else np.array([120, 70, 40])
+                pv, pf = [], []
+                for (cx, cz) in posts:                         # a square post, 0.28 m (in the model's own scale before fitting)
+                    w = o['roof'].get('post_w', 0.42); b0 = trimesh.creation.box((w, split * 1.04, w)); b0.apply_translation((cx, split * 0.52, cz))
+                    pf.append(b0.faces + len(v) + sum(len(x) for x in pv)); pv.append(b0.vertices)
+                if posts:
+                    v = np.vstack([v] + pv); f = np.vstack([f] + pf)
+                    rgb = np.vstack([rgb, np.tile(rgb_post.round().astype(int), (sum(len(x) for x in pv), 1))])
+                print(f'  {shape}: {len(posts)} straight posts')
             y = v[:, 1]; v[:, 1] = np.where(y < split, y / split * base_h, base_h + (y - split) / (H0 - split) * head_h)
             print(f'  {shape}: split at {split / H0:.2f} of the height')
             v += [0, omn[1], 0] if o.get('post') else [(omn[0] + omx[0]) / 2, omn[1], (omn[2] + omx[2]) / 2]; k = None   # (a lamp's post stands on the shape's origin, where its collider is)

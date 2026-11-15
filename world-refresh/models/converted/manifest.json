@@ -268,5 +268,55 @@
    0.38
   ],
   "tris": 2579
+ },
+ {
+  "name": "scarecrow",
+  "source": "models/02-small-props/scarecrow.glb",
+  "size_m": [
+   0.97,
+   1.95,
+   0.6
+  ],
+  "tris": 3774
+ },
+ {
+  "name": "water_butt",
+  "source": "models/02-small-props/water_butt.glb",
+  "size_m": [
+   0.83,
+   1.05,
+   0.92
+  ],
+  "tris": 2008
+ },
+ {
+  "name": "watering_can",
+  "source": "models/02-small-props/watering_can.glb",
+  "size_m": [
+   0.66,
+   0.45,
+   0.27
+  ],
+  "tris": 2086
+ },
+ {
+  "name": "wheelbarrow",
+  "source": "models/02-small-props/wheelbarrow.glb",
+  "size_m": [
+   1.15,
+   0.85,
+   0.56
+  ],
+  "tris": 3015
+ },
+ {
+  "name": "mailbox",
+  "source": "models/02-small-props/mailbox.glb",
+  "size_m": [
+   0.87,
+   1.7,
+   0.66
+  ],
+  "tris": 1888
  }
 ]

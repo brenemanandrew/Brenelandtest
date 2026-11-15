@@ -38,6 +38,12 @@ A = {
  'weed':         (P1 + 'wave2_redo/weed.glb', 'h', 0.25, {}),
  'rose_arch':    (P1 + 'wave2/rose_arch.glb', 'box', [2.6, 3.3, 0.9], {'long': 1}),   # posts 2.16 m apart in garden-build.js
  'trellis':      (P1 + 'wave2/trellis.glb', 'h', 1.5, {}),
+ # sheet 02 small props (flat: a few clean colours, Andrew found the texture-sampled props blotchy)
+ 'scarecrow':    (R + '02-small-props/scarecrow.glb', 'h', 1.95, {'flat': 5}),
+ 'water_butt':   (R + '02-small-props/water_butt.glb', 'h', 1.05, {'flat': 3}),
+ 'watering_can': (R + '02-small-props/watering_can.glb', 'h', 0.45, {'flat': 3}),
+ 'wheelbarrow':  (R + '02-small-props/wheelbarrow.glb', 'h', 0.85, {'flat': 4}),
+ 'mailbox':      (R + '02-small-props/mailbox.glb', 'h', 1.7, {'flat': 3}),
 }
 def neutral(img):
     a = np.asarray(img.convert('RGB')).astype(float) / 255
@@ -83,6 +89,10 @@ def run(name, src, mode, tgt, o):
         fy = v[faces][:, :, 1].mean(1); fl &= fy > o.get('crown', 0.3) * v[:, 1].max()   # nothing low on the trunk is leaf (moss marks on bark)
         alpha = alpha.copy(); alpha[faces[fl].ravel()] = 128; alpha[faces[~fl].ravel()] = 255
     col = np.c_[a[y, x], alpha].astype(np.uint8)
+    if o.get('flat'):                                              # unweld: one clean colour per face
+        fc = L.flat_colours(v, faces, a[y, x][faces].mean(1), k=o['flat'])
+        v = v[faces].reshape(-1, 3); faces = np.arange(len(v)).reshape(-1, 3)
+        col = np.c_[np.repeat(fc, 3, 0), np.full(len(v), 255)].round().astype(np.uint8)
     vc = trimesh.Trimesh(v, faces, vertex_colors=col, process=False); vc.export(f'{R}converted/vc/{name}.glb', include_normals=True)
     e = v.max(0) - v.min(0)
     return {'name': name, 'source': src, 'size_m': [round(float(x), 2) for x in e], 'tris': int(len(faces))}
