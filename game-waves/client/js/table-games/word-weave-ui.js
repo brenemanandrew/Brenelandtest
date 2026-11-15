@@ -120,7 +120,7 @@ function cellClick(s, r, c) {
   if (u.placed.some(p => p.r === r && p.c === c)) { takeBack(s, r, c); return; }
   if (u.sel != null && v.board[r][c] === '.') { placeAt(s, u.sel, r, c); return; }
   // nothing picked: on a small board, zoom to that corner; zoomed, look round from there
-  if (u.small) { u.zoom = { r, c }; s.rerender(); }
+  if (u.small) { if (!u.zoom) u.zoomAnim = true; u.zoom = { r, c }; s.rerender(); }
 }
 
 // ---------------------------------------------------------------- drag from the rack (pointer events; a tap picks the tile)
@@ -142,8 +142,19 @@ function startDrag(e, s, idx, tileEl) {
     if (!ghost) { const u = local(cur); if (u.swap) { if (u.swap.has(idx)) u.swap.delete(idx); else u.swap.add(idx); } else u.sel = u.sel === idx ? null : idx; cur.rerender(); return; }
     ghost.remove();
     if (ev.type === 'pointercancel') return;
-    const hit = document.elementFromPoint(ev.clientX, ev.clientY)?.closest?.('[data-sq]');
-    if (hit) placeAt(cur, idx, Number(hit.dataset.r), Number(hit.dataset.c));
+    const at = document.elementFromPoint(ev.clientX, ev.clientY);
+    const hit = at?.closest?.('[data-sq]');
+    if (hit) { placeAt(cur, idx, Number(hit.dataset.r), Number(hit.dataset.c)); return; }
+    // dropped on the rack: move the tile there (before the tile under the pointer, or after it on its right half)
+    const on = at?.closest?.('[data-ri]'), rk = at?.closest?.('.ww-rack');
+    if (rk) {
+      const u = local(cur), o = u.order.filter(i => i !== idx);
+      let j = o.length;
+      if (on && Number(on.dataset.ri) !== idx) { const rc = on.getBoundingClientRect(); j = o.indexOf(Number(on.dataset.ri)) + (ev.clientX > rc.left + rc.width / 2 ? 1 : 0); }
+      else if (on) return;
+      else { const rc = rk.getBoundingClientRect(); if (ev.clientX < rc.left + rc.width / 2) j = 0; }
+      o.splice(j, 0, idx); u.order = o; LOOK.sound?.('tg-tile'); cur.rerender();
+    }
   };
   addEventListener('pointermove', move, { passive: false }); addEventListener('pointerup', up); addEventListener('pointercancel', up);
 }
@@ -157,26 +168,52 @@ function tileEl(letter, value, opts = {}) {
 }
 
 // ---------------------------------------------------------------- the board
+// The frame's moment slip ("Your turn.", "Pips played ...") sits at the board region's foot. With a side panel it is moved over
+// the panel's foot (a band kept free there); without one the board stands at the top and a one-line band is kept under it.
+const FR = 18; // the wooden frame round the squares: padding 6 + border 3, each side
+const formOf = box => { const tg = box.closest && box.closest('.tg'); return !tg ? 'pc' : tg.classList.contains('portrait') ? 'portrait' : tg.dataset.form || 'pc'; };
+// phone sideways: when your hand region sits right under the board (the built-in layout), the board takes both and your rack
+// goes beside it, so the squares are about 19 px instead of 12
+function canMerge(box, s) {
+  if (!s.seated || !s.v || !s.v.rack || s.v.phase !== 'play' || formOf(box) !== 'phone') return false;
+  const tg = box.closest('.tg'); if (!tg) return false;
+  const cs = getComputedStyle(tg), g = k => parseFloat(cs.getPropertyValue('--' + k));
+  const [bx, by, bw, bh, hx, hy, hw] = ['board-x', 'board-y', 'board-w', 'board-h', 'hand-x', 'hand-y', 'hand-w'].map(g);
+  if ([bx, by, bw, bh, hx, hy, hw].some(x => !Number.isFinite(x))) return false;
+  return Math.abs(bx - hx) < 1 && Math.abs(bw - hw) < 1.5 && hy >= by + bh - 1 && hy - (by + bh) < 6;
+}
 function renderBoard(box, s) {
   const v = s.v; box.textContent = '';
   if (!v || !v.board) return;
   const u = s.seated ? local(s) : (s.ui.placed = [], s.ui);
-  const W = box.clientWidth || 600, H = box.clientHeight || 300, pad = 6;
-  const wrap = el('div', 'ww-wrap');
-  // the side panel when there is room beside the board
-  const fullCell = Math.floor((Math.min(W, H) - 2 * pad - 12) / N);
-  const side = W - (fullCell * N + 12 + 2 * pad) >= 150;
+  const form = formOf(box), merged = canMerge(box, s);
+  const wrap = el('div', 'ww-wrap' + (merged ? ' merged' : ''));
+  box.append(wrap); // (first, so a merged board region has its full size when measured)
+  const W = box.clientWidth || 600, H = box.clientHeight || 300, pad = merged || form !== 'pc' ? 4 : 6, gap = merged ? 10 : 12;
+  const Wr = W - 2 * pad, Hr = H - 2 * pad;
+  const slipBand = form === 'pc' ? 36 : 28, sideBand = form === 'pc' ? 54 : 44; // (one line under the board; two over the panel)
+  // beside the board: the panel (and in a merged layout your rack, which needs ~7 tiles of 30 px)
+  const sideMin = merged ? 250 : 150;
+  // without a panel on a phone the frame is thinner (3 px of wood) to win back the slip's band
+  const cellSide = Math.floor((Math.min(Hr, Wr - gap - sideMin) - FR) / N);
+  const FRt = form === 'pc' ? FR : 10, cellFoot = Math.floor((Math.min(Wr, Hr - slipBand) - FRt) / N);
+  const side = merged || cellSide >= cellFoot;
+  const fr = side ? FR : FRt, fullCell = side ? cellSide : cellFoot;
+  const sideW = side ? Math.min(merged ? 330 : 230, Wr - gap - (fullCell * N + fr)) : 0;
   const small = fullCell < 24;
-  u.small = small; u.side = side;
+  u.small = small; u.side = side; u.merged = merged;
   if (!small) u.zoom = null;
   let cell = fullCell, rows = N, cols = N;
   if (u.zoom) {
-    const availW = (side ? W - 170 : W) - 2 * pad - 12, availH = H - 2 * pad - 12;
+    const availW = (side ? Wr - gap - sideW : Wr) - fr, availH = (side ? Hr : Hr - slipBand) - fr;
     cell = Math.max(fullCell, Math.floor(Math.min(availW, availH) / 9));
     rows = clamp(Math.floor(availH / cell), 9, N); cols = clamp(Math.floor(availW / cell), 9, N);
   }
   const r0 = u.zoom ? clamp(u.zoom.r - (rows >> 1), 0, N - rows) : 0, c0 = u.zoom ? clamp(u.zoom.c - (cols >> 1), 0, N - cols) : 0;
-  const frame = el('div', 'ww-frame' + (cell < 19 ? ' tiny' : ''));
+  wrap.classList.toggle('side', side);
+  wrap.style.padding = pad + 'px'; wrap.style.gap = gap + 'px';
+  if (!side) { wrap.style.alignItems = 'flex-start'; wrap.style.paddingBottom = slipBand + pad + 'px'; }
+  const frame = el('div', 'ww-frame' + (cell < 19 ? ' tiny' : '') + (fr < FR ? ' thin' : ''));
   frame.style.setProperty('--cs', cell + 'px');
   const view = el('div', 'ww-view'); view.style.width = cols * cell + 'px'; view.style.height = rows * cell + 'px';
   const grid = el('div', 'ww-grid'); grid.style.transform = `translate(${-c0 * cell}px, ${-r0 * cell}px)`;
@@ -194,7 +231,7 @@ function renderBoard(box, s) {
       b.setAttribute('aria-label', `${up}${bl ? ' (blank)' : ''}, ${pos}`); b.tabIndex = -1;
     } else if (p) {
       b.append(tileEl(p.letter, v.values[p.letter], { blank: p.blank, cls: 'new' }));
-      b.setAttribute('aria-label', `Your ${p.letter} on ${pos}: tap to take it back`);
+      b.setAttribute('aria-label', `Your ${p.letter}${p.blank ? ' (blank)' : ''} on ${pos}: tap to take it back`);
     } else {
       if (sq === '*') b.append(ico('star', 'ww-star'));
       else if (BONUS[sq]) b.append(el('span', 'ww-bl', BONUS[sq][0]));
@@ -206,19 +243,37 @@ function renderBoard(box, s) {
   view.append(grid); frame.append(view);
   if (u.zoom) {
     const zb = el('button', 'ww-zoom', '', { type: 'button', 'aria-label': 'Show the whole board' }); zb.append(ico('zoomout'));
-    zb.onclick = e => { e.stopPropagation(); u.zoom = null; s.rerender(); };
+    zb.onclick = e => { e.stopPropagation(); u.zoomFrom = { ...u.zoom, r0, c0, cell }; u.zoom = null; s.rerender(); };
     frame.append(zb);
   }
   wrap.append(frame);
-  if (side) wrap.append(sidePanel(s, u, H));
+  if (side) {
+    const sp = sidePanel(s, u, H, merged ? { w: sideW, h: Hr } : null);
+    sp.style.flex = `0 0 ${sideW}px`; sp.style.width = sideW + 'px'; sp.style.paddingBottom = sideBand + 'px';
+    wrap.append(sp);
+    // the slip over the panel's foot: its left edge and width, for the css below (custom properties only this module reads)
+    const left = Math.round((W - (fullCell * N + FR + gap + sideW)) / 2 + fullCell * N + FR + gap);
+    const bw = box.parentElement; if (bw) { bw.style.setProperty('--ww-sl', left + 'px'); bw.style.setProperty('--ww-sw', sideW + 'px'); }
+  }
   // the blank's letter
   if (u.picker) wrap.append(picker(s, u));
-  box.append(wrap);
+  zoomMotion(u, grid, cell, fullCell, r0, c0);
+}
+// a short glide in and out of the zoom (the squares grow from where they were on the whole board)
+function zoomMotion(u, grid, cell, fullCell, r0, c0) {
+  if (!grid.animate || (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches)) { u.zoomFrom = null; u.zoomAnim = null; return; }
+  const to = `translate(${-c0 * cell}px, ${-r0 * cell}px)`;
+  let from = null;
+  if (u.zoom && u.zoomAnim) from = `scale(${fullCell / cell})`; // (the whole board as it was)
+  else if (!u.zoom && u.zoomFrom) { const z = u.zoomFrom, k = z.cell / fullCell; from = `scale(${k}) translate(${-z.c0 * fullCell}px, ${-z.r0 * fullCell}px)`; }
+  u.zoomAnim = null; u.zoomFrom = null;
+  if (from) grid.animate([{ transform: from, transformOrigin: '0 0' }, { transform: to, transformOrigin: '0 0' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.3,1)' });
 }
 
-function sidePanel(s, u, H) {
-  const v = s.v, T = s.T, p = el('div', 'ww-side' + (H < 300 ? ' short' : ''));
-  const pv = preview(s, u);
+function sidePanel(s, u, H, rackBox) {
+  const v = s.v, T = s.T, p = el('div', 'ww-side' + (H < 300 || rackBox ? ' short' : '') + (rackBox ? ' withrack' : ''));
+  if (rackBox) { const r = el('div', 'ww-siderack'); renderRack(r, s, rackBox.w, Math.min(96, Math.round(rackBox.h * 0.3))); p.append(r); }
+  const pv = rackBox && u.swap ? null : preview(s, u);
   if (pv) p.append(pv);
   const L = v.last;
   if (L) {
@@ -268,21 +323,24 @@ function renderHand(box, s) {
   box.textContent = '';
   const v = s.v;
   if (!s.seated || !v || !v.rack) return;
-  const u = local(s), taken = used(u);
-  const W = box.clientWidth || 400, H = box.clientHeight || 90;
+  if (local(s).merged) return; // (the rack is beside the board; this region is hidden)
+  renderRack(box, s, box.clientWidth || 400, box.clientHeight || 90);
+}
+function renderRack(box, s, W, H) {
+  const v = s.v, u = local(s), taken = used(u);
   // a small line under the rack: the swap prompt, or the score preview / hint when the board has no side panel for it
   let note = null;
   if (u.swap) note = el('div', 'ww-note', u.swap.size ? `Swap ${u.swap.size} tile${u.swap.size > 1 ? 's' : ''}: tap the tick` : 'Tap the tiles to swap');
   else if (!u.side) note = preview(s, u);
   const n = Math.max(7, v.rack.length);
   const ts = Math.floor(clamp(Math.min((note ? H - 34 : H) * 0.7, (W - 30) / (n + 0.9)), 24, 64));
-  const wrap = el('div', 'ww-hand' + (u.swap ? ' swapping' : ''));
+  const wrap = el('div', 'ww-hand' + (u.swap ? ' swapping' : '') + (myTurn(s) ? ' myturn' : ''));
   wrap.style.setProperty('--ts', ts + 'px');
   const rack = el('div', 'ww-rack');
   for (const idx of u.order) {
     const L = v.rack[idx]; if (L === undefined) continue;
-    if (taken.has(idx) || (u.picker && u.picker.idx === idx)) { rack.append(el('span', 'ww-slot', '', { 'aria-hidden': 'true' })); continue; }
-    const b = el('button', 'ww-rt' + (u.sel === idx ? ' sel' : '') + (u.swap && u.swap.has(idx) ? ' marked' : ''), '', { type: 'button', 'aria-label': (L === '?' ? 'Blank tile' : `${L}, ${v.values[L]} point${v.values[L] === 1 ? "" : "s"}`) + (u.swap ? (u.swap.has(idx) ? ': swapping it' : ': tap to swap it') : ''), 'aria-pressed': u.sel === idx || (u.swap && u.swap.has(idx)) ? 'true' : 'false' });
+    if (taken.has(idx) || (u.picker && u.picker.idx === idx)) { rack.append(el('span', 'ww-slot', '', { 'aria-hidden': 'true', 'data-ri': idx })); continue; }
+    const b = el('button', 'ww-rt' + (u.sel === idx ? ' sel' : '') + (u.swap && u.swap.has(idx) ? ' marked' : ''), '', { type: 'button', 'data-ri': idx, 'aria-label': (L === '?' ? 'Blank tile' : `${L}, ${v.values[L]} point${v.values[L] === 1 ? "" : "s"}`) + (u.swap ? (u.swap.has(idx) ? ': swapping it' : ': tap to swap it') : ''), 'aria-pressed': u.sel === idx || (u.swap && u.swap.has(idx)) ? 'true' : 'false' });
     const t = tileEl(L, v.values[L] ?? 0, { blank: L === '?' });
     b.append(t);
     b.addEventListener('pointerdown', e => startDrag(e, s, idx, t));
@@ -300,8 +358,21 @@ export default {
   lid: 'words for 2 to 4',
   tip: 'Tap a letter, then a square (or drag it). Make words, then Play.',
   css: `
+/* the frame's slip: one line under the board, or two over the side panel's foot (renderBoard keeps the room free) */
+.tg-word-weave .tg-slip { bottom: 3px; line-height: 1.2; max-width: calc(100% - 12px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+.tg-word-weave .tg-boardwrap:has(.ww-wrap.side) .tg-slip { left: var(--ww-sl, 50%); max-width: var(--ww-sw, 92%); transform: none; bottom: 4px; white-space: normal; max-height: calc(2.4em + 11px); text-align: left; }
+.tg-word-weave .tg-boardwrap:has(.ww-wrap.side) .tg-slip.pop { animation: ww-rise 0.3s ease-out; }
+@keyframes ww-rise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+/* phone sideways: the board takes your hand's region too and the rack sits beside it (canMerge) */
+.tg-word-weave[data-form="phone"]:has(.ww-wrap.merged) .tg-boardwrap { height: calc(var(--hand-y) + var(--hand-h) - var(--board-y)); }
+.tg-word-weave[data-form="phone"]:has(.ww-wrap.merged) .tg-hand { display: none; }
+.tg-word-weave .ww-siderack { flex: 0 0 auto; display: flex; justify-content: center; }
+.tg-word-weave .ww-siderack .ww-hand { height: auto; padding: 2px 0 0; }
+.tg-word-weave .ww-hand.myturn .ww-rack { box-shadow: 0 0 0 3px #ffd34d, 0 3px 0 3px rgba(43, 35, 64, 0.85); }
+.tg-word-weave .ww-side.withrack { gap: 6px; }
 .tg-word-weave .ww-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px; box-sizing: border-box; }
 .tg-word-weave .ww-frame { --cs: 20px; position: relative; flex: 0 0 auto; padding: 6px; border-radius: 10px; background: linear-gradient(145deg, #b47a46, #9a6538 45%, #6e4224); border: 3px solid #2b2340; box-shadow: 0 4px 0 rgba(43, 35, 64, 0.85), inset 0 0 0 2px rgba(255, 230, 190, 0.35); }
+.tg-word-weave .ww-frame.thin { padding: 3px; border-width: 2px; border-radius: 8px; }
 .tg-word-weave .ww-view { position: relative; overflow: hidden; border-radius: 4px; background: #e9dcc0; box-shadow: 0 0 0 2px #2b2340; }
 .tg-word-weave .ww-grid { position: absolute; left: 0; top: 0; width: calc(var(--cs) * 15); height: calc(var(--cs) * 15); }
 .tg-word-weave .ww-sq { position: absolute; width: var(--cs); height: var(--cs); padding: 0; margin: 0; border: 0; box-sizing: border-box; background: #fff8ec; box-shadow: inset 0 0 0 0.5px #d8c7a6; display: grid; place-items: center; font-family: inherit; color: #2b2340; touch-action: manipulation; }
@@ -429,7 +500,7 @@ export default {
       case 'fullweave': return `Full Weave! ${w(b.seat)} used all seven: +${b.bonus}.`;
       case 'exchange': return `${w(b.seat)} swapped ${b.count} tile${b.count > 1 ? 's' : ''}.`;
       case 'pass': return `${w(b.seat)} passed.`;
-      case 'bagEmpty': return 'The bag is empty! First to use up their rack ends the game.';
+      case 'bagEmpty': return 'The bag is empty! Use up your rack to end it.';
       case 'turn': return you(b.seat) ? 'Your turn.' : null;
       case 'gameOver': {
         const names = (b.winners || []).map(w);

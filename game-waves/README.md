@@ -59,4 +59,4 @@ against `GROUP_SPACES`). Check: `node tools/tg-achievements-test.mjs` (real bot 
 
 - Real 3D pieces: on the world table they show a generic board slab and pawns (`generic-3d.js`).
 - Town Tycoon: no auctions or trades.
-- Word Weave: no rack drag-to-reorder (Shuffle works); blank-tile play not checked end to end in the UI.
+

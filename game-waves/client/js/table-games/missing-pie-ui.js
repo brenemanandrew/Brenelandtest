@@ -106,9 +106,19 @@ function cardEl(id, { tag = 'div', cls = '', label } = {}) {
 function rr(g, x, y, w, h, r) { r = Math.min(r, w / 2, h / 2); g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 const h01 = (a, b) => { const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return s - Math.floor(s); };
 
+// the frame's moment slip ("Pips asks: ...") sits at the foot of the board: keep a band free for it so it never covers a
+// place or a pawn. One line on phone sideways and PC (ellipsis if longer), two lines upright (see the .tg-slip css below).
+function slipRoom(board) {
+  const tg = board.closest && board.closest('.tg');
+  if (tg && tg.classList.contains('portrait')) return 44;
+  if (tg && tg.dataset.form === 'phone') return 30;
+  return 36;
+}
+
 // the places on a 3 x 3 grid: a band at the top for the banner, room at the foot for the pawns standing under each place
-function mapLayout(W, H) {
-  const m = 6, top = H < 260 ? 20 : 26, pr = Math.max(9, Math.min(15, Math.min(W, H) * 0.04)), bot = pr * 1.7 + 4 + (H >= 280 ? 24 : 0); // (and the moment's slip, where there is room)
+// and for the moment's slip under them
+function mapLayout(W, H, slip = 0) {
+  const m = 6, top = H < 260 ? 20 : 26, pr = Math.max(9, Math.min(15, Math.min(W, H) * 0.04)), bot = pr * 1.7 + 2 + slip;
   const bw = Math.max(58, Math.min(W * 0.25, 160)), bh = Math.max(40, Math.min((H - top - bot) * 0.27, 108));
   const pts = GRID.map(([c, r]) => ({ x: m + bw / 2 + c * (W - bw - 2 * m) / 2, y: top + bh / 2 + r * (H - bh - top - bot) / 2 }));
   return { W, H, bw, bh, pts, pr, side: bw / bh > 1.9 };
@@ -139,7 +149,7 @@ function drawMap(g, L) {
 
 function renderMap(root, s) {
   const { T, v, me, moves, ui } = s;
-  const W = root.clientWidth || 600, H = root.clientHeight || 300, L = mapLayout(W, H);
+  const W = root.clientWidth || 600, H = root.clientHeight || 300, L = mapLayout(W, H, ui.slip || 0);
   const c = el('canvas', 'mp-canvas'); const dpr = Math.min(2, window.devicePixelRatio || 1); c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
   const g = c.getContext('2d'); g.scale(dpr, dpr); drawMap(g, L); root.append(c);
   if (document.fonts && !document.fonts.check('700 12px Fredoka') && !ui.fontWait) { ui.fontWait = true; document.fonts.load('700 12px Fredoka').then(() => s.rerender()).catch(() => {}); }
@@ -350,7 +360,9 @@ function render(board, hand, s) {
   if (!ui.marks) { ui.marks = {}; ui.tab = 'who'; ui.nb = false; ui.picker = null; ui.pick = {}; }
   if (ui.picker === 'ask' && !moves.some(m => m.type === 'ask')) ui.picker = null;
   if (ui.picker === 'accuse' && !moves.some(m => m.type === 'accuse')) ui.picker = null;
-  const root = el('div', 'mp-root' + (board.clientHeight >= 280 ? ' roomy' : ''));
+  ui.slip = slipRoom(board);
+  const root = el('div', 'mp-root');
+  root.style.setProperty('--mp-slip', ui.slip + 'px');
   board.append(root);
   if (ui.picker) renderPicker(root, s);
   else if (ui.nb && v.hand) renderNotebook(root, s);
@@ -475,6 +487,9 @@ function onKey(code, s) {
 
 const css = `
 .tg-missing-pie .tg-boardwrap { background: #6fae55; }
+/* the moment's slip: in the band the map keeps free at the foot (slipRoom) */
+.tg-missing-pie .tg-slip { bottom: 3px; line-height: 1.2; max-width: min(calc(100% - 12px), 52rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+.tg.portrait.tg-missing-pie .tg-slip { white-space: normal; max-height: calc(2.4em + 11px); }
 .tg-missing-pie .mp-root { position: absolute; inset: 0; overflow: hidden; }
 .tg-missing-pie .mp-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tg-missing-pie .mp-ico { display: inline-grid; place-items: center; }
@@ -484,7 +499,8 @@ const css = `
 .tg-missing-pie .mp-place .mp-pname { flex: 0 0 auto; font-size: 12px; font-weight: 700; line-height: 1.05; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tg-missing-pie .mp-place.side { flex-direction: row; gap: 4px; padding: 4px 6px 4px 4px; }
 .tg-missing-pie .mp-place.side .mp-bico { flex: 0 0 auto; width: auto; height: 100%; aspect-ratio: 1; }
-.tg-missing-pie .mp-place.side .mp-pname { white-space: normal; text-align: left; font-size: 13px; }
+.tg-missing-pie .mp-place.side .mp-bico { max-width: 46%; }
+.tg-missing-pie .mp-place.side .mp-pname { flex: 1 1 0; min-width: 0; white-space: normal; text-align: left; font-size: 13px; }
 .tg-missing-pie .mp-place.here { box-shadow: 0 0 0 3px #fff8ec, 0 0 0 5.5px ${INK}, inset 0 5px 0 var(--roof); }
 .tg-missing-pie .mp-place.can { background: #fff1b8; border-color: ${INK}; box-shadow: 0 0 0 3px #ffd34d, 0 0 16px 6px rgba(255,211,77,0.9), inset 0 5px 0 var(--roof); animation: mp-glow 1s ease-in-out infinite; cursor: pointer; }
 .tg-missing-pie .mp-place.can:hover { background: #ffe58a; }
@@ -523,7 +539,7 @@ const css = `
 .tg-missing-pie .mp-over .tg-sub { max-width: 26rem; margin-left: auto; margin-right: auto; }
 
 /* the notebook */
-.tg-missing-pie .mp-root.roomy .mp-nb, .tg-missing-pie .mp-root.roomy .mp-pick { padding-bottom: 34px; }
+.tg-missing-pie .mp-nb, .tg-missing-pie .mp-pick { padding-bottom: var(--mp-slip, 34px) !important; }
 .tg-missing-pie .mp-nb { position: absolute; inset: 0; display: flex; flex-direction: column; background: #fbf6ea; background-image: repeating-linear-gradient(#fbf6ea 0 23px, #dfe8f2 23px 24px); padding: 5px 6px 4px; box-sizing: border-box; }
 .tg-missing-pie .mp-tabs { display: flex; gap: 4px; justify-content: center; flex: 0 0 auto; margin-bottom: 4px; }
 .tg-missing-pie .mp-tab { min-height: 30px; min-width: 56px; padding: 0 10px; border-radius: 15px; border: 2.5px solid ${INK}; background: #fff8ec; color: ${INK}; font-weight: 700; font-size: 13px; }
