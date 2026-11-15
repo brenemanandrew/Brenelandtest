@@ -1,0 +1,16 @@
+{
+ "garden_base_a.glb": {
+  "id": "G-base",
+  "preview": "01a1df85-acfe-7767-b336-84958aec70c2",
+  "refine": "01a1df86-696c-77e2-a0fd-917140a8fc95",
+  "done": true,
+  "credits": 10
+ },
+ "garden_base_b.glb": {
+  "id": "G-base",
+  "preview": "01a1df85-b7b8-7602-b89d-7b1f2f7a5ca6",
+  "refine": "01a1df87-636b-7555-a27e-690bcdbd88c9",
+  "done": true,
+  "credits": 10
+ }
+}

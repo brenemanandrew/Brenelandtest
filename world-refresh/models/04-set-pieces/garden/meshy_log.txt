@@ -1,0 +1,7 @@
+preview garden_base_a.glb 01a1df85-acfe-7767-b336-84958aec70c2
+preview garden_base_b.glb 01a1df85-b7b8-7602-b89d-7b1f2f7a5ca6
+refine garden_base_a.glb
+DONE garden_base_a.glb
+refine garden_base_b.glb
+DONE garden_base_b.glb
+ALL FINISHED 2 done, 0 failed
