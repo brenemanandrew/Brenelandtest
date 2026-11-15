@@ -108,6 +108,7 @@ export function dressDog(dog, name) {
   if (!both) for (const m of old) m.visible = false;
   const up = dog.update.bind(dog);
   dog.update = (...a) => { const r = up(...a); if (!both) for (const m of old) m.visible = false; return r; };   // (some poses show their parts again)
+  { const ta = new THREE.Object3D(); ta.position.set(0, 0.32, 0.05); dog.head.add(ta); root.userData.tagAnchor = ta; }   // name tag just above the head (ui.js)
   dog.meshyNala = mesh; if (name === 'nala') globalThis.__nala = dog; (globalThis.__nalas ||= []).push(dog);   // (test hook: the screenshot script finds her)
   return true;
 }

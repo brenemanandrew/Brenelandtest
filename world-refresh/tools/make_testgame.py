@@ -291,6 +291,7 @@ for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.joi
 
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
-hook = "    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n    ink.render(scene, camera);"
-assert m.count('    ink.render(scene, camera);') == 1; m = m.replace('    ink.render(scene, camera);', hook, 1); open(p, 'w').write(m)
+hook = "    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
+a = '    ui.update(camera, innerWidth, innerHeight);'
+assert m.count(a) == 1; m = m.replace(a, hook + a, 1); open(p, 'w').write(m)   # (before the labels, so name tags follow the pinned camera)
 print('test game written to', OUT)
