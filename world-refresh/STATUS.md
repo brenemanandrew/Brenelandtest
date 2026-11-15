@@ -14,7 +14,7 @@ Done (live on the test site)
 
 Blocked
 - Meshy credits are 0 until the monthly reset: no new models (fish shack, main house, Joyce's house, strip mall shell, redo list).
-- Dax: the model is not in the Drive folder yet.
+- Dax: done (Meshy statue from his share link, on the game dog rig like Nala; ?olddog to compare).
 - Set-piece shells for the main house, Joyce's house, Lovecraft house and strip mall must be built to the game's exact window/door openings
   (see audits/): a Meshy model cannot line up with them. Lovecraft concept shell made (models/04-set-pieces/v2) as the style target.
 - Shipping to the live game needs the Breneland-Next project (GitHub or the PC).

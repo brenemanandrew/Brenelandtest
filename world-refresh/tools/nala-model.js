@@ -6,20 +6,24 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../vendor/three/jsm/loaders/GLTFLoader.js';
 import { GRADIENT_3 } from './toon.js';
-let GEO = null, MAP = null, META = null;
+const DOGS = {};   // name -> { GEO, MAP, META }: the Meshy dogs (Nala, Dax)
 const q = new URLSearchParams(location.search);
 if (!q.has('oldworld') && !q.has('olddog')) {
-  try {
-    const gl = await new GLTFLoader().loadAsync('/models/refresh/nala_mesh.glb');
+  const ld = new GLTFLoader();
+  await Promise.all(['nala', 'dax'].map(async name => { try {
+    const gl = await ld.loadAsync('/models/refresh/' + name + '_mesh.glb'); let GEO = null, MAP = null;
     gl.scene.traverse(o => { if (o.isMesh && !GEO) { GEO = o.geometry; MAP = o.material.map; } });
-    META = await (await fetch('/models/refresh/nala_meta.json')).json();   // her tail joints + Meshy's tail weights, the lower jaw
-  } catch (e) { console.warn('Nala model failed, keeping the code dog', e); }
+    const META = await (await fetch('/models/refresh/' + name + '_meta.json')).json();
+    DOGS[name] = { GEO, MAP, META };
+  } catch (e) { console.warn('Meshy dog failed, keeping the code dog', name, e); } }));
 }
 const _v = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3();
 function segDist(p, a, b) { _a.subVectors(b, a); const L2 = _a.lengthSq(); let t = L2 > 0 ? _b.subVectors(p, a).dot(_a) / L2 : 0; t = Math.max(0, Math.min(1, t)); return _v.copy(a).addScaledVector(_a, t).distanceTo(p); }
 
-export function dressNala(dog) {
-  if (!GEO) return false;
+export const dressNala = dog => dressDog(dog, 'nala');
+export function dressDog(dog, name) {
+  const D0 = DOGS[name]; if (!D0) return false;
+  const { GEO, MAP, META } = D0;
   const root = dog.root; root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
   const P = (o, local = null) => (local ? o.localToWorld(local.clone()) : new THREE.Vector3().setFromMatrixPosition(o.matrixWorld)).applyMatrix4(inv);
@@ -99,7 +103,7 @@ export function dressNala(dog) {
   if (!both) for (const m of old) m.visible = false;
   const up = dog.update.bind(dog);
   dog.update = (...a) => { const r = up(...a); if (!both) for (const m of old) m.visible = false; return r; };   // (some poses show their parts again)
-  dog.meshyNala = mesh; globalThis.__nala = dog; (globalThis.__nalas ||= []).push(dog);   // (test hook: the screenshot script finds her)
+  dog.meshyNala = mesh; if (name === 'nala') globalThis.__nala = dog; (globalThis.__nalas ||= []).push(dog);   // (test hook: the screenshot script finds her)
   return true;
 }
 function isUnder(o, anc) { for (let x = o; x; x = x.parent) if (x === anc) return true; return false; }

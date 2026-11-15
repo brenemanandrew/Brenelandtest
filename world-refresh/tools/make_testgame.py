@@ -188,15 +188,16 @@ assert t.count(a) == 1; open(p, 'w').write(t.replace(a, "await fetch(new URLSear
 # ---- Nala: her Meshy model bound to the code dog's rig (tools/nala-model.js)
 shutil.copy(os.path.join(WR, 'models/characters/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/nala_mesh.glb'))
 shutil.copy(os.path.join(WR, 'models/characters/nala_meta.json'), os.path.join(OUT, 'models/refresh/nala_meta.json'))
+for f in ['dax_mesh.glb', 'dax_meta.json']: shutil.copy(os.path.join(WR, 'models/characters', f), os.path.join(OUT, 'models/refresh', f))
 shutil.copy(os.path.join(HERE, 'nala-model.js'), os.path.join(OUT, 'js/nala-model.js'))
 p = os.path.join(OUT, 'js/dogs.js'); t = open(p).read()
 a = "    shadows(this.root, true, false);\n    this.applyPose(1 / 60, 0);\n  }"
 assert t.count(a) == 1
-t = t.replace(a, a[:-4] + "\n    if (this.look.name === 'Nala') dressNala(this);\n  }", 1)
-open(p, 'w').write("import { dressNala } from './nala-model.js';\n" + t)
+t = t.replace(a, a[:-4] + "\n    if (this.look.name === 'Nala') dressNala(this); else if (this.look.name === 'Dax') dressDog(this, 'dax');\n  }", 1)
+open(p, 'w').write("import { dressNala, dressDog } from './nala-model.js';\n" + t)
 p = os.path.join(OUT, 'js/npcs.js'); t = open(p).read(); a = "    ch.root.userData.npc = def;"
 assert t.count(a) == 1   # the yard Nala is built here from her saved look (which may not carry her name)
-open(p, 'w').write("import { dressNala } from './nala-model.js';\n" + t.replace(a, a + "\n    if (def.id === 'nala' && def.kind === 'dog' && !ch.meshyNala) dressNala(ch);", 1))
+open(p, 'w').write("import { dressNala, dressDog } from './nala-model.js';\n" + t.replace(a, a + "\n    if (def.id === 'nala' && def.kind === 'dog' && !ch.meshyNala) dressNala(ch);\n    if (def.id === 'dax' && def.kind === 'dog' && !ch.meshyNala) dressDog(ch, 'dax');", 1))
 
 # textured models are drawn instanced: one draw call per model kind however many copies (batch.js addInst + build)
 p = os.path.join(OUT, 'js/batch.js'); t = open(p).read()
@@ -277,7 +278,7 @@ open(p, 'w').write("const NAT = typeof location === 'undefined' || !new URLSearc
 
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
-for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb')]: glb_jpeg.run(g)
+for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/dax_mesh.glb')]: glb_jpeg.run(g)
 
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
