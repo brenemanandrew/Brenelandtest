@@ -167,7 +167,7 @@ function renderBoard(box, s) {
   const fullCell = Math.floor((Math.min(W, H) - 2 * pad - 12) / N);
   const side = W - (fullCell * N + 12 + 2 * pad) >= 150;
   const small = fullCell < 24;
-  u.small = small;
+  u.small = small; u.side = side;
   if (!small) u.zoom = null;
   let cell = fullCell, rows = N, cols = N;
   if (u.zoom) {
@@ -210,14 +210,16 @@ function renderBoard(box, s) {
     frame.append(zb);
   }
   wrap.append(frame);
-  if (side) wrap.append(sidePanel(s, u));
+  if (side) wrap.append(sidePanel(s, u, H));
   // the blank's letter
   if (u.picker) wrap.append(picker(s, u));
   box.append(wrap);
 }
 
-function sidePanel(s, u) {
-  const v = s.v, T = s.T, p = el('div', 'ww-side');
+function sidePanel(s, u, H) {
+  const v = s.v, T = s.T, p = el('div', 'ww-side' + (H < 300 ? ' short' : ''));
+  const pv = preview(s, u);
+  if (pv) p.append(pv);
   const L = v.last;
   if (L) {
     const row = el('div', 'ww-last');
@@ -228,10 +230,8 @@ function sidePanel(s, u) {
     p.append(row);
   }
   const bag = el('div', 'ww-bag'); bag.append(ico('swap'), el('span', '', v.bag ? `${v.bag} in the bag` : 'The bag is empty')); p.append(bag);
-  const pv = preview(s, u);
-  if (pv) p.append(pv);
   const leg = el('div', 'ww-legend');
-  for (const k of ['d', 't', 'D', 'T']) { const r = el('div', 'ww-lg'); r.append(el('span', 'ww-sw b-' + (k === k.toUpperCase() ? 'w' + k : 'l' + k), BONUS[k][0]), el('span', '', BONUS[k][1])); leg.append(r); }
+  for (const k of ['d', 't', 'D', 'T']) { const r = el('div', 'ww-lg'); r.append(el('span', 'ww-sw b-' + (k === k.toUpperCase() ? 'w' + k : 'l' + k), BONUS[k][0]), el('span', 'ww-lgl', BONUS[k][1]), el('span', 'ww-lgs', { d: 'letter x2', t: 'letter x3', D: 'word x2', T: 'word x3' }[k])); leg.append(r); }
   p.append(leg);
   return p;
 }
@@ -244,7 +244,7 @@ function preview(s, u) {
     const chk = shapeCheck(v.board, tiles, v.layout, v.values);
     return el('div', 'ww-pv' + (chk.error ? ' bad' : ''), chk.error ? 'Not a line yet' : `${chk.word}: ${chk.score} points`);
   }
-  if (v.hint != null && myTurn(s)) return el('div', 'ww-pv hint', v.hint ? `Your best now: ${v.hint}` : 'No word fits: swap or pass');
+  if (v.hint != null && myTurn(s)) return el('div', 'ww-pv ww-hint', v.hint ? `Your best now: ${v.hint}` : 'No word fits: swap or pass');
   return null;
 }
 
@@ -270,15 +270,19 @@ function renderHand(box, s) {
   if (!s.seated || !v || !v.rack) return;
   const u = local(s), taken = used(u);
   const W = box.clientWidth || 400, H = box.clientHeight || 90;
+  // a small line under the rack: the swap prompt, or the score preview / hint when the board has no side panel for it
+  let note = null;
+  if (u.swap) note = el('div', 'ww-note', u.swap.size ? `Swap ${u.swap.size} tile${u.swap.size > 1 ? 's' : ''}: tap the tick` : 'Tap the tiles to swap');
+  else if (!u.side) note = preview(s, u);
   const n = Math.max(7, v.rack.length);
-  const ts = Math.floor(clamp(Math.min(H * 0.66, (W - 30) / (n + 0.9)), 26, 64));
+  const ts = Math.floor(clamp(Math.min((note ? H - 34 : H) * 0.7, (W - 30) / (n + 0.9)), 24, 64));
   const wrap = el('div', 'ww-hand' + (u.swap ? ' swapping' : ''));
   wrap.style.setProperty('--ts', ts + 'px');
   const rack = el('div', 'ww-rack');
   for (const idx of u.order) {
     const L = v.rack[idx]; if (L === undefined) continue;
     if (taken.has(idx) || (u.picker && u.picker.idx === idx)) { rack.append(el('span', 'ww-slot', '', { 'aria-hidden': 'true' })); continue; }
-    const b = el('button', 'ww-rt' + (u.sel === idx ? ' sel' : '') + (u.swap && u.swap.has(idx) ? ' marked' : ''), '', { type: 'button', 'aria-label': (L === '?' ? 'Blank tile' : `${L}, ${v.values[L]} points`) + (u.swap ? (u.swap.has(idx) ? ': swapping it' : ': tap to swap it') : ''), 'aria-pressed': u.sel === idx || (u.swap && u.swap.has(idx)) ? 'true' : 'false' });
+    const b = el('button', 'ww-rt' + (u.sel === idx ? ' sel' : '') + (u.swap && u.swap.has(idx) ? ' marked' : ''), '', { type: 'button', 'aria-label': (L === '?' ? 'Blank tile' : `${L}, ${v.values[L]} point${v.values[L] === 1 ? "" : "s"}`) + (u.swap ? (u.swap.has(idx) ? ': swapping it' : ': tap to swap it') : ''), 'aria-pressed': u.sel === idx || (u.swap && u.swap.has(idx)) ? 'true' : 'false' });
     const t = tileEl(L, v.values[L] ?? 0, { blank: L === '?' });
     b.append(t);
     b.addEventListener('pointerdown', e => startDrag(e, s, idx, t));
@@ -286,10 +290,6 @@ function renderHand(box, s) {
     rack.append(b);
   }
   wrap.append(rack);
-  // a small line under the rack: the swap prompt, the score preview, or the hint (on a narrow screen the side panel is off)
-  let note = null;
-  if (u.swap) note = el('div', 'ww-note', u.swap.size ? `Swap ${u.swap.size} tile${u.swap.size > 1 ? 's' : ''}: tap the tick` : 'Tap the tiles to swap');
-  else { const pv = preview(s, u); if (pv) note = pv; }
   if (note) wrap.append(note);
   box.append(wrap);
 }
@@ -337,6 +337,12 @@ export default {
 .tg-word-weave .ww-pv.bad { background: #f3e3c3; color: #7a6f63; }
 .tg-word-weave .ww-legend { display: grid; grid-template-columns: 1fr; gap: 3px; font-size: 12.5px; }
 .tg-word-weave .ww-lg { display: flex; align-items: center; gap: 6px; }
+.tg-word-weave .ww-lgs { display: none; }
+.tg-word-weave .ww-side.short { gap: 5px; }
+.tg-word-weave .ww-side.short .ww-legend { grid-template-columns: 1fr 1fr; gap: 3px 8px; font-size: 12px; }
+.tg-word-weave .ww-side.short .ww-lgl { display: none; }
+.tg-word-weave .ww-side.short .ww-lgs { display: inline; }
+.tg-word-weave .ww-side.short .ww-last, .tg-word-weave .ww-side.short .ww-bag, .tg-word-weave .ww-side.short .ww-pv { padding: 3px 9px; font-size: 13px; }
 .tg-word-weave .ww-sw { display: inline-grid; place-items: center; width: 24px; height: 20px; border-radius: 4px; border: 1.5px solid #2b2340; font-size: 10.5px; font-weight: 700; }
 .tg-word-weave .ww-sw.b-ld { background: #ffe08a; } .tg-word-weave .ww-sw.b-lt { background: #f6a95a; }
 .tg-word-weave .ww-sw.b-wD { background: #ffaec4; } .tg-word-weave .ww-sw.b-wT { background: #e8574d; color: #fff8ec; }
@@ -362,11 +368,14 @@ export default {
 .tg-word-weave .ww-ghost { position: fixed; z-index: 80; pointer-events: none; transform: translate(-50%, -60%) scale(1.15) rotate(-5deg); border-width: 2.5px; }
 .tg-word-weave .ww-over-rows .ww-adj { font-size: 12px; font-weight: 600; color: #7a6f63; }
 .tg-word-weave .ww-over-rows .tg-crow { grid-template-columns: 16px minmax(3rem, 8rem) auto auto; }
-.tg-word-weave .ww-rpic { display: grid; grid-template-columns: repeat(5, 22px); grid-auto-rows: 22px; gap: 0; --cs: 22px; }
+.tg-word-weave .ww-rpic { display: grid; grid-template-columns: repeat(5, 15px); grid-auto-rows: 15px; gap: 0; --cs: 15px; justify-content: center; }
 .tg-word-weave .ww-rpic > span { position: relative; display: grid; place-items: center; background: #fff8ec; box-shadow: inset 0 0 0 0.5px #d8c7a6; }
-.tg-word-weave .ww-rpic .ww-bl { font-size: 8px; }
-.tg-word-weave .tg-rules .ww-sw { width: 26px; height: 22px; }
-.tg-word-weave .ww-rrow-sw { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.tg-word-weave .ww-rpic .ww-t { border-width: 1px; }
+.tg-word-weave .ww-rpic .ww-t i { display: none; }
+.tg-word-weave .ww-plus { grid-column: 1 / -1; text-align: center; font-size: 14px; color: #2f7a45; line-height: 1.2; }
+.tg-word-weave .tg-rules .ww-sw { width: 24px; height: 20px; }
+.tg-word-weave .ww-rrow-sw { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; max-width: 56px; }
+.tg-word-weave .ww-rrow-sw .tg-ico { width: 28px; height: 28px; }
 @keyframes ww-pop { from { transform: scale(0.6); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .tg-word-weave .ww-t.new { animation: none; } }
 `,
@@ -458,11 +467,12 @@ export default {
     const c = el('div', 'tg-rules');
     c.append(el('div', 'tg-h', 'Word Weave'));
     const row = (pic, text) => { const r = el('div', 'tg-rrow'); const p = el('div', 'tg-rpic'); p.append(pic); r.append(p, el('p', '', text)); c.append(r); };
-    // a little board: WEAVE across, with ON hanging off the V... (a cross word)
-    const mini = (cells) => { const g = el('div', 'ww-rpic'); for (const x of cells) { const sq = el('span'); if (x && x.length === 1) sq.append(tileEl(x, { W: 4, E: 1, A: 1, V: 5, O: 1, N: 1, T: 1 }[x] || 1)); else if (x) { sq.classList.add('ww-sw', 'b-' + x); } g.append(sq); } return g; };
-    row(mini([null, null, null, 'O', null, 'W', 'E', 'A', 'V', 'E', null, null, null, 'E', null]), 'Make words across or down, joined to the tiles already there. The first word covers the star.');
-    row(mini(['ld', 'lt', null, 'wD', 'wT']), 'Bonus squares: 2L and 3L count a letter double or triple, 2W and 3W the whole word. Only for tiles you just put down.');
-    const seven = el('div', 'ww-rrow-sw'); for (const L of 'WEAVERS') { const t = el('span', 'ww-sq'); t.style.cssText = 'position:relative;width:15px;height:15px;--cs:15px'; t.append(tileEl(L, 1)); seven.append(t); }
+    // a little board: WEAVE across, TOE down through its E (a cross word)
+    const mini = cells => { const g = el('div', 'ww-rpic'); for (const x of cells) { const sq = el('span'); if (x) sq.append(tileEl(x, 1)); g.append(sq); } return g; };
+    row(mini([null, null, null, null, 'T', null, null, null, null, 'O', 'W', 'E', 'A', 'V', 'E']), 'Make words across or down, joined to the tiles already there. The first word covers the star.');
+    const sw = el('div', 'ww-rrow-sw'); for (const k of ['ld', 'lt', 'wD', 'wT']) sw.append(el('span', 'ww-sw b-' + k, { ld: '2L', lt: '3L', wD: '2W', wT: '3W' }[k]));
+    row(sw, 'Bonus squares: 2L and 3L count a letter double or triple, 2W and 3W the whole word. Only for tiles you just put down.');
+    const seven = mini(['W', 'E', 'A', 'V', 'E']); seven.append(el('b', 'ww-plus', '+50'));
     row(seven, 'Use all seven tiles in one turn: Full Weave, +50.');
     const ic = k => { const s = el('div', 'ww-rrow-sw'); s.append(ico(k)); return s; };
     row(ic('swap'), 'No good word? Swap some tiles with the bag (while it has 7 or more), or pass. A blank tile is any letter you pick, worth 0.');
