@@ -264,6 +264,17 @@ t = t.replace("const BY_ID = new Map(", "for (const [k, like] of " + json.dumps(
 open(p, 'w').write(t)
 shutil.copy(os.path.join(HERE, 'acc_test.html'), os.path.join(OUT, 'acc_test.html'))
 
+# ---- people: a gentle, more natural proportion pass in bodyDims (longer legs and arms, a slightly smaller head on a longer
+# neck, a little more taper), every other system reads these numbers so clothes, hats, seats and IK follow; ?oldbody = as before
+p = os.path.join(OUT, 'js/human.js'); t = open(p).read()
+a = "  D.hipX *= S.hipXK; D.armR *= S.armK; D.neckR *= S.neckK;\n  return D;"
+assert t.count(a) == 1
+t = t.replace(a, "  D.hipX *= S.hipXK; D.armR *= S.armK; D.neckR *= S.neckK;\n  if (NAT) { D.legLen *= 1.1; D.Lr = D.legLen - D.a0; D.Lt = D.Lr * 0.53; D.Ls = D.Lr * 0.47; D.Lu *= 1.07; D.Lf *= 1.07; D.neckY *= 1.18; D.wT *= 1.04; D.legR *= 0.94; D.armR *= 0.94; }\n  return D;", 1)
+a = "    if (o.headSize !== undefined && o.headSize !== 1) { headC.scale.setScalar(o.headSize); headC.position.y = D.headY * o.headSize; }"
+assert t.count(a) == 1
+t = t.replace(a, "    { const hs = o.headSize ?? (NAT && !this.kidK ? 0.86 : 1); if (hs !== 1) { headC.scale.setScalar(hs); headC.position.y = D.headY * hs; } }", 1)
+open(p, 'w').write("const NAT = typeof location === 'undefined' || !new URLSearchParams(location.search).has('oldbody');   // (world-refresh: natural proportions)\n" + t)
+
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
 for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb')]: glb_jpeg.run(g)
