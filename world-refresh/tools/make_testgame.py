@@ -132,6 +132,13 @@ patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 
 patch('world.js', [("    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z });",
   "    if (RM.shore_rock) { rput(b, 'shore_rock', r.x, y - 0.05, r.z, { s: r.s * 1.1, ry: r.x }); rput(b, 'shore_rock', x2, y2 - 0.03, z2, { s: r.s * 0.5, ry: r.z }); } else {\n    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z }); }")])
 
+# ---- the static props (props-static.js reads models/props.json): swap the good sheet 02/03 shapes
+sys.path.insert(0, HERE); import props_swap
+props_swap.run(os.path.join(REPO, 'breneland-live/models/props.json'), os.path.join(OUT, 'models/props.json'))
+shutil.copy(os.path.join(REPO, 'breneland-live/models/props.json'), os.path.join(OUT, 'models/props-old.json'))   # ?oldworld uses the old shapes
+p = os.path.join(OUT, 'js/props-static.js'); t = open(p).read(); a = "await fetch('/models/props.json')"
+assert t.count(a) == 1; open(p, 'w').write(t.replace(a, "await fetch(new URLSearchParams(location.search).has('oldworld') ? '/models/props-old.json' : '/models/props.json')", 1))
+
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
 hook = "    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n    ink.render(scene, camera);"
