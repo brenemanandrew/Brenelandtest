@@ -59,7 +59,7 @@ open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
 SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
-TEXTURED = ['potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
+TEXTURED = ['fern', 'mossy_rock', 'log', 'mushrooms', 'potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
 os.makedirs(os.path.join(OUT, 'models/refresh/tex'), exist_ok=True)
 for k in TEXTURED: shutil.copy(os.path.join(WR, 'models/converted/tex', k + '.glb'), os.path.join(OUT, 'models/refresh/tex', k + '.glb'))
 for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
@@ -210,6 +210,47 @@ a = "  _m.compose(_p, _q, _s);\n  for (const pname of Object.keys(S.parts)) {"
 assert t.count(a) == 1, 'props-static compose'
 t = t.replace(a, "  _m.compose(_p, _q, _s);\n  if (RP[shape] && b.addInst) { b.addInst('prop_' + shape, RP[shape].geo, RP[shape].mat, _m); skip = [...(skip || []), 'body']; }\n  for (const pname of Object.keys(S.parts)) {", 1)
 open(p, 'w').write("import { RP } from './refresh-models.js';\n" + t)
+
+# ---- the woods floor (world-trees.js buildUndergrowth): ferns, mossy rocks, fallen logs and mushrooms become the textured
+# models, instanced per 48 m cell (each cell's meshes are still shown only near the camera); placement, colliders, random
+# stream all unchanged. The code pieces that the models already include (log ends, moss caps, mushroom caps) are skipped.
+p = os.path.join(OUT, 'js/world-trees.js'); t = open(p).read()
+a = "  const place = (list, geo, color, x, y, z, sx, sy, sz, ry = 0, rx = 0, rz = 0) => {\n"
+assert t.count(a) == 1, 'undergrowth place'
+t = t.replace(a, a + """    if (UG(list, geo, color, x, y, z, sx, sy, sz, ry, rx, rz)) return;
+""", 1)
+a = "  const mat = toon('#ffffff', { vertexColors: true, side: 'double' });\n  for (const c of cells.values()) {\n"
+assert t.count(a) == 1, 'undergrowth build'
+t = t.replace(a, a + """    for (const [key, ms] of Object.entries(mergeInst(c.ferns.inst, c.solid.inst))) {
+      const im = new THREE.InstancedMesh(RT[key].userData.geo, RT[key], ms.length); ms.forEach((m4, i) => im.setMatrixAt(i, m4)); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere();
+      im.name = 'undergrowth ' + key + ' ' + c.key; im.castShadow = false; im.receiveShadow = true; im.visible = false; im.userData.noMerge = true; parent.add(im); c.meshes.push(im);
+    }
+""", 1)
+helper = """
+// world-refresh: the woods floor's models (instanced per cell)
+import { RT } from './refresh-models.js';
+const _um = new THREE.Matrix4(), _ue = new THREE.Euler(), _uq = new THREE.Quaternion(), _us = new THREE.Vector3(), _upv = new THREE.Vector3(), _ut = new THREE.Matrix4();
+function mergeInst(a, b) { const o = {}; for (const src of [a || {}, b || {}]) for (const [k, v] of Object.entries(src)) o[k] = (o[k] || []).concat(v); return o; }
+function UG(list, geo, color, x, y, z, sx, sy, sz, ry, rx, rz) {
+  let key = null, S = null, lift = 0;
+  if (geo === FERN && RT.fern) { key = 'fern'; S = [sx * 1.15, sy * 0.7, sz * 1.15]; }
+  else if (geo === ROCK_GEO && RT.mossy_rock) { if (color === UC.moss) return true; key = 'mossy_rock'; S = [2 * sx / 1.5, 2 * sy / 1.21, 2 * sz / 1.5]; lift = -0.605; }
+  else if (geo === LOG_GEO && RT.log) { key = 'log'; S = [sx / 2.5, 2 * sy / 0.5, 2 * sz / 0.6]; lift = -0.25; }
+  else if (geo === LOG_END && RT.log) return true;
+  else if (geo === STEM && RT.mushrooms) { key = 'mushrooms'; S = [sx * 0.6, sx * 0.6, sx * 0.6]; }
+  else if (geo === CAP && RT.mushrooms) return true;
+  if (!key) return false;
+  _ue.set(rx, ry, rz, 'YXZ'); _uq.setFromEuler(_ue); _um.compose(_upv.set(x, y, z), _uq, _us.set(...S));
+  if (lift) _um.multiply(_ut.makeTranslation(0, lift, 0));   // (the code shapes are centred, the models stand on their base)
+  ((list.inst ||= {})[key] ||= []).push(_um.clone());
+  return true;
+}
+"""
+t = t.replace("const UC = {", helper + "const UC = {", 1)
+a = "  function update(cam) {\n    if (!cam) return;"
+assert t.count(a) == 1
+t = t.replace(a, a + "\n    if (window.__cam) cam = { position: { x: window.__cam.p[0], y: window.__cam.p[1], z: window.__cam.p[2] } };   // (test hook: the pinned screenshot camera)", 1)
+open(p, 'w').write(t)
 
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
