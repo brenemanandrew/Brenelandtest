@@ -1,0 +1,21 @@
+<!doctype html><html><body style="margin:0;background:#cfe6f2">
+<script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
+<script type="module">
+// Nala test bench (serve the TEST GAME root): the game's own Dog (dogs.js) in a row of poses, each run for a while so the
+// pose settles; ?both shows the code dog under the Meshy one (append &nalaboth), ?olddog the code dog alone.
+import * as THREE from 'three';
+import { Dog, NALA } from '/js/dogs.js';
+const POSES = (new URLSearchParams(location.search).get('poses') || 'idle:0,walk:1.2,trot:3.2,lope:6,sit:0,lie:0,sleep:0,playbow:0').split(',').map(s => s.split(':'));
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#cfe6f2');
+sc.add(new THREE.HemisphereLight(0xffffff, 0x88aa77, 1.3)); const dl = new THREE.DirectionalLight(0xffffff, 2.2); dl.position.set(-3, 6, 5); sc.add(dl);
+const gnd = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), new THREE.MeshToonMaterial({ color: '#7fbf5a' })); gnd.rotation.x = -Math.PI / 2; sc.add(gnd);
+const dogs = [];
+POSES.forEach(([anim, sp], i) => {
+  const d = new Dog({ ...NALA }); d.root.position.set((i - (POSES.length - 1) / 2) * 1.9, 0, 0); d.root.rotation.y = Math.PI / 2; sc.add(d.root); dogs.push([d, anim, +sp]);
+});
+let t = 0; for (let k = 0; k < 240; k++) { t += 1 / 60; for (const [d, anim, sp] of dogs) d.update(1 / 60, t, sp, anim === 'idle' ? null : anim); }
+const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100); const cz = +(new URLSearchParams(location.search).get('cam') || 13); cam.position.set(0, 2.2 * cz / 13, cz); cam.lookAt(0, 0.5, 0); if (new URLSearchParams(location.search).has('top')) { cam.position.set(0, cz, 0.01); cam.lookAt(0, 0, 0); }
+sc.updateMatrixWorld(true); r.render(sc, cam);
+document.title = POSES.map(p => p[0]).join(' '); window.READY = 1;
+</script></body></html>

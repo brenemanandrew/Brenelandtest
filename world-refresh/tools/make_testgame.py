@@ -152,6 +152,18 @@ shutil.copy(os.path.join(REPO, 'breneland-live/models/props.json'), os.path.join
 p = os.path.join(OUT, 'js/props-static.js'); t = open(p).read(); a = "await fetch('/models/props.json')"
 assert t.count(a) == 1; open(p, 'w').write(t.replace(a, "await fetch(new URLSearchParams(location.search).has('oldworld') ? '/models/props-old.json' : '/models/props.json')", 1))
 
+# ---- Nala: her Meshy model bound to the code dog's rig (tools/nala-model.js)
+shutil.copy(os.path.join(WR, 'models/characters/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/nala_mesh.glb'))
+shutil.copy(os.path.join(HERE, 'nala-model.js'), os.path.join(OUT, 'js/nala-model.js'))
+p = os.path.join(OUT, 'js/dogs.js'); t = open(p).read()
+a = "    shadows(this.root, true, false);\n    this.applyPose(1 / 60, 0);\n  }"
+assert t.count(a) == 1
+t = t.replace(a, a[:-4] + "\n    if (this.look.name === 'Nala') dressNala(this);\n  }", 1)
+open(p, 'w').write("import { dressNala } from './nala-model.js';\n" + t)
+p = os.path.join(OUT, 'js/npcs.js'); t = open(p).read(); a = "    ch.root.userData.npc = def;"
+assert t.count(a) == 1   # the yard Nala is built here from her saved look (which may not carry her name)
+open(p, 'w').write("import { dressNala } from './nala-model.js';\n" + t.replace(a, a + "\n    if (def.id === 'nala' && def.kind === 'dog' && !ch.meshyNala) dressNala(ch);", 1))
+
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
 hook = "    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n    ink.render(scene, camera);"
