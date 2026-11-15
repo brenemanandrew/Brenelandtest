@@ -1,5 +1,6 @@
-// Town Tycoon engine tests: many bot games (2-4 players, both lengths, mixed levels), money conserved, no negative cash,
-// views and beats leak no secret (dice rng, deck order), replays, hard vs easy, and hand-made rule checks.
+// Town Tycoon engine tests: many bot games (2-4 players, both lengths, auctions and trades on and off, mixed levels), money
+// conserved, no negative cash, views and beats leak no secret (dice rng, deck order), replays, auctions and trades happen,
+// hard vs normal / easy, and hand-made rule checks (auctions and trades too).
 // Run: node game-waves/tools/town-tycoon-test.mjs
 import game, * as TT from '../server/lib/table-games/town-tycoon.js';
 
@@ -30,17 +31,24 @@ function checkInvariants(S, label) {
   }
 }
 
+const stats = { auctions: 0, sold: 0, unsold: 0, bids: 0, offers: 0, accepted: 0, declined: 0, cancelled: 0, gamesAuction: 0, gamesTrade: 0 };
+const TIMER_SAFE = { auction: 'pass', offer: 'decline', trade: 'cancel' };
 function playGame(levels, settings, seed, opts = {}) {
   let S = game.newGame({ players: players(levels), settings, seed });
   const log = [], times = [];
-  let moves = 0;
+  let moves = 0, sawA = false, sawT = false;
   while (S.phase === 'play' && moves < MOVE_CAP) {
-    const seat = S.turn;
+    const seat = TT.actor(S);
+    ok(game.view(S, null).turn === seat && game.view(S, null).roller === S.turn, 'view.turn is the actor');
     const legal = game.legalMoves(S, seat);
     ok(legal.length > 0, 'no legal move for the seat whose turn it is (stage ' + S.stage + ')');
     if (!legal.length) break;
     for (let k = 0; k < S.n; k++) if (k !== seat) ok(game.legalMoves(S, k).length === 0, 'out of turn moves');
     ok(!legal.some(m => m.type === 'end') || legal[legal.length - 1].type === 'end', 'end not last');
+    if (TIMER_SAFE[S.stage]) ok(legal[0].type === TIMER_SAFE[S.stage], 'timer-safe moves[0] in ' + S.stage);
+    ok(legal.every(m => J(m) === J(JSON.parse(J(m)))) && new Set(legal.map(J)).size === legal.length, 'moves listable and unique');
+    if (!settings.auctions && settings.auctions !== undefined) ok(S.stage !== 'auction', 'auction with auctions off');
+    if (!settings.trades && settings.trades !== undefined) ok(!legal.some(m => m.type === 'trade'), 'trade with trades off');
     const v = game.view(S, seat);
     if (opts.checkViews && moves % 7 === 0) { checkView(v, S, 'seat'); checkView(game.view(S, null), S, 'null'); checkView(game.view(S, (seat + 1) % S.n), S, 'other'); }
     const t0 = performance.now();
@@ -48,10 +56,17 @@ function playGame(levels, settings, seed, opts = {}) {
     times.push(performance.now() - t0);
     ok(m && legal.some(x => J(x) === J(m)), 'bot move not legal: ' + J(m));
     const r = game.apply(S, seat, m);
-    for (const b of r.beats) ok(!SECRET_KEYS.some(k => k in b && k !== 'card') && !('decks' in b), 'beat with a secret: ' + J(b));
+    for (const b of r.beats) {
+      ok(!SECRET_KEYS.some(k => k in b && k !== 'card') && !('decks' in b), 'beat with a secret: ' + J(b));
+      if (b.kind === 'auction') { if (b.step === 'start') { stats.auctions++; sawA = true; } else if (b.step === 'bid') stats.bids++; else if (b.step === 'unsold') stats.unsold++; }
+      if (b.kind === 'buy' && b.auction) stats.sold++;
+      if (b.kind === 'trade') { if (b.step === 'offer') { stats.offers++; sawT = true; } else if (b.step === 'accept') stats.accepted++; else if (b.step === 'decline') stats.declined++; else if (b.step === 'cancel') stats.cancelled++; }
+    }
     S = r.state; log.push([seat, m]); moves++;
     checkInvariants(S, 'seed ' + seed);
   }
+  if (sawA) stats.gamesAuction++;
+  if (sawT) stats.gamesTrade++;
   return { S, log, moves, times };
 }
 
@@ -59,10 +74,15 @@ function playGame(levels, settings, seed, opts = {}) {
 const LV = ['easy', 'normal', 'hard'];
 let games = 0, done = 0, capped = 0, totalMoves = 0, maxMoves = 0, roundSum = 0, maxTime = 0, timeSum = 0, timeN = 0, bankrupts = 0;
 const byLen = { quick: { g: 0, r: 0, m: 0 }, full: { g: 0, r: 0, m: 0, last: 0 } };
-for (let k = 0; k < 360; k++) {
+const offStats = { quick: { g: 0, r: 0 }, full: { g: 0, r: 0 } }, onStats = { quick: { g: 0, r: 0 }, full: { g: 0, r: 0 } };
+for (let k = 0; k < 480; k++) {
   const n = 2 + (k % 3), len = k % 2 ? 'full' : 'quick', start = k % 5 === 0 ? '1000' : '1500';
+  // auctions and trades: both on (half the games), each alone, both off
+  const mode = (k >> 1) % 4, auctions = mode === 0 || mode === 1, trades = mode === 0 || mode === 2;
   const levels = Array.from({ length: n }, (_, i) => LV[(k + i * 2) % 3]);
-  const { S, moves, times, log } = playGame(levels, { length: len, start }, 1000 + k, { checkViews: k < 60 });
+  const set = { length: len, start, auctions, trades };
+  const { S, moves, times, log } = playGame(levels, set, 1000 + k, { checkViews: k < 80 });
+  const OS = mode === 3 ? offStats : mode === 0 ? onStats : null; if (OS) { OS[len].g++; OS[len].r += S.round; }
   games++; totalMoves += moves; maxMoves = Math.max(maxMoves, moves); roundSum += S.round;
   for (const t of times) { maxTime = Math.max(maxTime, t); timeSum += t; timeN++; }
   bankrupts += S.out.length;
@@ -76,20 +96,21 @@ for (let k = 0; k < 360; k++) {
   const B = byLen[len]; B.g++; B.r += S.round; B.m += moves; if (len === 'full' && S.alive.filter(Boolean).length === 1) B.last++;
   // replay
   if (k % 10 === 0) {
-    let R = game.newGame({ players: players(levels), settings: { length: len, start }, seed: 1000 + k });
+    let R = game.newGame({ players: players(levels), settings: set, seed: 1000 + k });
     for (const [seat, m] of log) R = game.apply(R, seat, m).state;
     ok(J(R) === J(S), 'replay differs, seed ' + (1000 + k));
   }
 }
 
 // ---------------------------------------------------------------- hard vs easy (and hard vs normal), 2 players, seat swapped
-function duel(a, b, N, len) {
+function duel(a, b, N, len, n = 2) {
   let wa = 0, wb = 0, ties = 0, rounds = 0, moves = 0;
   for (let k = 0; k < N; k++) {
-    const levels = k % 2 ? [b, a] : [a, b], ai = k % 2 ? 1 : 0;
+    // one seat a, the rest b, a's seat rotating
+    const ai = k % n, levels = Array.from({ length: n }, (_, i) => (i === ai ? a : b));
     const { S, moves: mv } = playGame(levels, { length: len }, 50000 + k);
     const w = game.score(S).winners;
-    if (w.length > 1) ties++; else if (w[0] === ai) wa++; else wb++;
+    if (w.length > 1 && w.includes(ai)) ties++; else if (w[0] === ai) wa++; else wb++;
     rounds += S.round; moves += mv;
   }
   return { wa, wb, ties, rounds: (rounds / N).toFixed(1), moves: Math.round(moves / N) };
@@ -98,7 +119,10 @@ const d1 = duel('hard', 'easy', 400, 'quick');
 const d2 = duel('hard', 'easy', 400, 'full');
 const d3 = duel('hard', 'normal', 400, 'full');
 const d4 = duel('normal', 'easy', 400, 'full');
+const d5 = duel('hard', 'normal', 400, 'quick');
+const d6 = duel('hard', 'normal', 300, 'full', 3);
 ok(d1.wa > d1.wb && d2.wa > d2.wb, 'hard should beat easy');
+ok(d3.wa > d3.wb, 'hard should beat normal');
 
 // ---------------------------------------------------------------- hand rule checks
 const base = () => game.newGame({ players: players(['normal', 'normal']), settings: { length: 'full' }, seed: 7 });

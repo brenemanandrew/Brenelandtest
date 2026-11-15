@@ -5,7 +5,8 @@
 //   easy    wanders and asks at random half the time (else as normal), accuses only when its own cards and the cards shown to it leave one answer each
 //   normal  the same notes, asks about cards it has not seen, heads for places it has not seen, accuses when sure
 //   hard    also reads everyone else's asks: who could not show holds none of the three, who showed holds one of them,
-//           hand sizes fill in the rest; asks with its own cards to pin down one thing at a time, takes the bus
+//           hand sizes fill in the rest; asks with its own cards to pin down one thing at a time, takes the bus.
+//           It only takes in some of those asks (see HARD), so a careful person can beat it.
 export const LEVELS = ['easy', 'normal', 'hard'];
 
 // ---- the cards (ids are what moves and views carry; the client has its own names and pictures for them)
@@ -105,8 +106,21 @@ function viewRng(v) {
 }
 const pick = (a, rng) => a[Math.floor(rng() * a.length) % a.length];
 
+// hard is a sharp reader but not a perfect one: it takes in only some of other people's asks (the same ones every turn,
+// picked by a steady hash of seat and ask number), like a person who misses most of them while thinking about their own
+// move. How many it catches varies from game to game (spread: 0 to 2x notice), so some games it is sharper than others.
+// Who passed on its own asks it does not note (cards shown to it it always keeps).
+// Tuned with tools/missing-pie-test.mjs: hard beats normal about 70% of the time, all-hard tables solve in about 11 rounds.
+export const HARD = { notice: 0.12, spread: 1, own: 0 };
 function knowledge(v, lv) {
-  return solve({ n: v.n, me: v.seat, counts: v.counts, hand: v.hand, seen: v.seen, log: v.log, accusations: v.accusations }, lv === 'hard');
+  const hard = lv === 'hard';
+  let log = v.log || [];
+  if (hard) {
+    const u = hash01(v.seat, 99, ...(v.hand || []).map(c => CARDS.indexOf(c))); // steady for the whole game
+    const notice = HARD.notice * (1 - HARD.spread + 2 * HARD.spread * u);
+    log = log.filter((e, i) => hash01(v.seat, i, 7331) < (e.seat === v.seat ? HARD.own : notice));
+  }
+  return solve({ n: v.n, me: v.seat, counts: v.counts, hand: v.hand, seen: v.seen, log, accusations: v.accusations }, hard);
 }
 
 // the place a bot wants to ask in: a place card still in the running (hard: the nearest; when the place is known, any place

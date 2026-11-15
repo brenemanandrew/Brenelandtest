@@ -10,16 +10,42 @@ import { createGeneric3D } from './generic-3d.js';
 
 export const FILES = { 'word-weave': './word-weave-ui.js', 'missing-pie': './missing-pie-ui.js', 'town-tycoon': './town-tycoon-ui.js' };
 export const UIS = {};
+// each game's own pieces on the real table (<id>-3d.js: create(parent, table) like createGeneric3D); a missing or broken one
+// falls back to the generic board and pawns
+export const FILES3D = { 'word-weave': './word-weave-3d.js', 'missing-pie': './missing-pie-3d.js', 'town-tycoon': './town-tycoon-3d.js' };
+export const T3D = {};
 const css = new Set();
-export const ready = Promise.all(Object.entries(FILES).map(([id, f]) => import(f).then(m => { UIS[id] = m.default; }).catch(e => console.error('[tg-games] could not load', id, e))));
+export const ready = Promise.all([
+  ...Object.entries(FILES).map(([id, f]) => import(f).then(m => { UIS[id] = m.default; }).catch(e => console.error('[tg-games] could not load', id, e))),
+  ...Object.entries(FILES3D).map(([id, f]) => import(f).then(m => { const c = m.create || (m.default && m.default.create); if (typeof c === 'function') T3D[id] = c; }).catch(e => console.warn('[tg-games] no 3D pieces for', id, e))),
+]);
+let settled = false; ready.then(() => { settled = true; });
 export const uiOf = game => (game && game !== 'mexican-train' ? UIS[game] || null : null);
 function cssOnce(UI) { if (!UI.css || css.has(UI.id)) return; css.add(UI.id); const s = document.createElement('style'); s.dataset.tgGame = UI.id; s.textContent = UI.css; document.head.append(s); }
 
-// the game's pieces on the real table (the game's own, or the generic board and pawns)
+// the game's pieces on the real table (its <id>-3d.js, else the UI module's table3d, else the generic board and pawns)
 export function table3dFor(game, parent, d) {
+  if (game && FILES3D[game] && !settled) return late3d(game, parent, d); // (asked before the modules arrived: swap in once they do)
   const UI = uiOf(game);
+  try { if (game && T3D[game]) return T3D[game](parent, d); } catch (e) { console.error('[tg-games] 3d', game, e); }
   try { if (UI?.table3d) return UI.table3d(parent, d); } catch (e) { console.error('[tg-games] table3d', game, e); }
   return createGeneric3D(parent, d, UI?.look3d || {});
+}
+
+// a stand-in until the game's modules have loaded: the generic pieces, then the game's own with the last update replayed
+function late3d(game, parent, d) {
+  let cur = createGeneric3D(parent, d, {}), last = null, gone = false;
+  ready.then(() => {
+    if (gone) return;
+    const nx = table3dFor(game, parent, d), vis = cur.root.visible; cur.dispose(); cur = nx; cur.root.visible = vis;
+    if (last) cur.update(...last);
+  });
+  return {
+    get root() { return cur.root; }, get flying() { return !!cur.flying; },
+    update(...a) { last = a; cur.update(...a); }, tick(...a) { cur.tick(...a); }, slide(...a) { cur.slide(...a); },
+    drawn: () => (cur.drawn ? cur.drawn() : null),
+    dispose() { gone = true; cur.dispose(); },
+  };
 }
 
 // the players strip for a generic game: the dot in the seat colour, bot/folk mark, the name, then what the game adds per seat

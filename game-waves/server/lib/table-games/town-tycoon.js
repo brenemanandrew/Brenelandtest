@@ -10,7 +10,15 @@
 //
 // A turn: roll, move, resolve the space (buy or skip a free property, rent, a card, the fund), then build / sell / mortgage /
 // unmortgage, then end. Doubles roll again; three doubles in a turn and you are Lost in the Woods. Owing more than you can
-// raise is bankrupt. No auctions and no trades in this version.
+// raise is bankrupt.
+// Auctions (setting, on by default): a free property the lander skips (or cannot afford) is bid on by everyone with cash, in
+// turn order from the next seat: raise +B10 / +B50 / +B100 or pass (out for good), never past twice the price; the last one in
+// buys it for the bid. Trades (setting, on by default): on your turn (before or after the roll) you may build an offer to one
+// player step by step (pick places with no buildings on their colour, set money), send it, and they accept or decline. Two
+// offers a turn at most.
+// view.turn is the seat that must act now (the bidder in an auction, the one answering an offer); view.roller is whose turn it
+// is on the board. The server's turn timer and runner follow view.turn, so every step is timer-safe: moves[0] is a pass /
+// decline / cancel there.
 import { chooseMove } from './town-tycoon-bot.js';
 
 export const ID = 'town-tycoon';
@@ -25,10 +33,15 @@ export const FUND = 100;          // the Dog Treat Fund
 export const ROUNDS = { quick: 15, full: 60 }; // quick: richest after 15 rounds; full: last one standing (60 rounds at most)
 export const TRANSIT_RENT = [0, 25, 60];      // by how many transit spaces the owner holds
 export const TOOL_RATE = 6;                   // Tool Crib Rentals: the dice x this
+export const RAISES = [10, 50, 100];          // an auction raise
+export const AUCTION_CAP = 2;                 // a bid never goes past this x the price (so an auction always ends)
+export const TRADE_STEPS = [-100, -50, -10, 10, 50, 100]; // money in an offer: + is what the offerer pays
+export const OFFERS_PER_TURN = 2;             // trade offers opened in one turn, at most
 
 export const DWELL = {
   turn: 300, roll: 900, move: 900, buy: 1100, skip: 500, rent: 1300, card: 2200, tax: 1100, build: 700, sell: 700,
   mortgage: 700, unmortgage: 700, woods: 1500, owe: 1400, pay: 1100, bankrupt: 2500, gameOver: 9000,
+  auction: 600, trade: 900,
 };
 
 export const SETTINGS = [
@@ -40,6 +53,8 @@ export const SETTINGS = [
     { value: '1500', label: 'B1500' },
     { value: '1000', label: 'B1000 (tighter)' },
   ] },
+  { key: 'auctions', kind: 'toggle', label: 'Auctions', default: true },
+  { key: 'trades', kind: 'toggle', label: 'Trades', default: true },
 ];
 
 // ---- the board. group: a colour pair (0..7); rents: [no cottage, 1, 2, 3, 4 cottages, shop]; build: one cottage's cost
@@ -149,6 +164,8 @@ function normSettings(s = {}) {
   return {
     length: Object.prototype.hasOwnProperty.call(ROUNDS, s.length) ? s.length : 'quick',
     start: s.start === '1000' ? '1000' : '1500',
+    auctions: !(s.auctions === false || s.auctions === 'false'),
+    trades: !(s.trades === false || s.trades === 'false'),
   };
 }
 
@@ -160,6 +177,9 @@ function clone(S) {
     maps: S.maps.map(m => m.slice()), owner: S.owner.slice(), lvl: S.lvl.slice(), mort: S.mort.slice(),
     decks: { lucky: S.decks.lucky.slice(), notice: S.decks.notice.slice() },
     dice: S.dice && S.dice.slice(), debt: S.debt && { ...S.debt }, last: S.last && { ...S.last },
+    auction: S.auction ? { ...S.auction, in: S.auction.in.slice() } : null,
+    trade: S.trade ? { ...S.trade, give: S.trade.give.slice(), get: S.trade.get.slice() } : null,
+    declined: (S.declined || []).slice(),
   };
 }
 
@@ -181,6 +201,7 @@ export function newGame({ players, settings, seed } = {}) {
     decks: { lucky: [], notice: [] },
     turn: 0, stage: 'roll', dice: null, doubles: 0, again: false, debt: null, last: null,
     bankIn: 0, bankOut: 0, moveN: 0,
+    auction: null, trade: null, offers: 0, declined: [],
   };
   S.decks.lucky = shuffled(S, CARDS.lucky.length);
   S.decks.notice = shuffled(S, CARDS.notice.length);
@@ -189,7 +210,7 @@ export function newGame({ players, settings, seed } = {}) {
 }
 
 function startTurn(S, s, beats) {
-  S.turn = s; S.doubles = 0; S.again = false; S.dice = null; S.debt = null;
+  S.turn = s; S.doubles = 0; S.again = false; S.dice = null; S.debt = null; S.offers = 0;
   S.stage = S.woods[s] >= 0 ? 'woods' : 'roll';
   beat(beats, 'turn', { seat: s, round: S.round, woods: S.woods[s] >= 0 });
 }
@@ -247,24 +268,66 @@ function manageMoves(S, s, out, raiseOnly) {
   if (!raiseOnly) for (const i of OWNABLE) if (canUnmortgage(S, s, i)) out.push({ type: 'unmortgage', space: i });
 }
 
-// moves[0] is always safe for the server's timer (roll, skip, or a step that raises the money owed); 'end' only when the
-// turn can really end.
+// who must act now: the bidder in an auction, the one answering an offer, else the seat whose turn it is
+export function actor(S) {
+  if (!S || S.phase !== 'play') return -1;
+  if (S.stage === 'auction' && S.auction) return S.auction.seat;
+  if (S.stage === 'offer' && S.trade) return S.trade.to;
+  return S.turn;
+}
+
+// a place that may change hands in a trade: owned by one of the two, no buildings on its colour
+function tradable(S, i) {
+  if (!ownable(i) || S.owner[i] < 0) return false;
+  const b = BOARD[i];
+  return !(b.kind === 'street' && GROUP_SPACES[b.group].some(j => S.lvl[j] > 0));
+}
+function tradeMoves(S, s, out) {
+  if (!S.settings.trades || (S.offers || 0) >= OFFERS_PER_TURN) return;
+  for (let k = 0; k < S.n; k++) {
+    if (k === s || !S.alive[k]) continue;
+    if (OWNABLE.some(i => (S.owner[i] === s || S.owner[i] === k) && tradable(S, i))) out.push({ type: 'trade', to: k });
+  }
+}
+function draftMoves(S, out) {
+  const t = S.trade;
+  out.push({ type: 'cancel' });
+  for (const i of OWNABLE) if ((S.owner[i] === t.from || S.owner[i] === t.to) && tradable(S, i)) out.push({ type: 'pick', space: i });
+  for (const x of TRADE_STEPS) {
+    const c = t.cash + x;
+    if (c <= S.cash[t.from] && -c <= S.cash[t.to]) out.push({ type: 'cash', add: x });
+  }
+  if (t.give.length || t.get.length || t.cash) out.push({ type: 'send' });
+}
+
+// moves[0] is always safe for the server's timer (roll, skip, pass, decline, cancel, or a step that raises the money owed);
+// 'end' only when the turn can really end, and always last.
 export function legalMoves(S, seat) {
-  if (!S || S.phase !== 'play' || !Number.isInteger(seat) || seat !== S.turn || !S.alive[seat]) return [];
+  if (!S || S.phase !== 'play' || !Number.isInteger(seat) || seat !== actor(S) || !S.alive[seat]) return [];
   const out = [];
   switch (S.stage) {
-    case 'roll': out.push({ type: 'roll' }); manageMoves(S, seat, out, false); break;
+    case 'roll': out.push({ type: 'roll' }); manageMoves(S, seat, out, false); tradeMoves(S, seat, out); break;
     case 'woods':
       out.push({ type: 'roll' });
       if (S.cash[seat] >= WOODS_FEE) out.push({ type: 'pay' });
       if (S.maps[seat].length) out.push({ type: 'map' });
       manageMoves(S, seat, out, false);
+      tradeMoves(S, seat, out);
       break;
+    case 'auction': {
+      const a = S.auction;
+      out.push({ type: 'pass' });
+      for (const r of RAISES) { const amount = a.bid + r; if (amount <= a.cap && amount <= S.cash[seat]) out.push({ type: 'bid', amount }); }
+      break;
+    }
+    case 'trade': draftMoves(S, out); break;
+    case 'offer': out.push({ type: 'decline' }, { type: 'accept' }); break;
     case 'buy': out.push({ type: 'skip' }); if (S.cash[seat] >= BOARD[S.pos[seat]].price) out.push({ type: 'buy' }); break;
     case 'debt': manageMoves(S, seat, out, true); break;
     case 'manage':
       if (S.again) out.push({ type: 'roll' });
       manageMoves(S, seat, out, false);
+      tradeMoves(S, seat, out);
       if (!S.again) out.push({ type: 'end' });
       break;
     default: break;
@@ -272,7 +335,8 @@ export function legalMoves(S, seat) {
   return out;
 }
 
-const sameMove = (a, b) => !!a && !!b && a.type === b.type && (a.space === undefined ? b.space === undefined : a.space === b.space);
+// the same move, whatever order its keys came in
+const sameMove = (a, b) => !!a && !!b && typeof b === 'object' && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => a[k] === b[k]);
 
 export function apply(state, seat, move) {
   const legal = legalMoves(state, seat);
@@ -293,7 +357,7 @@ export function apply(state, seat, move) {
       beat(beats, 'woods', { seat, out: true, how: 'map' });
       break;
     }
-    case 'skip': beat(beats, 'skip', { seat, space: S.pos[seat] }); S.stage = 'manage'; break;
+    case 'skip': beat(beats, 'skip', { seat, space: S.pos[seat] }); S.stage = 'manage'; startAuction(S, S.pos[seat], seat, beats); break;
     case 'buy': {
       const i = S.pos[seat], price = BOARD[i].price;
       pay(S, seat, price, -1); S.owner[i] = seat;
@@ -328,6 +392,55 @@ export function apply(state, seat, move) {
       break;
     }
     case 'end': endTurn(S, beats); break;
+    // the auction
+    case 'pass': {
+      const a = S.auction;
+      a.in = a.in.filter(k => k !== seat);
+      beat(beats, 'auction', { step: 'pass', seat, space: a.space, bid: a.bid, lead: a.lead });
+      nextBidder(S, seat, beats);
+      break;
+    }
+    case 'bid': {
+      const a = S.auction;
+      a.bid = move.amount; a.lead = seat;
+      beat(beats, 'auction', { step: 'bid', seat, space: a.space, bid: a.bid, lead: seat, dwell: 450 });
+      nextBidder(S, seat, beats);
+      break;
+    }
+    // a trade: open, pick places, set money, send; the other player accepts or declines
+    case 'trade':
+      S.offers = (S.offers || 0) + 1;
+      S.trade = { from: seat, to: move.to, give: [], get: [], cash: 0, back: S.stage };
+      S.stage = 'trade';
+      beat(beats, 'trade', { step: 'open', seat, from: seat, to: move.to, dwell: 300 });
+      break;
+    case 'pick': {
+      const t = S.trade, i = move.space, side = S.owner[i] === t.from ? 'give' : 'get';
+      t[side] = t[side].includes(i) ? t[side].filter(x => x !== i) : t[side].concat(i).sort((x, y) => x - y);
+      break;
+    }
+    case 'cash': S.trade.cash += move.add; break;
+    case 'send': {
+      const t = S.trade;
+      S.stage = 'offer';
+      beat(beats, 'trade', { step: 'offer', seat, from: t.from, to: t.to, give: t.give.slice(), get: t.get.slice(), cash: t.cash });
+      break;
+    }
+    case 'cancel': { const t = S.trade; S.stage = t.back; S.trade = null; beat(beats, 'trade', { step: 'cancel', seat, from: t.from, to: t.to, dwell: 300 }); break; }
+    case 'accept': case 'decline': {
+      const t = S.trade, yes = move.type === 'accept';
+      if (yes) {
+        if (!t.give.every(i => S.owner[i] === t.from && tradable(S, i)) || !t.get.every(i => S.owner[i] === t.to && tradable(S, i))) throw illegal('the offer changed');
+        if (t.cash > 0) pay(S, t.from, t.cash, t.to); else if (t.cash < 0) pay(S, t.to, -t.cash, t.from);
+        for (const i of t.give) S.owner[i] = t.to;
+        for (const i of t.get) S.owner[i] = t.from;
+      } else {
+        S.declined = (S.declined || []).concat({ from: t.from, to: t.to, give: t.give.slice(), get: t.get.slice(), cash: t.cash, round: S.round }).slice(-8);
+      }
+      beat(beats, 'trade', { step: yes ? 'accept' : 'decline', seat, from: t.from, to: t.to, give: t.give.slice(), get: t.get.slice(), cash: t.cash });
+      S.stage = t.back; S.trade = null;
+      break;
+    }
     default: throw illegal('unknown move');
   }
   return { state: S, beats };
@@ -406,7 +519,7 @@ function land(S, s, beats) {
     case 'lucky': case 'notice': drawCard(S, s, b.kind, beats); return;
     case 'street': case 'transit': case 'tool': {
       const o = S.owner[i];
-      if (o < 0) { if (S.cash[s] >= b.price) S.stage = 'buy'; else beat(beats, 'skip', { seat: s, space: i, short: true }); return; }
+      if (o < 0) { if (S.cash[s] >= b.price) S.stage = 'buy'; else { beat(beats, 'skip', { seat: s, space: i, short: true }); startAuction(S, i, s, beats); } return; }
       if (o === s || S.mort[i]) return;
       const amount = rentOf(S, i, S.dice ? S.dice[0] + S.dice[1] : 7);
       if (amount > 0 && charge(S, s, amount, o, 'rent', null, beats)) beat(beats, 'rent', { seat: s, owner: o, space: i, amount });
@@ -466,6 +579,32 @@ function settleDebt(S, beats) {
   if (d.after === 'woodsMove') woodsWalk(S, s, beats);
 }
 
+// ---- auctions: everyone with cash, in turn order from the seat after the one who skipped (who bids last)
+function startAuction(S, i, s, beats) {
+  if (!S.settings.auctions) return;
+  const order = [];
+  for (let k = 1; k <= S.n; k++) { const q = (s + k) % S.n; if (S.alive[q] && S.cash[q] >= RAISES[0]) order.push(q); }
+  if (!order.length) return;
+  const price = BOARD[i].price;
+  S.auction = { space: i, price, bid: 0, lead: -1, seat: order[0], in: order, cap: price * AUCTION_CAP, back: S.stage };
+  S.stage = 'auction';
+  beat(beats, 'auction', { step: 'start', seat: s, space: i, price, cap: price * AUCTION_CAP, bidders: order.slice(), dwell: 1400 });
+}
+// on round the table from the seat that just acted: the next one still in who is not leading; nobody -> it is over
+function nextBidder(S, from, beats) {
+  const a = S.auction;
+  for (let k = 1; k <= S.n; k++) {
+    const q = (from + k) % S.n;
+    if (a.in.includes(q) && q !== a.lead && !(a.bid + RAISES[0] > Math.min(a.cap, S.cash[q]))) { a.seat = q; return; }
+    if (a.in.includes(q) && q !== a.lead) { a.in = a.in.filter(x => x !== q); beat(beats, 'auction', { step: 'pass', seat: q, space: a.space, bid: a.bid, lead: a.lead, auto: true, dwell: 300 }); }
+  }
+  S.auction = null; S.stage = a.back;
+  if (a.lead >= 0) {
+    pay(S, a.lead, a.bid, -1); S.owner[a.space] = a.lead;
+    beat(beats, 'buy', { seat: a.lead, space: a.space, price: a.bid, cash: S.cash[a.lead], auction: true });
+  } else beat(beats, 'auction', { step: 'unsold', seat: S.turn, space: a.space });
+}
+
 function bankrupt(S, s, to, beats) {
   // the buildings go back to the bank for half
   let back = 0;
@@ -502,14 +641,14 @@ function winnersOf(S) {
   return alive.filter(s => w[s] === hi);
 }
 function gameOver(S, beats, why) {
-  S.phase = 'over'; S.stage = 'over'; S.turn = -1; S.again = false; S.debt = null;
+  S.phase = 'over'; S.stage = 'over'; S.turn = -1; S.again = false; S.debt = null; S.auction = null; S.trade = null;
   beat(beats, 'gameOver', { why, totals: worthAll(S), winners: winnersOf(S) });
 }
 
 export function view(S, seat) {
   const n = S.n, me = Number.isInteger(seat) && seat >= 0 && seat < n ? seat : null;
   return {
-    game: ID, n, seat: me, settings: { ...S.settings }, phase: S.phase, turn: S.turn, stage: S.stage,
+    game: ID, n, seat: me, settings: { ...S.settings }, phase: S.phase, turn: actor(S), roller: S.turn, stage: S.stage,
     round: S.round, rounds: S.rounds, start: S.start,
     board: BOARD, groups: GROUPS,
     cash: S.cash.slice(), pos: S.pos.slice(), alive: S.alive.slice(), woods: S.woods.slice(), out: S.out.slice(),
@@ -520,6 +659,10 @@ export function view(S, seat) {
     debt: S.debt && { amount: S.debt.amount, to: S.debt.to, reason: S.debt.reason },
     decks: { lucky: S.decks.lucky.length, notice: S.decks.notice.length },
     last: S.last && { deck: S.last.deck, seat: S.last.seat, text: CARDS[S.last.deck][S.last.card].text },
+    auction: S.auction ? { space: S.auction.space, price: S.auction.price, bid: S.auction.bid, lead: S.auction.lead, seat: S.auction.seat, in: S.auction.in.slice(), cap: S.auction.cap } : null,
+    trade: S.trade ? { from: S.trade.from, to: S.trade.to, give: S.trade.give.slice(), get: S.trade.get.slice(), cash: S.trade.cash, sent: S.stage === 'offer' } : null,
+    offers: S.offers || 0, offersMax: OFFERS_PER_TURN,
+    declined: (S.declined || []).map(d => ({ ...d, give: d.give.slice(), get: d.get.slice() })),
     moves: me === null ? [] : legalMoves(S, me),
   };
 }
