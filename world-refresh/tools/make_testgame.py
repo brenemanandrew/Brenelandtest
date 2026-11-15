@@ -85,7 +85,7 @@ export const RT = {};   // textured models (their own mesh, the painted texture 
 if (!q.has('oldworld') && !q.has('oldtrees')) {
   const ld = new GLTFLoader(), { GRADIENT_3 } = await import('./toon.js');
   await Promise.all(TEXLIST.map(async k => { try { const gl = await ld.loadAsync('/models/refresh/tex/' + k + '.glb'); let m = null; gl.scene.traverse(o => { if (o.isMesh && !m) m = o; });
-    RT[k] = new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3 }); RT[k].userData.geo = m.geometry; RM[k] = RM[k] || m.geometry; } catch (e) { console.warn('refresh textured model failed', k, e); } }));
+    RT[k] = new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3, side: ['hedge_box', 'fern', 'sunflower', 'tomatoes', 'carrots', 'strawberries', 'lettuce', 'pumpkins'].includes(k) ? THREE.DoubleSide : THREE.FrontSide }); /* (leafy models: thin leaves have a back too) */ RT[k].userData.geo = m.geometry; RM[k] = RM[k] || m.geometry; } catch (e) { console.warn('refresh textured model failed', k, e); } }));
 }
 export const RP = {};   // props.json shapes, textured (props-static.js draws them instanced)
 if (!q.has('oldworld') && !q.has('oldtrees')) {
@@ -162,16 +162,16 @@ t = section(t, "  { const p = PLAN.barrow, yaw = -0.5", "    disc(p.u, p.v, 0.6)
 # the garden's frame: the fence's pickets become the Meshy fence (2 m sections stretched to each open run, colliders kept),
 # the shed's walls, roof, door and window the Meshy potting shed (its collider and the tools on its west wall kept)
 a = "      const t = i / n; if (skip && t > skip[0] && t < skip[1]) continue;"
-assert t.count(a) == 1; t = t.replace(a, "      if (RM.picket_fence) break;\n" + a, 1)
+assert t.count(a) == 1; t = t.replace(a, a + "\n      if (RM.fence_picket_0) { const u = a[0] + (c[0] - a[0]) * t, v = a[1] + (c[1] - a[1]) * t, [fx, fz] = W(u, v), post = i % 8 === 0 || (skip && (Math.abs(t - skip[0]) < 0.5 / n || Math.abs(t - skip[1]) < 0.5 / n)); if (post) rput(b, 'fence_post', fx, H(fx, fz) - 0.02, fz, { sx: 0.85, sy: 0.6, sz: 0.85 }); else rput(b, 'fence_picket_' + (i % 3), fx, H(fx, fz) - 0.02, fz, { sx: 0.36, sy: 0.58, sz: 0.9, ry: yaw + Math.PI / 2 }); continue; }", 1)
 a = "    const seg = (t0, t1) => { const u0 = a[0] + (c[0] - a[0]) * t0, v0 = a[1] + (c[1] - a[1]) * t0, u1 = a[0] + (c[0] - a[0]) * t1, v1 = a[1] + (c[1] - a[1]) * t1;\n      const l = Math.hypot(u1 - u0, v1 - v0); for (const y of [0.22, 0.52]) put("
 assert t.count(a) == 1, 'fence seg'
-t = t.replace(a, a.replace("for (const y of [0.22, 0.52]) put(", "if (RM.picket_fence) { const m = Math.max(1, Math.round(l / 1.9)); for (let q = 0; q < m; q++) { const f = (q + 0.5) / m, [fx, fz] = W(u0 + (u1 - u0) * f, v0 + (v1 - v0) * f); rput(b, 'picket_fence', fx, H(fx, fz) - 0.02, fz, { sx: l / m / 1.9, ry: yaw - Math.PI / 2 }); } } else for (const y of [0.22, 0.52]) put("), 1)
+t = t.replace(a, a.replace("for (const y of [0.22, 0.52]) put(", "if (RM.fence_rail) { for (const y of [0.22, 0.52]) { const [fx, fz] = W((u0 + u1) / 2, (v0 + v1) / 2); b.add(RM.fence_rail, '#ffffff', { x: fx, y: H(fx, fz) + y + 0.03, z: fz, sx: l, sy: 0.7, sz: 0.8, ry: yaw - Math.PI / 2 }); } } else for (const y of [0.22, 0.52]) put("), 1)
 t = section(t, "    put(GEO.box, '#7aa6c8', s.u, 1.05, s.v, { sx: s.w, sy: 2.1, sz: s.d });", "    box(u0, u1, v0, v1);",
   ("RM.potting_shed || RT.potting_shed", "{ const s = PLAN.shed, [hx, hz] = W(s.u, s.v); if (!rmesh(group, 'potting_shed', hx, H(hx, hz) - 0.02, hz)) rput(b, 'potting_shed', hx, H(hx, hz) - 0.02, hz); }"))
 open(os.path.join(OUT, 'js/garden-build.js'), 'w').write(IMP + t)
 # hedges
 patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });",
-  "      if (RM.hedge_box) { rput(b, 'hedge_box', x, y + 0.02, zc, { sx: (L - 0.05) / 3.3, sy: h / 1.5, sz: d / 0.92, ry: 0 }); continue; }\n      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });")])
+  "      if (RM.hedge_box) { rput(b, 'hedge_box', x, y + 0.02, zc, { sx: (L - 0.05) / 3.3, sy: h / 1.5, sz: d / 0.92, ry: 0 }); b.add(GEO.box, '#2f5a2b', { x, y: y + h * 0.42, z: zc, sx: L - 0.6, sy: h * 0.8, sz: d - 0.34 }); continue; }   // (a solid core: no fence seen through the gaps in the leaves)\n      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });")])
 # shore rocks
 patch('world.js', [("    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z });",
   "    if (RM.shore_rock) { rput(b, 'shore_rock', r.x, y - 0.05, r.z, { s: r.s * 1.1, ry: r.x }); rput(b, 'shore_rock', x2, y2 - 0.03, z2, { s: r.s * 0.5, ry: r.z }); } else {\n    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z }); }"),
@@ -282,7 +282,7 @@ open(p, 'w').write("const NAT = typeof location === 'undefined' || !new URLSearc
 p = os.path.join(OUT, 'js/terrain.js'); t = open(p).read()
 a = "  let land = 0.42 + fbm(x * 0.035, z * 0.035) * 0.32;\n"
 assert t.count(a) == 1
-t = t.replace(a, a + "  if (HMAP) land += hmapAt(x, z) * smoothstep(-6, -22, s) * smoothstep(26, 40, Math.hypot(x + 64, z - 20));   // the Blender-shaped land (raise only: things under the old ground stay hidden)\n", 1)
+t = t.replace(a, a + "  if (HMAP) land += hmapAt(x, z) * smoothstep(-6, -22, s) * smoothstep(26, 40, Math.hypot(x + 64, z - 20)) * reliefRoom(x, z);   // the Blender-shaped land (raise only: things under the old ground stay hidden)\n", 1)
 # slope and crest colour so the hills read: darker on slopes, a sunnier green on the crests (open land only)
 a = "  if (h > 6) col.lerp(C.rock, smoothstep(6, 14, h) * 0.6);"
 assert t.count(a) == 1
@@ -303,6 +303,20 @@ function hmapAt(x, z) {
 }
 """
 hm += """
+// the shaped land eases out over ~20 m round everything kept flat (town, house pad, the garden and every flat zone), so no
+// steep bank rises at their edges
+function reliefRoom(x, z) {
+  let k = 1 - townWeight(x, z) ** 0.5;
+  const hx = Math.max(GARAGE.minX - 3 - x, 0, x - HOUSE.maxX - 3), hz = Math.max(HOUSE.minZ - 5 - z, 0, z - HOUSE.maxZ - 3);
+  k = Math.min(k, smoothstep(2, 22, Math.sqrt(hx * hx + hz * hz)));
+  for (let i = 0; i < flatZones.length; i++) {
+    const f = flatZones[i]; let d;
+    if (f.minX !== undefined) { const ex = Math.max(f.minX - x, 0, x - f.maxX), ez = Math.max(f.minZ - z, 0, z - f.maxZ); d = Math.sqrt(ex * ex + ez * ez); }
+    else d = Math.max(0, Math.hypot(x - f.x, z - f.z) - f.r);
+    if (d < 24) k = Math.min(k, smoothstep(2, 24, d));
+  }
+  return k;
+}
 // how far a draped strip (the trails) must rise so the shaped ground does not bulge up through it between its samples
 export function hmapLift(x, z) {
   if (!HMAP) return 0;

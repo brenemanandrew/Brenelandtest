@@ -313,11 +313,11 @@
   "name": "mailbox",
   "source": "models/02-small-props/mailbox.glb",
   "size_m": [
-   0.87,
-   1.7,
-   0.66
+   0.6,
+   1.27,
+   0.45
   ],
-  "tris": 1888
+  "tris": 916
  },
  {
   "name": "picket_fence",

@@ -16,7 +16,7 @@ A = {
  'birch':        (TR + 'birch.glb', 'h', 6.71, {'neutral': 1, 'crown': 0.45}),
  'pine':         (P1 + 'pine.glb', 'h', 6.62, {}),
  'palm':         (P1 + 'wave2/palm.glb', 'h', 5.89, {}),
- 'hedge_box':    (P1 + 'v3/hedge_a.glb', 'box', [3.3, 1.5, 0.92], {'long': 1}),
+ 'hedge_box':    (P1 + 'v3/hedge_a.glb', 'box', [3.3, 1.5, 0.92], {'long': 1, 'nowhite': 1}),   # (light flecks between the leaves: Andrew's audit)
  'hedge_end':    (P1 + 'wave2_redo/hedge_end.glb', 'box', [1.65, 1.5, 0.92], {'long': 1}),
  'hedge_bush':   (P1 + 'v3/hedge_b.glb', 'h', 1.2, {}),
  'topiary_ball': (P1 + 'wave2/hedge_end.glb', 'h', 1.0, {}),
@@ -43,7 +43,7 @@ A = {
  'water_butt':   (R + '02-small-props/water_butt.glb', 'h', 1.05, {'flat': 3}),
  'watering_can': (R + '02-small-props/watering_can.glb', 'h', 0.45, {'flat': 3}),
  'wheelbarrow':  (R + '02-small-props/wheelbarrow.glb', 'h', 0.85, {'flat': 4}),
- 'mailbox':      (R + '02-small-props/mailbox.glb', 'h', 1.7, {'flat': 3}),
+ 'mailbox':      (R + '02-small-props/mailbox.glb', 'h', 1.25, {'post': 0.55}),   # Andrew: stump post -> a tall slim post under the box
  # the community garden's frame (one matching set)
  'picket_fence': (R + '02-small-props/picket_fence.glb', 'box', [1.9, 0.84, 0.12], {'flat': 2, 'long': 1}),
  'clock_tower':  (R + '04-set-pieces/v2/clock_tower.glb', 'h', 12.0, {}),   # new: the town clock tower, west side of the bus plaza
@@ -63,9 +63,18 @@ def neutral(img):
     for c, tint in enumerate((0.97, 1.0, 0.95)): out[..., c] = np.where(leaf, g * tint, a[..., c])
     return Image.fromarray((out * 255).astype(np.uint8)), Image.fromarray((leaf * 255).astype(np.uint8))
 def run(name, src, mode, tgt, o):
+    OVER = None
     m = L.load(src)
     tex = m.visual.material.baseColorTexture
     leafmask = None
+    if o.get('nowhite'):   # pale, grey texels (gaps in the painted leaves) -> the median leaf green round them
+        from scipy import ndimage
+        a0 = np.asarray(tex.convert('RGB')).astype(float); mxc, mnc = a0.max(2), a0.min(2)
+        bad = (mxc > 150) & ((mxc - mnc) / np.maximum(mxc, 1) < 0.35)
+        good = ~bad; fill = np.stack([ndimage.median_filter(np.where(good, a0[..., c], np.nan if False else a0[..., c]), size=9) for c in range(3)], 2)
+        dark = np.stack([ndimage.grey_erosion(a0[..., c], size=7) for c in range(3)], 2)
+        a0[bad] = (0.5 * fill + 0.5 * dark)[bad] * 0.8
+        tex = Image.fromarray(np.clip(a0, 0, 255).astype(np.uint8)); print('hedge: cleaned', int(bad.sum()), 'pale texels')
     if o.get('neutral'): tex, leafmask = neutral(tex)
     v = m.vertices.copy()
     ext = v.max(0) - v.min(0)
@@ -75,12 +84,29 @@ def run(name, src, mode, tgt, o):
     elif mode == 'bed': k = np.full(3, min(2.6 / ext[0], 1.3 / ext[2], o.get('maxh', 9) / ext[1]))
     else: k = np.array(tgt) / ext
     v = v * k
+    if o.get('post'):   # stretch what is under the box into a tall, slimmer post: box keeps its size, total height kept
+        y0 = v[:, 1].min(); H = v[:, 1].max() - y0; ys = y0 + 0.4 * H
+        tx = np.asarray(m.visual.material.baseColorTexture.convert('RGB').resize((256, 256))).astype(int); uvv = m.visual.uv
+        cc = tx[np.clip(((1 - uvv[:, 1] % 1) * 255).astype(int), 0, 255), np.clip(((uvv[:, 0] % 1) * 255).astype(int), 0, 255)]
+        red = (cc[:, 0] > 140) & (cc[:, 1] < 90) & (cc[:, 2] < 90)          # the box is the red part, the post is what is under it
+        st = (~red) & (v[:, 1] < y0 + 0.6 * H); bins = [np.percentile(v[st, 1], 97) + 0.004]   # the stump's top (brown, under the box)
+        split = bins[0]; post_h = o['post']
+        cx, cz = v[red][:, 0].mean(), v[red][:, 2].mean(); post_uv = uvv[(~red) & (v[:, 1] < split)][0]
+        v[:, 1] += post_h - (split - y0)                                 # the box up onto the new post
+        keepf = v[m.faces][:, :, 1].mean(1) > y0 + post_h + 0.004   # drop Meshy's stump (the non-red part under the box)
+        import trimesh as _t
+        bx = _t.creation.box((0.11, post_h + 0.03, 0.11)); bx.apply_translation((cx, y0 + post_h / 2 - 0.01, cz))
+        PF = np.vstack([m.faces[keepf], bx.faces + len(v)]); v = np.vstack([v, bx.vertices])
+        UV = np.vstack([uvv, np.tile(post_uv, (len(bx.vertices), 1))])
+        v = v * (tgt / (v[:, 1].max() - y0))
+        OVER = (PF, UV)
     if o.get('maxw'):                                              # narrow the crown, keep the height
         e = v.max(0) - v.min(0); f = min(1, o['maxw'] / max(e[0], e[2])); v[:, [0, 2]] *= f
     mn, mx = v.min(0), v.max(0)
     v -= [(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2]
-    faces = m.faces if np.linalg.det(np.diag(k)) > 0 and not (o.get('long') and (m.vertices.max(0) - m.vertices.min(0))[2] > (m.vertices.max(0) - m.vertices.min(0))[0]) else m.faces
-    uv = m.visual.uv
+    OVER = locals().get('OVER')
+    faces = OVER[0] if OVER else m.faces if np.linalg.det(np.diag(k)) > 0 and not (o.get('long') and (m.vertices.max(0) - m.vertices.min(0))[2] > (m.vertices.max(0) - m.vertices.min(0))[0]) else m.faces
+    uv = OVER[1] if OVER else m.visual.uv
     px = 512 if name in SMALL else 1024
     mat = trimesh.visual.material.PBRMaterial(baseColorTexture=tex.convert('RGB').resize((px, px)), metallicFactor=0, roughnessFactor=1)
     t = trimesh.Trimesh(v, faces, visual=trimesh.visual.TextureVisuals(uv=uv, material=mat), process=False)
