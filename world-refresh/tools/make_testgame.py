@@ -154,6 +154,7 @@ assert t.count(a) == 1; open(p, 'w').write(t.replace(a, "await fetch(new URLSear
 
 # ---- Nala: her Meshy model bound to the code dog's rig (tools/nala-model.js)
 shutil.copy(os.path.join(WR, 'models/characters/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/nala_mesh.glb'))
+shutil.copy(os.path.join(WR, 'models/characters/nala_meta.json'), os.path.join(OUT, 'models/refresh/nala_meta.json'))
 shutil.copy(os.path.join(HERE, 'nala-model.js'), os.path.join(OUT, 'js/nala-model.js'))
 p = os.path.join(OUT, 'js/dogs.js'); t = open(p).read()
 a = "    shadows(this.root, true, false);\n    this.applyPose(1 / 60, 0);\n  }"
