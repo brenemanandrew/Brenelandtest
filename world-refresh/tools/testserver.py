@@ -5,6 +5,7 @@ Usage: python3 testserver.py ROOT PORT"""
 import sys, os, json, urllib.request, http.server, socketserver
 ROOT, PORT = sys.argv[1], int(sys.argv[2]); LIVE = 'https://breneland.fly.dev'
 class H(http.server.SimpleHTTPRequestHandler):
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map, '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json', '.glb': 'model/gltf-binary', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.html': 'text/html', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.webmanifest': 'application/manifest+json'}
     def __init__(s, *a, **k): super().__init__(*a, directory=ROOT, **k)
     def log_message(s, *a): pass
     def _json(s, obj, code=200):
