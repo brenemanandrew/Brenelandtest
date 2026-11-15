@@ -113,7 +113,7 @@ export function create(parent, table) {
 
   function build(view, order, phase) {
     const v = view || {};
-    const k = JSON.stringify([v.owner, v.lvl, v.mort, v.dice, v.decks, v.turn, phase, order, v.alive]);
+    const k = JSON.stringify([v.owner, v.lvl, v.mort, v.dice, v.decks, v.roller ?? v.turn, phase, order, v.alive]);
     if (k !== key) {
       key = k; builds++;
       const B = Array.isArray(v.board) ? v.board : [], groups = Array.isArray(v.groups) ? v.groups : [];
@@ -159,7 +159,7 @@ export function create(parent, table) {
     if (moved || !pawnsBuilt.length || pawnKey() !== lastPawnKey) buildPawns();
   }
   let lastPawnKey = '';
-  const pawnKey = () => JSON.stringify([walk.shown, pawnView && pawnView.alive, pawnView && pawnView.turn, pawnPhase, pawnOrder]);
+  const pawnKey = () => JSON.stringify([walk.shown, pawnView && pawnView.alive, pawnView && (pawnView.roller ?? pawnView.turn), pawnPhase, pawnOrder]);
   function buildPawns() {
     lastPawnKey = pawnKey();
     pawnsBuilt = drop(pawnsBuilt);
@@ -168,7 +168,7 @@ export function create(parent, table) {
     for (let s = 0; s < order.length; s++) { if (v.alive && !v.alive[s]) continue; const p = walk.shown[s]; if (!Number.isInteger(p)) continue; if (!at.has(p)) at.set(p, []); at.get(p).push(s); }
     for (const [p, list] of at) list.forEach((s, j) => {
       const u = list.length === 1 ? 0 : (j % 2 ? 0.2 : -0.2), w = list.length <= 2 ? 0.45 : (j < 2 ? 0.32 : 0.6);
-      const [x, z] = inCell(p, list.length <= 2 ? (j - (list.length - 1) / 2) * 0.4 : u, w), turn = s === v.turn && pawnPhase === 'play';
+      const [x, z] = inCell(p, list.length <= 2 ? (j - (list.length - 1) / 2) * 0.4 : u, w), turn = s === (v.roller ?? v.turn) && pawnPhase === 'play';
       if (turn) b.add(GEO.cyl12, '#ffd34d', { x, y: TRAY_TOP + 0.001, z, sx: C * 0.22, sy: 0.002, sz: C * 0.22 });
       pawn(b, x, z, SEAT_COLORS[order[s] % 8], { h: C * 0.78, y: TRAY_TOP + (turn ? 0.003 : 0), ring: CREAM });
     });

@@ -57,5 +57,5 @@ against `GROUP_SPACES`). Check: `node tools/tg-achievements-test.mjs` (real bot 
 
 ## Not done
 
-- Town Tycoon: no auctions or trades.
+
 

@@ -752,9 +752,13 @@ const ui = {
 .tg-town-tycoon .tt-rules .tg-rpic .tg-ico { width: 30px; height: 30px; }
 .tg-town-tycoon .tt-midtop { position: absolute; z-index: 5; pointer-events: none; }
 .tg-town-tycoon .tt-midtop > * { pointer-events: auto; }
-.tg-town-tycoon .tt-cacts { display: flex; gap: 5px; justify-content: center; padding: 2px 6px 7px; flex-wrap: wrap; }
+.tg-town-tycoon .tt-card:has(.tt-cacts) { width: min(96%, 310px); }
+.tg-town-tycoon .tt-cacts { position: sticky; bottom: 0; z-index: 1; display: flex; gap: 5px; justify-content: center; padding: 4px 6px 6px; flex-wrap: wrap; background: #fff8ec; border-top: 2px dashed #d9cdb4; }
 .tg-town-tycoon .tt-cact { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 10px 0 6px; border: 2.5px solid #2b2340; border-radius: 18px; background: #fff8ec; font: 700 14px Fredoka, sans-serif; color: #2b2340; box-shadow: 0 2px 0 rgba(43,35,64,.8); }
 .tg-town-tycoon .tt-cact.hot { background: #ffd34d; }
+.tg-town-tycoon[data-form="phone"] .tt-cacts, .tg-town-tycoon.portrait .tt-cacts { flex-wrap: nowrap; gap: 4px; padding: 3px 4px 4px; }
+.tg-town-tycoon[data-form="phone"] .tt-cact, .tg-town-tycoon.portrait .tt-cact { min-height: 32px; padding: 0 7px 0 3px; font-size: 13px; gap: 3px; }
+.tg-town-tycoon[data-form="phone"] .tt-cico, .tg-town-tycoon.portrait .tt-cico { width: 19px; height: 19px; }
 .tg-town-tycoon .tt-cact.off { opacity: .5; }
 .tg-town-tycoon .tt-cico { width: 22px; height: 22px; display: block; }
 .tg-town-tycoon .tt-cico svg, .tg-town-tycoon .tt-pico svg { width: 100%; height: 100%; display: block; }
