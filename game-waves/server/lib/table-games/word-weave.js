@@ -136,7 +136,8 @@ export function apply(state, seat, move) {
     S.scores[seat] += ev.score;
     const placed = tiles.map(t => (t.blank ? { r: t.r, c: t.c, letter: t.letter, blank: true } : { r: t.r, c: t.c, letter: t.letter }));
     S.last = { seat, type: 'place', word: ev.main, words: ev.words, score: ev.score, tiles: placed, full: ev.full };
-    beat(beats, 'place', { seat, word: ev.main, words: ev.words.map(w => ({ word: w.word, score: w.score })), score: ev.score, tiles: placed, full: ev.full, total: S.scores[seat] });
+    // tripleWord: a new tile on a Triple Word square (public, for the achievements)
+    beat(beats, 'place', { seat, word: ev.main, words: ev.words.map(w => ({ word: w.word, score: w.score })), score: ev.score, tiles: placed, full: ev.full, total: S.scores[seat], tripleWord: tiles.some(t => LAYOUT[t.r][t.c] === 'T') });
     if (ev.full) beat(beats, 'fullweave', { seat, bonus: FULL_BONUS });
     S.scoreless = ev.score > 0 ? 0 : S.scoreless + 1;
     draw(S, seat, beats);

@@ -149,7 +149,7 @@ export function apply(state, seat, move) {
     }
     case 'accuse': {
       const right = move.who === S.tin.who && move.what === S.tin.what && move.where === S.tin.where;
-      beat(beats, 'accuse', { seat, who: move.who, what: move.what, where: move.where, right });
+      beat(beats, 'accuse', { seat, who: move.who, what: move.what, where: move.where, right, round: S.round }); // (round: public, for the achievements)
       if (right) { gameOver(S, [seat], 'solved', beats); break; }
       S.out[seat] = true;
       S.accusations.push({ seat, who: move.who, what: move.what, where: move.where });

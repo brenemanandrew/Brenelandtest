@@ -29,9 +29,34 @@ NOT shipped. Do not deploy until Andrew says so.
   Word Weave, Missing Pie and Town Tycoon all finish; Word Weave moves pass through `check()` with no refusals.
 - `node tools/harness/run.mjs GAME OUTDIR [players] [advance]`: screenshots at phone upright, phone sideways and PC.
 
+## Achievements
+
+1. Server: `server/lib/tg-achievements.js` -> `lib/tg-achievements.js` (replaces it; every existing achievement and how it is
+   earned is unchanged, `tg-first-win` is now titled "Table Winner" instead of "Lowest Score Wins", same id).
+2. Client: `client/js/achievements.js` -> `public/js/achievements.js` (the live file plus medallion pictures for the new icons).
+3. The engines' beats carry two new public fields used here: Word Weave `place.tripleWord`, The Missing Pie `accuse.round`.
+
+New ones (people only, never bots; once each; games with bots count):
+
+| id | Title | Earned by |
+|---|---|---|
+| `ww-full-weave` | Full Weave | all 7 tiles in one Word Weave turn |
+| `ww-big-word` | Word Wizard | one word worth 50+ |
+| `ww-triple` | Triple Treat | a new tile on a Triple Word square |
+| `ww-last-tile` | Empty Rack | going out with your last tile to end the game |
+| `mp-solved` | Pie Detective | a right accusation in The Missing Pie |
+| `mp-quick` | Quick Crumbs | solved by round 6 |
+| `mp-stumper` | Stumped the Table | an ask nobody could answer |
+| `tt-pair` | Matching Set | both streets of a colour pair in Town Tycoon |
+| `tt-shop` | Open for Business | a shop built on a street |
+| `tt-big-rent` | Rent Day | a rent of B500+ paid to you |
+| `tt-last` | Last One Standing | won a full game as the last player left |
+
+Town Tycoon's colour pairs are listed in `tg-achievements.js` (`TT_PAIRS`); if the board changes, update it (the test checks it
+against `GROUP_SPACES`). Check: `node tools/tg-achievements-test.mjs` (real bot games of all three plus stub Mexican Train beats).
+
 ## Not done
 
-- Server-side achievements for the new games.
 - Real 3D pieces: on the world table they show a generic board slab and pawns (`generic-3d.js`).
 - Town Tycoon: no auctions or trades.
 - Word Weave: no rack drag-to-reorder (Shuffle works); blank-tile play not checked end to end in the UI.

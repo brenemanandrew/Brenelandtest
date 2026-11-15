@@ -159,7 +159,7 @@ function shuffled(S, keep, R) {
   return T;
 }
 const BEAT_KEYS = {
-  turn: 'dwell kind round seat', place: 'dwell full kind score seat tiles total word words', draw: 'bag count dwell kind seat',
+  turn: 'dwell kind round seat', place: 'dwell full kind score seat tiles total tripleWord word words', draw: 'bag count dwell kind seat',
   exchange: 'count dwell kind seat', pass: 'dwell kind seat', fullweave: 'bonus dwell kind seat', bagEmpty: 'dwell kind',
   gameOver: 'adjust dwell kind out racks totals why winners',
 };
