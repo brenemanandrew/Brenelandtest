@@ -85,8 +85,8 @@ export function cardFan(b, x, z, a, n, back, { w = 0.034, h = 0.05, trim = CREAM
     const cx = x + tx * off - Math.sin(a) * i * 0.0012, cz = z + tz * off - Math.cos(a) * i * 0.0012;
     // stood up, leaning back toward the chair a little, fanned about its foot
     const yy = y + h * 0.5 * Math.cos(rz);
-    b.add(GEO.box, trim, { x: cx, y: yy, z: cz, sx: w, sy: h, sz: 0.0016, rz, rx: -0.35, ry: a });
-    b.add(GEO.box, back, { x: cx - Math.sin(a) * 0.0011, y: yy, z: cz - Math.cos(a) * 0.0011, sx: w * 0.8, sy: h * 0.84, sz: 0.0012, rz, rx: -0.35, ry: a });
+    b.add(GEO.box, trim, { x: cx, y: yy, z: cz, sx: w, sy: h, sz: 0.0016, rz, rx: 0.35, ry: a });
+    b.add(GEO.box, back, { x: cx - Math.sin(a) * 0.0011, y: yy, z: cz - Math.cos(a) * 0.0011, sx: w * 0.8, sy: h * 0.84, sz: 0.0012, rz, rx: 0.35, ry: a });
   }
 }
 

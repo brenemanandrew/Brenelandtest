@@ -109,7 +109,7 @@ window.__stats = () => { renderer.info.reset(); renderer.info.autoReset = false;
 // update() with an unchanged view (a fresh copy of the same public view) must not rebuild
 window.__same = () => { const a = pieces.drawn().builds; pieces.update(JSON.parse(JSON.stringify(E.view(state, null))), order.slice(), phaseOf()); pieces.update(E.view(state, null), order, phaseOf()); return { before: a, after: pieces.drawn().builds }; };
 const CAMS = {
-  player: () => { const s = d.seats[order[0]] || d.seats[0], a = Math.atan2(s.x, s.z); return [[Math.sin(a + 0.35) * 1.75, 1.62, Math.cos(a + 0.35) * 1.75], [0, d.top, 0]]; },
+  player: () => { const s = d.seats[order[0]] || d.seats[0], a = Math.atan2(s.x, s.z), r = Math.hypot(s.x, s.z) + 0.05; return [[Math.sin(a) * r, d.top + 0.5, Math.cos(a) * r], [0, d.top, -0.0]]; },
   above: () => [[0.02, d.top + 1.05, 0.12], [0, d.top, 0]],
   low: () => { const s = d.seats[order[Math.min(1, N - 1)]], a = Math.atan2(s.x, s.z); return [[Math.sin(a) * 1.05, d.top + 0.32, Math.cos(a) * 1.05], [0, d.top + 0.02, 0]]; },
   passer: () => [[2.6, 1.65, 1.9], [0, d.top, 0]],

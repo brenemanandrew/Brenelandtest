@@ -122,24 +122,24 @@ export function create(parent, table) {
     tray(b, S, { frame: '#6e4224', lip: '#4f8a3c' });
     for (let i = 0; i < PLACES.length; i++) { const [x, z] = at(i); building(b, i, x, z - G * 0.1); }
     // the pie box on the lawn: shut and tied with a ribbon, or open with the pie inside once the answer is out
-    const [lx, lz] = at(8), bz = lz - G * 0.1, bw = S * 0.09, bh = S * 0.05, sol = phase === 'over' && v.solution ? v.solution : null;
-    b.add(GEO.box, '#ffaec4', { x: lx, y: TRAY_TOP + bh / 2, z: bz, sx: bw, sy: bh, sz: bw });
+    const [lx, lz] = at(8), bz = lz - G * 0.1, bw = S * 0.11, bh = S * 0.06, sol = phase === 'over' && v.solution ? v.solution : null;
+    b.add(GEO.box, '#fff1d6', { x: lx, y: TRAY_TOP + bh / 2, z: bz, sx: bw, sy: bh, sz: bw });
     if (!sol) {
-      b.add(GEO.box, '#ffc7d6', { x: lx, y: TRAY_TOP + bh + 0.002, z: bz, sx: bw * 1.06, sy: 0.006, sz: bw * 1.06 });
+      b.add(GEO.box, '#fff8ec', { x: lx, y: TRAY_TOP + bh + 0.002, z: bz, sx: bw * 1.06, sy: 0.006, sz: bw * 1.06 });
       b.add(GEO.box, '#e0463c', { x: lx, y: TRAY_TOP + bh / 2 + 0.001, z: bz, sx: bw * 0.16, sy: bh + 0.008, sz: bw * 1.08 });
       b.add(GEO.box, '#e0463c', { x: lx, y: TRAY_TOP + bh / 2 + 0.001, z: bz, sx: bw * 1.08, sy: bh + 0.008, sz: bw * 0.16 });
       for (const u of [-1, 1]) b.add(GEO.sphere, '#e0463c', { x: lx + u * bw * 0.12, y: TRAY_TOP + bh + 0.009, z: bz, sx: bw * 0.13, sy: bw * 0.08, sz: bw * 0.09, rz: u * 0.5 });
     } else {
       b.add(GEO.cyl12, '#d9a35b', { x: lx, y: TRAY_TOP + bh + 0.002, z: bz, sx: bw * 0.4, sy: 0.008, sz: bw * 0.4 });
       b.add(GEO.sphere, '#f2b630', { x: lx, y: TRAY_TOP + bh + 0.006, z: bz, sx: bw * 0.36, sy: bw * 0.14, sz: bw * 0.36 });
-      b.add(GEO.box, '#ffc7d6', { x: lx + bw * 0.95, y: TRAY_TOP + 0.003, z: bz - bw * 0.2, sx: bw * 1.06, sy: 0.006, sz: bw * 1.06, ry: 0.4 });
+      b.add(GEO.box, '#fff8ec', { x: lx + bw * 0.95, y: TRAY_TOP + 0.003, z: bz - bw * 0.2, sx: bw * 1.06, sy: 0.006, sz: bw * 1.06, ry: 0.4 });
       const cards = [WHO_COL[WHO.indexOf(sol.who)] || '#fff8ec', WHAT_COL[WHAT.indexOf(sol.what)] || '#fff8ec', (PLACES[placeIdx(sol.where)] || {}).roof || '#fff8ec'];
       cards.forEach((c, j) => { const x = lx + (j - 1) * S * 0.07, z = bz + G * 0.42; b.add(GEO.box, CREAM, { x, y: TRAY_TOP + 0.002, z, sx: S * 0.055, sy: 0.003, sz: S * 0.08, ry: (j - 1) * 0.12 }); b.add(GEO.box, c, { x, y: TRAY_TOP + 0.004, z: z - S * 0.008, sx: S * 0.038, sy: 0.002, sz: S * 0.04, ry: (j - 1) * 0.12 }); });
     }
     // the suspects' pawns, along the front of their place (a player's on a base in their seat colour)
     const n = order ? order.length : 0, here = new Map();
     WHO.forEach((w, i) => { const p = placeIdx((v.pos || [])[i] || 'lawn'); if (!here.has(p)) here.set(p, []); here.get(p).push(i); });
-    const ph = S * 0.085;
+    const ph = S * 0.105;
     for (const [p, list] of here) {
       const [x, z] = at(p);
       list.forEach((i, j) => {
@@ -156,7 +156,7 @@ export function create(parent, table) {
       const r = Math.max(S * 0.5 + 0.05, Math.min(edgeOf(chair) - 0.07, S * 0.5 + 0.16)), cx = Math.sin(a) * r, cz = Math.cos(a) * r;
       const picking = v.pending && v.pending.by === i && v.stage === 'show';
       const p = T(cx, cz, a);
-      b.add(GEO.cyl12, SEAT_COLORS[chair % 8], { x: p.x, y: 0.002, z: p.z, sx: 0.05, sy: 0.004, sz: 0.035, ry: p.ry });
+      b.add(GEO.cyl12, SEAT_COLORS[chair % 8], { x: p.x, y: 0.002, z: p.z, sx: 0.03, sy: 0.004, sz: 0.018, ry: p.ry });
       fanInto(b, p, cnt - (picking ? 1 : 0));
       if (picking) { const q = T(cx - Math.sin(a) * 0.03, cz - Math.cos(a) * 0.03, a); b.add(GEO.box, CREAM, { x: q.x, y: 0.075, z: q.z, sx: 0.036, sy: 0.052, sz: 0.002, ry: q.ry, rx: 0.2 }); b.add(GEO.box, '#b8433a', { x: q.x - Math.sin(q.ry) * 0.0012, y: 0.075, z: q.z - Math.cos(q.ry) * 0.0012, sx: 0.029, sy: 0.044, sz: 0.0014, ry: q.ry, rx: 0.2 }); }
     }
