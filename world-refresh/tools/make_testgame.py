@@ -352,7 +352,9 @@ open(p, 'w').write(t)
 p = os.path.join(OUT, 'js/toon.js'); t = open(p).read()
 a = "      vec2 c = vUv - 0.5;\n      col *= 1.0 - uVignette * dot(c, c) * 1.6;"
 assert t.count(a) == 1
-vib = """      if (uVibrant > 0.0) {
+vib = """      float vibK = uVibrant;
+      if (uIndoor > 0.0) vibK *= mix(1.0, (uUseNormal > 0.5 ? mix(0.0, 0.45, step(0.5, solid(vUv))) : 0.3), uIndoor);   // (indoors: none on people, softer on the room)
+      if (vibK > 0.0) {
         // bloom: what is brighter than ~0.75 glows softly into its neighbours (8 taps on a ring, two rings)
         vec3 bl = vec3(0.0);
         for (int i = 0; i < 8; i++) {
@@ -360,25 +362,25 @@ vib = """      if (uVibrant > 0.0) {
           vec2 dir = vec2(cos(a), sin(a)) * uTexel;
           bl += max(texture2D(tColor, vUv + dir * 5.0).rgb - 0.72, 0.0) + max(texture2D(tColor, vUv + dir * 12.0).rgb - 0.72, 0.0) * 0.6;
         }
-        col += bl * (0.11 * uVibrant);
+        col += bl * (0.11 * vibK);
         // vibrance: the duller a colour the more it is lifted (skin and grass do not go neon)
         float l2 = dot(col, vec3(0.299, 0.587, 0.114)), mx = max(col.r, max(col.g, col.b)), mn = min(col.r, min(col.g, col.b));
         float satNow = (mx - mn) / max(mx, 1e-3);
         float near = 1.0 - smoothstep(25.0, 140.0, d);
-        col = mix(vec3(l2), col, 1.0 + uVibrant * (0.32 * (1.0 - satNow) + 0.06) * (0.55 + 0.45 * near));
+        col = mix(vec3(l2), col, 1.0 + vibK * (0.32 * (1.0 - satNow) + 0.06) * (0.55 + 0.45 * near));
         // contrast: a soft S round the mid tones, deeper darks, lights held below clipping
-        col = mix(col, col * col * (3.0 - 2.0 * col), 0.22 * uVibrant * (1.0 - smoothstep(0.85, 1.2, mx)));
+        col = mix(col, col * col * (3.0 - 2.0 * col), 0.22 * vibK * (1.0 - smoothstep(0.85, 1.2, mx)));
         // a little warm light on the sunlit side of things and a little cool in the shade
-        col += vec3(0.022, 0.012, -0.01) * smoothstep(0.55, 0.95, l2) * uVibrant;
-        col += vec3(-0.008, 0.0, 0.016) * (1.0 - smoothstep(0.08, 0.35, l2)) * uVibrant;
+        col += vec3(0.022, 0.012, -0.01) * smoothstep(0.55, 0.95, l2) * vibK;
+        col += vec3(-0.008, 0.0, 0.016) * (1.0 - smoothstep(0.08, 0.35, l2)) * vibK;
       }
 """
 t = t.replace(a, vib + a, 1)
-a = "uniform float uUseNormal,"; assert t.count(a) == 1; t = t.replace(a, "uniform float uVibrant; uniform float uUseNormal,", 1)
+a = "uniform float uUseNormal,"; assert t.count(a) == 1; t = t.replace(a, "uniform float uVibrant, uIndoor; uniform float uUseNormal,", 1)
 a = "  get uniforms() { return this.material.uniforms; }"; assert t.count(a) == 1
 t = t.replace(a, a + "\n  set vibrant(v) { this.material.uniforms.uVibrant.value = v; }", 1)
 a = "    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);"; assert t.count(a) == 1
-t = t.replace(a, "    this.material.uniforms.uVibrant = { value: (typeof location !== 'undefined' && new URLSearchParams(location.search).has('novibrant')) || quality === 'low' ? 0 : 1.35 };\n" + a, 1)
+t = t.replace(a, "    this.material.uniforms.uIndoor = { value: 0 };\n    this.material.uniforms.uVibrant = { value: (typeof location !== 'undefined' && new URLSearchParams(location.search).has('novibrant')) || quality === 'low' ? 0 : 1.35 };\n" + a, 1)
 open(p, 'w').write(t)
 
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
@@ -387,7 +389,7 @@ for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.joi
 
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
-hook = "    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
+hook = "    if (ink.uniforms.uIndoor) ink.uniforms.uIndoor.value = WEATHER.indoor || 0;   // (vibrant pass: softer indoors, none on people there)\n    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
 a = '    ui.update(camera, innerWidth, innerHeight);'
 assert m.count(a) == 1; m = m.replace(a, hook + a, 1); open(p, 'w').write(m)   # (before the labels, so name tags follow the pinned camera)
 print('test game written to', OUT)
