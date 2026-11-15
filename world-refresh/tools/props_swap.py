@@ -21,11 +21,14 @@ def vertex_rgb(m):
     tex = np.asarray(m.visual.material.baseColorTexture.convert('RGB').resize((512, 512))); uv = m.visual.uv
     x = np.clip((uv[:, 0] % 1) * 511, 0, 511).astype(int); y = np.clip((1 - uv[:, 1] % 1) * 511, 0, 511).astype(int)
     return tex[y, x].astype(int)
-def run(src, dst):
+def run(src, dst, texdir=None):
+    import trimesh
+    if texdir: os.makedirs(texdir, exist_ok=True)
     D = json.load(open(src))
     for shape, (path, fit, o) in SWAP.items():
         S = D['shapes'][shape]
         old = np.concatenate([np.array(p['pos']).reshape(-1, 3) for p in S['parts'].values()]); omn, omx = old.min(0), old.max(0); oe = omx - omn
+        post_uv = None
         m = L.load(path); v = m.vertices.copy(); f = m.faces; rgb = vertex_rgb(m)
         e = v.max(0) - v.min(0)
         if (oe[0] > oe[2]) != (e[0] > e[2]) and abs(oe[0] - oe[2]) > 0.15 * max(oe[0], oe[2]): v = v[:, [2, 1, 0]] * [1, 1, -1]; f = f[:, ::-1]   # long side the same way as the old shape
@@ -72,6 +75,7 @@ def run(src, dst):
                         k2 = (px > 0, pz > 0)
                         if k2 not in q or px * px + pz * pz > q[k2][0] ** 2 + q[k2][1] ** 2: q[k2] = (px, pz)
                     posts = list(q.values())
+                post_uv = m.visual.uv[m.faces[low][len(m.faces[low]) // 2][0]] if low.any() else None   # texture spot of the old (wooden) posts
                 keep = ~low; f = f[keep]; rgb_post = rgb[m.faces[low]].mean((0, 1)) if low.any() else np.array([120, 70, 40])
                 pv, pf = [], []
                 for (cx, cz) in posts:                         # a square post, 0.28 m (in the model's own scale before fitting)
@@ -131,6 +135,12 @@ def run(src, dst):
             return out
         skins = sorted({k for p in S['parts'].values() for k in p.get('skins', {})})
         parts = {'body': part(~glow, skins)}
+        if texdir:   # the textured body (glass stays the glow part): fitted vertices, Meshy's own uvs, 1024 px texture
+            fill = (post_uv if post_uv is not None else m.visual.uv[m.faces[0][0]])[None]
+            uv = np.vstack([m.visual.uv, np.repeat(fill, len(v) - len(m.visual.uv), 0)]) if len(v) > len(m.visual.uv) else m.visual.uv
+            tex = m.visual.material.baseColorTexture.convert('RGB').resize((1024, 1024))
+            tm = trimesh.Trimesh(v, f[~glow], visual=trimesh.visual.TextureVisuals(uv=uv, material=trimesh.visual.material.PBRMaterial(baseColorTexture=tex, metallicFactor=0, roughnessFactor=1)), process=False)
+            tm.export(os.path.join(texdir, 'prop_' + shape + '.glb'), include_normals=True)
         oldglow = [n for n, p in S['parts'].items() if 'skins' not in p]
         if glow.any() and oldglow:
             parts[oldglow[0]] = part(glow, None)

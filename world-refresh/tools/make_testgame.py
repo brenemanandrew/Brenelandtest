@@ -5,7 +5,7 @@ The old code tree is still built into a throwaway batcher first, so every random
 exactly as before (nothing else in the world moves). Leaves are tinted with the same palette colour the old tree would use.
 If a model fails to load, the old code tree is used (fallback)."""
 import os, sys, shutil, json
-HERE = os.path.dirname(os.path.abspath(__file__)); WR = os.path.dirname(HERE); REPO = os.path.dirname(WR)
+HERE = os.path.dirname(os.path.abspath(__file__)); sys.path.insert(0, HERE); import props_swap; WR = os.path.dirname(HERE); REPO = os.path.dirname(WR)
 OUT = sys.argv[1]
 if os.path.exists(OUT): shutil.rmtree(OUT)
 shutil.copytree(os.path.join(REPO, 'breneland-live'), OUT)
@@ -59,7 +59,7 @@ open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
 SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
-TEXTURED = ['potting_shed']   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
+TEXTURED = ['potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
 os.makedirs(os.path.join(OUT, 'models/refresh/tex'), exist_ok=True)
 for k in TEXTURED: shutil.copy(os.path.join(WR, 'models/converted/tex', k + '.glb'), os.path.join(OUT, 'models/refresh/tex', k + '.glb'))
 for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
@@ -87,13 +87,23 @@ if (!q.has('oldworld') && !q.has('oldtrees')) {
   await Promise.all(TEXLIST.map(async k => { try { const gl = await ld.loadAsync('/models/refresh/tex/' + k + '.glb'); let m = null; gl.scene.traverse(o => { if (o.isMesh && !m) m = o; });
     RT[k] = new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3 }); RT[k].userData.geo = m.geometry; RM[k] = RM[k] || m.geometry; } catch (e) { console.warn('refresh textured model failed', k, e); } }));
 }
+export const RP = {};   // props.json shapes, textured (props-static.js draws them instanced)
+if (!q.has('oldworld') && !q.has('oldtrees')) {
+  const ld = new GLTFLoader(), { GRADIENT_3 } = await import('./toon.js');
+  await Promise.all(PROPLIST.map(async k => { try { const gl = await ld.loadAsync('/models/refresh/tex/prop_' + k + '.glb'); let m = null; gl.scene.traverse(o => { if (o.isMesh && !m) m = o; });
+    RP[k] = { geo: m.geometry, mat: new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3 }) }; } catch (e) { console.warn('refresh prop failed, keeping the colour version', k, e); } }));
+}
+const _rm = new THREE.Matrix4(), _rq = new THREE.Quaternion(), _rp = new THREE.Vector3(), _rs = new THREE.Vector3(), _ry = new THREE.Vector3(0, 1, 0);
 export function rmesh(parent, k, x, y, z, { s = 1, ry = 0 } = {}) {
   if (!RT[k]) return null; const m = new THREE.Mesh(RT[k].userData.geo, RT[k]); m.position.set(x, y, z); m.rotation.y = ry; m.scale.setScalar(s);
   m.castShadow = m.receiveShadow = true; m.userData.noMerge = true; parent.add(m); return m;
 }
 // add a model to a batcher: x, y = ground under its centre, z; s or sx/sy/sz scale; ry yaw
-export function rput(b, k, x, y, z, { s = 1, sx, sy, sz, ry = 0 } = {}) { if (RM[k]) b.add(RM[k], '#ffffff', { x, y, z, ry, sx: sx ?? s, sy: sy ?? s, sz: sz ?? s }); }
-""".replace('%s', json.dumps(SWAP), 1).replace('TEXLIST', json.dumps(TEXTURED)))
+export function rput(b, k, x, y, z, { s = 1, sx, sy, sz, ry = 0 } = {}) {
+  if (RT[k] && b.addInst) { _rm.compose(_rp.set(x, y, z), _rq.setFromAxisAngle(_ry, ry), _rs.set(sx ?? s, sy ?? s, sz ?? s)); b.addInst(k, RT[k].userData.geo, RT[k], _rm); return; }
+  if (RM[k]) b.add(RM[k], '#ffffff', { x, y, z, ry, sx: sx ?? s, sy: sy ?? s, sz: sz ?? s });
+}
+""".replace('%s', json.dumps(SWAP), 1).replace('TEXLIST', json.dumps(TEXTURED)).replace('PROPLIST', json.dumps(list(props_swap.SWAP))))
 IMP = "import { RM, RT, MUTE, rput, rmesh } from './refresh-models.js';\n"
 def patch(fn, pairs):
     p = os.path.join(OUT, 'js', fn); t = open(p).read()
@@ -169,7 +179,7 @@ patch('world.js', [("    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s,
 
 # ---- the static props (props-static.js reads models/props.json): swap the good sheet 02/03 shapes
 sys.path.insert(0, HERE); import props_swap
-props_swap.run(os.path.join(REPO, 'breneland-live/models/props.json'), os.path.join(OUT, 'models/props.json'))
+props_swap.run(os.path.join(REPO, 'breneland-live/models/props.json'), os.path.join(OUT, 'models/props.json'), os.path.join(OUT, 'models/refresh/tex'))
 shutil.copy(os.path.join(REPO, 'breneland-live/models/props.json'), os.path.join(OUT, 'models/props-old.json'))   # ?oldworld uses the old shapes
 p = os.path.join(OUT, 'js/props-static.js'); t = open(p).read(); a = "await fetch('/models/props.json')"
 assert t.count(a) == 1; open(p, 'w').write(t.replace(a, "await fetch(new URLSearchParams(location.search).has('oldworld') ? '/models/props-old.json' : '/models/props.json')", 1))
@@ -186,6 +196,24 @@ open(p, 'w').write("import { dressNala } from './nala-model.js';\n" + t)
 p = os.path.join(OUT, 'js/npcs.js'); t = open(p).read(); a = "    ch.root.userData.npc = def;"
 assert t.count(a) == 1   # the yard Nala is built here from her saved look (which may not carry her name)
 open(p, 'w').write("import { dressNala } from './nala-model.js';\n" + t.replace(a, a + "\n    if (def.id === 'nala' && def.kind === 'dog' && !ch.meshyNala) dressNala(ch);", 1))
+
+# textured models are drawn instanced: one draw call per model kind however many copies (batch.js addInst + build)
+p = os.path.join(OUT, 'js/batch.js'); t = open(p).read()
+a = "  build(parent, name = 'batch') {\n    const out = [];"
+assert t.count(a) == 1
+t = t.replace(a, """  addInst(key, geo, mat, matrix) { (this.inst ||= new Map()); if (!this.inst.has(key)) this.inst.set(key, { geo, mat, ms: [] }); this.inst.get(key).ms.push(matrix.clone()); return this; }
+""" + a + """
+    if (this.inst) { for (const [key, I] of this.inst) { const im = new THREE.InstancedMesh(I.geo, I.mat, I.ms.length); I.ms.forEach((m, i) => im.setMatrixAt(i, m)); im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.castShadow = this.castShadow; im.receiveShadow = this.receiveShadow; im.name = name + ':' + key; im.userData.noMerge = true; parent.add(im); out.push(im); } this.inst.clear(); }""", 1)
+open(p, 'w').write(t)
+p = os.path.join(OUT, 'js/props-static.js'); t = open(p).read()
+a = "  _m.compose(_p, _q, _s);\n  for (const pname of Object.keys(S.parts)) {"
+assert t.count(a) == 1, 'props-static compose'
+t = t.replace(a, "  _m.compose(_p, _q, _s);\n  if (RP[shape] && b.addInst) { b.addInst('prop_' + shape, RP[shape].geo, RP[shape].mat, _m); skip = [...(skip || []), 'body']; }\n  for (const pname of Object.keys(S.parts)) {", 1)
+open(p, 'w').write("import { RP } from './refresh-models.js';\n" + t)
+
+# textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
+import glob, glb_jpeg
+for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb')]: glb_jpeg.run(g)
 
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()

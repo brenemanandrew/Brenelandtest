@@ -48,6 +48,7 @@ A = {
  'picket_fence': (R + '02-small-props/picket_fence.glb', 'box', [1.9, 0.84, 0.12], {'flat': 2, 'long': 1}),
  'potting_shed': (R + '03-large-props/potting_shed.glb', 'box', [2.6, 2.7, 2.1], {}),   # flat colours broke it into shards (Andrew)
 }
+SMALL = {'mushrooms', 'grass_tuft', 'herb_pot', 'weed', 'fern', 'watering_can', 'mailbox', 'water_butt', 'wheelbarrow', 'scarecrow', 'shore_rock'}
 def neutral(img):
     a = np.asarray(img.convert('RGB')).astype(float) / 255
     h, s, v = np.vectorize(colorsys.rgb_to_hsv, otypes=[float] * 3)(a[..., 0], a[..., 1], a[..., 2])
@@ -79,7 +80,8 @@ def run(name, src, mode, tgt, o):
     v -= [(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2]
     faces = m.faces if np.linalg.det(np.diag(k)) > 0 and not (o.get('long') and (m.vertices.max(0) - m.vertices.min(0))[2] > (m.vertices.max(0) - m.vertices.min(0))[0]) else m.faces
     uv = m.visual.uv
-    mat = trimesh.visual.material.PBRMaterial(baseColorTexture=tex, metallicFactor=0, roughnessFactor=1)
+    px = 512 if name in SMALL else 1024
+    mat = trimesh.visual.material.PBRMaterial(baseColorTexture=tex.convert('RGB').resize((px, px)), metallicFactor=0, roughnessFactor=1)
     t = trimesh.Trimesh(v, faces, visual=trimesh.visual.TextureVisuals(uv=uv, material=mat), process=False)
     t.export(f'{R}converted/tex/{name}.glb', include_normals=True)
     small = tex.convert('RGB').resize((512, 512))                  # bake: sample per vertex (soft blur, the wash survives a bit)
