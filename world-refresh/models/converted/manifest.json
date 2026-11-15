@@ -318,5 +318,25 @@
    0.66
   ],
   "tris": 1888
+ },
+ {
+  "name": "picket_fence",
+  "source": "models/02-small-props/picket_fence.glb",
+  "size_m": [
+   1.9,
+   0.84,
+   0.12
+  ],
+  "tris": 1558
+ },
+ {
+  "name": "potting_shed",
+  "source": "models/03-large-props/potting_shed.glb",
+  "size_m": [
+   2.6,
+   2.7,
+   2.1
+  ],
+  "tris": 7992
  }
 ]

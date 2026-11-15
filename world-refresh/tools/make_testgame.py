@@ -58,7 +58,7 @@ s = s.replace(old, new, 1)
 open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
-SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
+SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
 for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
 open(os.path.join(OUT, 'js/refresh-models.js'), 'w').write("""// world-refresh test: converted Meshy models for the props that are swapped (see world-refresh/tools/make_testgame.py).
 // ?oldworld (or ?oldtrees) turns every swap off; a model that fails to load leaves the old code-made prop in place.
@@ -136,6 +136,15 @@ t = section(t, "  { const p = PLAN.butt;", "put(GEO.box, '#3fa06a', c.u, 0.45, c
   ("RM.water_butt && RM.watering_can", "{ const [bx, bz] = W(PLAN.butt.u, PLAN.butt.v), [cx, cz] = W(PLAN.can.u, PLAN.can.v); rput(b, 'water_butt', bx, H(bx, bz) - 0.02, bz, { ry: -Math.PI / 2 }); rput(b, 'watering_can', cx, H(cx, cz) - 0.01, cz, { ry: 2.4 }); }"))
 t = section(t, "  { const p = PLAN.barrow, yaw = -0.5", "    disc(p.u, p.v, 0.6); }",
   ("RM.wheelbarrow", "{ const [wx, wz] = W(PLAN.barrow.u, PLAN.barrow.v); rput(b, 'wheelbarrow', wx, H(wx, wz) - 0.02, wz, { ry: -0.5 + Math.PI / 2 }); }"))
+# the garden's frame: the fence's pickets become the Meshy fence (2 m sections stretched to each open run, colliders kept),
+# the shed's walls, roof, door and window the Meshy potting shed (its collider and the tools on its west wall kept)
+a = "      const t = i / n; if (skip && t > skip[0] && t < skip[1]) continue;"
+assert t.count(a) == 1; t = t.replace(a, "      if (RM.picket_fence) break;\n" + a, 1)
+a = "    const seg = (t0, t1) => { const u0 = a[0] + (c[0] - a[0]) * t0, v0 = a[1] + (c[1] - a[1]) * t0, u1 = a[0] + (c[0] - a[0]) * t1, v1 = a[1] + (c[1] - a[1]) * t1;\n      const l = Math.hypot(u1 - u0, v1 - v0); for (const y of [0.22, 0.52]) put("
+assert t.count(a) == 1, 'fence seg'
+t = t.replace(a, a.replace("for (const y of [0.22, 0.52]) put(", "if (RM.picket_fence) { const m = Math.max(1, Math.round(l / 1.9)); for (let q = 0; q < m; q++) { const f = (q + 0.5) / m, [fx, fz] = W(u0 + (u1 - u0) * f, v0 + (v1 - v0) * f); rput(b, 'picket_fence', fx, H(fx, fz) - 0.02, fz, { sx: l / m / 1.9, ry: yaw - Math.PI / 2 }); } } else for (const y of [0.22, 0.52]) put("), 1)
+t = section(t, "    put(GEO.box, '#7aa6c8', s.u, 1.05, s.v, { sx: s.w, sy: 2.1, sz: s.d });", "    box(u0, u1, v0, v1);",
+  ("RM.potting_shed", "{ const s = PLAN.shed, [hx, hz] = W(s.u, s.v); rput(b, 'potting_shed', hx, H(hx, hz) - 0.02, hz); }"))
 open(os.path.join(OUT, 'js/garden-build.js'), 'w').write(IMP + t)
 # hedges
 patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });",
