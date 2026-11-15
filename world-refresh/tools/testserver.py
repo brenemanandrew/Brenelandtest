@@ -22,4 +22,4 @@ class H(http.server.SimpleHTTPRequestHandler):
         n = int(s.headers.get('content-length') or 0); s.rfile.read(n); s._json({'ok': True})
     do_PUT = do_DELETE = do_PATCH = do_POST
 socketserver.ThreadingTCPServer.allow_reuse_address = True
-socketserver.ThreadingTCPServer(('127.0.0.1', PORT), H).serve_forever()
+socketserver.ThreadingTCPServer(('0.0.0.0', PORT), H).serve_forever()
