@@ -1,0 +1,25 @@
+--- a/lib/table-games/index.js
++++ b/lib/table-games/index.js
+@@ -307,7 +307,12 @@
+     const g = G(T).game;
+     const legal = g.legalMoves(T.state, e) || [];
+     const key = JSON.stringify(move);
+-    if (!legal.some(m => JSON.stringify(m) === key)) return 'That move is not open right now.';
++    // a move not in the list: a game whose moves cannot all be listed (Word Weave's words) checks it itself (null = fine, or why not)
++    if (!legal.some(m => JSON.stringify(m) === key)) {
++      if (typeof g.check !== 'function') return 'That move is not open right now.';
++      let why = null; try { why = g.check(T.state, e, move); } catch { why = 'That move could not be made.'; }
++      if (why) return String(why);
++    }
+     let r;
+     try { r = g.apply(T.state, e, move); } catch (err) { if (!err.illegal) console.error('[table-games] apply', T.game, err.message); return 'That move could not be made.'; }
+     if (!r || r.error || !r.state) return (r && r.error) || 'That move could not be made.';
+@@ -368,7 +373,7 @@
+     if (!moves.length) return null;
+     let m = null;
+     if (G0.bot) { try { const v = G0.game.view(T.state, e); if (!Array.isArray(v.moves)) v.moves = moves; m = G0.bot(v, level, rnd); if (m && m.move) m = m.move; } catch (err) { console.error('[table-games] bot', err.message); m = null; } }
+-    if (m && !moves.some(x => JSON.stringify(x) === JSON.stringify(m))) m = null;
++    if (m && !moves.some(x => JSON.stringify(x) === JSON.stringify(m)) && !(typeof G0.game.check === 'function' && (() => { try { return G0.game.check(T.state, e, m) === null; } catch { return false; } })())) m = null;
+     return m;
+   }
+ 
