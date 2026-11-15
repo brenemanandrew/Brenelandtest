@@ -12,9 +12,9 @@ SWAP = {
  'post_lantern':      (M + '/02-small-props/post_lantern.glb', 'h', {'glow': 1, 'post': {'w': 0.42, 'h': 3.92}}),
  'camp_lantern':      (M + '/02-small-props/camp_lantern.glb', 'h', {'glow': 1}),
  'planter_brick':     (M + '/02-small-props/planter_brick.glb', 'box', {}),
- 'bench_park':        (M + '/02-small-props/bench_park.glb', 'box', {'back': -1, 'colours': 3}),
- 'picnic_table':      (M + '/02-small-props/picnic_table.glb', 'box', {}),
- 'picnic_table_long': (M + '/02-small-props/picnic_table_long.glb', 'box', {}),
+ 'bench_park':        (M + '/02-small-props/bench_park.glb', 'box', {'back': -1, 'colours': 3, 'seat': 1}),
+ 'picnic_table':      (M + '/02-small-props/picnic_table.glb', 'box', {'benches': 1}),        # Andrew: sat in the wrong spot
+ 'picnic_table_long': (M + '/02-small-props/picnic_table_long.glb', 'box', {'benches': 1}),
  'shelter':           (M + '/03-large-props/shelter.glb', 'box', {'roof': {'eave': 2.6, 'roof_h': 1.5, 'straight': 1}}),   # Andrew: squat -> posts up to the 2.6 m eave
 }
 def vertex_rgb(m):
@@ -29,6 +29,14 @@ def run(src, dst):
         m = L.load(path); v = m.vertices.copy(); f = m.faces; rgb = vertex_rgb(m)
         e = v.max(0) - v.min(0)
         if (oe[0] > oe[2]) != (e[0] > e[2]) and abs(oe[0] - oe[2]) > 0.15 * max(oe[0], oe[2]): v = v[:, [2, 1, 0]] * [1, 1, -1]; f = f[:, ::-1]   # long side the same way as the old shape
+        def upfaces(V, F, lo, hi):
+            T = V[F]; nz = np.cross(T[:, 1] - T[:, 0], T[:, 2] - T[:, 0]); a = np.linalg.norm(nz, axis=1) + 1e-12; ny = nz[:, 1] / a
+            cy = T[:, :, 1].mean(1); H0 = V[:, 1].max() - V[:, 1].min(); y0 = V[:, 1].min(); sel = (ny > 0.85) & (cy > y0 + lo * H0) & (cy < y0 + hi * H0)
+            return T[sel].mean(1), a[sel]
+        if o.get('benches'):
+            c, _ = upfaces(v, f, 0.25, 0.7); ctr = (v.max(0) + v.min(0)) / 2; ext = v.max(0) - v.min(0)
+            far = lambda ax: np.mean(np.abs(c[:, ax] - ctr[ax]) > 0.3 * ext[ax] / 2 * 2 * 0.5) if len(c) else 0
+            if far(0) > far(2): v = v[:, [2, 1, 0]] * [1, 1, -1]; f = f[:, ::-1]; print(f'  {shape}: turned so the benches run along x')
         if o.get('back'):   # benches: the backrest (the tall half) must be on the same side as the old shape's
             hi = v[:, 1] > v[:, 1].min() + 0.7 * (v[:, 1].max() - v[:, 1].min()); zc = (v[:, 2].max() + v[:, 2].min()) / 2
             if np.sign(v[hi, 2].mean() - zc) != o['back']: v = v * [-1, 1, -1]
@@ -79,6 +87,23 @@ def run(src, dst):
         elif fit == 'box': k = oe / e
         else: k = np.full(3, oe[1] / e[1])
         if k is not None: v = (v - [(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2]) * k + [(omn[0] + omx[0]) / 2, omn[1], (omn[2] + omx[2]) / 2]
+        if o.get('benches') or o.get('seat'):
+            lo, hi = (0.25, 0.7) if o.get('benches') else (0.2, 0.75)
+            c, a = upfaces(v, f, lo, hi)
+            if len(c):   # the game sits people at 0.3 m (park.js SEAT_H): squash only what is under the seat down to that
+                top0 = float(np.percentile(c[:, 1], 70)); y0 = v[:, 1].min()
+                if top0 - y0 > 0.33:
+                    k2 = 0.31 / (top0 - y0); y = v[:, 1] - y0; v[:, 1] = y0 + np.where(y < top0 - y0, y * k2, 0.31 + (y - (top0 - y0)))
+                    c, a = upfaces(v, f, lo * 0.7, hi)
+                for nm, A in S['anchors'].items():
+                    if not nm.startswith('seat'): continue
+                    side = c[np.sign(c[:, 2] - (v[:, 2].max() + v[:, 2].min()) / 2) == np.sign(A['pos'][2] or 1)] if o.get('benches') else c
+                    if not len(side): continue
+                    top = float(np.percentile(side[:, 1], 70)); zc = float(np.percentile(side[:, 2], 85 if (A['pos'][2] or 1) > 0 else 15)) if o.get('benches') else float(np.median(side[:, 2]))
+                    A['pos'] = [A['pos'][0], round(top, 3), round(zc, 3)]; A['seat_h'] = round(top, 3)
+                tops = upfaces(v, f, 0.8, 1.01)[0]
+                if 'table_top' in S['anchors'] and len(tops): S['anchors']['table_top']['pos'][1] = round(float(np.percentile(tops[:, 1], 70)), 3)
+                print(f'  {shape}: seats now', [S['anchors'][k]['pos'] for k in S['anchors'] if k.startswith('seat')])
         tri = v[f]; nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-12
         col = rgb[f].mean(1)                                   # one colour per face (flat, like the old props)
         # Andrew: the per-face colours from Meshy's texture looked blotchy. Clean flat look: cluster to a few colours (STYLE.md:

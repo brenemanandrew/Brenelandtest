@@ -46,7 +46,7 @@ A = {
  'mailbox':      (R + '02-small-props/mailbox.glb', 'h', 1.7, {'flat': 3}),
  # the community garden's frame (one matching set)
  'picket_fence': (R + '02-small-props/picket_fence.glb', 'box', [1.9, 0.84, 0.12], {'flat': 2, 'long': 1}),
- 'potting_shed': (R + '03-large-props/potting_shed.glb', 'box', [2.6, 2.7, 2.1], {'flat': 5}),
+ 'potting_shed': (R + '03-large-props/potting_shed.glb', 'box', [2.6, 2.7, 2.1], {}),   # flat colours broke it into shards (Andrew)
 }
 def neutral(img):
     a = np.asarray(img.convert('RGB')).astype(float) / 255
