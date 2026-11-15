@@ -333,6 +333,40 @@ pairs = [
 for a, b2 in pairs: assert t.count(a) == 1, a[:60]; t = t.replace(a, b2, 1)
 open(p, 'w').write(t)
 
+# ---- vibrant visuals (Andrew: like Minecraft's Vibrant Visuals): in the ink pass's composite, a vibrance and contrast grade,
+# a soft bloom of the bright pixels (HDR colour target: lamps, sunlit tops, the sky) and depth-aware colour; ?novibrant = as before
+p = os.path.join(OUT, 'js/toon.js'); t = open(p).read()
+a = "      vec2 c = vUv - 0.5;\n      col *= 1.0 - uVignette * dot(c, c) * 1.6;"
+assert t.count(a) == 1
+vib = """      if (uVibrant > 0.0) {
+        // bloom: what is brighter than ~0.75 glows softly into its neighbours (8 taps on a ring, two rings)
+        vec3 bl = vec3(0.0);
+        for (int i = 0; i < 8; i++) {
+          float a = float(i) * 0.785398;
+          vec2 dir = vec2(cos(a), sin(a)) * uTexel;
+          bl += max(texture2D(tColor, vUv + dir * 5.0).rgb - 0.72, 0.0) + max(texture2D(tColor, vUv + dir * 12.0).rgb - 0.72, 0.0) * 0.6;
+        }
+        col += bl * (0.11 * uVibrant);
+        // vibrance: the duller a colour the more it is lifted (skin and grass do not go neon)
+        float l2 = dot(col, vec3(0.299, 0.587, 0.114)), mx = max(col.r, max(col.g, col.b)), mn = min(col.r, min(col.g, col.b));
+        float satNow = (mx - mn) / max(mx, 1e-3);
+        float near = 1.0 - smoothstep(25.0, 140.0, d);
+        col = mix(vec3(l2), col, 1.0 + uVibrant * (0.32 * (1.0 - satNow) + 0.06) * (0.55 + 0.45 * near));
+        // contrast: a soft S round the mid tones, deeper darks, lights held below clipping
+        col = mix(col, col * col * (3.0 - 2.0 * col), 0.22 * uVibrant * (1.0 - smoothstep(0.85, 1.2, mx)));
+        // a little warm light on the sunlit side of things and a little cool in the shade
+        col += vec3(0.022, 0.012, -0.01) * smoothstep(0.55, 0.95, l2) * uVibrant;
+        col += vec3(-0.008, 0.0, 0.016) * (1.0 - smoothstep(0.08, 0.35, l2)) * uVibrant;
+      }
+"""
+t = t.replace(a, vib + a, 1)
+a = "uniform float uUseNormal,"; assert t.count(a) == 1; t = t.replace(a, "uniform float uVibrant; uniform float uUseNormal,", 1)
+a = "  get uniforms() { return this.material.uniforms; }"; assert t.count(a) == 1
+t = t.replace(a, a + "\n  set vibrant(v) { this.material.uniforms.uVibrant.value = v; }", 1)
+a = "    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);"; assert t.count(a) == 1
+t = t.replace(a, "    this.material.uniforms.uVibrant = { value: (typeof location !== 'undefined' && new URLSearchParams(location.search).has('novibrant')) || quality === 'low' ? 0 : 1.35 };\n" + a, 1)
+open(p, 'w').write(t)
+
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
 for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/dax_mesh.glb')]: glb_jpeg.run(g)
