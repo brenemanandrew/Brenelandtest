@@ -12,9 +12,9 @@ sc.add(new THREE.HemisphereLight(0xffffff, 0x88aa77, 1.3)); const dl = new THREE
 const gnd = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), new THREE.MeshToonMaterial({ color: '#7fbf5a' })); gnd.rotation.x = -Math.PI / 2; sc.add(gnd);
 const dogs = [];
 POSES.forEach(([anim, sp], i) => {
-  const d = new Dog({ ...NALA }); d.root.position.set((i - (POSES.length - 1) / 2) * 1.9, 0, 0); d.root.rotation.y = Math.PI / 2; sc.add(d.root); dogs.push([d, anim, +sp]);
+  const d = new Dog({ ...NALA }); d.root.position.set((i - (POSES.length - 1) / 2) * 1.9, 0, 0); d.root.rotation.y = Math.PI / 2; sc.add(d.root); dogs.push([d, anim, +sp, +(POSES[i][2] || 0)]);
 });
-let t = 0; for (let k = 0; k < 240; k++) { t += 1 / 60; for (const [d, anim, sp] of dogs) d.update(1 / 60, t, sp, anim === 'idle' ? null : anim); }
+let t = 0; for (let k = 0; k < 240; k++) { t += 1 / 60; for (const [d, anim, sp, lk] of dogs) { d.lookYaw = lk; d.update(1 / 60, t, sp, anim === 'idle' ? null : anim); } }
 const cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100); const cz = +(new URLSearchParams(location.search).get('cam') || 13); cam.position.set(0, 2.2 * cz / 13, cz); cam.lookAt(0, 0.5, 0); if (new URLSearchParams(location.search).has('top')) { cam.position.set(0, cz, 0.01); cam.lookAt(0, 0, 0); }
 sc.updateMatrixWorld(true); r.render(sc, cam);
 document.title = POSES.map(p => p[0]).join(' '); window.READY = 1;
