@@ -496,3 +496,78 @@ a = "  for (const [x, z] of [[-46, -10], [-55, -1], [-59, 13.5], [-76, -25], [-9
 assert t.count(a) == 1, 'park lamps'
 t = t.replace(a, a + "\n  for (const [x, z, s, r] of [[-90.2, -37.7, 0.5, 0.3], [-90.6, -38.4, 0.56, 1.1], [-90.95, -39.05, 0.52, 2.0], [-91.3, -39.65, 0.58, 0.7], [-91.6, -40.25, 0.5, 2.6]]) b.add(GEO.cyl8, ['#b4ada0', '#a8a194', '#bfb8aa', '#aea79a'][Math.round(r * 3) % 4], { x, y: terrainHeight(x, z) + 0.05, z, sx: s, sy: 0.08, sz: s * 0.78, ry: r });   // (flagstones onto the sidewalk)", 1)
 open(p, 'w').write(t)
+
+# ---- the Unstable Unicorns diorama (Andrew's Meshy model, balloons cut: blender/unicorns_prep.py) set back behind the table on a
+# new hill, draped up it: the stone path climbs from the lawn to the portal under the rainbow, where the play prompt now is.
+# ?oldworld = the old rainbow arch on the flat lawn.
+shutil.copy(os.path.join(WR, 'models/06-unicorns/unicorns_base.glb'), os.path.join(OUT, 'models/refresh/unicorns_base.glb'))
+p = os.path.join(OUT, 'js/terrain.js'); t = open(p).read()
+uni = """
+// world-refresh: the unicorns' hill, behind their table in the woods corner (the slot woods-corner, facing the house like the
+// name board): it rises from 5 m behind the table to 2.4 m at the portal, a broad top, then down into the woods
+const NOUNI = typeof location !== 'undefined' && new URLSearchParams(location.search).has('oldworld');
+const UNI = (() => { const x = -116, z = -36, f = Math.atan2(0 - x, -8 - z); return { x, z, fx: Math.sin(f), fz: Math.cos(f) }; })();
+export function uniHill(x, z) {
+  if (NOUNI) return 0;
+  const dx = x - UNI.x, dz = z - UNI.z, v = -(dx * UNI.fx + dz * UNI.fz), u = Math.abs(dx * UNI.fz - dz * UNI.fx);
+  if (v < 4 || v > 34 || u > 16) return 0;
+  return 2.4 * smoothstep(5, 13.5, v) * (1 - smoothstep(20, 32, v)) * (1 - smoothstep(8.5, 15.5, u));
+}
+"""
+a = "export const WATER_Y = 0;"
+assert t.count(a) == 1; t = t.replace(a, a + uni, 1)
+a = "  land += hillHeight(x, z, s); // the swing hill"
+assert t.count(a) == 1; t = t.replace(a, "  land += uniHill(x, z);   // (world-refresh: the unicorns' hill)\n" + a, 1)
+open(p, 'w').write(t)
+
+p = os.path.join(OUT, 'js/areas.js'); t = open(p).read()
+a = "THEMES.unicorns = (ctx) => {\n  const { b, group, x, z, rnd, colliders, updaters } = ctx;\n"
+assert t.count(a) == 1
+t = t.replace(a, a + """  // world-refresh: the diorama, x7, its front 5.5 m behind the table, draped on the hill (terrain.js uniHill). Model axes: x across,
+  // y up, +z the path's front, the portal behind the rainbow at (0.25, -0.5).
+  const NOUNI = new URLSearchParams(location.search).has('oldworld');
+  const US = 7, uf = Math.atan2(0 - x, -8 - z), uc = Math.cos(uf), us = Math.sin(uf), ucx = x - us * 11.3, ucz = z - uc * 11.3;
+  const uw = (lx, lz) => [ucx + (lx * uc + lz * us) * US, ucz + (-lx * us + lz * uc) * US];
+  const uniPortal = uw(0.24, -0.4);
+  if (!NOUNI) {
+    for (const [lx, lz, r] of [[-0.85, -0.33, 0.1], [0.88, -0.33, 0.1], [-0.72, -0.1, 0.14], [0.3, -0.66, 0.17], [0.5, -0.52, 0.08], [-0.42, -0.1, 0.06], [0.24, 0.47, 0.07], [0.7, 0.45, 0.13]]) { const [cx, cz] = uw(lx, lz); colliders.push({ type: 'circle', x: cx, z: cz, r: r * US }); }
+    (async () => {
+      const [{ GLTFLoader }, { GRADIENT_3 }] = await Promise.all([import('../vendor/three/jsm/loaders/GLTFLoader.js'), import('./toon.js')]);
+      const gl = await new GLTFLoader().loadAsync('/models/refresh/unicorns_base.glb'); let m = null; gl.scene.traverse(o => { if (o.isMesh && !m) m = o; });
+      const g = m.geometry, P = g.attributes.position, N = g.attributes.normal; let ymin = Infinity;
+      for (let i = 0; i < P.count; i++) ymin = Math.min(ymin, P.getY(i));
+      // the ground under it, smoothed (so the portal and doorways stand straight) on a 0.5 m grid
+      const G = 0.5, R = 12, n = Math.round(2 * R / G) + 1, H = new Float32Array(n * n);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const wx = ucx - R + i * G, wz = ucz - R + j * G; let s = 0; for (const [ox, oz] of [[0, 0], [1.4, 0], [-1.4, 0], [0, 1.4], [0, -1.4]]) s += terrainHeight(wx + ox, wz + oz); H[j * n + i] = s / 5; }
+      const hAt = (wx, wz) => { const fx = Math.min(n - 1.001, Math.max(0, (wx - ucx + R) / G)), fz = Math.min(n - 1.001, Math.max(0, (wz - ucz + R) / G)), i = fx | 0, j = fz | 0, tx = fx - i, tz = fz - j;
+        return (H[j * n + i] * (1 - tx) + H[j * n + i + 1] * tx) * (1 - tz) + (H[(j + 1) * n + i] * (1 - tx) + H[(j + 1) * n + i + 1] * tx) * tz; };
+      for (let i = 0; i < P.count; i++) {
+        const lx = P.getX(i), ly = P.getY(i), lz = P.getZ(i), [wx, wz] = uw(lx, lz);
+        P.setXYZ(i, wx, (ly - ymin - 0.025) * US + hAt(wx, wz), wz);
+        if (N) { const nx = N.getX(i), nz = N.getZ(i); N.setXYZ(i, nx * uc + nz * us, N.getY(i), -nx * us + nz * uc); }
+      }
+      P.needsUpdate = true; if (N) N.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
+      const mesh = new THREE.Mesh(g, new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3 }));
+      mesh.name = 'unicorns-diorama'; mesh.castShadow = true; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false; group.add(mesh);
+    })().catch(e => console.warn('unicorns diorama failed', e));
+  }
+""", 1)
+# the old code rainbow arch and its clouds give way to the diorama's rainbow
+a = "    group.add(shadows(arc, true, false));\n  });"
+assert t.count(a) == 1; t = t.replace(a, "    if (NOUNI) group.add(shadows(arc, true, false));\n  });", 1)
+a = "      b.add(GEO.ico1, '#ffffff', { x: archX + tx * u + fx * v,"
+assert t.count(a) == 1; t = t.replace(a, "      if (NOUNI) b.add(GEO.ico1, '#ffffff', { x: archX + tx * u + fx * v,", 1)
+a = "    colliders.push({ type: 'circle', x: archX + tx * s * 3.5, z: archZ + tz * s * 3.5, r: 1.0 });"
+assert t.count(a) == 1; t = t.replace(a, "    if (NOUNI) " + a.lstrip(), 1)
+a = "    lawnR: 13, // the woods keep"
+assert t.count(a) == 1; t = t.replace(a, "    promptAt: NOUNI ? null : { x: uniPortal[0], z: uniPortal[1] },   // (world-refresh: you play at the portal)\n    lawnR: NOUNI ? 13 : 24, // the woods keep", 1)
+a = "      tableR: spec.tableR || 0,\n"
+assert t.count(a) == 1; t = t.replace(a, a + "      promptAt: spec.promptAt || null,\n", 1)
+open(p, 'w').write(t)
+# the play prompt (and the stats window) go by the distance to promptAt where an area has one
+p = os.path.join(OUT, 'js/main.js'); t = open(p).read()
+a = "    for (const a of areas) {\n      const d = Math.hypot(a.x - px, a.z - pz);"
+assert t.count(a) == 1; t = t.replace(a, "    for (const a of areas) {\n      const q = a.promptAt || a, d = Math.hypot(q.x - px, q.z - pz);", 1)
+a = "      if (a && Math.hypot(a.x - px, a.z - pz) > a.promptR + 2.5) dismissed.delete(id);"
+assert t.count(a) == 1; t = t.replace(a, "      if (a && Math.hypot((a.promptAt || a).x - px, (a.promptAt || a).z - pz) > a.promptR + 2.5) dismissed.delete(id);", 1)
+open(p, 'w').write(t)
