@@ -58,8 +58,8 @@ s = s.replace(old, new, 1)
 open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
-SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed', 'fence_picket_0', 'fence_picket_1', 'fence_picket_2', 'fence_post', 'fence_rail']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
-TEXTURED = ['clock_tower', 'fern', 'mossy_rock', 'log', 'mushrooms', 'potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
+SWAP = ['flower_patch', 'hedge_bush', 'topiary_ball', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed', 'fence_picket_0', 'fence_picket_1', 'fence_picket_2', 'fence_post', 'fence_rail']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
+TEXTURED = ['flower_patch', 'hedge_bush', 'topiary_ball', 'fern', 'mossy_rock', 'log', 'mushrooms', 'potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
 os.makedirs(os.path.join(OUT, 'models/refresh/tex'), exist_ok=True)
 for k in TEXTURED: shutil.copy(os.path.join(WR, 'models/converted/tex', k + '.glb'), os.path.join(OUT, 'models/refresh/tex', k + '.glb'))
 for k in SWAP: shutil.copy(next(q for q in [os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(WR, 'models/blender', k + '.glb')] if os.path.exists(q)), os.path.join(OUT, 'models/refresh', k + '.glb'))
@@ -168,6 +168,22 @@ assert t.count(a) == 1, 'fence seg'
 t = t.replace(a, a.replace("for (const y of [0.22, 0.52]) put(", "if (RM.fence_rail) { for (const y of [0.22, 0.52]) { const [fx, fz] = W((u0 + u1) / 2, (v0 + v1) / 2); b.add(RM.fence_rail, '#ffffff', { x: fx, y: H(fx, fz) + y + 0.03, z: fz, sx: l, sy: 0.7, sz: 0.8, ry: yaw - Math.PI / 2 }); } } else for (const y of [0.22, 0.52]) put("), 1)
 t = section(t, "    put(GEO.box, '#7aa6c8', s.u, 1.05, s.v, { sx: s.w, sy: 2.1, sz: s.d });", "    box(u0, u1, v0, v1);",
   ("RM.potting_shed || RT.potting_shed", "{ const s = PLAN.shed, [hx, hz] = W(s.u, s.v); if (!rmesh(group, 'potting_shed', hx, H(hx, hz) - 0.02, hz)) rput(b, 'potting_shed', hx, H(hx, hz) - 0.02, hz); }"))
+# the garden's paths: soft, wobbly outlines that round off at the ends (with a faded margin into the grass) instead of hard boxes
+a = "  const flat = (col, u0, u1, v0, v1, lift = 0.02) => put(GEO.box, toon(col, { polygonOffset: true }), (u0 + u1) / 2, lift, (v0 + v1) / 2, { sx: u1 - u0, sy: 0.04, sz: v1 - v0 });"
+assert t.count(a) == 1, 'garden flat'
+t = t.replace(a, """  let __pn = 0;
+  const softGeo = (a, c, seed, grow) => { const sh = new THREE.Shape(), N = 72, n = 3.2;
+    for (let i = 0; i < N; i++) { const th = i / N * TAU, ct = Math.cos(th), st = Math.sin(th);
+      const ex = Math.sign(ct) * Math.pow(Math.abs(ct), 2 / n), ez = Math.sign(st) * Math.pow(Math.abs(st), 2 / n);
+      const w = 0.07 * Math.sin(th * 3 + seed) + 0.05 * Math.sin(th * 7 + seed * 2.3) + 0.03 * Math.sin(th * 13 + seed * 0.7);
+      const px = ex * (a + grow + w), pz = ez * (c + grow + w); if (i) sh.lineTo(px, pz); else sh.moveTo(px, pz); }
+    const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; };
+  const flat = (col, u0, u1, v0, v1, lift = 0.02) => { const seed = 1.7 + (__pn++) * 2.9, a = (u1 - u0) / 2, c = (v1 - v0) / 2;
+    const edge = '#' + new THREE.Color(col).lerp(new THREE.Color('#7f9c4e'), 0.45).getHexString();
+    put(softGeo(a, c, seed + 0.4, 0.16), toon(edge, { polygonOffset: true }), (u0 + u1) / 2, lift - 0.004, (v0 + v1) / 2);
+    put(softGeo(a, c, seed, 0), toon(col, { polygonOffset: true }), (u0 + u1) / 2, lift, (v0 + v1) / 2);
+    for (let k = 0; k < 6; k++) { const th = seed * 5 + k * 1.9, r = 1.02 + 0.12 * Math.sin(k * 3.1 + seed);   // a few loose stones out past the edge
+      put(GEO.cyl8, '#' + new THREE.Color(col).multiplyScalar(0.82).getHexString(), (u0 + u1) / 2 + Math.cos(th) * (a + 0.2) * r, lift + 0.01, (v0 + v1) / 2 + Math.sin(th) * (c + 0.2) * r, { sx: 0.07, sy: 0.02, sz: 0.05, ry: th }); } };""", 1)
 open(os.path.join(OUT, 'js/garden-build.js'), 'w').write(IMP + t)
 # hedges
 patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });",
@@ -175,7 +191,7 @@ patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 
 # shore rocks
 patch('world.js', [("    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z });",
   "    if (RM.shore_rock) { rput(b, 'shore_rock', r.x, y - 0.05, r.z, { s: r.s * 1.1, ry: r.x }); rput(b, 'shore_rock', x2, y2 - 0.03, z2, { s: r.s * 0.5, ry: r.z }); } else {\n    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z }); }"),
-  ("  for (const r of SHORE_ROCKS) {", "  if (RT.clock_tower) { const tx = -125, tz = -99.5, ty = terrainHeight(tx, tz); rput(b, 'clock_tower', tx, ty - 0.05, tz, { ry: Math.PI / 2 }); colliders.push({ type: 'circle', x: tx, z: tz, r: 2.3 }); }   // the new town clock tower (bus plaza, west side)\n  for (const r of SHORE_ROCKS) {"),
+   # (the clock tower test placement removed: Andrew found it random there; it waits for a planned spot)
   ("function buildMailbox(b) {\n  const { x, z } = MAILBOX;\n  const y = terrainHeight(x, z);", "function buildMailbox(b) {\n  const { x, z } = MAILBOX;\n  const y = terrainHeight(x, z);\n  if (RM.mailbox) { rput(b, 'mailbox', x, y - 0.02, z, { ry: Math.PI / 2 }); return; }")])
 
 # ---- the static props (props-static.js reads models/props.json): swap the good sheet 02/03 shapes
@@ -353,7 +369,7 @@ p = os.path.join(OUT, 'js/toon.js'); t = open(p).read()
 a = "      vec2 c = vUv - 0.5;\n      col *= 1.0 - uVignette * dot(c, c) * 1.6;"
 assert t.count(a) == 1
 vib = """      float vibK = uVibrant;
-      if (uIndoor > 0.0) vibK *= mix(1.0, (uUseNormal > 0.5 ? mix(0.0, 0.45, step(0.5, solid(vUv))) : 0.3), uIndoor);   // (indoors: none on people, softer on the room)
+      vibK *= 1.0 - clamp(uIndoor, 0.0, 1.0);   // (indoors: off, on people and room alike: the rooms' own colours were already rich and went red-orange)
       if (vibK > 0.0) {
         // bloom: what is brighter than ~0.75 glows softly into its neighbours (8 taps on a ring, two rings)
         vec3 bl = vec3(0.0);
@@ -383,13 +399,100 @@ a = "    this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material
 t = t.replace(a, "    this.material.uniforms.uIndoor = { value: 0 };\n    this.material.uniforms.uVibrant = { value: (typeof location !== 'undefined' && new URLSearchParams(location.search).has('novibrant')) || quality === 'low' ? 0 : 1.35 };\n" + a, 1)
 open(p, 'w').write(t)
 
+# ---- the town houses (Andrew: "nondescript, fill them out and give them yards"): addGableHouse gets lap siding, a covered porch
+# on posts, window boxes with flowers and gutters; every house gets a yard: a picket fence along the front (gap at the walk),
+# flower beds along the front wall, shrubs at the corners, sometimes a topiary or a bird bath. No random draws are taken (the
+# town's layout depends on the draw order): variety comes from a hash of the house's spot. All of it stays inside the house's
+# collider or is low decoration in the front yard.
+p = os.path.join(OUT, 'js/world.js'); t = open(p).read()
+a = "// addGableHouse's own draws"
+assert t.count(a) == 1
+extras = r'''
+const _lerpC = (a, b2, k) => new THREE.Color(a).lerp(new THREE.Color(b2), k).getStyle();
+function houseExtras(b, f, x, z, w, d, h, wallCol, roofCol, facing) {
+  const y = 0.3, fz = z + facing * (d / 2 + 0.06), H = (k) => hash01('hx' + k, Math.round(x * 10), Math.round(z * 10));
+  const fb = (x0, y0, a, x1, y1, b2, col) => f.boxMinMax(x0, y0, facing > 0 ? fz + a : fz - b2, x1, y1, facing > 0 ? fz + b2 : fz - a, col);
+  const lap = _lerpC(wallCol, '#000000', 0.12), trim = '#fbf7ee';
+  for (let yy = y + 0.85; yy < y + h - 0.2; yy += 0.34) fb(x - w / 2 + 0.1, yy, -0.02, x + w / 2 - 0.1, yy + 0.035, 0.02, lap);          // lap siding lines
+  for (const sx of [-1, 1]) for (let yy = y + 0.85; yy < y + h - 0.2; yy += 0.34) f.boxMinMax(x + sx * (w / 2 + 0.01) - 0.02, yy, z - d / 2 + 0.1, x + sx * (w / 2 + 0.01) + 0.02, yy + 0.035, z + d / 2 - 0.1, lap);
+  // covered porch: a small roof on two posts over the door and its step, a porch light already there
+  const pc = H(1) < 0.5 ? '#fbf7ee' : _lerpC(roofCol, '#ffffff', 0.15);
+  fb(x - 1.55, y + 2.62, -0.02, x + 1.55, y + 2.74, 1.15, pc); fb(x - 1.62, y + 2.74, 0.0, x + 1.62, y + 2.84, 1.22, _lerpC(roofCol, '#000000', 0.1));
+  for (const sx of [-1, 1]) fb(x + sx * 1.38 - 0.07, y + 0.5, 0.86, x + sx * 1.38 + 0.07, y + 2.62, 1.0, trim);
+  fb(x - 1.45, y + 0.5, 0.0, x + 1.45, y + 0.56, 1.02, '#b9b2a6');                                                                  // porch deck
+  // window boxes with flowers under the ground-floor windows
+  const fl = [['#ff6f91', '#ffd23f'], ['#ffffff', '#b48cff'], ['#ff8c42', '#ffe066'], ['#e84a5f', '#ffffff']][Math.floor(H(2) * 4)];
+  for (const wx of [-w / 3, w / 3]) {
+    fb(x + wx - 0.85, y + 0.98, 0.02, x + wx + 0.85, y + 1.2, 0.36, '#8a5a36');
+    for (let i = 0; i < 6; i++) { const cx = x + wx - 0.7 + i * 0.28, cz = fz + facing * 0.2; f.add(GEO.ico1, '#4f9a3e', { x: cx, y: y + 1.27, z: cz, sx: 0.15, sy: 0.11, sz: 0.13 }); f.add(GEO.ico1, fl[i % 2], { x: cx + 0.05, y: y + 1.36, z: cz + facing * 0.04, sx: 0.07, sy: 0.07, sz: 0.07 }); }
+  }
+  // gutters along both eaves and a downspout at a front corner
+  for (const side of [-1, 1]) f.add(GEO.box, '#e8e4dc', { x, y: y + h - 0.16, z: z + side * (d / 2 + 0.58), sx: w + 0.9, sy: 0.1, sz: 0.1 });
+  f.add(GEO.box, '#e8e4dc', { x: x + (H(3) < 0.5 ? -1 : 1) * (w / 2 + 0.05), y: y + h / 2, z: z + facing * (d / 2 + 0.1), sx: 0.08, sy: h, sz: 0.08 });
+}
+export function yardExtras(b, hx, hz, w, d, walkZ, facing) {
+  const H = (k) => hash01('yd' + k, Math.round(hx * 10), Math.round(hz * 10)), front = hz + facing * (d / 2), y0 = 0.3;
+  const fz = walkZ - facing * 1.25, gap = 1.05, x0 = hx - w / 2 - 0.6, x1 = hx + w / 2 + 0.3;
+  // a picket fence along the front of the yard (the Blender pickets), gap at the front walk
+  if (RM.fence_picket_0 && H(1) < 0.8) {
+    for (let px = x0; px <= x1; px += 0.36) { if (Math.abs(px - hx) < gap) continue; rput(b, 'fence_picket_' + (Math.abs(Math.round(px * 7)) % 3), px, y0 - 0.02, fz, { sx: 1, sy: 0.72, sz: 1 }); }
+    for (const px of [x0, hx - gap - 0.05, hx + gap + 0.05, x1]) rput(b, 'fence_post', px, y0 - 0.02, fz, { sx: 1, sy: 0.75, sz: 1 });
+    for (const [a, c] of [[x0, hx - gap], [hx + gap, x1]]) for (const yy of [0.28, 0.62]) if (RM.fence_rail) b.add(RM.fence_rail, '#ffffff', { x: (a + c) / 2, y: y0 + yy, z: fz + facing * 0.06, sx: c - a, ry: 0 });
+  }
+  // flower beds along the front wall, either side of the porch
+  for (const sx of [-1, 1]) {
+    const bx0 = sx < 0 ? hx - w / 2 + 0.4 : hx + 1.75, bx1 = sx < 0 ? hx - 1.75 : hx + w / 2 - 0.4, bz = front + facing * 0.55;
+    b.boxMinMax(bx0, y0, Math.min(bz - 0.35, bz + 0.35), bx1, y0 + 0.07, Math.max(bz - 0.35, bz + 0.35), '#5a3c26');
+    if (RM.flower_patch) for (let cx = bx0 + 0.6; cx < bx1 - 0.3; cx += 1.3) rput(b, 'flower_patch', cx, y0 + 0.02, bz, { s: 0.6, ry: cx * 1.7 });
+  }
+  // shrubs at the front corners of the house, a topiary or a bird bath now and then
+  if (RM.hedge_bush) for (const sx of [-1, 1]) rput(b, 'hedge_bush', hx + sx * (w / 2 + 0.2), y0 - 0.02, front + facing * 0.3, { s: 0.55 + H(4 + sx) * 0.25, ry: sx + hx });
+  const ox = hx + (H(6) < 0.5 ? -1 : 1) * (w / 4 + 0.5), oz = front + facing * (2.6 + H(7) * 0.8);
+  if (H(8) < 0.4 && RM.topiary_ball) rput(b, 'topiary_ball', ox, y0 - 0.02, oz, { s: 0.75 });
+  else if (H(8) < 0.7) { b.add(GEO.cyl12, '#d8d2c6', { x: ox, y: y0 + 0.4, z: oz, sx: 0.12, sy: 0.8, sz: 0.12 }); b.add(GEO.cyl12, '#e4ded2', { x: ox, y: y0 + 0.85, z: oz, sx: 0.45, sy: 0.1, sz: 0.45 }); b.add(GEO.cyl12, '#7fc8e0', { x: ox, y: y0 + 0.91, z: oz, sx: 0.38, sy: 0.02, sz: 0.38 }); }
+}
+'''
+t = t.replace(a, extras + a, 1)
+a = "    b.boxMinMax(cx - 0.62, y + h + rise + 0.9, z - 0.62, cx + 0.62, y + h + rise + 1.08, z + 0.62, '#7a3f35');\n  }\n}"
+assert t.count(a) == 1
+t = t.replace(a, a[:-2] + "\n  houseExtras(b, f, x, z, w, d, h, wallCol, roofCol, facing);\n}", 1)
+a = "    let tree = null;\n    // (qol-fixes"
+assert t.count(a) == 1
+t = t.replace(a, "    if (!joyce) yardExtras(b, hx, z, w, d, STREET.sidewalkN, 1);\n" + a, 1)
+open(p, 'w').write(t)
+p = os.path.join(OUT, 'js/world-town.js'); t = open(p).read()
+a = "import { addGableHouse, addCar, STREET_HOUSES } from './world.js';"; assert t.count(a) == 1
+t = t.replace(a, "import { addGableHouse, addCar, STREET_HOUSES, yardExtras } from './world.js';", 1)
+a = "    // a tree in the back yard, sometimes a shed or a swing set"; assert t.count(a) == 1
+t = t.replace(a, "    yardExtras(b, hx, hz, w, d, walkZ, facing);\n" + a, 1)
+open(p, 'w').write(t)
+
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
 for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/dax_mesh.glb')]: glb_jpeg.run(g)
 
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
-hook = "    if (ink.uniforms.uIndoor) ink.uniforms.uIndoor.value = WEATHER.indoor || 0;   // (vibrant pass: softer indoors, none on people there)\n    if (window.__cam) { camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
+hook = "    if (ink.uniforms.uIndoor) ink.uniforms.uIndoor.value = WEATHER.indoor || 0;   // (vibrant pass: softer indoors, none on people there)\n    if (window.__cam) { window.__world = world; camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
 a = '    ui.update(camera, innerWidth, innerHeight);'
 assert m.count(a) == 1; m = m.replace(a, hook + a, 1); open(p, 'w').write(m)   # (before the labels, so name tags follow the pinned camera)
 print('test game written to', OUT)
+# the park trail (park-north) stopped a few metres short of Breneland Rd's sidewalk: one more point carries it right up to the back
+# of the sidewalk at the zebra (it stops dead there, no fade)
+p = os.path.join(OUT, 'js/layout.js'); t = open(p).read()
+a = "pts: [[-82, -27], [-87, -33], [-92, -41.4]] }"
+assert t.count(a) == 1, 'park-north'
+t = t.replace(a, "pts: [[-82, -27], [-87, -33], [-90.4, -38.2], [-92, -40.9]] },\n  { name: 'park-north-mouth', width: 2.3, pts: [[-89.2, -36.4], [-90.9, -39.0], [-91.7, -40.6]] }", 1); open(p, 'w').write(t)   # (a wider mouth where it meets the sidewalk: it tapered to a point there and read as stopping short)
+# ...and a pine stood on its last few metres, its crown hiding where the trail meets the sidewalk: keep the trail's mouth by the
+# zebra clear of trees and scatter
+p = os.path.join(OUT, 'js/main.js'); t = open(p).read()
+a = "    if (world.onTrail(x, z, pad)) return false;\n    if (inFrisbeeField(x, z, pad)) return false;"
+assert t.count(a) == 1, 'isClear'
+t = t.replace(a, "    if (Math.hypot(x + 91, z + 38.6) < 4.2 + pad) return false;   // (the park trail's mouth at the zebra: open)\n" + a, 1); open(p, 'w').write(t)
+# where the park trail meets the sidewalk at the zebra the ground lifts to the sidewalk's back edge and hides the dirt for the last
+# metre or so: a few worn flagstones bridge it, so the trail clearly runs onto the sidewalk
+p = os.path.join(OUT, 'js/park.js'); t = open(p).read()
+a = "  for (const [x, z] of [[-46, -10], [-55, -1], [-59, 13.5], [-76, -25], [-92, -36], [-88, -38]]) lamp(x, z);"
+assert t.count(a) == 1, 'park lamps'
+t = t.replace(a, a + "\n  for (const [x, z, s, r] of [[-90.2, -37.7, 0.5, 0.3], [-90.6, -38.4, 0.56, 1.1], [-90.95, -39.05, 0.52, 2.0], [-91.3, -39.65, 0.58, 0.7], [-91.6, -40.25, 0.5, 2.6]]) b.add(GEO.cyl8, ['#b4ada0', '#a8a194', '#bfb8aa', '#aea79a'][Math.round(r * 3) % 4], { x, y: terrainHeight(x, z) + 0.05, z, sx: s, sy: 0.08, sz: s * 0.78, ry: r });   // (flagstones onto the sidewalk)", 1)
+open(p, 'w').write(t)
