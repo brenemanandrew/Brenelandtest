@@ -58,11 +58,11 @@ s = s.replace(old, new, 1)
 open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
-SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
+SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed', 'fence_picket_0', 'fence_picket_1', 'fence_picket_2', 'fence_post', 'fence_rail']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
 TEXTURED = ['clock_tower', 'fern', 'mossy_rock', 'log', 'mushrooms', 'potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
 os.makedirs(os.path.join(OUT, 'models/refresh/tex'), exist_ok=True)
 for k in TEXTURED: shutil.copy(os.path.join(WR, 'models/converted/tex', k + '.glb'), os.path.join(OUT, 'models/refresh/tex', k + '.glb'))
-for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
+for k in SWAP: shutil.copy(next(q for q in [os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(WR, 'models/blender', k + '.glb')] if os.path.exists(q)), os.path.join(OUT, 'models/refresh', k + '.glb'))
 open(os.path.join(OUT, 'js/refresh-models.js'), 'w').write("""// world-refresh test: converted Meshy models for the props that are swapped (see world-refresh/tools/make_testgame.py).
 // ?oldworld (or ?oldtrees) turns every swap off; a model that fails to load leaves the old code-made prop in place.
 import * as THREE from 'three';
@@ -317,6 +317,21 @@ open(p, 'w').write(t)
 
 p = os.path.join(OUT, 'js/world.js'); t = open(p).read(); a = "verts.push(x, terrainHeight(x, z) + trailLift(x, z), z);"
 assert t.count(a) == 1; open(p, 'w').write("import { hmapLift } from './terrain.js';\n" + t.replace(a, "verts.push(x, terrainHeight(x, z) + trailLift(x, z) + hmapLift(x, z), z);", 1))
+
+# ---- the yard fence, modelled in Blender (blender/build_fence.py): pickets (3 variants), posts with caps, rails; same spacing,
+# gates and colliders as buildFence's code boxes
+for f in ['fence_picket_0', 'fence_picket_1', 'fence_picket_2', 'fence_post', 'fence_rail']: shutil.copy(os.path.join(WR, 'models/blender', f + '.glb'), os.path.join(OUT, 'models/refresh', f + '.glb'))
+p = os.path.join(OUT, 'js/world.js'); t = open(p).read()
+pairs = [
+ ("      b.add(GEO.box, '#fbfaf5', { x, y: y + 0.55, z, sx: 0.31, sy: 1.1, sz: 0.05, ry: rot });\n      b.add(GEO.cone6, '#fbfaf5', { x, y: y + 1.17, z, sx: 0.155, sy: 0.17, sz: 0.04, ry: rot + Math.PI / 6 });",
+  "      if (RM.fence_picket_0) { const v = Math.abs(Math.round(c * 7.3)) % 3; rput(b, 'fence_picket_' + v, x, y - 0.03, z, { ry: rot }); } else {\n      b.add(GEO.box, '#fbfaf5', { x, y: y + 0.55, z, sx: 0.31, sy: 1.1, sz: 0.05, ry: rot });\n      b.add(GEO.cone6, '#fbfaf5', { x, y: y + 1.17, z, sx: 0.155, sy: 0.17, sz: 0.04, ry: rot + Math.PI / 6 }); }"),
+ ("      b.add(GEO.box, '#f1efe6', { x: x + oa[0], y: y + 0.62, z: z + oa[1], sx: 0.17, sy: 1.3, sz: 0.17 });\n      b.add(GEO.box, '#f1efe6', { x: x + oa[0], y: y + 1.31, z: z + oa[1], sx: 0.23, sy: 0.07, sz: 0.23 });",
+  "      if (RM.fence_post) rput(b, 'fence_post', x + oa[0], y - 0.03, z + oa[1]); else {\n      b.add(GEO.box, '#f1efe6', { x: x + oa[0], y: y + 0.62, z: z + oa[1], sx: 0.17, sy: 1.3, sz: 0.17 });\n      b.add(GEO.box, '#f1efe6', { x: x + oa[0], y: y + 1.31, z: z + oa[1], sx: 0.23, sy: 0.07, sz: 0.23 }); }"),
+ ("        if (alongX) b.add(GEO.box, '#f1efe6', { x: x + o[0], y: (ya + yb) / 2 + off, z: z + o[1], sx: len + 0.05, sy: 0.09, sz: 0.05, rz: tilt });",
+  "        if (RM.fence_rail) b.add(RM.fence_rail, '#ffffff', { x: x + o[0], y: (ya + yb) / 2 + off, z: z + o[1], sx: len + 0.05, ry: alongX ? 0 : -Math.PI / 2, rz: tilt });\n        else if (alongX) b.add(GEO.box, '#f1efe6', { x: x + o[0], y: (ya + yb) / 2 + off, z: z + o[1], sx: len + 0.05, sy: 0.09, sz: 0.05, rz: tilt });"),
+]
+for a, b2 in pairs: assert t.count(a) == 1, a[:60]; t = t.replace(a, b2, 1)
+open(p, 'w').write(t)
 
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
