@@ -282,8 +282,41 @@ open(p, 'w').write("const NAT = typeof location === 'undefined' || !new URLSearc
 p = os.path.join(OUT, 'js/terrain.js'); t = open(p).read()
 a = "  let land = 0.42 + fbm(x * 0.035, z * 0.035) * 0.32;\n"
 assert t.count(a) == 1
-t = t.replace(a, a + "  if (RELIEF) land += Math.max(0, fbm(x * 0.0125 + 11.3, z * 0.0125 - 5.7) * 1.7 + fbm(x * 0.03 - 2.1, z * 0.03 + 8.4) * 0.4 + 0.15) * smoothstep(-6, -22, s);   // (raise only: things under the old ground level must stay hidden)\n", 1)
-open(p, 'w').write("const RELIEF = typeof location === 'undefined' || !new URLSearchParams(location.search).has('flatworld');   // (world-refresh: landscaping)\n" + t)
+t = t.replace(a, a + "  if (HMAP) land += hmapAt(x, z) * smoothstep(-6, -22, s) * smoothstep(26, 40, Math.hypot(x + 64, z - 20));   // the Blender-shaped land (raise only: things under the old ground stay hidden)\n", 1)
+# slope and crest colour so the hills read: darker on slopes, a sunnier green on the crests (open land only)
+a = "  if (h > 6) col.lerp(C.rock, smoothstep(6, 14, h) * 0.6);"
+assert t.count(a) == 1
+t = t.replace(a, "  if (HMAP) { const e = 1.5, gx = hmapAt(x + e, z) - hmapAt(x - e, z), gz = hmapAt(x, z + e) - hmapAt(x, z - e), sl = Math.min(1, Math.hypot(gx, gz) / (2 * e) * 2.2), lit = (-gx + gz) / (2 * e); col.lerp(C.lawnDark, sl * 0.35); if (lit > 0) col.lerp(C.lawnLight, Math.min(0.3, lit * 0.9)); col.lerp(C.dry, Math.min(0.25, hmapAt(x, z) * 0.06)); }\n" + a, 1)
+hm = """
+// world-refresh: the land shaped in Blender (world-refresh/terrain/build_terrain.py), a 1 m height grid added on top of the
+// old ground; ?flatworld turns it off
+let HMAP = null, HM = null;
+if (typeof location !== 'undefined' && !new URLSearchParams(location.search).has('flatworld')) {
+  try { const [m, b] = await Promise.all([fetch('/models/refresh/terrain/height.json').then(r => r.json()), fetch('/models/refresh/terrain/height.bin').then(r => r.arrayBuffer())]); HM = m; HMAP = new Uint16Array(b); } catch (e) { console.warn('terrain map failed, old ground', e); }
+}
+function hmapAt(x, z) {
+  const fx = (x - HM.x0) / HM.cell, fz = (z - HM.z0) / HM.cell;
+  if (fx < 0 || fz < 0 || fx >= HM.nx - 1 || fz >= HM.nz - 1) return 0;
+  const ix = fx | 0, iz = fz | 0, tx = fx - ix, tz = fz - iz, i = iz * HM.nx + ix;
+  const a = HMAP[i], b = HMAP[i + 1], c = HMAP[i + HM.nx], d = HMAP[i + HM.nx + 1];
+  return ((a + (b - a) * tx) * (1 - tz) + (c + (d - c) * tx) * tz) / 65535 * HM.max;
+}
+"""
+hm += """
+// how far a draped strip (the trails) must rise so the shaped ground does not bulge up through it between its samples
+export function hmapLift(x, z) {
+  if (!HMAP) return 0;
+  const e = 2, c = hmapAt(x, z), k = (hmapAt(x + e, z) + hmapAt(x - e, z) + hmapAt(x, z + e) + hmapAt(x, z - e)) / 4 - c;   // (> 0 in a hollow, < 0 on a crest)
+  return 0.05 + Math.max(0, -k) * 3 + Math.hypot(hmapAt(x + e, z) - hmapAt(x - e, z), hmapAt(x, z + e) - hmapAt(x, z - e)) * 0.08;
+}
+"""
+t = t.replace("export const WATER_Y = 0;", "export const WATER_Y = 0;" + hm, 1)
+for f in ['height.bin', 'height.json']:
+    os.makedirs(os.path.join(OUT, 'models/refresh/terrain'), exist_ok=True); shutil.copy(os.path.join(WR, 'terrain', f), os.path.join(OUT, 'models/refresh/terrain', f))
+open(p, 'w').write(t)
+
+p = os.path.join(OUT, 'js/world.js'); t = open(p).read(); a = "verts.push(x, terrainHeight(x, z) + trailLift(x, z), z);"
+assert t.count(a) == 1; open(p, 'w').write("import { hmapLift } from './terrain.js';\n" + t.replace(a, "verts.push(x, terrainHeight(x, z) + trailLift(x, z) + hmapLift(x, z), z);", 1))
 
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
