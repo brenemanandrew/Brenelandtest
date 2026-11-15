@@ -1,6 +1,7 @@
 // The table-game harness (game-waves): one game on the real overlay frame (overlay.js), its engine and bots run here in the
 // page instead of on the server, drawn through the same tg-games.js calls index.js uses. Seat 0 is You; the rest are bots.
-// ?game=word-weave&players=3&advance=30|end&seed=7&watch=1&set=key:value,key:value&level=hard
+// ?game=word-weave&players=3&advance=30|end&seed=7&watch=1&set=key:value,key:value&level=hard&until=stage
+// (until: after advance, play on until seat 0 has a move in that view stage, e.g. until=auction or until=offer)
 import { createFrame } from '/js/table-games/overlay.js';
 import { ready, uiOf, renderGame, renderBar } from '/js/table-games/tg-games.js';
 import { ico } from '/js/table-games/mt-ui.js';
@@ -67,6 +68,8 @@ function step(auto0) {
 }
 const target = ADV === 'end' ? 1e9 : Number(ADV);
 for (let i = 0; i < target && i < 5000; i++) if (!step(true)) break;
+const UNTIL = Q.get('until');
+if (UNTIL) for (let i = 0; i < 20000; i++) { const v = E.view(state, 0); if (v && v.stage === UNTIL && (E.legalMoves(state, 0) || []).length) break; if (!step(true)) break; }
 // then bots on until it is your move (or the end)
 for (let i = 0; i < 400; i++) if (!step(false)) break;
 

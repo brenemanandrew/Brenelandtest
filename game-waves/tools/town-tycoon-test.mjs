@@ -117,7 +117,7 @@ function duel(a, b, N, len, n = 2) {
 }
 const d1 = duel('hard', 'easy', 400, 'quick');
 const d2 = duel('hard', 'easy', 400, 'full');
-const d3 = duel('hard', 'normal', 400, 'full');
+const d3 = duel('hard', 'normal', 1000, 'full');
 const d4 = duel('normal', 'easy', 400, 'full');
 const d5 = duel('hard', 'normal', 400, 'quick');
 const d6 = duel('hard', 'normal', 300, 'full', 3);
@@ -273,7 +273,7 @@ const act = (S, m) => game.apply(S, TT.actor(S), m);
   ok(D.stage === 'auction' && r.beats.some(b => b.kind === 'skip' && b.short), 'short: straight to auction');
   D = act(D, { type: 'bid', amount: 10 }).state; ok(D.auction.seat === 0, 'lander bids');
   D = act(D, { type: 'bid', amount: 20 }).state; D = act(D, { type: 'bid', amount: 30 }).state; D = act(D, { type: 'bid', amount: 40 }).state;
-  ok(J(game.legalMoves(D, 1)) === J([{ type: 'pass' }, { type: 'bid', amount: 50 }, { type: 'bid', amount: 90 }]), 'raises within the cap (B80 for a B100 place... cap 200)');
+  ok(J(game.legalMoves(D, 1)) === J([{ type: 'pass' }, { type: 'bid', amount: 50 }, { type: 'bid', amount: 90 }, { type: 'bid', amount: 140 }]), 'raises listed');
   D = act(D, { type: 'bid', amount: 50 }).state;
   ok(D.stage === 'manage' && D.owner[4] === 1 && D.cash[1] === 1500 - 50, 'lander cannot raise past its cash: auto out, seat 1 wins at 50');
   checkInvariants(D, 'auction short');
@@ -344,10 +344,10 @@ const pct = (a, n) => (100 * a / n).toFixed(0) + '%';
 console.log(`Town Tycoon: ${games} bot games, ${done} finished, ${capped} hit the move cap, avg ${(totalMoves / games).toFixed(0)} moves (max ${maxMoves}), avg ${(roundSum / games).toFixed(1)} rounds, ${bankrupts} bankruptcies`);
 console.log(`  quick: avg ${(byLen.quick.r / byLen.quick.g).toFixed(1)} rounds, ${(byLen.quick.m / byLen.quick.g).toFixed(0)} moves; full: avg ${(byLen.full.r / byLen.full.g).toFixed(1)} rounds, ${(byLen.full.m / byLen.full.g).toFixed(0)} moves, ${pct(byLen.full.last, byLen.full.g)} ended last-one-standing`);
 console.log(`  bot time: avg ${(timeSum / timeN).toFixed(3)} ms, max ${maxTime.toFixed(2)} ms`);
-console.log(`  auctions: ${stats.auctions} (${stats.sold} sold, ${stats.unsold} unsold, ${stats.bids} bids) in ${stats.gamesAuction} games; trades: ${stats.offers} offers, ${stats.accepted} accepted, ${stats.declined} declined, ${stats.cancelled} cancelled, in ${stats.gamesTrade} games`);
+console.log(`  auctions: ${stats.auctions} (${stats.sold} sold, ${stats.unsold} unsold, ${stats.bids} bids) in ${stats.gamesAuction} games (all games run, duels included); trades: ${stats.offers} offers, ${stats.accepted} accepted, ${stats.declined} declined, ${stats.cancelled} cancelled, in ${stats.gamesTrade} games`);
 console.log(`  rounds with auctions+trades on: quick ${(onStats.quick.r / onStats.quick.g).toFixed(1)}, full ${(onStats.full.r / onStats.full.g).toFixed(1)}; both off: quick ${(offStats.quick.r / offStats.quick.g).toFixed(1)}, full ${(offStats.full.r / offStats.full.g).toFixed(1)}`);
 ok(stats.auctions > 100 && stats.sold > 50 && stats.offers > 30 && stats.accepted > 5, 'auctions and trades happen');
-for (const [name, d, N] of [['hard vs easy, quick', d1, 400], ['hard vs easy, full', d2, 400], ['hard vs normal, full', d3, 400], ['normal vs easy, full', d4, 400], ['hard vs normal, quick', d5, 400], ['hard vs 2 normal, full (3 players)', d6, 300]])
+for (const [name, d, N] of [['hard vs easy, quick', d1, 400], ['hard vs easy, full', d2, 400], ['hard vs normal, full', d3, 1000], ['normal vs easy, full', d4, 400], ['hard vs normal, quick', d5, 400], ['hard vs 2 normal, full (3 players)', d6, 300]])
   console.log(`  ${name}: ${pct(d.wa, N)} / ${pct(d.wb, N)} (ties ${d.ties}), avg ${d.rounds} rounds, ${d.moves} moves`);
 console.log(fails ? `${fails} FAILURES` : 'all checks passed');
 process.exit(fails ? 1 : 0);

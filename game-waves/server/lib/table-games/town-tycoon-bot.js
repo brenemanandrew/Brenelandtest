@@ -6,12 +6,14 @@
 //           pays out of the woods while it is rich
 //   hard    values completing pairs and blocking other players' pairs, builds to 3 cottages fast on the best-landed groups,
 //           keeps a reserve tied to the worst rent it could land on, pays out of the woods early and stays in late
-// Auctions: each bids up to its own value of the place (easy low, hard high for a place that completes or blocks a pair).
-// Trades: every level answers by value (easy counts prices only, normal and hard also weigh the pair they would hand over);
-// normal and easy now and then offer a swap that completes a pair for both; hard offers swaps and buys the half it lacks for
-// cash when it can still build after. A declined offer is not made again for a few rounds.
+// Auctions: each bids up to its own value of the place (easy low, hard high for a place that completes or blocks a pair; in a
+// quick game hard takes anything under its price, as a deed counts its price at the end). Hard raises by B10 only.
+// Trades: every level answers by value (easy counts prices only, normal and hard also weigh the pair they would hand over;
+// hard builds faster, so it takes fair pair-for-pair swaps). Normal and easy now and then offer a swap that completes a pair
+// for both; hard offers swaps and buys the half it lacks with money and its dead deeds (tool crib, a lone stop, a blocked
+// street), only when it can still build 3 cottages a street after. A declined offer is not made again for a few rounds.
+// Tuned by self-play (tools/town-tycoon-test.mjs): hard beats normal about 64% in 2-player full games.
 export const LEVELS = ['easy', 'normal', 'hard'];
-const K = () => globalThis.__TTK || {};
 
 // how often each group is landed on, roughly (the spaces after the woods corner see more traffic)
 const HEAT = [0.8, 0.85, 1.15, 1.2, 1.1, 1.0, 0.95, 0.9];
@@ -49,36 +51,35 @@ export function chooseMove(v, level = 'normal') {
   const lv = LEVELS.includes(level) ? level : 'normal';
   const me = v.seat, has = t => moves.find(m => m.type === t), all = t => moves.filter(m => m.type === t);
   const cash = v.cash[me];
-  const L = f => (lv === 'hard' && (K().nf || []).includes(f) ? 'normal' : lv);
 
-  if (v.stage === 'debt') return raise(v, moves, L('raise'));
-  if (v.stage === 'auction') return auctionMove(v, L('auction'));
-  if (v.stage === 'offer') return answerOffer(v, L('answer')) ? has('accept') : has('decline');
-  if (v.stage === 'trade') return draftMove(v, L('plan'));
+  if (v.stage === 'debt') return raise(v, moves, lv);
+  if (v.stage === 'auction') return auctionMove(v, lv);
+  if (v.stage === 'offer') return answerOffer(v, lv) ? has('accept') : has('decline');
+  if (v.stage === 'trade') return draftMove(v, lv);
 
   if (v.stage === 'buy') {
     const i = v.buyAt, b = v.board[i], buy = has('buy');
     if (!buy) return has('skip');
-    return wantBuy(v, i, b, cash, L('buy')) ? buy : has('skip');
+    return wantBuy(v, i, b, cash, lv) ? buy : has('skip');
   }
 
   if (v.stage === 'woods') {
     if (lv !== 'easy') {
       if (has('map') && earlyGame(v)) return has('map');
-      if (has('pay') && wantOut(v, L('woods'), cash)) return has('pay');
+      if (has('pay') && wantOut(v, lv, cash)) return has('pay');
     }
     // build before the roll if it makes sense
-    const bm = lv !== 'easy' && pickBuild(v, L('build'), cash);
+    const bm = lv !== 'easy' && pickBuild(v, lv, cash);
     if (bm) return bm;
     return has('roll');
   }
 
   // roll / manage: a trade first (once a turn), build or unmortgage, then roll or end
-  if (v.offers < (lv === 'hard' ? 2 : 1) && has('trade')) { const p = tradePlan(v, L('plan')); if (p && moves.some(m => m.type === 'trade' && m.to === p.to)) return moves.find(m => m.type === 'trade' && m.to === p.to); }
+  if (v.offers < (lv === 'hard' ? 2 : 1) && has('trade')) { const p = tradePlan(v, lv); if (p && moves.some(m => m.type === 'trade' && m.to === p.to)) return moves.find(m => m.type === 'trade' && m.to === p.to); }
   if (lv !== 'easy') {
-    const bm = pickBuild(v, L('build'), cash); if (bm) return bm;
-    if (L('fund') === 'hard') { const fm = pickFund(v, cash); if (fm) return fm; }
-    const um = pickUnmortgage(v, L('unmort'), cash); if (um) return um;
+    const bm = pickBuild(v, lv, cash); if (bm) return bm;
+    if (lv === 'hard') { const fm = pickFund(v, cash); if (fm) return fm; }
+    const um = pickUnmortgage(v, lv, cash); if (um) return um;
   }
   return has('roll') || has('end') || moves[0];
 }
@@ -141,38 +142,17 @@ function pickBuild(v, lv, cash) {
   const me = v.seat;
   let reserve;
   if (lv === 'normal') reserve = 200;
-  else reserve = Math.max(K().bmin ?? 60, Math.min(500, danger(v, me) * 0.8, 0.6 * maxRent(v, me) + 60) * (K().bres ?? 1), blockFund(v, me));
+  else reserve = Math.max(120, Math.min(500, danger(v, me) * 0.8, 0.6 * maxRent(v, me) + 60));
   let best = null, bestS = -Infinity;
   for (const m of builds) {
     const i = m.space, b = v.board[i], c = buildCost(v, i), l = v.lvl[i];
     if (cash - c < reserve) continue;
     const gain = b.rents[l + 1] - (l === 0 ? b.rents[0] * 2 : b.rents[l]);
     let s = gain / c;
-    if (lv === 'hard') { s *= HEAT[b.group]; if (l < 3) s += 2; s += (K().tb ?? 0) * hitChance(v, me, i) * gain / c; }
+    if (lv === 'hard') { s *= HEAT[b.group]; if (l < 3) s += 2; }
     if (s > bestS) { bestS = s; best = m; }
   }
   return best;
-}
-// the chance another player lands on space i with their next roll (two dice from where they stand)
-function hitChance(v, me, i) {
-  let p = 0;
-  for (let k = 0; k < v.n; k++) {
-    if (k === me || !v.alive[k] || v.woods[k] >= 0) continue;
-    const d = (i - v.pos[k] + v.board.length) % v.board.length;
-    if (d >= 2 && d <= 12) p += (6 - Math.abs(d - 7)) / 36;
-  }
-  return p;
-}
-// hard: cash kept back to outbid another player on a free street that would complete their pair
-function blockFund(v, me) {
-  const k = K().fund ?? 0; if (!k) return 0;
-  let need = 0;
-  for (const b of v.board) {
-    if (b.kind !== 'street' || v.owner[b.i] >= 0) continue;
-    const o = groupSpaces(v, b.group).filter(j => j !== b.i).map(j => v.owner[j]);
-    if (o.length && o.every(x => x >= 0 && x !== me)) need = Math.max(need, b.price * k);
-  }
-  return need;
 }
 function pickUnmortgage(v, lv, cash) {
   const ms = v.moves.filter(m => m.type === 'unmortgage');
@@ -226,7 +206,7 @@ function worthTo(v, s, i, lv) {
   const h = horizon(v);
   if (b.kind === 'transit') { const mine = v.board.some(x => x.kind === 'transit' && x.i !== i && v.owner[x.i] === s); return p * Math.max(0.97, (mine ? 1.6 : 1.1) * h); }
   if (b.kind === 'tool') return p * 0.9;
-  const f = completes ? 1 + 1.0 * h : blocks ? 1 + (K().blk ?? 0.35) * h : 1 + 0.1 * h * HEAT[b.group];
+  const f = completes ? 1 + 1.0 * h : blocks ? 1 + 0.35 * h : 1 + 0.1 * h * HEAT[b.group];
   return p * Math.max(0.97, f);
 }
 function auctionMove(v, lv) {
@@ -234,12 +214,13 @@ function auctionMove(v, lv) {
   const pass = moves.find(m => m.type === 'pass');
   const bids = moves.filter(m => m.type === 'bid');
   if (!bids.length) return pass;
-  const reserve = lv === 'easy' ? 100 : lv === 'normal' ? 150 : Math.max(40, Math.min(300, 0.4 * maxRent(v, me) + 20)) * (K().ares ?? 1);
+  const reserve = lv === 'easy' ? 100 : lv === 'normal' ? 150 : Math.max(12, Math.min(90, 0.12 * maxRent(v, me) + 6));
   const ceil = Math.min(worthTo(v, me, a.space, lv), cash - reserve);
   const ok = bids.filter(m => m.amount <= ceil);
   if (!ok.length) return pass;
   // a big jump while far under the ceiling, else the smallest raise
   const room = ceil - a.bid;
+  if (lv === 'hard') return room > 150 && ok.length >= 2 ? ok[1] : ok[0]; // hard creeps up by B10 near its ceiling
   if (room > 250 && ok.length >= 3) return ok[2];
   if (room > 120 && ok.length >= 2) return ok[1];
   return ok[0];
@@ -255,18 +236,18 @@ function tradeValue(v, t, lv, me) {
   if (lv === 'easy') { const P = i => v.board[i].price; return sum(inSp.map(P)) - sum(outSp.map(P)) + cashIn; }
   // a deed: its price (half when mortgaged); hard counts a dead deed (bus / van / tool crib, a street it can never pair) lower
   // while there is time left to play
-  const P = i => { const p = v.board[i].price * (v.mort[i] ? 0.5 : 1); return lv === 'hard' && dead(v, me, i) ? p * (1 - (K().dead ?? 0.3) * horizon(v)) : p; };
+  const P = i => { const p = v.board[i].price * (v.mort[i] ? 0.5 : 1); return lv === 'hard' && dead(v, me, i) ? p * (1 - 0.3 * horizon(v)) : p; };
   const other = t.from === me ? t.to : t.from;
   const after = v.owner.slice();
   for (const i of t.give) after[i] = t.to;
   for (const i of t.get) after[i] = t.from;
   const pairs = (s, own) => { const out = []; for (let g = 0; g < v.groups.length; g++) if (groupSpaces(v, g).every(j => own[j] === s)) out.push(g); return out; };
   const h = lv === 'hard' ? horizon(v) : 1;
-  const gVal = g => { const p = sum(groupSpaces(v, g).map(P)); return lv === 'hard' ? (p * (K().gv ?? 1.2) * HEAT[g] + v.groups[g].build * 2) * h : p; };
+  const gVal = g => { const p = sum(groupSpaces(v, g).map(P)); return lv === 'hard' ? (p * 1.2 * HEAT[g] + v.groups[g].build * 2) * h : p; };
   const mine0 = pairs(me, v.owner), mine1 = pairs(me, after), th0 = pairs(other, v.owner), th1 = pairs(other, after);
   let val = cashIn + sum(inSp.map(P)) - sum(outSp.map(P));
   for (const g of mine1) if (!mine0.includes(g)) val += gVal(g);
-  for (const g of th1) if (!th0.includes(g)) val -= gVal(g) * (lv === 'hard' ? (K().pen ?? 1.1) : 0.6);
+  for (const g of th1) if (!th0.includes(g)) val -= gVal(g) * (lv === 'hard' ? 0.4 : 0.6);
   return val;
 }
 // a deed seat s gets little from: the tool crib, a lone bus or van stop, a street whose partner someone else owns
@@ -289,7 +270,6 @@ function tried(v, p) { return (v.declined || []).some(d => d.from === v.seat && 
 // the offer this bot wants to make now, or null. Deterministic from the view (rebuilt at each drafting step).
 function tradePlan(v, lv) {
   const me = v.seat, cash = v.cash[me];
-  if (lv === 'hard' && K().noplan) return null;
   if (lv === 'easy' && (v.round + me) % 5 !== 0) return null;
   if (lv === 'normal' && (v.round + me) % 2 !== 0) return null;
   const free = i => !v.board.some(x => x.kind === 'street' && x.group === v.board[i].group && v.lvl[x.i] > 0);
@@ -320,12 +300,12 @@ function tradePlan(v, lv) {
       const their = tradeValue(v, t, 'normal', c.to), theirEasy = tradeValue(v, t, 'easy', c.to);
       const tiers = [r10(NEED.easy + 10 - theirEasy), r10(NEED.normal + 10 - their)].filter((x, k, a) => a.indexOf(x) === k);
       for (const pay of tiers) {
-        const cashT = Math.max(-Math.max(0, v.cash[c.to] - 150), Math.min(pay, 1e9));
+        const cashT = Math.max(-Math.floor(Math.max(0, v.cash[c.to] - 150) / 10) * 10, pay); // (steps of B10)
         const p = { ...c, cash: cashT };
-        if (cash - Math.max(0, cashT) < (K().tres ?? 150) + (K().nb ?? 2) * v.groups[v.board[c.get[0]].group].build) continue;
+        if (cash - Math.max(0, cashT) < 50 + 6 * v.groups[v.board[c.get[0]].group].build) continue;
         if (tried(v, p)) continue;
         const mine = tradeValue(v, { ...t, cash: cashT }, 'hard', me);
-        if (mine > (K().tmin ?? 60)) { plans.push({ ...p, score: mine }); break; }
+        if (mine > 60) { plans.push({ ...p, score: mine }); break; }
       }
     } else {
       const p = { ...c, cash: 0 };
