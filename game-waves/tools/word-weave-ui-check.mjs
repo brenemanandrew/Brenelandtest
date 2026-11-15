@@ -7,7 +7,7 @@ import { createRequire } from 'module'; import fs from 'fs'; import path from 'p
 import { start } from './harness/server.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
-const out = process.argv[2] || '.';
+const out = process.argv[2] || (await import('os')).tmpdir();
 fs.mkdirSync(out, { recursive: true });
 const srv = await start(0), port = srv.address().port, browser = await chromium.launch();
 let fails = 0;
