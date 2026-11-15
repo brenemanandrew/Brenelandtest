@@ -12,7 +12,7 @@ SWAP = {
  'post_lantern':      (M + '/02-small-props/post_lantern.glb', 'h', {'glow': 1, 'post': {'w': 0.42, 'h': 3.92}}),
  'camp_lantern':      (M + '/02-small-props/camp_lantern.glb', 'h', {'glow': 1}),
  'planter_brick':     (M + '/02-small-props/planter_brick.glb', 'box', {}),
- 'bench_park':        (M + '/02-small-props/bench_park.glb', 'box', {'back': -1}),
+ 'bench_park':        (M + '/02-small-props/bench_park.glb', 'box', {'back': -1, 'colours': 3}),
  'picnic_table':      (M + '/02-small-props/picnic_table.glb', 'box', {}),
  'picnic_table_long': (M + '/02-small-props/picnic_table_long.glb', 'box', {}),
  'shelter':           (M + '/03-large-props/shelter.glb', 'box', {'roof': {'eave': 2.6, 'roof_h': 1.5}}),   # Andrew: squat -> posts up to the 2.6 m eave
@@ -57,8 +57,23 @@ def run(src, dst):
         if k is not None: v = (v - [(mn[0] + mx[0]) / 2, mn[1], (mn[2] + mx[2]) / 2]) * k + [(omn[0] + omx[0]) / 2, omn[1], (omn[2] + omx[2]) / 2]
         tri = v[f]; nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]); nrm /= np.linalg.norm(nrm, axis=1, keepdims=True) + 1e-12
         col = rgb[f].mean(1)                                   # one colour per face (flat, like the old props)
+        # Andrew: the per-face colours from Meshy's texture looked blotchy. Clean flat look: cluster to a few colours (STYLE.md:
+        # 2 to 4 main colours), each face takes its cluster's colour; glowing glass is kept apart so it stays bright
         glow = np.zeros(len(f), bool)
         if o.get('glow'): glow = (col[:, 0] > 185) & (col[:, 1] > 140) & (col[:, 2] < 150) & (col[:, 0] - col[:, 2] > 80)
+        from scipy.cluster.vq import kmeans2
+        kk = o.get('colours', 5); rng = np.random.default_rng(0)
+        cent, lab0 = kmeans2(col[~glow].astype(float), kk, seed=rng, minit='++')
+        lab = np.full(len(f), -1); lab[~glow] = lab0
+        import trimesh                                          # speckles (painted brush strokes) -> each face takes its neighbours' majority
+        adj = trimesh.Trimesh(v, f, process=True).face_adjacency
+        for _ in range(int(o.get('smooth', 6))):
+            votes = np.zeros((len(f), kk))
+            for a, b2 in ((adj[:, 0], adj[:, 1]), (adj[:, 1], adj[:, 0])):
+                ok = lab[b2] >= 0; np.add.at(votes, (a[ok], lab[b2][ok]), 1)
+            keep = lab >= 0; votes[np.arange(len(f))[keep], lab[keep]] += 1.5   # a face keeps its own colour on a tie
+            new = votes.argmax(1); lab = np.where((lab >= 0) & (votes.sum(1) > 0), new, lab)
+        col = col.copy(); col[lab >= 0] = cent[lab[lab >= 0]]
         def part(sel, skins):
             P = tri[sel].reshape(-1, 3); N = np.repeat(nrm[sel], 3, 0)
             out = {'pos': P.round(4).ravel().tolist(), 'nor': N.round(3).ravel().tolist(), 'idx': list(range(len(P)))}
