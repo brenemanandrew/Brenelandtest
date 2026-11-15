@@ -13,7 +13,8 @@ Facts about the live game, read from its code at breneland.fly.dev on 2026-11-14
 5. Check in game: day and night, near and far, frame rate in the woods.
 
 ## Decisions (Andrew, 2026-11-14)
-- Woods: only hand-placed trees (yard, street, park) get Meshy models. The instanced woods and their far versions keep the code-made trees for now (T5 fir and T8 stay code-made until revisited).
+- Trees (Andrew, 2026-11-15, after trying the test site): the Meshy trees lost. The game keeps ALL its own code-made trees. No tree swap.
+- Woods (superseded by the line above): only hand-placed trees (yard, street, park) get Meshy models. The instanced woods and their far versions keep the code-made trees for now (T5 fir and T8 stay code-made until revisited).
 - Seasons: one model per tree with pale neutral leaves; the game tints them by season as it does today. No separate autumn models.
 - Colour: bake Meshy textures to vertex colours so models drop into the existing toon batch. A textured batch for a stronger watercolour wash can come later.
 

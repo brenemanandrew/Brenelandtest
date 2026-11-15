@@ -11,7 +11,8 @@ if os.path.exists(OUT): shutil.rmtree(OUT)
 shutil.copytree(os.path.join(REPO, 'breneland-live'), OUT)
 shutil.copytree(os.path.join(HERE, 'vendor'), os.path.join(OUT, 'vendor/three/jsm'))
 os.makedirs(os.path.join(OUT, 'models/refresh'), exist_ok=True)
-for k in ['oak', 'maple', 'birch', 'pine', 'palm']:
+TREES = []   # Andrew 2026-11-15: the Meshy trees lost to the game's own trees; keep the code trees (was oak, maple, birch, pine, palm)
+for k in TREES:
     shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
 p = os.path.join(OUT, 'js/world-trees.js'); s = open(p).read()
 head = """import { GLTFLoader } from '../vendor/three/jsm/loaders/GLTFLoader.js';
@@ -20,7 +21,7 @@ const _tc = new THREE.Color();
 const REFRESH = await (async () => {
   { const q = new URLSearchParams(location.search); if (q.has('oldtrees') || q.has('oldworld')) return {}; }
   const out = {}, ld = new GLTFLoader();
-  for (const k of ['oak', 'maple', 'birch', 'pine', 'palm']) {
+  for (const k of %s) {
     try {
       const gl = await ld.loadAsync('/models/refresh/' + k + '.glb'); let mesh = null; gl.scene.traverse(o => { if (o.isMesh && !mesh) mesh = o; });
       const g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry, c = g.attributes.color, n = g.attributes.position.count;
@@ -37,6 +38,7 @@ const REFRESH = await (async () => {
   return out;
 })();
 """
+head = head.replace('%s', json.dumps(TREES))
 s = s.replace("import { view } from './perf-flags.js';", "import { view } from './perf-flags.js';\n" + head, 1)
 old = """  if (kind === 'pine') { addPine(b, x, y, z, s, rnd, parts); r = 0.35 * s; }
   else if (kind === 'palm') { addPalm(b, x, y, z, s, rnd, parts); r = 0.35; }

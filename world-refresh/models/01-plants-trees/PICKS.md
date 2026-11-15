@@ -1,4 +1,6 @@
 # Sheet 01 picks (Andrew, 2026-11-14)
+
+2026-11-15: TREES DROPPED. After trying them in the game Andrew chose the game's own trees. T1-T7 below are not used.
 Chosen model per asset. Paths relative to models/01-plants-trees/.
 | # | Asset | File |
 |---|---|---|
