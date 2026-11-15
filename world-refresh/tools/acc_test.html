@@ -1,0 +1,18 @@
+<!doctype html><html><body style="margin:0;background:#e9f1f5">
+<script type="importmap">{"imports":{"three":"/vendor/three/three.module.js"}}</script>
+<script type="module">
+// accessories test bench (serve the TEST GAME root): a row of people wearing the new pieces
+import * as THREE from 'three';
+import { Human } from '/js/human.js';
+import { loadClothesModel } from '/js/clothing-wear.js';
+await loadClothesModel();
+const LOOKS = [{ wHat: 'cap-red' }, { wHat: 'hat-bobble-rust' }, { wHat: 'hat-bobble-cream' }, { wHat: 'hat-fedora-brown' }, { wHat: 'hat-fedora-teal', wAcc: 'glasses-sunny' }, { wHat: 'hat-garden-straw' }, { wAcc: 'glasses-sunny' }, { wAcc: 'satchel-tan' }];
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#e9f1f5');
+sc.add(new THREE.HemisphereLight(0xffffff, 0x99aa88, 1.3)); const dl = new THREE.DirectionalLight(0xffffff, 2); dl.position.set(-2, 5, 6); sc.add(dl);
+const turn = +(new URLSearchParams(location.search).get('turn') || 0.5);
+const ppl = LOOKS.map((w, i) => { const h = new Human({ shirt: '#5b7fa8', pants: '#4a4a52', hairStyle: new URLSearchParams(location.search).get('hs') || undefined, hair: '#5a3a24', skin: '#e0b48f', ...w }); h.root.position.set((i - (LOOKS.length - 1) / 2) * 1.25, 0, 0); h.root.rotation.y = turn; sc.add(h.root); return h; });
+for (let k = 0; k < 90; k++) for (const h of ppl) h.update(1 / 60, k / 60, 0, null);
+const cam = new THREE.PerspectiveCamera(26, innerWidth / innerHeight, 0.1, 100); cam.position.set(0, 1.6, 12); cam.lookAt(0, 1.2, 0);
+await new Promise(res => setTimeout(res, 4000)); r.render(sc, cam); window.READY = 1;
+</script></body></html>

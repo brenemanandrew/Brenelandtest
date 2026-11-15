@@ -11,6 +11,8 @@ class H(http.server.SimpleHTTPRequestHandler):
     def _json(s, obj, code=200):
         b = json.dumps(obj).encode(); s.send_response(code); s.send_header('content-type', 'application/json'); s.send_header('content-length', str(len(b))); s.end_headers(); s.wfile.write(b)
     def do_GET(s):
+        if s.path.startswith('/api/clothing'):   # test site: Peak Threads stocks the new Meshy accessories (plus a few of the usual)
+            return s._json({'week': 1, 'ends': 4102444800000, 'stock': ['hat-bobble-rust', 'hat-fedora-brown', 'hat-garden-straw', 'glasses-sunny', 'satchel-tan', 'hoodie-plum', 'jeans-blue'], 'mall': True})
         if s.path.startswith('/api/'):
             try:
                 r = urllib.request.urlopen(urllib.request.Request(LIVE + s.path, headers={'user-agent': 'breneland-local-test'}), timeout=20); b = r.read()

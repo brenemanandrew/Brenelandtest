@@ -253,6 +253,17 @@ assert t.count(a) == 1
 t = t.replace(a, a + "\n    if (window.__cam) cam = { position: { x: window.__cam.p[0], y: window.__cam.p[1], z: window.__cam.p[2] } };   // (test hook: the pinned screenshot camera)", 1)
 open(p, 'w').write(t)
 
+# ---- accessories: Meshy hats, sunglasses and a satchel added to Peak Threads' catalogue (models/clothes.json + clothing-catalog.js)
+import acc_swap
+lines = acc_swap.run(os.path.join(REPO, 'breneland-live/models/clothes.json'), os.path.join(OUT, 'models/clothes.json'))
+p = os.path.join(OUT, 'js/clothing-catalog.js'); t = open(p).read(); a = "  P('glasses-tortoise',"
+assert t.count(a) == 1; t = t.replace(a, "\n".join(lines) + "\n" + a, 1)
+a = "export const HAT_RIM = {"; assert t.count(a) == 1
+t = t.replace(a, a + " " + " ".join(f"{k}: null," for k in acc_swap.RIM), 1)
+t = t.replace("const BY_ID = new Map(", "for (const [k, like] of " + json.dumps(list(acc_swap.RIM.items())) + ") HAT_RIM[k] = HAT_RIM[like];\nconst BY_ID = new Map(", 1)
+open(p, 'w').write(t)
+shutil.copy(os.path.join(HERE, 'acc_test.html'), os.path.join(OUT, 'acc_test.html'))
+
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
 for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb')]: glb_jpeg.run(g)
