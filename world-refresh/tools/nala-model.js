@@ -36,7 +36,12 @@ export function dressDog(dog, name) {
   let fx = 0, fz = 0, nf = 0;
   for (let i = 0; i < pos.count; i++) if (pos.getY(i) < mb.min.y + 0.08 * (mb.max.y - mb.min.y)) { fx += pos.getX(i); fz += pos.getZ(i); nf++; }
   fx /= nf; fz /= nf;
-  const F = q => new THREE.Vector3(pc.x + (q[0] - fx) * k, pc.y - 0.02 + (q[1] - mb.min.y) * k, pc.z + (q[2] - fz) * k);
+  const pfz = (paws[0].z + paws[1].z) / 2, phz = (paws[2].z + paws[3].z) / 2, lowY = mb.min.y + 0.08 * (mb.max.y - mb.min.y);
+  const fz2 = [], hz2 = []; for (let i = 0; i < pos.count; i++) if (pos.getY(i) < lowY) (pos.getZ(i) > fz ? fz2 : hz2).push(pos.getZ(i));
+  const med = a => a.sort((x, y) => x - y)[a.length >> 1];
+  const mF = fz2.length ? med(fz2) : fz + 1, mH = hz2.length ? med(hz2) : fz - 1;
+  const kz = Math.abs(pfz - phz) / Math.max(1e-3, Math.abs(mF - mH)) / k, zMid = (mF + mH) / 2, cMid = (pfz + phz) / 2;
+  const F = q => new THREE.Vector3(pc.x + (q[0] - fx) * k, pc.y - 0.02 + (q[1] - mb.min.y) * k, cMid + (q[2] - zMid) * k * kz);
   for (let i = 0; i < pos.count; i++) { const f = F([pos.getX(i), pos.getY(i), pos.getZ(i)]); pos.setXYZ(i, f.x, f.y, f.z); }
   // her tail: the code tail moved to her tail's root and pointed down her tail for the bind, its bones as long as hers, so the
   // carriage and the wag lift and swing HER tail from where it really starts (the code tail's own meshes stay hidden)

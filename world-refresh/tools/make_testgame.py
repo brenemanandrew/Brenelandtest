@@ -276,6 +276,15 @@ assert t.count(a) == 1
 t = t.replace(a, "    { const hs = o.headSize ?? (NAT && !this.kidK ? 0.86 : 1); if (hs !== 1) { headC.scale.setScalar(hs); headC.position.y = D.headY * hs; } }", 1)
 open(p, 'w').write("const NAT = typeof location === 'undefined' || !new URLSearchParams(location.search).has('oldbody');   // (world-refresh: natural proportions)\n" + t)
 
+# ---- terrain: gentle landscaping in the open land (Andrew: Breneland is mostly flat; the real world is not). Big soft knolls and
+# dips (about +-1.3 m over 50-90 m) plus a smaller roll, faded out near the water; town, house pad, garden, game spots and every
+# flat zone are applied AFTER this in terrainHeight, so they stay exactly as flat as before. ?flatworld = the old ground.
+p = os.path.join(OUT, 'js/terrain.js'); t = open(p).read()
+a = "  let land = 0.42 + fbm(x * 0.035, z * 0.035) * 0.32;\n"
+assert t.count(a) == 1
+t = t.replace(a, a + "  if (RELIEF) land += Math.max(0, fbm(x * 0.0125 + 11.3, z * 0.0125 - 5.7) * 1.7 + fbm(x * 0.03 - 2.1, z * 0.03 + 8.4) * 0.4 + 0.15) * smoothstep(-6, -22, s);   // (raise only: things under the old ground level must stay hidden)\n", 1)
+open(p, 'w').write("const RELIEF = typeof location === 'undefined' || !new URLSearchParams(location.search).has('flatworld');   // (world-refresh: landscaping)\n" + t)
+
 # textures as JPEG inside the GLBs (the PNGs made the textured set ~32 MB)
 import glob, glb_jpeg
 for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.join(OUT, 'models/refresh/nala_mesh.glb'), os.path.join(OUT, 'models/refresh/dax_mesh.glb')]: glb_jpeg.run(g)
