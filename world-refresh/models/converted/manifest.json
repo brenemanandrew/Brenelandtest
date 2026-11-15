@@ -330,6 +330,16 @@
   "tris": 1558
  },
  {
+  "name": "clock_tower",
+  "source": "models/04-set-pieces/v2/clock_tower.glb",
+  "size_m": [
+   5.07,
+   12.0,
+   3.83
+  ],
+  "tris": 30086
+ },
+ {
   "name": "potting_shed",
   "source": "models/03-large-props/potting_shed.glb",
   "size_m": [

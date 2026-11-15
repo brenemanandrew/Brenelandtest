@@ -1,0 +1,44 @@
+{
+ "bobble_hat.glb": {
+  "id": "hat_bobble",
+  "preview": "01a1e025-a5e6-7583-82af-00d428fd1f01",
+  "refine": "01a1e028-0f0d-760b-9d7e-c83c012a0cd3",
+  "done": true,
+  "credits": 10
+ },
+ "fedora.glb": {
+  "id": "hat_fedora",
+  "preview": "01a1e025-b208-705b-8352-939118c49141",
+  "refine": "01a1e026-9a75-722f-9d0f-cb41b250eb45",
+  "done": true,
+  "credits": 10
+ },
+ "straw_hat.glb": {
+  "id": "hat_straw",
+  "preview": "01a1e025-c17f-7147-9a0b-3b0cf82e22e5",
+  "refine": "01a1e027-02ea-73aa-860e-abbef08859fd",
+  "done": true,
+  "credits": 10
+ },
+ "sunglasses.glb": {
+  "id": "glasses_sun",
+  "preview": "01a1e025-cfeb-72c2-9c01-c248152b42bc",
+  "refine": "01a1e026-9fe9-7080-9219-3bde47137f1e",
+  "done": true,
+  "credits": 10
+ },
+ "satchel.glb": {
+  "id": "satchel",
+  "preview": "01a1e025-d962-7509-b54f-aec2451fc9ef",
+  "refine": "01a1e026-a713-7756-ab6e-e25a7f01157e",
+  "done": true,
+  "credits": 10
+ },
+ "bandana.glb": {
+  "id": "bandana",
+  "preview": "01a1e025-e420-72be-935e-c7e21a30dc59",
+  "refine": "01a1e026-ad72-701e-912b-16cb05e06829",
+  "done": true,
+  "credits": 10
+ }
+}

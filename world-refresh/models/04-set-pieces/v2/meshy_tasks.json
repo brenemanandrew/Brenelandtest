@@ -1,0 +1,16 @@
+{
+ "clock_tower.glb": {
+  "id": "clock_tower",
+  "preview": "01a1e022-a13c-71cf-8fb9-2881428b15ad",
+  "refine": "01a1e023-b062-7123-bdc1-28613e1b3649",
+  "done": true,
+  "credits": 10
+ },
+ "lovecraft_shell.glb": {
+  "id": "lovecraft_shell",
+  "preview": "01a1e022-af2c-73a4-98c0-256fa7c282b4",
+  "refine": "01a1e024-58dc-777d-8574-11dfb99e3de5",
+  "done": true,
+  "credits": 10
+ }
+}

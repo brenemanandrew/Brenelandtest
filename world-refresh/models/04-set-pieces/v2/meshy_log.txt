@@ -1,0 +1,7 @@
+preview clock_tower.glb 01a1e022-a13c-71cf-8fb9-2881428b15ad
+preview lovecraft_shell.glb 01a1e022-af2c-73a4-98c0-256fa7c282b4
+refine clock_tower.glb
+refine lovecraft_shell.glb
+DONE clock_tower.glb
+DONE lovecraft_shell.glb
+ALL FINISHED 2 done, 0 failed

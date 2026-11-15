@@ -1,0 +1,19 @@
+preview bobble_hat.glb 01a1e025-a5e6-7583-82af-00d428fd1f01
+preview fedora.glb 01a1e025-b208-705b-8352-939118c49141
+preview straw_hat.glb 01a1e025-c17f-7147-9a0b-3b0cf82e22e5
+preview sunglasses.glb 01a1e025-cfeb-72c2-9c01-c248152b42bc
+preview satchel.glb 01a1e025-d962-7509-b54f-aec2451fc9ef
+preview bandana.glb 01a1e025-e420-72be-935e-c7e21a30dc59
+refine fedora.glb
+refine sunglasses.glb
+refine satchel.glb
+refine bandana.glb
+refine straw_hat.glb
+DONE fedora.glb
+DONE sunglasses.glb
+DONE satchel.glb
+DONE bandana.glb
+DONE straw_hat.glb
+refine bobble_hat.glb
+DONE bobble_hat.glb
+ALL FINISHED 6 done, 0 failed

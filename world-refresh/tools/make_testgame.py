@@ -59,7 +59,7 @@ open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
 SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
-TEXTURED = ['fern', 'mossy_rock', 'log', 'mushrooms', 'potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
+TEXTURED = ['clock_tower', 'fern', 'mossy_rock', 'log', 'mushrooms', 'potting_shed', 'raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence']   # Andrew: textures crisper than the colour bake   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
 os.makedirs(os.path.join(OUT, 'models/refresh/tex'), exist_ok=True)
 for k in TEXTURED: shutil.copy(os.path.join(WR, 'models/converted/tex', k + '.glb'), os.path.join(OUT, 'models/refresh/tex', k + '.glb'))
 for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
@@ -175,6 +175,7 @@ patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 
 # shore rocks
 patch('world.js', [("    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z });",
   "    if (RM.shore_rock) { rput(b, 'shore_rock', r.x, y - 0.05, r.z, { s: r.s * 1.1, ry: r.x }); rput(b, 'shore_rock', x2, y2 - 0.03, z2, { s: r.s * 0.5, ry: r.z }); } else {\n    b.add(GEO.dodec, '#9a9b93', { x: r.x, y: y + 0.2 * r.s, z: r.z, sx: r.s, sy: r.s * 0.7, sz: r.s * 0.9, ry: r.x });\n    b.add(GEO.dodec, '#8a8b84', { x: x2, y: y2 + 0.06, z: z2, sx: r.s * 0.5, sy: r.s * 0.4, sz: r.s * 0.5, ry: r.z }); }"),
+  ("  for (const r of SHORE_ROCKS) {", "  if (RT.clock_tower) { const tx = -125, tz = -99.5, ty = terrainHeight(tx, tz); rput(b, 'clock_tower', tx, ty - 0.05, tz, { ry: Math.PI / 2 }); colliders.push({ type: 'circle', x: tx, z: tz, r: 2.3 }); }   // the new town clock tower (bus plaza, west side)\n  for (const r of SHORE_ROCKS) {"),
   ("function buildMailbox(b) {\n  const { x, z } = MAILBOX;\n  const y = terrainHeight(x, z);", "function buildMailbox(b) {\n  const { x, z } = MAILBOX;\n  const y = terrainHeight(x, z);\n  if (RM.mailbox) { rput(b, 'mailbox', x, y - 0.02, z, { ry: Math.PI / 2 }); return; }")])
 
 # ---- the static props (props-static.js reads models/props.json): swap the good sheet 02/03 shapes
