@@ -4,7 +4,7 @@
 // a red shop on built streets, the two card piles, the dice as last rolled, and a pawn per player still in the game on their
 // space (stepping along the ring to a new one). Draws: the printed board, one vertex-colour batch for the board's pieces
 // (rebuilt only when the public view changes) and one small batch for the pawns (rebuilt per step while one walks).
-import { THREE, Batcher, GEO, SEAT_COLORS, INK, FONT, CREAM, tableBase, canvasMat, whenFonts, svgImg, rr, tray, facePlane, TRAY_TOP, drop, pawn, die, roof } from './tg-kit3d.js';
+import { THREE, Batcher, GEO, SEAT_COLORS, INK, FONT, CREAM, tableBase, boardYaw, sideSpot, canvasMat, whenFonts, svgImg, rr, tray, facePlane, TRAY_TOP, drop, pawn, die, roof } from './tg-kit3d.js';
 
 const SIZE = 28, SIDE = 8; // 8 x 8 cells round the edge: corners at 0, 7, 14, 21
 const ST = `stroke="${INK}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"`;
@@ -120,7 +120,7 @@ export function create(parent, table) {
       const bk = JSON.stringify([B.map(b => [b.name, b.kind, b.group, b.price]), groups.map(g2 => g2.color)]);
       if (bk !== boardKey) { boardKey = bk; lastBoard = [B, groups]; drawBoard(B, groups); whenFonts(() => drawBoard(...lastBoard)); }
       built = drop(built);
-      const yaw = order && order.length ? dirOf(order[0]) : 0; bg.rotation.y = yaw; bg.updateMatrix();
+      const yaw = boardYaw(table, dirOf, order); bg.rotation.y = yaw; bg.updateMatrix();
       const b = new Batcher({ vertexColors: true, castShadow: false });
       tray(b, S, { frame: '#6e4224', lip: '#c99a62' });
       const own = v.owner || [], lvl = v.lvl || [], mort = v.mort || [];

@@ -3,7 +3,7 @@
 // last word's in yellow), a rack in each player's seat colour with their tiles stood on it backs out, and the cloth bag
 // while it holds tiles. Draws: the printed board, the tiles' faces (one canvas laid over the board, redrawn on a change),
 // one vertex-colour batch for everything else. Rebuilt only when the public view changes.
-import { THREE, Batcher, GEO, SEAT_COLORS, INK, FONT, CREAM, tableBase, canvasMat, whenFonts, rr, tray, facePlane, TRAY_TOP, drop, h01 } from './tg-kit3d.js';
+import { THREE, Batcher, GEO, SEAT_COLORS, INK, FONT, CREAM, tableBase, boardYaw, sideSpot, clearR, canvasMat, whenFonts, rr, tray, facePlane, TRAY_TOP, drop, h01 } from './tg-kit3d.js';
 
 const N = 15;
 const SQ = { '.': '#fff8ec', d: '#ffe08a', t: '#f6a95a', D: '#ffaec4', T: '#e8574d', '*': '#ffaec4' };
@@ -67,7 +67,7 @@ export function create(parent, table) {
     const fresh = new Set(lastT.map(t => t.r * N + t.c));
     last = [rows, fresh]; drawFaces(rows, fresh);
     built = drop(built);
-    const yaw = order && order.length ? dirOf(order[0]) : 0; bg.rotation.y = yaw; bg.updateMatrix();
+    const yaw = boardYaw(table, dirOf, order); bg.rotation.y = yaw; bg.updateMatrix();
     const b = new Batcher({ vertexColors: true, castShadow: false });
     tray(b, S, { frame: '#6e4224', lip: '#b47a46' });
     // the tiles' bodies under the faces: a cream block on a darker foot
@@ -85,8 +85,9 @@ export function create(parent, table) {
     const n = order ? order.length : 0;
     for (let i = 0; i < n; i++) {
       const chair = order[i], a = dirOf(chair), col = SEAT_COLORS[chair % 8], cnt = Math.min(7, (view && view.counts && view.counts[i]) || 0);
-      const r = Math.max(S * 0.5 + 0.035, Math.min(edgeOf(chair) - 0.06, S * 0.5 + 0.16));
-      const cx = Math.sin(a) * r, cz = Math.cos(a) * r, tx = Math.cos(a), tz = -Math.sin(a), w = C * 0.95, len = w * 7.8;
+      const w = C * 0.95, len = w * 7.8;
+      const r = clearR(S, yaw, a, len / 2, w * 0.6, S * 0.5 + 0.035, Math.max(S * 0.5 + 0.035, edgeOf(chair) - 0.03));
+      const cx = Math.sin(a) * r, cz = Math.cos(a) * r, tx = Math.cos(a), tz = -Math.sin(a);
       const p = T(cx, cz, a);
       b.add(GEO.box, col, { ...p, y: 0.008, sx: len, sy: 0.016, sz: w * 0.95 });
       b.add(GEO.box, i === turn ? '#ffd34d' : '#2b2340', { ...T(cx + Math.sin(a) * w * 0.4, cz + Math.cos(a) * w * 0.4, a), y: 0.019, sx: len, sy: 0.006, sz: w * 0.16 });
@@ -101,7 +102,7 @@ export function create(parent, table) {
     // the bag: a soft purple sack beside the board, fuller with more tiles in it
     const bagN = view ? view.bag || 0 : 0;
     if (bagN > 0) {
-      const k2 = 0.6 + 0.4 * Math.min(1, bagN / 80), a = n ? dirOf(order[0]) + Math.PI * 0.75 : 2.3, r = S * 0.62;
+      const k2 = 0.6 + 0.4 * Math.min(1, bagN / 80), a = sideSpot(yaw, dirOf, order), r = S * 0.5 / Math.cos(0.35) + 0.045;
       const p = T(Math.sin(a) * r, Math.cos(a) * r, a), s = 0.034 * k2;
       b.add(GEO.sphere, '#7b5bb8', { ...p, y: s * 0.8, sx: s, sy: s * 0.85, sz: s });
       b.add(GEO.cyl8, '#5d4392', { ...p, y: s * 1.6, sx: s * 0.4, sy: s * 0.35, sz: s * 0.4 });

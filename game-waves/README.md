@@ -15,7 +15,7 @@ NOT shipped. Do not deploy until Andrew says so.
 2. Server patch: apply `server/patches/table-games-index-check.patch` to `lib/table-games/index.js`. It lets a game with
    `check()` (Word Weave) accept moves that cannot be listed, for people and bots. Mexican Train is unaffected.
 3. Client: `client/js/table-games/*` -> `public/js/table-games/` (replaces `index.js` and `tg-look.js`; adds `tg-games.js`,
-   `generic-3d.js` and the three `*-ui.js`). Mexican Train's path in `index.js` is unchanged.
+   `generic-3d.js`, `tg-kit3d.js`, the three `*-ui.js` and the three `*-3d.js` world-table pieces). Mexican Train's path in `index.js` is unchanged.
 4. `games.json` `tableGames`: add `{ "id": "word-weave", "name": "Word Weave" }`, `{ "id": "missing-pie", "name": "The Missing Pie" }`,
    `{ "id": "town-tycoon", "name": "Town Tycoon" }` (plus `copies` / `blurb` as wanted).
 5. Credits: `data/CREDITS.md` (ENABLE word list, public domain; LDNOOBW blocklist, CC BY 4.0) into the game's credits.
@@ -57,6 +57,5 @@ against `GROUP_SPACES`). Check: `node tools/tg-achievements-test.mjs` (real bot 
 
 ## Not done
 
-- Real 3D pieces: on the world table they show a generic board slab and pawns (`generic-3d.js`).
 - Town Tycoon: no auctions or trades.
 

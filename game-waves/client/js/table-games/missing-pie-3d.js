@@ -4,7 +4,7 @@
 // only once the game is over and the view shows the solution), a pawn per suspect where the view puts them (a player's on a
 // base in their seat colour, lying down once they are out), the die after a roll, and each player's cards as a fan of backs
 // in front of their chair (one lifted while they pick a card to show). Draws: the printed board and one vertex-colour batch.
-import { THREE, Batcher, GEO, SEAT_COLORS, INK, FONT, CREAM, tableBase, canvasMat, whenFonts, rr, tray, facePlane, TRAY_TOP, drop, pawn, cardFan, die, roof, h01 } from './tg-kit3d.js';
+import { THREE, Batcher, GEO, SEAT_COLORS, INK, FONT, CREAM, tableBase, boardYaw, sideSpot, clearR, canvasMat, whenFonts, rr, tray, facePlane, TRAY_TOP, drop, pawn, cardFan, die, roof, h01 } from './tg-kit3d.js';
 
 // the engine's places (missing-pie-bot.js WHERE order), how each is drawn, and where it sits on the 3 x 3 map
 const PLACES = [
@@ -115,7 +115,7 @@ export function create(parent, table) {
     const k = JSON.stringify([v.pos, v.out, v.active, v.turn, v.stage, v.roll, v.pending && [v.pending.asker, v.pending.by], v.counts, v.solution, phase, order]);
     if (k === key) return; key = k; builds++;
     built = drop(built);
-    const yaw = order && order.length ? dirOf(order[0]) : 0; bg.rotation.y = yaw; bg.updateMatrix();
+    const yaw = boardYaw(table, dirOf, order); bg.rotation.y = yaw; bg.updateMatrix();
     const cy = Math.cos(-yaw), sy = Math.sin(-yaw), toB = (x, z) => [x * cy + z * sy, -x * sy + z * cy];
     const T = (x, z, a) => { const [bx, bz] = toB(x, z); return { x: bx, z: bz, ry: a - yaw }; };
     const b = new Batcher({ vertexColors: true, castShadow: false });
@@ -153,7 +153,7 @@ export function create(parent, table) {
     // each player's cards: a fan of backs in front of their chair (one lifted while they pick a card to show)
     for (let i = 0; i < n; i++) {
       const chair = order[i], a = dirOf(chair), cnt = (v.counts || [])[i] || 0;
-      const r = Math.max(S * 0.5 + 0.05, Math.min(edgeOf(chair) - 0.07, S * 0.5 + 0.16)), cx = Math.sin(a) * r, cz = Math.cos(a) * r;
+      const r = clearR(S, yaw, a, 0.07, 0.03, S * 0.5 + 0.05, Math.max(S * 0.5 + 0.05, edgeOf(chair) - 0.04)), cx = Math.sin(a) * r, cz = Math.cos(a) * r;
       const picking = v.pending && v.pending.by === i && v.stage === 'show';
       const p = T(cx, cz, a);
       b.add(GEO.cyl12, SEAT_COLORS[chair % 8], { x: p.x, y: 0.002, z: p.z, sx: 0.03, sy: 0.004, sz: 0.018, ry: p.ry });

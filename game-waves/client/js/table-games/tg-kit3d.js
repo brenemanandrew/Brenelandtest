@@ -21,6 +21,44 @@ export function tableBase(parent, table, name, { min = 0.22, max = 0.5, k = 1.15
   return { root, S, dirOf, edgeOf };
 }
 
+// which way the board turns: its bottom edge toward the first player; on a long (rectangular) top, squared to the top's sides
+export function boardYaw(table, dirOf, order) {
+  const want = order && order.length ? dirOf(order[0]) : 0;
+  if (!table.edge) return want;
+  let lo = Infinity, hi = 0, best = 0;
+  for (let i = 0; i < 64; i++) { const a = i / 64 * Math.PI, e = table.edge(a); if (e < lo) { lo = e; best = a; } if (e > hi) hi = e; }
+  if (hi / lo < 1.05) return want;
+  let y = best, d = Infinity;
+  for (let k = 0; k < 4; k++) { const a = best + k * Math.PI / 2, dd = Math.abs(Math.atan2(Math.sin(a - want), Math.cos(a - want))); if (dd < d) { d = dd; y = a; } }
+  return y;
+}
+// a spot beside the board (on a side, not a corner) away from every player's chair: the angle
+export function sideSpot(yaw, dirOf, order) {
+  let best = yaw + Math.PI / 2, far = -1;
+  for (let k = 0; k < 4; k++) {
+    const a = yaw + k * Math.PI / 2 + 0.35;
+    const near = Math.min(...(order || []).map(c => Math.abs(Math.atan2(Math.sin(dirOf(c) - a), Math.cos(dirOf(c) - a)))), 9);
+    if (near > far) { far = near; best = a; }
+  }
+  return best;
+}
+
+// how far out along angle a a thing half-long hl (across a) and half-deep hd must sit to clear the board square (side S,
+// turned by yaw), starting at r0, never past rMax
+export function clearR(S, yaw, a, hl, hd, r0, rMax) {
+  const lim = S / 2 + 0.022, c = Math.cos(-yaw), s = Math.sin(-yaw);
+  const inside = r => {
+    for (const u of [-hl, 0, hl]) for (const w of [-hd, hd]) {
+      const x = Math.sin(a) * (r + w) + Math.cos(a) * u, z = Math.cos(a) * (r + w) - Math.sin(a) * u;
+      const bx = x * c + z * s, bz = -x * s + z * c;
+      if (Math.abs(bx) < lim && Math.abs(bz) < lim) return true;
+    }
+    return false;
+  };
+  let r = r0; while (r < rMax && inside(r)) r += 0.005;
+  return Math.min(r, Math.max(r0, rMax));
+}
+
 // a canvas texture on a toon material (redrawn by the caller; call .dirty() after drawing)
 export function canvasMat(w, h, { alpha = false } = {}) {
   const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
