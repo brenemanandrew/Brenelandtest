@@ -59,6 +59,9 @@ open(p, 'w').write(s)
 
 # ---- shared loader for the other refresh models (one module, top-level await, so builders can use them synchronously)
 SWAP = ['raised_bed', 'lettuce', 'carrots', 'strawberries', 'tomatoes', 'pumpkins', 'sunflower', 'hedge_box', 'shore_rock', 'scarecrow', 'water_butt', 'watering_can', 'wheelbarrow', 'mailbox', 'picket_fence', 'potting_shed']   # rose_arch: Meshy made a brown gate with doors, the garden's arch is white and open: redo first
+TEXTURED = ['potting_shed']   # drawn with their painted texture (own mesh, one draw call): the vertex-colour bake smeared them (Andrew)
+os.makedirs(os.path.join(OUT, 'models/refresh/tex'), exist_ok=True)
+for k in TEXTURED: shutil.copy(os.path.join(WR, 'models/converted/tex', k + '.glb'), os.path.join(OUT, 'models/refresh/tex', k + '.glb'))
 for k in SWAP: shutil.copy(os.path.join(WR, 'models/converted/vc', k + '.glb'), os.path.join(OUT, 'models/refresh', k + '.glb'))
 open(os.path.join(OUT, 'js/refresh-models.js'), 'w').write("""// world-refresh test: converted Meshy models for the props that are swapped (see world-refresh/tools/make_testgame.py).
 // ?oldworld (or ?oldtrees) turns every swap off; a model that fails to load leaves the old code-made prop in place.
@@ -78,10 +81,20 @@ if (!q.has('oldworld') && !q.has('oldtrees')) {
     } catch (e) { console.warn('refresh model failed, keeping the code prop', k, e); }
   }));
 }
+export const RT = {};   // textured models (their own mesh, the painted texture kept)
+if (!q.has('oldworld') && !q.has('oldtrees')) {
+  const ld = new GLTFLoader(), { GRADIENT_3 } = await import('./toon.js');
+  await Promise.all(TEXLIST.map(async k => { try { const gl = await ld.loadAsync('/models/refresh/tex/' + k + '.glb'); let m = null; gl.scene.traverse(o => { if (o.isMesh && !m) m = o; });
+    RT[k] = new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3 }); RT[k].userData.geo = m.geometry; RM[k] = RM[k] || m.geometry; } catch (e) { console.warn('refresh textured model failed', k, e); } }));
+}
+export function rmesh(parent, k, x, y, z, { s = 1, ry = 0 } = {}) {
+  if (!RT[k]) return null; const m = new THREE.Mesh(RT[k].userData.geo, RT[k]); m.position.set(x, y, z); m.rotation.y = ry; m.scale.setScalar(s);
+  m.castShadow = m.receiveShadow = true; m.userData.noMerge = true; parent.add(m); return m;
+}
 // add a model to a batcher: x, y = ground under its centre, z; s or sx/sy/sz scale; ry yaw
 export function rput(b, k, x, y, z, { s = 1, sx, sy, sz, ry = 0 } = {}) { if (RM[k]) b.add(RM[k], '#ffffff', { x, y, z, ry, sx: sx ?? s, sy: sy ?? s, sz: sz ?? s }); }
-""" % json.dumps(SWAP))
-IMP = "import { RM, MUTE, rput } from './refresh-models.js';\n"
+""".replace('%s', json.dumps(SWAP), 1).replace('TEXLIST', json.dumps(TEXTURED)))
+IMP = "import { RM, RT, MUTE, rput, rmesh } from './refresh-models.js';\n"
 def patch(fn, pairs):
     p = os.path.join(OUT, 'js', fn); t = open(p).read()
     for a, b in pairs:
@@ -144,7 +157,7 @@ a = "    const seg = (t0, t1) => { const u0 = a[0] + (c[0] - a[0]) * t0, v0 = a[
 assert t.count(a) == 1, 'fence seg'
 t = t.replace(a, a.replace("for (const y of [0.22, 0.52]) put(", "if (RM.picket_fence) { const m = Math.max(1, Math.round(l / 1.9)); for (let q = 0; q < m; q++) { const f = (q + 0.5) / m, [fx, fz] = W(u0 + (u1 - u0) * f, v0 + (v1 - v0) * f); rput(b, 'picket_fence', fx, H(fx, fz) - 0.02, fz, { sx: l / m / 1.9, ry: yaw - Math.PI / 2 }); } } else for (const y of [0.22, 0.52]) put("), 1)
 t = section(t, "    put(GEO.box, '#7aa6c8', s.u, 1.05, s.v, { sx: s.w, sy: 2.1, sz: s.d });", "    box(u0, u1, v0, v1);",
-  ("RM.potting_shed", "{ const s = PLAN.shed, [hx, hz] = W(s.u, s.v); rput(b, 'potting_shed', hx, H(hx, hz) - 0.02, hz); }"))
+  ("RM.potting_shed || RT.potting_shed", "{ const s = PLAN.shed, [hx, hz] = W(s.u, s.v); if (!rmesh(group, 'potting_shed', hx, H(hx, hz) - 0.02, hz)) rput(b, 'potting_shed', hx, H(hx, hz) - 0.02, hz); }"))
 open(os.path.join(OUT, 'js/garden-build.js'), 'w').write(IMP + t)
 # hedges
 patch('lawn.js', [("      b.add(GEO.box, col, { x, y: y + h / 2, z: zc, sx: L - 0.07, sy: h, sz: d });",
