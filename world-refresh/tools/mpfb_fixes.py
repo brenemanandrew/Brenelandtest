@@ -934,3 +934,81 @@ def tuck_blouse(M, blouse_sw, skirt_sw):
     d = P[sel][:, [0, 2]] - [0, cz]; r = np.linalg.norm(d, axis=1, keepdims=True); k = np.maximum(0, r - 0.008) / np.maximum(r, 1e-6)
     P[sel, 0] = d[:, 0] * k[:, 0]; P[sel, 2] = cz + d[:, 1] * k[:, 0]
     M['pos'] = P.ravel().astype(np.float32); return len(sel)
+
+def _swatches(M):
+    UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    return np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+
+def _add(M, V, F, N, uv, near):
+    SI = M['si'].reshape(-1, 4); SWt = M['sw'].reshape(-1, 4); n0 = M['verts']
+    M['pos'] = np.concatenate([M['pos'], V.ravel()]).astype(np.float32); M['nor'] = np.concatenate([M['nor'], N.ravel()]).astype(np.float32)
+    M['uv'] = np.concatenate([M['uv'], np.tile(uv, (len(V), 1)).ravel()]).astype(np.float32); M['fuv'] = np.concatenate([M['fuv'], np.zeros(len(V) * 2, np.float32)])
+    M['si'] = np.concatenate([M['si'], SI[near].ravel()]); M['sw'] = np.concatenate([M['sw'], SWt[near].ravel()])
+    M['ink'] = np.concatenate([M['ink'], np.round(N.ravel() * 0.002 * 100000).astype(np.int16)])
+    Fa = (F + n0).ravel().astype(M['groups'][''].dtype)
+    M['groups'][''] = np.concatenate([M['groups'][''], Fa]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, Fa.dtype)), Fa])
+    M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+
+def _drop(M, bad):
+    for grp in (M['groups'], M['inkGroups']):
+        for g in list(grp.keys()):
+            t = grp[g].reshape(-1, 3).astype(np.int64)
+            if len(t): grp[g] = t[~bad(t)].ravel().astype(grp[g].dtype)
+
+def crop_top(M, J, top_sw, shorts_sw, skin_sw, navel_uv, yc=0.80, yshorts=0.685):
+    """Zoe's evening top tied up at her midriff (Andrew): the tank cut straight above her navel with a knot at the front, her shorts
+    sitting lower on her hips, and a belly button."""
+    P = M['pos'].reshape(-1, 3); sw = _swatches(M)
+    for col, y0, keep_above in ((top_sw, yc, True), (shorts_sw, yshorts, False)):
+        m = sw == col
+        _drop(M, lambda t, m=m, y0=y0, ka=keep_above: m[t].all(1) & ((P[t].mean(1)[:, 1] < y0) if ka else (P[t].mean(1)[:, 1] > y0)))
+        idx = np.where(m)[0]
+        if keep_above: P[idx, 1] = np.maximum(P[idx, 1], y0)
+        else: P[idx, 1] = np.minimum(P[idx, 1], y0)
+    M['pos'] = P.ravel().astype(np.float32)
+    names = [b['name'] for b in J['bones']]; dom = _dominant(M)
+    skin = np.where(sw == skin_sw)[0]; S = P[skin]
+    # the knot: a squashed ball and two short tails at the front of the hem, a little to one side
+    front = S[(np.abs(S[:, 0]) < 0.03) & (np.abs(S[:, 1] - yc) < 0.02)]
+    zf = front[:, 2].max() + 0.02 if len(front) else 0.12
+    th = np.linspace(0, np.pi, 8); ph = np.linspace(0, 2 * np.pi, 12, endpoint=False); TH, PH = np.meshgrid(th, ph, indexing='ij')
+    U = np.stack([np.sin(TH) * np.cos(PH), np.cos(TH), np.sin(TH) * np.sin(PH)], -1).reshape(-1, 3)
+    F = []
+    for j in range(7):
+        for i in range(12): a, b = j * 12 + i, j * 12 + (i + 1) % 12; F += [(a, a + 12, b + 12), (a, b + 12, b)]
+    F = np.array(F); parts = []
+    for c, r in (((0.035, yc + 0.005, zf), (0.024, 0.018, 0.016)), ((0.025, yc - 0.022, zf - 0.004), (0.012, 0.022, 0.008)), ((0.05, yc - 0.018, zf - 0.006), (0.011, 0.02, 0.008))):
+        parts.append((U * r + c, U))
+    tuv = M['uv'].reshape(-1, 2)[np.where(sw == top_sw)[0][0]]
+    sp = names.index('spine_02')
+    for V, N in parts:
+        near = skin[np.argmin(((V[:, None, :] - S[None, :, :]) ** 2).sum(2), 1)]
+        _add(M, V.astype(np.float32), F, N.astype(np.float32), tuv, near)
+    # the belly button: a small dark oval on her skin
+    P = M['pos'].reshape(-1, 3); ny = 0.74
+    T = M['groups'][''].reshape(-1, 3).astype(np.int64); sk = np.zeros(len(P), bool); sk[skin] = True
+    ST = T[sk[T].all(1) & (np.abs(P[T].mean(1)[:, 1] - ny) < 0.06) & (np.abs(P[T].mean(1)[:, 0]) < 0.06)]
+    if len(ST):
+        t = _raycast(np.array([[0, ny, 0.5]]), np.array([[0, 0, -1.0]]), P[ST[:, 0]], P[ST[:, 1]], P[ST[:, 2]])[0]
+        if not np.isnan(t):
+            zc = 0.5 - t + 0.0015; a = np.linspace(0, 2 * np.pi, 12, endpoint=False)
+            V = np.vstack([[0, ny, zc], np.stack([np.cos(a) * 0.004, ny + np.sin(a) * 0.006, np.full(12, zc)], 1)]).astype(np.float32)
+            Fb = np.array([(0, 1 + i, 1 + (i + 1) % 12) for i in range(12)]); Fb = np.vstack([Fb, Fb[:, [0, 2, 1]]])
+            near = skin[np.argmin(((V[:, None, :] - S[None, :, :]) ** 2).sum(2), 1)]
+            _add(M, V, Fb, np.tile([0, 0, 1.0], (len(V), 1)).astype(np.float32), navel_uv, near)
+    return True
+
+def short_sleeves(M, J, top_sw, frac=0.55):
+    """Asha's evening top with short sleeves (Andrew): each sleeve is cut a little past half way down the upper arm, along the arm's
+    own line (the points past it drawn back onto it), so the cuff is clean; her arms are modelled underneath."""
+    P = M['pos'].reshape(-1, 3).copy(); sw = _swatches(M); W = bone_world(J)
+    top = np.where(sw == top_sw)[0]; cut = np.zeros(len(P), bool)
+    for side in ('l', 'r'):
+        sh, el = np.array(W['upperarm_' + side]), np.array(W['lowerarm_' + side]); ax = el - sh; ln = np.linalg.norm(ax); ax /= ln
+        names = [b['name'] for b in J['bones']]; dom = _dominant(M); armb = [names.index(x + side) for x in ('upperarm_', 'lowerarm_', 'hand_') if x + side in names]
+        i = top[(np.sign(P[top, 0]) == np.sign(sh[0])) & np.isin(dom[top], armb)]   # (the sleeve only: points that follow the arm)
+        t = (P[i] - sh) @ ax / ln; beyond = i[t > frac]; cut[beyond] = True
+        tb = (P[beyond] - sh) @ ax / ln; P[beyond] -= ((tb - frac) * ln)[:, None] * ax
+    T = M['groups'][''].reshape(-1, 3).astype(np.int64)
+    _drop(M, lambda t: cut[t].all(1))
+    M['pos'] = P.ravel().astype(np.float32); return int(cut.sum())

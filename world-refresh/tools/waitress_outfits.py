@@ -97,7 +97,10 @@ def edit(M, Mn_unused, plan, J, bones, ink_w, detail):
     tris = M['groups'][''].reshape(-1, 3).astype(np.int64); ink_t = M['inkGroups'].get('', np.zeros(0, np.uint16)).reshape(-1, 3).astype(np.int64)
     if plan.get('hide') is not None:   # triangles of the trousers below the hem go: the legs under them show
         hv = plan['hide'](P, sw); keep = ~hv[tris].any(1); tris = tris[keep]; ink_t = ink_t[~hv[ink_t].all(1)]
-    sk = plan['skirt']; cloth = sk['cloth'](P, sw)
+    sk = plan['skirt']
+    if sk is None:
+        M['uv'] = UV.ravel().astype(np.float32); M['groups'][''] = tris.ravel().astype(M['groups'][''].dtype); M['inkGroups'][''] = ink_t.ravel().astype(M['groups'][''].dtype); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3; return
+    cloth = sk['cloth'](P, sw)
     V, N, SUV, SI, W, INK, F, OT = build_skirt(M, np.where(cloth)[0], sk['top'], sk['hem'], sk['flare'], detail[0], detail[1], sk['uv'], bones, ink_w)
     M['pos'] = np.concatenate([M['pos'], V.ravel()]).astype(np.float32)
     M['nor'] = np.concatenate([M['nor'], N.ravel()]).astype(np.float32)
@@ -148,6 +151,7 @@ for who in ('zoe', 'asha'):
             plan = {'uv': [(lambda P, s, sh=shorts: s == sh, np.array(sw_uv(k_black), np.float32))],   # the shorts black, under the skirt
                     'hide': None,
                     'skirt': {'cloth': lambda P, s, sh=shorts: s == sh, 'top': 0.72, 'hem': 0.40, 'flare': 0.07, 'uv': lambda t: region_uv(SKIRTN, t)}}
+            if who == 'zoe': plan = {'uv': [], 'hide': None, 'skirt': None}   # (Zoe: her navy shorts, no skirt; her top tied up below)
         else:
             shirt = pal['#b8262b']; pants = pal['#1f1d22']; shoe_c = '#141217'; shoe = pal[shoe_c]
             k_white, im = add_swatch(J, im, '#f4f1ea'); k_red, im = add_swatch(J, im, '#c7392f')
@@ -172,6 +176,12 @@ for who in ('zoe', 'asha'):
         if HEADS:   # (new heads: off until Andrew picks a direction; HEADS=1 turns the anime_head.py try on)
             mm = anime_head.apply(M, J, who, swf); anime_head.apply(L, J, who, swf); im = imref[0]
             pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
+        if when == 'night' and who == 'zoe':   # her top tied at the midriff, shorts low on the hips, a belly button
+            pz = {v: int(k2) for k2, v in J['palette'].items()}; k_nav, im = add_swatch(J, im, '#b07c66'); nuv = np.array(sw_uv(k_nav), np.float32)
+            for D in (M, L): mpfb_fixes.crop_top(D, J, pz['#33603f'], pz['#28335c'], 4, nuv)
+        if when == 'night' and who == 'asha':   # short sleeves
+            pz = {v: int(k2) for k2, v in J['palette'].items()}
+            for D in (M, L): mpfb_fixes.short_sleeves(D, J, pz['#2f5a3a'])
         if when == 'night':   # high heels, the feet part of them; the game lifts her by the new lowest point
             wp = mpfb_fixes.bone_world(J); bu = np.array(sw_uv(k_black), np.float32)
             sh = pal['#17151a']
