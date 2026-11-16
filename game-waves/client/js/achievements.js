@@ -205,6 +205,73 @@ export const ICONS = {
     g.fillStyle = DARK; g.fillRect(-r * 0.07, r * 0.2, r * 0.14, r * 0.22);
     g.fillStyle = ink; g.beginPath(); g.moveTo(-r * 0.24, -r * 0.16); g.lineTo(-r * 0.26, -r * 0.44); g.lineTo(-r * 0.12, -r * 0.3); g.lineTo(0, -r * 0.48); g.lineTo(r * 0.12, -r * 0.3); g.lineTo(r * 0.26, -r * 0.44); g.lineTo(r * 0.24, -r * 0.16); g.closePath(); g.fill();
   },
+  // ---- Wave 13: Hearthfield, Pillow Forts
+  // a wide hall with two chimneys and a big door
+  'hf-hall'(g, r, ink) {
+    g.fillStyle = ink; g.fillRect(-r * 0.3, -r * 0.42, r * 0.1, r * 0.2); g.fillRect(r * 0.2, -r * 0.42, r * 0.1, r * 0.2); // the chimneys
+    g.beginPath(); g.moveTo(-r * 0.46, -r * 0.04); g.lineTo(0, -r * 0.36); g.lineTo(r * 0.46, -r * 0.04); g.closePath(); g.fill();
+    g.fillStyle = CREAM; g.fillRect(-r * 0.38, -r * 0.04, r * 0.76, r * 0.44);
+    g.fillStyle = ink; g.beginPath(); g.moveTo(-r * 0.09, r * 0.4); g.lineTo(-r * 0.09, r * 0.16); g.arc(0, r * 0.16, r * 0.09, Math.PI, 0); g.lineTo(r * 0.09, r * 0.4); g.closePath(); g.fill();
+    g.fillStyle = DARK; g.fillRect(-r * 0.3, r * 0.06, r * 0.13, r * 0.12); g.fillRect(r * 0.17, r * 0.06, r * 0.13, r * 0.12);
+  },
+  // a winding lane with a little flag at its end
+  'hf-parade'(g, r, ink) {
+    line(g, r * 0.14, ink); g.beginPath(); g.moveTo(-r * 0.42, r * 0.38); g.quadraticCurveTo(-r * 0.36, -r * 0.02, 0, r * 0.06); g.quadraticCurveTo(r * 0.3, r * 0.12, r * 0.22, -r * 0.18); g.stroke();
+    line(g, r * 0.04, DARK); g.setLineDash([r * 0.06, r * 0.07]); g.beginPath(); g.moveTo(-r * 0.42, r * 0.38); g.quadraticCurveTo(-r * 0.36, -r * 0.02, 0, r * 0.06); g.quadraticCurveTo(r * 0.3, r * 0.12, r * 0.22, -r * 0.18); g.stroke(); g.setLineDash([]);
+    line(g, r * 0.05, CREAM); g.beginPath(); g.moveTo(r * 0.22, -r * 0.16); g.lineTo(r * 0.22, -r * 0.5); g.stroke();
+    g.fillStyle = CREAM; g.beginPath(); g.moveTo(r * 0.24, -r * 0.5); g.lineTo(r * 0.46, -r * 0.42); g.lineTo(r * 0.24, -r * 0.34); g.closePath(); g.fill();
+  },
+  // Rascal the raccoon's face: round ears, the mask, a shiny nose
+  'hf-raccoon'(g, r, ink) {
+    g.fillStyle = ink; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * r * 0.28, -r * 0.28, r * 0.13, 0, Math.PI * 2); g.fill(); }
+    g.beginPath(); g.ellipse(0, r * 0.02, r * 0.4, r * 0.34, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = DARK; g.beginPath(); g.ellipse(0, -r * 0.04, r * 0.34, r * 0.11, 0, 0, Math.PI * 2); g.fill(); // the mask
+    g.fillStyle = CREAM; for (const s of [-1, 1]) { g.beginPath(); g.arc(s * r * 0.14, -r * 0.05, r * 0.05, 0, Math.PI * 2); g.fill(); }
+    g.beginPath(); g.ellipse(0, r * 0.2, r * 0.15, r * 0.1, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = DARK; g.beginPath(); g.arc(0, r * 0.16, r * 0.05, 0, Math.PI * 2); g.fill();
+  },
+  // a basket with five harvest cards fanned up out of it
+  'hf-basket'(g, r, ink) {
+    for (let i = 0; i < 5; i++) {
+      g.save(); g.translate(0, r * 0.12); g.rotate((i - 2) * 0.36); g.translate(0, -r * 0.3);
+      g.fillStyle = CREAM; g.strokeStyle = DARK; g.lineWidth = r * 0.03; g.beginPath(); g.roundRect(-r * 0.09, -r * 0.14, r * 0.18, r * 0.28, r * 0.03); g.fill(); g.stroke();
+      g.fillStyle = ink; g.beginPath(); g.arc(0, -r * 0.03, r * 0.045, 0, Math.PI * 2); g.fill();
+      g.restore();
+    }
+    g.fillStyle = ink; g.beginPath(); g.moveTo(-r * 0.44, -r * 0.02); g.lineTo(r * 0.44, -r * 0.02); g.lineTo(r * 0.32, r * 0.4); g.lineTo(-r * 0.32, r * 0.4); g.closePath(); g.fill();
+    line(g, r * 0.04, DARK); for (const y of [0.12, 0.26]) { g.beginPath(); g.moveTo(-r * 0.38, y * r); g.lineTo(r * 0.38, y * r); g.stroke(); }
+  },
+  // a flag planted on a pillow (a whole region claimed)
+  'pf-flag'(g, r, ink) {
+    g.fillStyle = CREAM; g.beginPath(); g.ellipse(0, r * 0.28, r * 0.42, r * 0.16, 0, 0, Math.PI * 2); g.fill();
+    line(g, r * 0.03, DARK); g.beginPath(); g.ellipse(0, r * 0.28, r * 0.3, r * 0.09, 0, 0, Math.PI * 2); g.stroke();
+    line(g, r * 0.06, CREAM); g.beginPath(); g.moveTo(-r * 0.1, r * 0.22); g.lineTo(-r * 0.1, -r * 0.46); g.stroke();
+    g.fillStyle = ink; g.beginPath(); g.moveTo(-r * 0.07, -r * 0.46); g.quadraticCurveTo(r * 0.14, -r * 0.52, r * 0.36, -r * 0.4); g.quadraticCurveTo(r * 0.2, -r * 0.28, r * 0.36, -r * 0.14); g.quadraticCurveTo(r * 0.14, -r * 0.24, -r * 0.07, -r * 0.16); g.closePath(); g.fill();
+  },
+  // a pillow flopped flat, with little swirls round it
+  'pf-flop'(g, r, ink) {
+    g.save(); g.rotate(-0.2);
+    g.fillStyle = ink; g.beginPath(); g.moveTo(-r * 0.38, r * 0.04); g.quadraticCurveTo(0, -r * 0.08, r * 0.38, r * 0.04); g.quadraticCurveTo(r * 0.46, r * 0.18, r * 0.38, r * 0.32); g.quadraticCurveTo(0, r * 0.4, -r * 0.38, r * 0.32); g.quadraticCurveTo(-r * 0.46, r * 0.18, -r * 0.38, r * 0.04); g.fill();
+    line(g, r * 0.03, DARK); g.beginPath(); g.moveTo(-r * 0.28, r * 0.18); g.quadraticCurveTo(0, r * 0.12, r * 0.28, r * 0.18); g.stroke();
+    g.restore();
+    line(g, r * 0.05, CREAM); for (const [x, y, a] of [[-0.24, -0.3, 0], [0.04, -0.4, 1], [0.3, -0.26, 2]]) { g.beginPath(); g.arc(x * r, y * r, r * 0.07, a, a + Math.PI * 1.4); g.stroke(); }
+  },
+  // one small pillow facing a stack of three big ones
+  'pf-pillow'(g, r, ink) {
+    const pil = (x, y, w, h, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(x - w, y - h); g.quadraticCurveTo(x, y - h * 0.5, x + w, y - h); g.quadraticCurveTo(x + w * 0.7, y, x + w, y + h); g.quadraticCurveTo(x, y + h * 0.5, x - w, y + h); g.quadraticCurveTo(x - w * 0.7, y, x - w, y - h); g.fill(); g.strokeStyle = DARK; g.lineWidth = r * 0.03; g.stroke(); };
+    for (let i = 0; i < 3; i++) pil(r * 0.22, r * (0.3 - i * 0.24), r * 0.2, r * 0.1, CREAM);
+    pil(-r * 0.24, r * 0.26, r * 0.18, r * 0.13, ink);
+    g.fillStyle = ink; g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r * 0.07 : r * 0.15; g.lineTo(-r * 0.24 + Math.cos(a) * q, -r * 0.1 + Math.sin(a) * q); } g.closePath(); g.fill();
+  },
+  // a pillow fort with battlements and a flag on top
+  'pf-fort'(g, r, ink) {
+    g.fillStyle = ink; g.fillRect(-r * 0.36, -r * 0.1, r * 0.72, r * 0.5);
+    for (let i = 0; i < 4; i++) g.fillRect(-r * 0.36 + i * r * 0.2, -r * 0.22, r * 0.12, r * 0.14);
+    g.fillStyle = DARK; g.beginPath(); g.moveTo(-r * 0.1, r * 0.4); g.lineTo(-r * 0.1, r * 0.18); g.arc(0, r * 0.18, r * 0.1, Math.PI, 0); g.lineTo(r * 0.1, r * 0.4); g.closePath(); g.fill();
+    line(g, r * 0.03, DARK); for (const y of [0.04, 0.14]) { g.beginPath(); g.moveTo(-r * 0.3, y * r); g.lineTo(-r * 0.16, y * r); g.moveTo(r * 0.16, y * r); g.lineTo(r * 0.3, y * r); g.stroke(); }
+    line(g, r * 0.04, CREAM); g.beginPath(); g.moveTo(0, -r * 0.1); g.lineTo(0, -r * 0.48); g.stroke();
+    g.fillStyle = CREAM; g.beginPath(); g.moveTo(r * 0.02, -r * 0.48); g.lineTo(r * 0.22, -r * 0.41); g.lineTo(r * 0.02, -r * 0.34); g.closePath(); g.fill();
+  },
 };
 // a medallion: brass ring, a dark face, the glyph (or a letter, or "?" for a locked secret)
 export function paintIcon(g, size, def, earned) {

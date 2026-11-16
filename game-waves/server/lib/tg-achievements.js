@@ -8,6 +8,8 @@
 //   Word Weave: a Full Weave, a single word worth 50+, a Triple Word square, going out with your last tile.
 //   The Missing Pie: solving it, solving it by round 6, an ask nobody could answer.
 //   Town Tycoon: a full colour pair, a shop, a rent of B500+ paid to you, last one standing in a full game.
+//   Hearthfield: a first hall, the Grand Parade badge, the Critter Keeper badge, 5+ cards from one roll.
+//   Pillow Forts: taking the last area of a region, flopping a crew out, a win with 1 pillow against 3+, last crew in a full game.
 'use strict';
 
 const ACHS = [
@@ -32,12 +34,24 @@ const ACHS = [
   { id: 'tt-shop', title: 'Open for Business', line: 'Built a shop on a street in Town Tycoon.', icon: 'tt-shop', color: '#ffd34d' },
   { id: 'tt-big-rent', title: 'Rent Day', line: 'Collected a rent of B500 or more in Town Tycoon.', icon: 'tt-coins', color: '#e3aa45' },
   { id: 'tt-last', title: 'Last One Standing', line: 'Won a full game of Town Tycoon as the last player left.', icon: 'tt-crown', color: '#3f6fd9' },
+  // Hearthfield
+  { id: 'hf-hall', title: 'Grand Hall', line: 'Grew a cottage into a hall in Hearthfield.', icon: 'hf-hall', color: '#e0863c' },
+  { id: 'hf-parade', title: 'Lead the Parade', line: 'Won the Grand Parade badge for the longest lane in Hearthfield.', icon: 'hf-parade', color: '#ffd34d' },
+  { id: 'hf-keeper', title: 'Critter Keeper', line: 'Won the Critter Keeper badge by shooing Rascal the raccoon in Hearthfield.', icon: 'hf-raccoon', color: '#9aa7b8' },
+  { id: 'hf-harvest', title: 'Bumper Harvest', line: 'Gathered 5 or more cards from a single roll in Hearthfield.', icon: 'hf-basket', color: '#7ddc7a' },
+  // Pillow Forts
+  { id: 'pf-region', title: 'The Whole Floor', line: 'Claimed every area of a region in Pillow Forts.', icon: 'pf-flag', color: '#b9d8f6' },
+  { id: 'pf-flop', title: 'Flopped Out', line: 'Took the very last area of another crew in Pillow Forts.', icon: 'pf-flop', color: '#ff8fb8' },
+  { id: 'pf-underdog', title: 'Little Pillow, Big Win', line: 'Won a pillow fight in Pillow Forts with 1 pillow against 3 or more.', icon: 'pf-pillow', color: '#b98cf0' },
+  { id: 'pf-last', title: 'Last Fort Standing', line: 'Won a full game of Pillow Forts as the last crew left.', icon: 'pf-fort', color: '#e0463c' },
 ];
 
 const WW_BIG = 50;     // one word's points (bonus squares in, the Full Weave bonus out)
 const MP_QUICK = 6;    // solved on or before this round
 const TT_RENT = 500;   // one rent payment
 const TT_SHOP = 5;     // a street's building level: 1-4 cottages, 5 a shop
+const HF_HARVEST = 5; // cards one seat gets from one roll (a hall gives 2)
+const PF_DEF = 3;     // the underdog win: 1 pillow thrown against this many defenders or more
 // Town Tycoon's colour pairs (board spaces). Keep in step with town-tycoon.js GROUP_SPACES (the test checks it).
 const TT_PAIRS = [[1, 3], [4, 6], [8, 10], [12, 13], [15, 17], [18, 20], [22, 23], [26, 27]];
 
@@ -76,6 +90,8 @@ function register(api) {
     const P = people(T);
     if (!P.size) { if (tt && list.some(b => kindOf(b) === 'gameOver')) T._achTT = null; return; }
     const mt = T.game === 'mexican-train', ww = T.game === 'word-weave', mp = T.game === 'missing-pie';
+    const hf = T.game === 'hearthfield', pf = T.game === 'pillow-forts';
+    const full = !!(T.settings && T.settings.length === 'full');
     for (let i = 0; i < list.length; i++) {
       const b = list[i], k = kindOf(b);
       // out on a double: the place of a double and the out, the same seat, one after the other
@@ -102,6 +118,18 @@ function register(api) {
         }
         if (k === 'rent' && Number.isFinite(b.amount) && b.amount >= TT_RENT && P.has(b.owner)) grant(P.get(b.owner), 'tt-big-rent');
         if (k === 'gameOver' && b.why === 'last' && T.settings && T.settings.length === 'full' && Array.isArray(b.winners)) for (const s of b.winners) if (P.has(s)) grant(P.get(s), 'tt-last');
+      }
+      if (hf) {
+        if (k === 'build' && b.what === 'hall' && P.has(b.seat)) grant(P.get(b.seat), 'hf-hall');
+        if (k === 'badge' && P.has(b.seat)) { if (b.badge === 'parade') grant(P.get(b.seat), 'hf-parade'); else if (b.badge === 'keeper') grant(P.get(b.seat), 'hf-keeper'); }
+        if (k === 'produce' && Array.isArray(b.gains)) b.gains.forEach((g, s) => { if (Array.isArray(g) && g.reduce((x, y) => x + (Number(y) || 0), 0) >= HF_HARVEST && P.has(s)) grant(P.get(s), 'hf-harvest'); });
+      }
+      if (pf) {
+        if (k === 'region' && P.has(b.seat)) grant(P.get(b.seat), 'pf-region');
+        if (k === 'flop' && P.has(b.by)) grant(P.get(b.by), 'pf-flop');
+        // the area started with (pillows left + lost) and keeps one at home, so 1 thrown means it started with 2; a won area lost them all
+        if (k === 'battle' && b.won === true && P.has(b.seat) && Array.isArray(b.left) && b.left[0] + b.aLost - 1 === 1 && b.dLost >= PF_DEF) grant(P.get(b.seat), 'pf-underdog');
+        if (k === 'gameOver' && b.why === 'last' && full && Array.isArray(b.winners)) for (const s of b.winners) if (P.has(s)) grant(P.get(s), 'pf-last');
       }
     }
     if (tt && list.some(b => kindOf(b) === 'gameOver')) T._achTT = null;

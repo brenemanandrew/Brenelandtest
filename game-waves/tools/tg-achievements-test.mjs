@@ -1,6 +1,6 @@
 // Table-games achievements test: loads server/lib/tg-achievements.js with a stand-in api (achievements.define / grant,
-// players, tableGames.on) and plays real bot games of Word Weave, The Missing Pie and Town Tycoon through it, plus a stub
-// Mexican Train beat run. Each game's grants are checked against an independent reading of the game (states and beats):
+// players, tableGames.on) and plays real bot games of Word Weave, The Missing Pie, Town Tycoon, Hearthfield and Pillow Forts
+// through it (plus a few Pillow Forts games started from a set-up position, for its rare moments), and a stub Mexican Train beat run. Each game's grants are checked against an independent reading of the game (states and beats):
 // every new achievement can be earned, only people (never bots) get them, each is granted once, the old ones still work.
 // Run: node game-waves/tools/tg-achievements-test.mjs
 import { createRequire } from 'module';
@@ -8,6 +8,8 @@ import WW from '../server/lib/table-games/word-weave.js';
 import { LAYOUT } from '../server/lib/table-games/word-weave-core.js';
 import MP from '../server/lib/table-games/missing-pie.js';
 import TT, { GROUP_SPACES } from '../server/lib/table-games/town-tycoon.js';
+import HF from '../server/lib/table-games/hearthfield.js';
+import PF, { REGION_AREAS as PF_REGIONS, ADJ as PF_ADJ } from '../server/lib/table-games/pillow-forts.js';
 
 const require = createRequire(import.meta.url);
 const { register, ACHS, TT_PAIRS } = require('../server/lib/tg-achievements.js');
@@ -43,7 +45,8 @@ const has = (sid, id) => !!(got.get(sid) && got.get(sid).has(id));
 const emit = (T, ev) => { for (const f of listeners) f(T, ev); };
 
 // ---- definitions
-const NEW = ['ww-full-weave', 'ww-big-word', 'ww-triple', 'ww-last-tile', 'mp-solved', 'mp-quick', 'mp-stumper', 'tt-pair', 'tt-shop', 'tt-big-rent', 'tt-last'];
+const NEW = ['ww-full-weave', 'ww-big-word', 'ww-triple', 'ww-last-tile', 'mp-solved', 'mp-quick', 'mp-stumper', 'tt-pair', 'tt-shop', 'tt-big-rent', 'tt-last',
+  'hf-hall', 'hf-parade', 'hf-keeper', 'hf-harvest', 'pf-region', 'pf-flop', 'pf-underdog', 'pf-last'];
 const OLD = ['tg-first-game', 'tg-first-win', 'tg-beat-hard', 'tg-full-table', 'mt-out-double', 'mt-zero', 'mt-full-ride'];
 for (const id of [...OLD, ...NEW]) ok(DEFS.has(id), 'defined: ' + id);
 ok(DEFS.size === OLD.length + NEW.length, 'no other achievements defined');
@@ -65,19 +68,20 @@ function table(game, kinds, settings) {
 
 // plays one game on table T through the same order of events as lib/table-games/index.js applyMove: finish (phase, result),
 // then { kind: 'beats' }, then { kind: 'result' }. The oracle(prev, next, beats, seat, add) reads each move independently.
-function playGame(G, T, levels, seed, oracle, turnOf) {
+function playGame(G, T, levels, seed, oracle, turnOf, opts = {}) {
   const n = T.order.length, R = rng32(seed);
   T.seed = seed; T.phase = 'play'; T.result = null;
-  let S = G.newGame({ players: T.order.map((c, k) => ({ name: 'P' + k, bot: levels[k], kind: T.seats[c].kind })), settings: T.settings, seed });
+  let S = opts.start || G.newGame({ players: T.order.map((c, k) => ({ name: 'P' + k, bot: levels[k], kind: T.seats[c].kind })), settings: T.settings, seed });
+  const forced = (opts.moves || []).slice();
   const want = new Map(); // engine seat -> Set(id) this game
   const add = (seat, id) => { if (!Number.isInteger(seat)) return; (want.get(seat) || want.set(seat, new Set()).get(seat)).add(id); };
   calls.length = 0;
   let steps = 0;
   while (S.phase !== 'over' && steps++ < 30000) {
     const seat = turnOf(S);
-    const m = G.bot(G.view(S, seat), levels[seat], R);
+    const m = forced.length ? forced.shift() : G.bot(G.view(S, seat), levels[seat], R);
     const r = G.apply(S, seat, m);
-    oracle(S, r.state, r.beats, seat, add, T);
+    oracle(S, r.state, r.beats, seat, add, T, m);
     S = r.state;
     const sc = G.score(S);
     if (sc.done) { T.phase = 'over'; T.result = { totals: sc.totals, winners: sc.winners, counted: !T.hadBot }; }
@@ -157,6 +161,80 @@ for (let g = 0; g < 3; g++) {
     const { want } = playGame(TT, T, levels, 500 + g * 50 + i, ttOracle, S => TT.view(S, null).turn);
     tally(T, want);
   }
+}
+
+// ---- Hearthfield
+const sumOf = a => a.reduce((x, y) => x + y, 0);
+const hfOracle = (prev, next, beats, seat, add) => {
+  for (let v = 0; v < next.hall.length; v++) if (next.hall[v] && !prev.hall[v]) add(next.own[v], 'hf-hall');
+  if (next.parade >= 0 && next.parade !== prev.parade) add(next.parade, 'hf-parade');
+  if (next.keeper >= 0 && next.keeper !== prev.keeper) add(next.keeper, 'hf-keeper');
+  // a roll that is not a raid only changes hands by what the fields pay
+  if (prev.stage === 'roll' && beats.some(b => b.kind === 'roll' && !b.raid)) for (let k = 0; k < next.n; k++) if (sumOf(next.hand[k]) - sumOf(prev.hand[k]) >= 5) add(k, 'hf-harvest');
+};
+const hfTurn = S => HF.view(S, null).turn;
+for (let i = 0; i < 90; i++) {
+  const n = 3 + (i % 2), kinds = Array.from({ length: n }, (_, k) => (k < 1 + (i % 3) ? 'human' : LV[(i + k) % 3]));
+  if (i % 10 === 9) kinds.fill('human');
+  const levels = kinds.map((k, j) => (k === 'human' ? LV[(i + j) % 3] : k));
+  const T = table('hearthfield', kinds, { length: ['quick', 'standard', 'long'][i % 3], board: i % 4 ? 'random' : 'starter', trades: i % 5 !== 0 });
+  const { want } = playGame(HF, T, levels, 700 + i, hfOracle, hfTurn);
+  tally(T, want);
+}
+
+// ---- Pillow Forts
+const pfOracle = (prev, next, beats, seat, add, T, m) => {
+  for (let g = 0; g < PF_REGIONS.length; g++) if (PF_REGIONS[g].every(i => next.owner[i] === seat) && !PF_REGIONS[g].every(i => prev.owner[i] === seat)) add(seat, 'pf-region');
+  for (let k = 0; k < next.n; k++) if (prev.alive[k] && !next.alive[k]) add(seat, 'pf-flop');
+  if (m && (m.type === 'roll' || m.type === 'blitz') && prev.pillows[m.from] === 2 && prev.pillows[m.to] >= 3 && next.owner[m.to] === seat) add(seat, 'pf-underdog');
+  if (next.phase === 'over' && T.settings.length === 'full' && next.alive.filter(Boolean).length === 1) add(next.alive.indexOf(true), 'pf-last');
+};
+const pfTurn = S => PF.view(S, null).turn;
+for (let i = 0; i < 50; i++) {
+  const n = 2 + (i % 5), kinds = Array.from({ length: n }, (_, k) => (k < 1 + (i % 2) ? 'human' : LV[(i + k) % 3]));
+  if (i % 10 === 9) kinds.fill('human');
+  const levels = kinds.map((k, j) => (k === 'human' ? LV[(i + j) % 3] : k));
+  const T = table('pillow-forts', kinds, { length: i % 3 === 2 ? 'full' : 'quick', cards: i % 4 !== 3 });
+  const { want } = playGame(PF, T, levels, 900 + i, pfOracle, pfTurn);
+  tally(T, want);
+}
+// set-up positions (real engine moves from there): a person's 2-pillow area next to 3+ defenders, and a crew down to its last area.
+// Both are rare in bot games, so the opening blitz is forced and the dice (the state's rng) picked to give the wanted fight.
+function pfSetup(settings, kinds, seed, fromP, toP, lastArea) {
+  const S = PF.newGame({ players: kinds.map((k, i) => ({ name: 'P' + i, bot: 'hard', kind: k })), settings, seed });
+  S.turn = 0; S.stage = 'attack'; S.left = 0; S.gained = false; S.adv = null;
+  let from = -1, to = -1;
+  for (let i = 0; i < S.owner.length && from < 0; i++) if (S.owner[i] === 0) for (const j of PF_ADJ[i]) if (S.owner[j] === 1) { from = i; to = j; break; }
+  if (lastArea) for (let i = 0; i < S.owner.length; i++) if (S.owner[i] >= 1 && i !== to) S.owner[i] = 0; // every other crew's area but the target goes to seat 0
+  S.pillows[from] = fromP; S.pillows[to] = toP;
+  if (lastArea) for (let k = 2; k < S.n; k++) { S.alive[k] = false; S.out.push(k); S.hands[0].push(...S.hands[k]); S.hands[k] = []; } // (the others flopped earlier)
+  return { S, from, to };
+}
+function pfForced(settings, kinds, fromP, toP, lastArea, wantWon) {
+  for (let seed = 1; seed < 4000; seed++) {
+    const { S, from, to } = pfSetup(settings, kinds, 4242, fromP, toP, lastArea);
+    if (from < 0) return null;
+    S.rng = seed >>> 0;
+    const m = { type: 'blitz', from, to }, r = PF.apply(S, 0, m);
+    if (r.state.owner[to] === 0 === wantWon) return { S, m };
+  }
+  return null;
+}
+for (const [label, settings, kinds, fromP, toP, lastArea, wantWon, expect] of [
+  ['underdog win', { length: 'quick', cards: true }, ['human', 'hard', 'easy'], 2, 3, false, true, 'pf-underdog'],
+  ['underdog loss', { length: 'quick', cards: true }, ['human', 'hard', 'easy'], 2, 3, false, false, null],
+  ['last crew, full', { length: 'full', cards: true }, ['human', 'hard'], 12, 1, true, true, 'pf-last'],
+  ['last crew, quick', { length: 'quick', cards: true }, ['human', 'hard'], 12, 1, true, true, null],
+  ['last crew, full, 3 crews', { length: 'full', cards: false }, ['human', 'normal', 'hard'], 12, 1, true, true, 'pf-last'],
+]) {
+  const f = pfForced(settings, kinds, fromP, toP, lastArea, wantWon);
+  ok(!!f, 'pillow forts set-up found: ' + label);
+  if (!f) continue;
+  const T = table('pillow-forts', kinds, settings);
+  const { want } = playGame(PF, T, kinds.map(k => (k === 'human' ? 'hard' : k)), 4242, pfOracle, pfTurn, { start: f.S, moves: [f.m] });
+  if (expect) ok(want.get(0) && want.get(0).has(expect) && has(T.seats[0].sid, expect), label + ': ' + expect + ' earned');
+  if (!expect) ok(!has(T.seats[0].sid, 'pf-underdog') && !has(T.seats[0].sid, 'pf-last'), label + ': nothing rare earned');
+  tally(T, want);
 }
 
 // ---- Mexican Train (stub beats, as mexican-train.js sends them) and the generic ones on it
