@@ -247,3 +247,58 @@ export function addCloth(ch, data, THREE, { skirtColor, top = 0.62 } = {}) {
     },
   };
 }
+
+/** Bust jiggle (Andrew): the bust follows the chest on a soft, under-damped spring (lags, bounces, settles) as she walks, turns or
+ * dances. How much is tied to the bust's size: her natural size (how far it stands off her breastbone) plus the Bust slider.
+ * Returns { step(dt, fwd), setSize(look) } (step after the character's own update). */
+export function addJiggle(ch, data, THREE, look) {
+  const g0 = data.geo[''], o = g0.userData.orig || g0.attributes.position.array;
+  const R = g0.userData.measure || (g0.userData.measure = measure(data, o, g0.attributes.skinIndex.array, g0.attributes.skinWeight.array));
+  const cs = R.bust.filter(Boolean); if (!cs.length) return null;
+  // natural size: the fullest point's distance in front of the breastbone at that height
+  let sternum = -9; const by = cs[0][1];
+  for (let i = 0; i < o.length / 3; i++) if (Math.abs(o[i * 3]) < 0.015 && Math.abs(o[i * 3 + 1] - by) < 0.02 && R.wHead[i] < 0.1) sternum = Math.max(sternum, o[i * 3 + 2]);
+  const natural = Math.max(0, Math.min(1, (cs[0][2] - sternum) / 0.06));
+  const mark = g => {
+    if (!g || g.attributes.aBust) return;
+    const p = g.userData.orig || g.attributes.position.array, n = p.length / 3, a = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let w = 0; const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2];
+      for (const c of cs) { const dx = x - c[0], dy = y - c[1]; if (z < c[2] - 0.08) continue; w = Math.max(w, Math.exp(-(dx * dx) / (2 * 0.06 * 0.06) - (dy * dy) / (2 * 0.065 * 0.065)) * Math.min(1, (z - (c[2] - 0.08)) / 0.06)); }
+      a[i] = w < 0.02 ? 0 : w; }
+    g.setAttribute('aBust', new THREE.BufferAttribute(a, 1));
+  };
+  mark(data.geo['']); mark(data.lod['']);
+  const U = { uJig: { value: new THREE.Vector3() } };
+  const patch = m => {
+    if (!m || m.userData.jig) return; m.userData.jig = true;
+    const prev = m.onBeforeCompile, key = m.customProgramCacheKey?.bind(m);
+    m.onBeforeCompile = (sh, r) => {
+      prev?.call(m, sh, r); Object.assign(sh.uniforms, U);
+      sh.vertexShader = 'attribute float aBust; uniform vec3 uJig;\n' + sh.vertexShader.replace('#include <skinning_vertex>', 'transformed += uJig * aBust;\n#include <skinning_vertex>');
+    };
+    m.customProgramCacheKey = () => 'jig-' + (key ? key() : ''); m.needsUpdate = true;
+  };
+  patch(ch.mat); patch(ch.matBoth);
+  for (const h of Object.values(ch.hulls || {})) { if (!h.material.userData.cloth) h.material = h.material.clone(); patch(h.material); }
+  const sp = ch.byName?.get('spine_03') || ch.byName?.get('spine_02'); if (!sp) return null;
+  const cur = new THREE.Vector3(), prev = new THREE.Vector3(), vel = new THREE.Vector3(), pvel = new THREE.Vector3(), off = new THREE.Vector3(), offV = new THREE.Vector3(), inv = new THREE.Matrix4();
+  let first = true, amp = 0;
+  const api = {
+    U, natural,
+    setSize(lk) { const s = 0.35 + natural * 0.65 + (lk?.shape?.bust || 0); amp = Math.max(0, Math.min(1.8, s)); },
+    step(dt, fwd = 0) {
+      if (!dt) return;
+      sp.getWorldPosition(cur); ch.root.updateMatrixWorld(); inv.copy(ch.root.matrixWorld).invert(); cur.applyMatrix4(inv);
+      if (first) { prev.copy(cur); first = false; }
+      vel.copy(cur).sub(prev).divideScalar(dt); prev.copy(cur); if (vel.length() > 4) vel.set(0, 0, 0);
+      vel.z += fwd;
+      // the chest's acceleration pushes the bust the other way; a soft spring (about 4 Hz) with light damping brings it back
+      const acc = vel.clone().sub(pvel).divideScalar(dt); pvel.copy(vel); acc.clampLength(0, 40);
+      const K = 600, D = 9;
+      offV.addScaledVector(acc, -0.05 * amp).addScaledVector(off, -K * dt).multiplyScalar(Math.exp(-D * dt));
+      off.addScaledVector(offV, dt); off.clampLength(0, 0.02 * amp + 1e-4);
+      U.uJig.value.set(off.x * 0.4, off.y, off.z * 0.6);
+    },
+  };
+  api.setSize(look); return api;
+}
