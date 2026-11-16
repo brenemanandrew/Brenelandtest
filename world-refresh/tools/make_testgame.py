@@ -501,6 +501,7 @@ open(p, 'w').write(t)
 # new hill, draped up it: the stone path climbs from the lawn to the portal under the rainbow, where the play prompt now is.
 # ?oldworld = the old rainbow arch on the flat lawn.
 shutil.copy(os.path.join(WR, 'models/06-unicorns/unicorns_base.glb'), os.path.join(OUT, 'models/refresh/unicorns_base.glb'))
+shutil.copy(os.path.join(WR, 'tools/unicorn-fx.js'), os.path.join(OUT, 'js/unicorn-fx.js'))
 p = os.path.join(OUT, 'js/terrain.js'); t = open(p).read()
 uni = """
 // world-refresh: the unicorns' hill, behind their table in the woods corner (the slot woods-corner, facing the house like the
@@ -528,9 +529,9 @@ t = t.replace(a, a + """  // world-refresh: the diorama, x7, its front 5.5 m beh
   const NOUNI = new URLSearchParams(location.search).has('oldworld');
   const US = 7, uf = Math.atan2(0 - x, -8 - z), uc = Math.cos(uf), us = Math.sin(uf), ucx = x - us * 11.3, ucz = z - uc * 11.3;
   const uw = (lx, lz) => [ucx + (lx * uc + lz * us) * US, ucz + (-lx * us + lz * uc) * US];
-  const uniPortal = uw(0.24, -0.4);
+  const uniPortal = uw(0.31, -0.46);
   if (!NOUNI) {
-    for (const [lx, lz, r] of [[-0.85, -0.33, 0.1], [0.88, -0.33, 0.1], [-0.72, -0.1, 0.14], [0.3, -0.66, 0.17], [0.5, -0.52, 0.08], [-0.42, -0.1, 0.06], [0.24, 0.47, 0.07], [0.7, 0.45, 0.13]]) { const [cx, cz] = uw(lx, lz); colliders.push({ type: 'circle', x: cx, z: cz, r: r * US }); }
+    for (const [lx, lz, r] of [[-0.85, -0.33, 0.1], [0.88, -0.33, 0.1], [-0.72, -0.1, 0.14], [0.3, -0.66, 0.17], [0.5, -0.52, 0.08], [-0.37, -0.235, 0.07], [0.245, 0.515, 0.07], [0.7, 0.45, 0.13]]) { const [cx, cz] = uw(lx, lz); colliders.push({ type: 'circle', x: cx, z: cz, r: r * US }); }
     (async () => {
       const [{ GLTFLoader }, { GRADIENT_3 }] = await Promise.all([import('../vendor/three/jsm/loaders/GLTFLoader.js'), import('./toon.js')]);
       const gl = await new GLTFLoader().loadAsync('/models/refresh/unicorns_base.glb'); let m = null; gl.scene.traverse(o => { if (o.isMesh && !m) m = o; });
@@ -549,6 +550,8 @@ t = t.replace(a, a + """  // world-refresh: the diorama, x7, its front 5.5 m beh
       P.needsUpdate = true; if (N) N.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
       const mesh = new THREE.Mesh(g, new THREE.MeshToonMaterial({ map: m.material.map, gradientMap: GRADIENT_3 }));
       mesh.name = 'unicorns-diorama'; mesh.castShadow = true; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false; group.add(mesh);
+      const { unicornFx } = await import('./unicorn-fx.js');   // the name on the rainbow, its magic, the portal's vortex, the mirrors
+      unicornFx({ group, updaters, L2W: uw, Y: (ly, wx, wz) => (ly - ymin - 0.025) * US + hAt(wx, wz), US, yaw: uf, ground: hAt });
     })().catch(e => console.warn('unicorns diorama failed', e));
   }
 """, 1)
