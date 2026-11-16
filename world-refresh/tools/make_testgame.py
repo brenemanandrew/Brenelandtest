@@ -626,3 +626,8 @@ t = t.replace(a, """      balloons: NOUNI ? balloons.map(bl => ({ x: bl.x, y: bl
 a = "  return {\n    tableR: 1.3,\n    far: lod, // its moving folk"
 assert t.count(a) == 1; t = t.replace(a, "  return {\n    tableR: NOUNI ? 1.3 : 0,\n    far: lod, // its moving folk", 1)
 open(p, 'w').write(t)
+
+# ---- the Summit Slice waitresses' uniforms (tools/waitress_outfits.py edits the baked MPFB characters): night = the green top and a
+# black skirt, day = red and cream stripes, a cream skirt with a red hem band, Asha's apron red, white sneakers
+import subprocess
+subprocess.run([sys.executable, os.path.join(WR, 'tools/waitress_outfits.py'), os.path.join(REPO, 'breneland-live/models/mpfb'), os.path.join(OUT, 'models/mpfb')], check=True)
