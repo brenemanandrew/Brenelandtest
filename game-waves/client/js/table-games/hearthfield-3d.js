@@ -46,7 +46,7 @@ function makeGeo(rows) {
 
 const UX = 13.6, UY = 6.8; // the printed meadow's extent in hex units (with the carts round it)
 export function create(parent, table) {
-  const { root, S, dirOf, edgeOf } = tableBase(parent, table, 'tg-hf', { min: 0.3, max: 0.62, k: 1.3 });
+  const { root, S, dirOf, edgeOf } = tableBase(parent, table, 'tg-hf', { min: 0.34, max: 0.7, k: 1.45 });
   const D = S * UY / UX, k = S / UX, TOP = 0.016;
   const board = canvasMat(1024, Math.round(1024 * UY / UX));
   const bg = new THREE.Group(); root.add(bg);
@@ -67,13 +67,13 @@ export function create(parent, table) {
       const c = v.carts[i], R = u * 0.36;
       g.beginPath(); g.arc(X(px), Y(py), R, 0, Math.PI * 2); g.fillStyle = c === 'any' ? CREAM : FILL[c]; g.fill(); g.lineWidth = u * 0.07; g.strokeStyle = INK; g.stroke();
       if (c === 'any') { g.fillStyle = INK; g.font = `700 ${Math.round(R)}px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('3:1', X(px), Y(py) + 1); }
-      else { const im = svgImg(SV(ART[c]), () => redraw()); if (im) g.drawImage(im, X(px) - R * 0.75, Y(py) - R * 0.75, R * 1.5, R * 1.5); }
+      else { const im = svgImg(SV(ART[c]), later); if (im) g.drawImage(im, X(px) - R * 0.75, Y(py) - R * 0.75, R * 1.5, R * 1.5); }
     });
     // the fields
     G.hex.forEach((h, i) => {
       const t = v.tiles[i] || {}, res = t.res || 'town';
       hexPath(h, 0.985); g.fillStyle = FILL[res]; g.fill(); g.lineWidth = u * 0.075; g.lineJoin = 'round'; g.strokeStyle = INK; g.stroke();
-      const im = svgImg(SV(ART[res]), () => redraw());
+      const im = svgImg(SV(ART[res]), later);
       const sz = t.res ? u * 0.82 : u * 1.3;
       if (im) g.drawImage(im, X(h.x) - sz / 2, Y(h.y) - (t.res ? u * 0.86 : sz * 0.55), sz, sz);
       if (t.res) {
@@ -86,16 +86,21 @@ export function create(parent, table) {
     board.dirty();
   }
   const redraw = () => { if (last) drawBoard(last); };
+  // a picture that arrives later redraws the board once (not once per waiting picture: those would multiply)
+  let pending = false;
+  const later = () => { if (pending) return; pending = true; setTimeout(() => { pending = false; redraw(); }, 30); };
 
   // a cottage (or a hall: wider, two roofs and a chimney) at (x, z) in seat colour
+  const shade = (hex, f) => { const n = parseInt(hex.slice(1), 16); const c = [n >> 16, (n >> 8) & 255, n & 255].map(x => Math.round(x * f)); return '#' + c.map(x => x.toString(16).padStart(2, '0')).join(''); };
   function house(b, x, z, col, hall, yaw) {
+    const rf = shade(col, 0.68);
     const w = hall ? k * 0.62 : k * 0.4, h = hall ? k * 0.36 : k * 0.3, d = k * 0.36;
     b.add(GEO.box, col, { x, y: TOP + h / 2, z, sx: w, sy: h, sz: d, ry: yaw });
     if (hall) {
       const c = Math.cos(yaw), s = Math.sin(yaw);
-      for (const o of [-0.25, 0.25]) roof(b, col === '#2fb5a8' ? '#1f8a80' : INK, x + c * o * w, TOP + h, z - s * o * w, w * 0.52, d * 1.12, h * 0.6, yaw);
+      for (const o of [-0.25, 0.25]) roof(b, rf, x + c * o * w, TOP + h, z - s * o * w, w * 0.52, d * 1.12, h * 0.6, yaw);
       b.add(GEO.box, '#9a6538', { x: x + c * w * 0.3, y: TOP + h * 1.35, z: z - s * w * 0.3, sx: k * 0.07, sy: h * 0.6, sz: k * 0.07, ry: yaw });
-    } else roof(b, INK, x, TOP + h, z, w * 1.12, d * 1.1, h * 0.7, yaw + Math.PI / 2);
+    } else roof(b, rf, x, TOP + h, z, w * 1.12, d * 1.1, h * 0.7, yaw + Math.PI / 2);
     b.add(GEO.box, CREAM, { x: x + Math.sin(yaw) * d * 0.51, y: TOP + h * 0.3, z: z + Math.cos(yaw) * d * 0.51, sx: w * 0.25, sy: h * 0.55, sz: 0.001, ry: yaw });
   }
   // Rascal: a grey round body, a striped tail, a head with a dark mask
@@ -132,8 +137,8 @@ export function create(parent, table) {
       if (o < 0) return;
       const E = G.e[e], a = G.v[E.a], c = G.v[E.b], [x1, z1] = at(a.x, a.y), [x2, z2] = at(c.x, c.y);
       const len = Math.hypot(x2 - x1, z2 - z1) * 0.62, ang = Math.atan2(x2 - x1, z2 - z1);
-      b.add(GEO.box, INK, { x: (x1 + x2) / 2, y: TOP + k * 0.06, z: (z1 + z2) / 2, sx: k * 0.17, sy: k * 0.1, sz: len + k * 0.04, ry: ang });
-      b.add(GEO.box, col(o), { x: (x1 + x2) / 2, y: TOP + k * 0.1, z: (z1 + z2) / 2, sx: k * 0.12, sy: k * 0.06, sz: len, ry: ang });
+      b.add(GEO.box, INK, { x: (x1 + x2) / 2, y: TOP + k * 0.06, z: (z1 + z2) / 2, sx: k * 0.15, sy: k * 0.08, sz: len + k * 0.03, ry: ang });
+      b.add(GEO.box, col(o), { x: (x1 + x2) / 2, y: TOP + k * 0.1, z: (z1 + z2) / 2, sx: k * 0.13, sy: k * 0.06, sz: len, ry: ang });
     });
     // homes, facing the board's front
     v.own.forEach((o, x) => { if (o < 0) return; const [px, pz] = at(G.v[x].x, G.v[x].y); house(b, px, pz, col(o), !!v.hall[x], 0); });
