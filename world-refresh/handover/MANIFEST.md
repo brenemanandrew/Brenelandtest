@@ -72,6 +72,8 @@ under your usual rules.
   - Reflections and light shafts by day and dawn.
   - The game store outside and in.
 - No automated suites: they are not in the mirror. Please run yours.
+- **Fixed 2026-11-16 (PM relay from Game Waves):** NaN vertices in the heeled staff models (belinda, zoe_night, asha_night): a
+  fractional power of a slightly negative sine in `mpfb_fixes.sandals`. Now clamped; the writer refuses NaN; 0 left, 0 NaN console messages.
 - **Known and pre-existing:** about 28 "computeBoundingSphere NaN" console warnings, the same with `?oldstore`, so not from these
   changes.
 

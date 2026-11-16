@@ -387,7 +387,8 @@ def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45, style='sandal', heel='
             d = np.abs(F_[:, 2] - zz); m = d < (z1 - z0) / 20 + 0.004
             if m.sum() < 2: m = d <= np.sort(d)[min(3, len(d) - 1)]
             xs = F_[m, 0]; yb = F_[m, 1].min()
-            wpad = 0.004 * np.sin(np.pi * (zz - z0) / (z1 - z0)) ** 0.3; nar = 0.3 * max(0, 1 - (zz - z0) / (0.3 * (z1 - z0)))   # (narrower under the heel)
+            wpad = 0.004 * max(0.0, np.sin(np.pi * (zz - z0) / (z1 - z0))) ** 0.3;   # (clamped: the last slice's sine dips a hair below zero, and a fractional power of that was NaN)
+            nar = 0.3 * max(0, 1 - (zz - z0) / (0.3 * (z1 - z0)))   # (narrower under the heel)
             xm_ = (xs.min() + xs.max()) / 2; xs = xm_ + (xs - xm_) * (1 - nar)
             top += [(xs.min() - wpad, yb + 0.0006, zz), (xs.max() + wpad, yb + 0.0006, zz)]; bot += [(xs.min() - wpad, yb - 0.0045, zz), (xs.max() + wpad, yb - 0.0045, zz)]
         T_, B_ = np.array(top), np.array(bot); V = np.vstack([T_, B_]); k = len(zs); F = []

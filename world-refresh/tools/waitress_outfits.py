@@ -115,6 +115,9 @@ def edit(M, Mn_unused, plan, J, bones, ink_w, detail):
 
 def write(J, M, L, buf, out_json):
     """re-pack every section: mesh and lod from the edited arrays, everything else copied as it was"""
+    for D in (M, L):
+        for k in ('pos', 'nor'):
+            assert not np.isnan(D[k]).any(), f'NaN in {k} of {out_json}'   # (never write a broken mesh)
     parts = []; off = [0]
     def put(arr, typ):
         a = np.ascontiguousarray(arr.astype(mpfb_io.T[typ])); pad = (-off[0]) % 4
