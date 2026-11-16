@@ -690,3 +690,33 @@ for name in ['patch_diorama_fix', 'patch_unicorns_new', 'patch_kids_roam']:
 # black skirt, day = red and cream stripes, a cream skirt with a red hem band, Asha's apron red, white sneakers
 import subprocess
 subprocess.run([sys.executable, os.path.join(WR, 'tools/waitress_outfits.py'), os.path.join(REPO, 'breneland-live/models/mpfb'), os.path.join(OUT, 'models/mpfb')], check=True)
+
+# ---- Andrew's staff editor (tools/staff-editor.html, tools/staff-shape.js): his own face and body sliders, outfit choice and colours
+# for Belinda, Mina, Zoe and Asha. The game applies the saved looks (this browser's, over models/staff-looks.json) as they load.
+shutil.copy(os.path.join(WR, 'tools/staff-shape.js'), os.path.join(OUT, 'js/staff-shape.js'))
+shutil.copy(os.path.join(WR, 'tools/staff-editor.html'), os.path.join(OUT, 'staff-editor.html'))
+if os.path.exists(os.path.join(WR, 'models/staff-looks.json')): shutil.copy(os.path.join(WR, 'models/staff-looks.json'), os.path.join(OUT, 'models/staff-looks.json'))
+LIVEM = os.path.join(REPO, 'breneland-live/models/mpfb')
+for nid in ('zoe_day', 'zoe_night', 'asha_day', 'asha_night'):   # the original outfits, under their own names
+    Jo = json.load(open(os.path.join(LIVEM, nid + '.json')))
+    shutil.copy(os.path.join(LIVEM, Jo['bin']), os.path.join(OUT, 'models/mpfb', nid + '_orig.bin'))
+    shutil.copy(os.path.join(LIVEM, Jo['sheet']['full']), os.path.join(OUT, 'models/mpfb', nid + '_orig.webp'))
+    Jo['id'] = nid + '_orig'; Jo['bin'] = nid + '_orig.bin'; Jo['sheet'] = {'full': nid + '_orig.webp', 'half': nid + '_orig.webp'}
+    json.dump(Jo, open(os.path.join(OUT, 'models/mpfb', nid + '_orig.json'), 'w'), separators=(',', ':'))
+p = os.path.join(OUT, 'js/mpfb-characters.js'); t = open(p).read()
+a = "export async function loadMpfbCharacters() {\n  if (!bakedCharactersOn()) return false;\n  const jobs = [];\n  for (const [who, outfits] of Object.entries(STAFF_MODELS)) for (const [k, id] of Object.entries(outfits)) jobs.push(loadBakedCharacter(id).then(d => { if (d) (LOADED[who] = LOADED[who] || {})[k] = d; }));"
+assert t.count(a) == 1, 'mpfb load'
+t = t.replace(a, """let STAFF_LOOKS = {};
+export async function loadMpfbCharacters() {
+  if (!bakedCharactersOn()) return false;
+  const jobs = [];
+  try { STAFF_LOOKS = await SS.loadLooks(); } catch (e) { STAFF_LOOKS = {}; }   // (world-refresh: Andrew's edits from the staff editor)
+  for (const [who, outfits] of Object.entries(STAFF_MODELS)) for (const [k, id0] of Object.entries(outfits)) {
+    const look = STAFF_LOOKS[who]?.[k], id = look?.variant === 'original' ? id0 + '_orig' : id0;
+    jobs.push(loadBakedCharacter(id).then(d => { if (d) { if (look) SS.applyLook(d, look); (LOADED[who] = LOADED[who] || {})[k] = d; } }));
+  }""", 1)
+a = "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n      this.chars[k] = ch;"
+assert t.count(a) == 1, 'mpfb body'
+t = t.replace(a, "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n      this.chars[k] = ch;\n      { const look = STAFF_LOOKS[who]?.[k]; if (look) for (const m of [ch.mat, ch.matBoth]) SS.paintLook(m, d, look, THREE); }", 1)
+t = "import * as THREE from 'three';\nimport * as SS from './staff-shape.js';\n" + t
+open(p, 'w').write(t)

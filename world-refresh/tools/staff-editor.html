@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breneland - staff editor</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/three.module.js" } }</script>
+<style>
+  html, body { margin: 0; height: 100%; background: #e9e4da; font: 14px system-ui, sans-serif; color: #2b2522; overflow: hidden; }
+  #wrap { display: flex; height: 100%; }
+  #view { flex: 1; position: relative; min-width: 0; }
+  #view canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+  #panel { width: 330px; max-width: 46vw; overflow-y: auto; background: #fbf8f2; border-left: 1px solid #d8d0c2; padding: 10px 12px 40px; box-sizing: border-box; }
+  h1 { font-size: 17px; margin: 4px 0 8px; } h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #7a6a5a; margin: 16px 0 6px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 5px 0; } .row label { flex: 0 0 120px; font-size: 13px; }
+  .row input[type=range] { flex: 1; } .row output { width: 38px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: #7a6a5a; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; } .chip { border: 1px solid #cbbfac; background: #fff; border-radius: 16px; padding: 5px 11px; cursor: pointer; }
+  .chip.on { background: #3d6b4a; color: #fff; border-color: #3d6b4a; }
+  .sw { display: flex; align-items: center; gap: 6px; margin: 3px 0; font-size: 12px; } .sw input { width: 40px; height: 26px; border: 0; padding: 0; background: none; }
+  button.act { margin: 4px 4px 0 0; padding: 7px 12px; border-radius: 8px; border: 1px solid #b9ab95; background: #fff; cursor: pointer; }
+  button.main { background: #c7392f; color: #fff; border-color: #c7392f; }
+  #msg { font-size: 12px; color: #3d6b4a; min-height: 16px; margin-top: 6px; }
+  #hint { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: #6a5d50; background: #fbf8f2cc; padding: 4px 8px; border-radius: 6px; }
+  @media (max-width: 700px) { #wrap { flex-direction: column; } #view { height: 52vh; flex: none; } #panel { width: 100%; max-width: none; height: 48vh; border-left: 0; border-top: 1px solid #d8d0c2; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="view"><div id="hint">Drag to turn, wheel or pinch to zoom</div></div>
+  <div id="panel">
+    <h1>Staff editor</h1>
+    <div class="chips" id="who"></div>
+    <h2>Outfit</h2>
+    <div class="chips" id="when"></div>
+    <div class="chips" id="variant" style="margin-top:6px"></div>
+    <h2>Pose</h2>
+    <div class="chips" id="clips"></div>
+    <div id="sliders"></div>
+    <h2>Outfit colours</h2>
+    <div id="colors"></div>
+    <h2>Save</h2>
+    <button class="act main" id="save">Save (this browser)</button><button class="act" id="reset">Reset her</button>
+    <button class="act" id="dl">Download looks file</button><button class="act" id="copy">Copy looks</button>
+    <div id="msg"></div>
+    <p style="font-size:12px;color:#7a6a5a">Saved looks show in the test game on this same browser right away. To make them permanent for everyone, download the looks file and send it to Claude (it goes in as world-refresh/models/staff-looks.json).</p>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { loadBakedCharacter, BakedCharacter } from '/js/baked-character.js';
+import { SLIDERS, STAFF, MODEL_ID, loadLooks, saveLooksLocal, applyLook, paintLook } from '/js/staff-shape.js';
+
+const NAMES = { belinda: 'Belinda', mina: 'Mina', zoe: 'Zoe', asha: 'Asha' };
+let LOOKS = await loadLooks();
+const st = { who: 'belinda', when: 'day', clip: 'idle' };
+const lookOf = () => { LOOKS[st.who] = LOOKS[st.who] || {}; return (LOOKS[st.who][st.when] = LOOKS[st.who][st.when] || { shape: {}, colors: {}, variant: 'new' }); };
+
+// ---- the view
+const view = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; view.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#e9e4da');
+scene.add(new THREE.HemisphereLight('#fff6e8', '#b8b0a4', 1.6));
+const sun = new THREE.DirectionalLight('#fff3e0', 2.2); sun.position.set(2, 4, 3); sun.castShadow = true; scene.add(sun);
+const floor = new THREE.Mesh(new THREE.CircleGeometry(1.4, 48), new THREE.MeshToonMaterial({ color: '#d9cfbf' })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 50);
+const orbit = { yaw: 0.35, pitch: 0.08, dist: 3.4, ty: 0.85 };
+function placeCam() { const { yaw, pitch, dist, ty } = orbit; camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(0, ty, 0); }
+function resize() { const r = view.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize(); placeCam();
+let drag = null; const pts = new Map();
+renderer.domElement.addEventListener('pointerdown', e => { renderer.domElement.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); drag = { x: e.clientX, y: e.clientY, d: null }; });
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (drag.d) orbit.dist = Math.min(8, Math.max(0.6, orbit.dist * drag.d / d)); drag.d = d; }
+  else if (drag) { orbit.yaw -= (e.clientX - drag.x) * 0.01; orbit.pitch = Math.max(-0.4, Math.min(1.2, orbit.pitch + (e.clientY - drag.y) * 0.006)); drag.x = e.clientX; drag.y = e.clientY; }
+  placeCam();
+});
+const up = e => { pts.delete(e.pointerId); if (!pts.size) drag = null; };
+renderer.domElement.addEventListener('pointerup', up); renderer.domElement.addEventListener('pointercancel', up);
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); orbit.dist = Math.min(8, Math.max(0.6, orbit.dist * (1 + e.deltaY * 0.001))); placeCam(); }, { passive: false });
+
+// ---- the character
+let ch = null, data = null, loadingId = null;
+async function show() {
+  const look = lookOf(), id = MODEL_ID(st.who, st.when, look.variant);
+  loadingId = id; const d = await loadBakedCharacter(id); if (loadingId !== id) return;
+  if (!d) { msg('Could not load ' + id); return; }
+  if (ch) { scene.remove(ch.root); ch.dispose?.(); }
+  data = d; applyLook(data, look);
+  ch = new BakedCharacter(data, { name: 'editor-' + id }); scene.add(ch.root);
+  ch.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  paintAll(); playClip(); buildColors(); buildClips();
+}
+function paintAll() { if (!ch) return; const look = lookOf(); for (const m of [ch.mat, ch.matBoth]) paintLook(m, data, look, THREE); }
+function playClip() { if (!ch) return; const c = ch.clips?.[st.clip] ? st.clip : 'idle'; try { ch.play(c); } catch (e) { /* (clips differ per character) */ } }
+let t0 = performance.now();
+renderer.setAnimationLoop(() => { const t = performance.now(), dt = Math.min(0.05, (t - t0) / 1000); t0 = t; if (ch) { try { ch.update(dt, t / 1000, 0); } catch (e) { /* */ } ch.root.position.set(0, 0, 0); } renderer.render(scene, camera); });
+
+// ---- the panel
+const $ = id => document.getElementById(id);
+function chips(el, items, cur, on) { el.innerHTML = ''; for (const [k, label] of items) { const b = document.createElement('button'); b.className = 'chip' + (k === cur ? ' on' : ''); b.textContent = label; b.onclick = () => on(k); el.appendChild(b); } }
+function buildTop() {
+  chips($('who'), Object.keys(NAMES).map(k => [k, NAMES[k]]), st.who, k => { st.who = k; if (!STAFF[k].includes(st.when)) st.when = 'day'; buildTop(); show(); });
+  chips($('when'), STAFF[st.who].map(k => [k, k === 'day' ? 'Day' : 'Evening']), st.when, k => { st.when = k; buildTop(); show(); });
+  const v = $('variant');
+  if (st.who === 'zoe' || st.who === 'asha') chips(v, [['new', st.when === 'day' ? 'Striped uniform' : 'Green top, skirt, heels'], ['original', 'Original outfit']], lookOf().variant || 'new', k => { lookOf().variant = k; lookOf().colors = {}; buildTop(); show(); });
+  else v.innerHTML = '';
+  buildSliders();
+}
+function buildClips() {
+  const have = Object.keys(ch?.clips || data?.clips || {}).filter(c => !['start', 'stop', 'turn_l', 'turn_r'].includes(c));
+  chips($('clips'), have.map(c => [c, c.replace('_', ' ')]), st.clip, k => { st.clip = k; buildClips(); playClip(); });
+}
+function buildSliders() {
+  const el = $('sliders'); el.innerHTML = ''; let grp = '';
+  const L = lookOf(); L.shape = L.shape || {};
+  for (const [k, label, mn, mx, g] of SLIDERS) {
+    if (g !== grp) { const h = document.createElement('h2'); h.textContent = g; el.appendChild(h); grp = g; }
+    const row = document.createElement('div'); row.className = 'row';
+    row.innerHTML = `<label>${label}</label><input type="range" min="${mn}" max="${mx}" step="0.01" value="${L.shape[k] || 0}"><output>${(L.shape[k] || 0).toFixed(2)}</output>`;
+    const inp = row.querySelector('input'), out = row.querySelector('output');
+    inp.oninput = () => { L.shape[k] = +inp.value; out.textContent = (+inp.value).toFixed(2); if (data) applyLook(data, L); };
+    inp.ondblclick = () => { inp.value = 0; inp.oninput(); };
+    el.appendChild(row);
+  }
+}
+function buildColors() {
+  const el = $('colors'); el.innerHTML = ''; if (!data) return;
+  const L = lookOf(); L.colors = L.colors || {};
+  const pal = data.J.palette || {};
+  // where each swatch is used: by the height of the vertices that sample it (the face's own paint is not here)
+  const g = data.geo[''], uv = g.attributes.uv.array, pos = (g.userData.orig || g.attributes.position.array), H = data.J.head;
+  const use = {}; for (let v = 0; v < uv.length / 2; v++) { const px = uv[v * 2] * 2048, py = (1 - uv[v * 2 + 1]) * 2048; if (px < 1536 || py < 1536) continue;
+    const k = Math.floor((px - 1536) / 32) + Math.floor((py - 1536) / 32) * 16; (use[k] = use[k] || []).push(pos[v * 3 + 1]); }
+  const where = k => { const ys = use[k]; if (!ys) return 'unused'; ys.sort((a, b) => a - b); const y = ys[ys.length >> 1], n = ys.length;
+    if (n > 3000 && ys[0] < 0.2 && ys[n - 1] > H.chin) return 'skin';
+    if (y > H.chin + (H.top - H.chin) * 0.55) return n < 400 ? 'cap / hair detail' : 'hair / cap';
+    if (y > H.chin) return n < 800 ? 'face detail (lips, mouth)' : 'hair';
+    if (y > 0.75) return n < 300 ? 'top detail' : 'top';
+    if (y > 0.3) return n < 300 ? 'bottom detail' : 'skirt / shorts / trousers';
+    return 'shoes'; };
+  for (const [i, col] of Object.entries(pal)) {
+    if (where(+i) === 'unused') continue;
+    const row = document.createElement('div'); row.className = 'sw';
+    const cur = L.colors[i] || col;
+    row.innerHTML = `<input type="color" value="${cur}"><span>${where(+i)}</span>${L.colors[i] ? '<button class="act" style="padding:2px 6px">undo</button>' : ''}`;
+    row.querySelector('input').oninput = e => { L.colors[i] = e.target.value; paintAll(); };
+    row.querySelector('input').onchange = () => buildColors();
+    const u = row.querySelector('button'); if (u) u.onclick = () => { delete L.colors[i]; paintAll(); buildColors(); };
+    el.appendChild(row);
+  }
+}
+const msg = t => { $('msg').textContent = t; setTimeout(() => { if ($('msg').textContent === t) $('msg').textContent = ''; }, 4000); };
+$('save').onclick = () => { saveLooksLocal(LOOKS); msg('Saved. The test game on this browser now uses it.'); };
+$('reset').onclick = () => { LOOKS[st.who][st.when] = { shape: {}, colors: {}, variant: 'new' }; buildTop(); show(); msg(NAMES[st.who] + ' reset (press Save to keep it).'); };
+const text = () => JSON.stringify(LOOKS, null, 1);
+$('dl').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text()], { type: 'application/json' })); a.download = 'staff-looks.json'; a.click(); };
+$('copy').onclick = async () => { try { await navigator.clipboard.writeText(text()); msg('Copied.'); } catch (e) { msg('Copy did not work here: use Download.'); } };
+buildTop(); show();
+window.__editor = { st, get ch() { return ch; }, LOOKS };
+</script>
+</body>
+</html>
