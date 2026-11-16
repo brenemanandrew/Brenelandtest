@@ -17,10 +17,17 @@ the "World" and "Rules" sections.
 - **Characters may talk to each other** and build their own relationships and small storylines, so the world feels alive. Keep these
   everyday-sized (a new hobby, a friendly rivalry, a crush, a falling-out and a making-up), and in keeping with each character.
 - **Privacy is absolute:**
-  - A player's conversations with a character are seen only by that player and that character, and NPC-to-NPC chats by no player.
+  - A player's conversations with a character are seen only by that player and that character.
+  - NPC-to-NPC conversations are public (everyone nearby sees them) UNLESS the subject is sensitive; then they are private and no
+    player sees them.
   - They are stored on the player's own machine, never sent to the game server or anyone else.
   - Nobody reads them, not other players, not Andrew's tools, and not the developer assistant (Claude).
   - The code that stores them must keep them out of logs, analytics and screenshots.
+- **Actions:** characters can act at, with or around people, not just talk. Write actions as `*Kevin grabs his fishing pole*`.
+  - **Generic actions** (doing something in the world) are seen by everyone nearby.
+  - **Whispered actions** aimed at one player are private, like `*Kevin secretly passes you a note*` or `*Kevin gives you a hug*`.
+    They show only to that player, in purple like a whisper.
+  - When a character is talking privately with a player, its actions toward that player are whispered by default.
 - **Handoff:** this file is the starting point. Andrew edits it and adds storyline details; the characters carry on from there by
   themselves.
 

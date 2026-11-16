@@ -87,4 +87,8 @@ Spec of what Andrew asked for, plus what exists and a build plan. Nothing here i
 - **Whisper:** OK to add the whisper message type to the Breneland-Next server when we ship.
 - **Party musical guests:** generated acts. Each guest has its own name and its own consistent style, and the music is composed for
   them. Andrew will add some free local-band music later (not now).
+- **Whispers both ways are purple:** your whispers and whispers to you are light-purple text in the chat log and purple-outlined
+  balloons in the world.
+- **NPC actions:** generic actions are public (`*Kevin grabs his fishing pole*`); actions aimed at one player are whispered, private and
+  purple (`*Kevin passes you a note secretly*`, `*Kevin gives you a hug*`). NPC-to-NPC talk is public unless the subject is sensitive.
 - **NPC memory and relationships:** see `characters.md`, section 0.
