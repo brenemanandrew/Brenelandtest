@@ -206,6 +206,7 @@ for nid in ('belinda', 'mina'):
     if nid == 'mina':
         pm = {v: int(k2) for k2, v in J['palette'].items()}
         for D in (M, L): mpfb_fixes.tuck_blouse(D, pm['#efe5cc'], pm['#5d5c5e'])
+        print('mina skirt follows her legs', mpfb_fixes.skirt_follow_legs(M, J, pm['#5d5c5e']), mpfb_fixes.skirt_follow_legs(L, J, pm['#5d5c5e']))   # (sitting: no thighs through it)
     if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
         hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
         sk4 = int({v: k for k, v in J['palette'].items()}['#c98e62']); dr8 = int({v: k for k, v in J['palette'].items()}['#1f6b3a'])

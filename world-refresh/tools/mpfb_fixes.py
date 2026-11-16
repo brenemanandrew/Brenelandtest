@@ -1044,3 +1044,35 @@ def join_cap2(M, cap_sw):
         nr = np.minimum(nr, rad)   # (only ever inward)
         P[b, 0] = cx + np.sin(ang) * nr; P[b, 2] = cz + np.cos(ang) * nr; n += len(b)
     M['pos'] = P.ravel().astype(np.float32); return n
+
+def skirt_follow_legs(M, J, k, top=0.60, full=0.44, mid=0.07, front=1.0, back=0.7):
+    """The motion check: Mina's long skirt hangs on stiff spring rods baked without leg collision, so her thighs came through it
+    when she sat. Below the hips its points now also follow her legs: thigh above the knee, shin below (blended round the knee), and
+    across the middle the two legs blended evenly (mid, m) so the cloth spans between the knees instead of tearing. The share grows
+    from nothing at `top` to full at `full` (heights in m), less at the back. The springs keep the rest, so it still swings."""
+    names = [b['name'] for b in J['bones']]; W = bone_world(J)
+    bi = {n: names.index(n) for n in ('thigh_l', 'thigh_r', 'calf_l', 'calf_r')}
+    knee = (W['calf_l'][1] + W['calf_r'][1]) / 2
+    P = M['pos'].reshape(-1, 3); SI = M['si'].reshape(-1, 4).copy(); SW = M['sw'].reshape(-1, 4).astype(np.float64) / 255
+    sel = np.where(_swatches(M) == k)[0]; n = 0
+    for i in sel:
+        x, y, z = P[i]
+        a = np.clip((top - y) / (top - full), 0, 1); a = a * a * (3 - 2 * a)
+        a *= front if z > 0 else back
+        if a <= 0: continue
+        sl = np.clip((x + mid) / (2 * mid), 0, 1); sl = sl * sl * (3 - 2 * sl)   # (+x is her left)
+        kb = np.clip((knee + 0.04 - y) / 0.08, 0, 1)                             # 0 thigh .. 1 shin
+        w = {}
+        for j in range(4):
+            if SW[i, j] > 0: w[SI[i, j]] = w.get(SI[i, j], 0) + SW[i, j] * (1 - a)
+        for s, f in (('l', sl), ('r', 1 - sl)):
+            for b, g in (('thigh_', 1 - kb), ('calf_', kb)):
+                v = a * f * g
+                if v > 0: w[bi[b + s]] = w.get(bi[b + s], 0) + v
+        top4 = sorted(w.items(), key=lambda t: -t[1])[:4]; tot = sum(v for _, v in top4)
+        q = np.round(np.array([v for _, v in top4]) / tot * 255).astype(int); q[0] += 255 - q.sum()
+        SI[i] = 0; SW[i] = 0
+        for j, ((b, _), v) in enumerate(zip(top4, q)): SI[i, j] = b; SW[i, j] = v / 255
+        n += 1
+    M['si'] = SI.ravel().astype(M['si'].dtype); M['sw'] = np.round(SW * 255).ravel().astype(M['sw'].dtype)
+    return n
