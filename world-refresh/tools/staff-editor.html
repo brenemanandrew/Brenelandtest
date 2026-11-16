@@ -65,6 +65,7 @@ const sun = new THREE.DirectionalLight('#fff3e0', 2.2); sun.position.set(2, 4, 3
 const floor = new THREE.Mesh(new THREE.CircleGeometry(1.4, 48), new THREE.MeshToonMaterial({ color: '#d9cfbf' })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 50);
 const orbit = { yaw: 0.35, pitch: 0.08, dist: 3.4, ty: 0.85 };
+{ const q = new URLSearchParams(location.search); if (q.get('cam')) { const [a, b, c, d] = q.get('cam').split(',').map(Number); Object.assign(orbit, { yaw: a, pitch: b, dist: c, ty: d }); } if (q.get('who')) st.who = q.get('who'); }   // (?cam=yaw,pitch,dist,height ?who=belinda)
 function placeCam() { const { yaw, pitch, dist, ty } = orbit; camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(0, ty, 0); }
 function resize() { const r = view.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize(); placeCam();

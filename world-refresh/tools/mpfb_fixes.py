@@ -310,3 +310,29 @@ def new_head(M, J, seg=(56, 36), style=None):
         M['inkGroups']['_face'] = np.concatenate([it[~((ic[:, 1] > chin + 0.01) & ~ear(ic))].ravel(), (F + n0).ravel()]).astype(dt)
     M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
     return int(gone.sum())
+
+def fill_hair_dip(M, J, hair_sw, k=1.0):
+    """Belinda's hair: its two side pieces stood up at the top corners, above the crown between them (a dip between two horns).
+    Fit the crown's dome (a quadratic over the tops of its columns, between the side pieces) and bring anything above it down onto it,
+    so the top reads as one piece."""
+    P = M['pos'].reshape(-1, 3).copy(); UV = M['uv'].reshape(-1, 2)
+    px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    top = J['head']['top']; hv = np.where((sw == hair_sw) & (P[:, 1] > top - 0.22))[0]
+    if len(hv) < 50: return 0
+    H = P[hv]
+    # the column tops on a 1.5 cm grid
+    gx = np.round(H[:, 0] / 0.015).astype(int); gz = np.round(H[:, 2] / 0.015).astype(int)
+    cols = {}
+    for i, key in enumerate(zip(gx, gz)):
+        if key not in cols or H[i, 1] > H[cols[key], 1]: cols[key] = i
+    C = H[list(cols.values())]
+    mid = np.abs(C[:, 0]) < 0.1                          # the crown (between the side pieces) sets the dome
+    A = lambda X, Z: np.stack([np.ones_like(X), X, Z, X * X, X * Z, Z * Z], 1)
+    cf, *_ = np.linalg.lstsq(A(C[mid, 0], C[mid, 2]), C[mid, 1], rcond=None)
+    dome = A(H[:, 0], H[:, 2]) @ cf
+    over = np.clip(H[:, 1] - dome, 0, 0.1)               # the side pieces' tops standing above it come down onto it
+    lift = -over * k
+    P[hv, 1] += lift
+    M['pos'] = P.ravel().astype(np.float32)
+    return int((lift < -0.002).sum())

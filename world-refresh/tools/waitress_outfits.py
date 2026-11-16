@@ -7,7 +7,7 @@ on Andrew's PC). Zoe and Asha, day and night:
 The skirt is new geometry: rings round the hips measured off the shorts/trousers, flaring out and down, an inner layer, weighted to
 the pelvis with the thighs taking over toward the hem (so it swings with the walk), with the ink hull like the other clothes.
 Usage: python3 tools/waitress_outfits.py SRC_DIR OUT_DIR   (SRC_DIR = breneland-live/models/mpfb; writes the 4 .json/.bin/.webp)"""
-import sys, os, json, numpy as np
+import sys, os, json, shutil, numpy as np
 from PIL import Image
 sys.path.insert(0, os.path.dirname(__file__)); import mpfb_io, mpfb_fixes, anime_head
 
@@ -186,7 +186,15 @@ for nid in ('belinda', 'mina'):
     def swf(h, J=J, imref=imref, swc=swc):
         if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
         return swc[h]
-    if not HEADS: break   # (Belinda and Mina are only touched for the new heads)
+    if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
+        hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
+        if not HEADS:
+            for kk in ('full', 'half'):
+                f = J['sheet'].get(kk)
+                if f and os.path.exists(os.path.join(SRC, f)): shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
+            for D in (M, L): D['tris'] = sum(len(g) for g in D['groups'].values()) // 3
+            write(J, M, L, buf, os.path.join(OUT, nid + '.json')); continue
+    if not HEADS: continue   # (Mina is only touched for the new heads)
     mm = anime_head.apply(M, J, nid, swf); anime_head.apply(L, J, nid, swf)
     pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
     imref[0].save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)
