@@ -434,7 +434,17 @@ export function yardExtras(b, hx, hz, w, d, walkZ, facing) {
   const H = (k) => hash01('yd' + k, Math.round(hx * 10), Math.round(hz * 10)), front = hz + facing * (d / 2), y0 = 0.3;
   const fz = walkZ - facing * 1.25, gap = 1.05, x0 = hx - w / 2 - 0.6, x1 = hx + w / 2 + 0.3;
   // a picket fence along the front of the yard (the Blender pickets), gap at the front walk
-  if (RM.fence_picket_0 && H(1) < 0.8) {
+  if (H(1) >= 0.5 && H(1) < 0.8) {   // (some yards a rustic split-rail fence instead: weathered posts, two rough rails each bay, a little sag)
+    const posts = []; for (let px = x0; px <= x1 + 0.01; px += 2.3) posts.push(px); if (posts[posts.length - 1] < x1 - 0.3) posts.push(x1);
+    const pz = fz + facing * 0.02;
+    for (const px of posts) if (Math.abs(px - hx) >= gap) b.add(GEO.cyl6, ['#6f5d48', '#7b6a55', '#665443'][Math.abs(Math.round(px * 3)) % 3], { x: px, y: y0 + 0.5, z: pz, sx: 0.1, sy: 1.0, sz: 0.1, ry: px });
+    for (let i = 0; i < posts.length - 1; i++) {
+      let a = posts[i], c = posts[i + 1]; if (a < hx && c > hx) { if (hx - gap - a > 0.4) c = hx - gap; else continue; }
+      if (Math.abs(a - hx) < gap) continue;
+      const L = c - a, mx = (a + c) / 2, tw = (hash01('sr', Math.round(mx * 10), 0) - 0.5) * 0.06;
+      for (const [yy, k] of [[0.42, 0], [0.78, 1]]) b.add(GEO.cyl6, ['#8f8270', '#9a8d7a'][k], { x: mx, y: y0 + yy + tw * (k ? 1 : -1), z: pz + facing * 0.07, sx: 0.075 + 0.015 * k, sy: L + 0.12, sz: 0.06, rz: Math.PI / 2 + tw * 0.3 });
+    }
+  } else if (RM.fence_picket_0 && H(1) < 0.8) {
     for (let px = x0; px <= x1; px += 0.36) { if (Math.abs(px - hx) < gap) continue; rput(b, 'fence_picket_' + (Math.abs(Math.round(px * 7)) % 3), px, y0 - 0.02, fz, { sx: 1, sy: 0.72, sz: 1 }); }
     for (const px of [x0, hx - gap - 0.05, hx + gap + 0.05, x1]) rput(b, 'fence_post', px, y0 - 0.02, fz, { sx: 1, sy: 0.75, sz: 1 });
     for (const [a, c] of [[x0, hx - gap], [hx + gap, x1]]) for (const yy of [0.28, 0.62]) if (RM.fence_rail) b.add(RM.fence_rail, '#ffffff', { x: (a + c) / 2, y: y0 + yy, z: fz + facing * 0.06, sx: c - a, ry: 0 });
@@ -719,4 +729,68 @@ a = "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n  
 assert t.count(a) == 1, 'mpfb body'
 t = t.replace(a, "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n      this.chars[k] = ch;\n      { const look = STAFF_LOOKS[who]?.[k]; if (look) for (const m of [ch.mat, ch.matBoth]) SS.paintLook(m, d, look, THREE); }\n      { const cl = who === 'belinda' ? SS.addCloth(ch, d, THREE, { skirtColor: '#1f6b3a' }) : null, jg = SS.addJiggle(ch, d, THREE, STAFF_LOOKS[who]?.[k]); if (cl || jg) { const u0 = ch.update.bind(ch); ch.update = (...a) => { const r = u0(...a); cl?.step(a[0]); jg?.step(a[0]); return r; }; } }   // (her skirt moves like cloth; the bust jiggles by its size)", 1)
 t = "import * as THREE from 'three';\nimport * as SS from './staff-shape.js';\n" + t
+open(p, 'w').write(t)
+
+# ---- lake reflections: the world mirrored in the water (a reflected camera, half resolution, rendered only while the camera is
+# near the water and above it), rippled by the waves' own normals and mixed in by the fresnel, so it stays cel-looking.
+p = os.path.join(OUT, 'js/world.js'); t = open(p).read()
+a = "      uTime: { value: 0 },\n      uniform float uTime, uGlint;"
+if t.count("uniform float uTime, uGlint;") == 1:
+    t = t.replace("uniform float uTime, uGlint;", "uniform float uTime, uGlint; uniform sampler2D uRefl; uniform mat4 uReflM; uniform float uReflOn;", 1)
+    a = "        float fres = pow(1.0 - clamp(dot(n, V), 0.0, 1.0), 4.0);\n        vec3 col = mix(base, uSky, fres * 0.5);"
+    assert t.count(a) == 1, 'water fres'
+    t = t.replace(a, a + """
+        if (uReflOn > 0.5) { vec4 rp = uReflM * vec4(vWorld, 1.0); vec2 ruv = rp.xy / rp.w + n.xz * 0.035 * (1.0 - far);
+          if (ruv.x > 0.0 && ruv.x < 1.0 && ruv.y > 0.0 && ruv.y < 1.0) { vec3 rc = texture2D(uRefl, ruv).rgb;
+            float rk = (0.28 + 0.42 * fres) * (1.0 - far * 0.6) * smoothstep(0.3, 2.5, s); col = mix(col, rc, rk); } }""", 1)
+    a = "  const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000, 1, 1).rotateX(-Math.PI / 2), mat);"
+    assert t.count(a) == 1, 'water mesh'
+    t = t.replace(a, a + """
+  { // (world-refresh) the reflection: a camera mirrored in the water plane renders the scene (water hidden) into a half-size target
+    const q = new URLSearchParams(location.search), off = q.has('noreflect') || q.has('oldworld');
+    const rt = new THREE.WebGLRenderTarget(512, 512), vc = new THREE.PerspectiveCamera(), bias = new THREE.Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+    Object.assign(mat.uniforms, { uRefl: { value: rt.texture }, uReflM: { value: new THREE.Matrix4() }, uReflOn: { value: 0 } });
+    let frame = -1, flip = 0; const _t = new THREE.Vector3(), _d = new THREE.Vector3();
+    water.onBeforeRender = (renderer, scene, camera) => {
+      if (off || !camera.isPerspectiveCamera || scene.overrideMaterial || camera === vc) return;
+      const f = renderer.info.render.frame; if (f === frame) return; frame = f;
+      const h = camera.position.y - WATER_Y, near = coastSigned(camera.position.x, camera.position.z);
+      mat.uniforms.uReflOn.value = h > 0.2 && near > -60 ? 1 : 0; if (!mat.uniforms.uReflOn.value) return;
+      if ((flip++ & 1)) return;   // (every other frame)
+      camera.getWorldDirection(_d); vc.position.set(camera.position.x, 2 * WATER_Y - camera.position.y, camera.position.z);
+      _t.copy(camera.position).add(_d); _t.y = 2 * WATER_Y - _t.y; vc.up.set(0, -1, 0); vc.lookAt(_t);
+      vc.fov = camera.fov; vc.aspect = camera.aspect; vc.near = camera.near; vc.far = camera.far; vc.updateProjectionMatrix(); vc.updateMatrixWorld();
+      const pm = vc.projectionMatrix.elements, cp = new THREE.Vector4(0, 1, 0, -WATER_Y + 0.05).applyMatrix4(vc.matrixWorldInverse.clone().invert().transpose());
+      const qv = new THREE.Vector4((Math.sign(cp.x) + pm[8]) / pm[0], (Math.sign(cp.y) + pm[9]) / pm[5], -1, (1 + pm[10]) / pm[14]);
+      cp.multiplyScalar(2 / cp.dot(qv)); pm[2] = cp.x; pm[6] = cp.y; pm[10] = cp.z + 1; pm[14] = cp.w;   // (clip below the water)
+      mat.uniforms.uReflM.value.copy(bias).multiply(vc.projectionMatrix).multiply(vc.matrixWorldInverse);
+      const was = renderer.getRenderTarget(), sa = renderer.shadowMap.autoUpdate; water.visible = false; renderer.shadowMap.autoUpdate = false;
+      renderer.setRenderTarget(rt); renderer.clear(); renderer.render(scene, vc); renderer.setRenderTarget(was); renderer.shadowMap.autoUpdate = sa; water.visible = true;
+    };
+  }""", 1)
+    open(p, 'w').write(t)
+
+# ---- light shafts: soft sunbeams slanting down through Strickler Woods by day (additive planes with a soft gradient, leaning away
+# from the sun, a slow shimmer), gone at dusk and in rain; ?noshafts turns them off
+p = os.path.join(OUT, 'js/world.js'); t = open(p).read()
+a = "  updaters.push((dt, t) => { water.material.uniforms.uTime.value = t; });"
+assert t.count(a) == 1, 'water updater'
+t = t.replace(a, a + """
+  if (!new URLSearchParams(location.search).has('noshafts') && !new URLSearchParams(location.search).has('oldworld')) {
+    const g = new THREE.Group(); g.name = 'light-shafts'; root.add(g);
+    const sm = new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uK: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
+      vertexShader: 'varying vec2 vU; void main() { vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform float uT, uK; varying vec2 vU; void main() { float edge = smoothstep(0.0, 0.35, vU.x) * smoothstep(1.0, 0.65, vU.x);
+        float len = smoothstep(0.0, 0.25, vU.y) * smoothstep(1.0, 0.55, vU.y); float sh = 0.75 + 0.25 * sin(uT * 0.6 + vU.x * 6.0 + vU.y * 3.0);
+        gl_FragColor = vec4(vec3(1.0, 0.93, 0.72) * edge * len * sh * uK * 0.28, 1.0); }` });
+    const geo = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
+    for (let i = 0; i < 26; i++) {
+      const x = -150 + hash01('sh', i, 1) * 26, z = -90 + hash01('sh', i, 2) * 130; if (coastSigned(x, z) > -3) continue;
+      const m = new THREE.Mesh(geo, sm); const w = 1.2 + hash01('sh', i, 3) * 1.8, h = 11 + hash01('sh', i, 4) * 6;
+      m.scale.set(w, h, 1); m.position.set(x, terrainHeight(x, z) - 0.5, z); m.rotation.set(0, hash01('sh', i, 5) * Math.PI, -0.45); m.renderOrder = 5; m.frustumCulled = true;
+      g.add(m); const m2 = m.clone(); m2.rotation.y += Math.PI / 2; g.add(m2);
+    }
+    updaters.push((dt, t) => { sm.uniforms.uT.value = t; const sy = sun.position.clone().normalize().y; sm.uniforms.uK.value = Math.max(0, Math.min(1, (sy - 0.08) / 0.25)) * (1 - Math.min(1, (globalThis.__WEATHER_RAIN || 0)));
+      g.rotation.y = 0; });
+  }""", 1)
 open(p, 'w').write(t)
