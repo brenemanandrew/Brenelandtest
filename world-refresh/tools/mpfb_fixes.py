@@ -961,7 +961,7 @@ def crop_top(M, J, top_sw, shorts_sw, skin_sw, navel_uv, yc=0.80, yshorts=0.685)
     P = M['pos'].reshape(-1, 3); sw = _swatches(M)
     for col, y0, keep_above in ((top_sw, yc, True), (shorts_sw, yshorts, False)):
         m = sw == col
-        _drop(M, lambda t, m=m, y0=y0, ka=keep_above: m[t].all(1) & ((P[t].mean(1)[:, 1] < y0) if ka else (P[t].mean(1)[:, 1] > y0)))
+        _drop(M, lambda t, m=m, y0=y0, ka=keep_above: m[t].all(1) & ((P[t][:, :, 1] < y0).all(1) if ka else (P[t][:, :, 1] > y0).all(1)))   # (only wholly past the line: the rest are drawn onto it, no notches)
         idx = np.where(m)[0]
         if keep_above: P[idx, 1] = np.maximum(P[idx, 1], y0)
         else: P[idx, 1] = np.minimum(P[idx, 1], y0)
@@ -1076,3 +1076,25 @@ def skirt_follow_legs(M, J, k, top=0.60, full=0.44, mid=0.07, front=1.0, back=0.
         n += 1
     M['si'] = SI.ravel().astype(M['si'].dtype); M['sw'] = np.round(SW * 255).ravel().astype(M['sw'].dtype)
     return n
+
+def _near_weights(M, idx, src, Q=None):
+    """Points `idx` take the skin weights of their nearest point among `src` (at positions Q, default their own)."""
+    from scipy.spatial import cKDTree
+    P = M['pos'].reshape(-1, 3); SI = M['si'].reshape(-1, 4).copy(); SW = M['sw'].reshape(-1, 4).copy()
+    if not len(idx) or not len(src): return 0
+    _, j = cKDTree(P[src]).query(P[idx] if Q is None else Q); SI[idx] = SI[src[j]]; SW[idx] = SW[src[j]]
+    M['si'] = SI.ravel(); M['sw'] = SW.ravel(); return len(idx)
+
+def crop_weights(M, top_sw, shorts_sw, skin_sw, yc=0.80, yshorts=0.685, band=0.012):
+    """The motion check: the tied top's hem (and the shorts' top) were cut straight at rest, but the points drawn onto the cut line
+    kept the weights of where they came from, so in any pose neighbours moved apart into a sawtooth. Every top/shorts point within
+    `band` of its cut line now takes the weights of the skin right under it, so the edge moves as one smooth line."""
+    P = M['pos'].reshape(-1, 3); sw = _swatches(M); skin = np.where(sw == skin_sw)[0]; n = 0
+    for col, y0 in ((top_sw, yc), (shorts_sw, yshorts)):
+        idx = np.where((sw == col) & (np.abs(P[:, 1] - y0) < band))[0]
+        n += _near_weights(M, idx, skin)
+    return n
+
+def drop_colour(M, k):
+    """Remove every triangle of one palette colour (Asha's day apron: the two waitresses now dress alike, Andrew)."""
+    sw = _swatches(M); m = sw == k; n0 = len(M['groups']['']); _drop(M, lambda t: m[t].all(1)); return (n0 - len(M['groups'][''])) // 3

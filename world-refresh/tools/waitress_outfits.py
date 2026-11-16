@@ -179,6 +179,12 @@ for who in ('zoe', 'asha'):
         if when == 'night' and who == 'zoe':   # her top tied at the midriff, shorts low on the hips, a belly button
             pz = {v: int(k2) for k2, v in J['palette'].items()}; k_nav, im = add_swatch(J, im, '#b07c66'); nuv = np.array(sw_uv(k_nav), np.float32)
             for D in (M, L): mpfb_fixes.crop_top(D, J, pz['#33603f'], pz['#28335c'], 4, nuv)
+            print('zoe crop edges smoothed', [mpfb_fixes.crop_weights(D, pz['#33603f'], pz['#28335c'], 4) for D in (M, L)])
+        if when == 'day' and who == 'asha':   # her apron off: it fought the new skirt, and both waitresses now match (her original keeps it)
+            def skm(D):
+                UV = D['uv'].reshape(-1, 2); px = UV[:, 0] * SZ; py = (1 - UV[:, 1]) * SZ
+                return (px >= SKIRTD[0]) & (px < SKIRTD[0] + 512) & (py >= SKIRTD[1]) & (py < SKIRTD[1] + 512)
+            print('asha apron removed (dressed like Zoe)', [mpfb_fixes.drop_colour(D, k_red) for D in (M, L)])
         if when == 'night' and who == 'asha':   # short sleeves
             pz = {v: int(k2) for k2, v in J['palette'].items()}
             for D in (M, L): mpfb_fixes.short_sleeves(D, J, pz['#2f5a3a'])
