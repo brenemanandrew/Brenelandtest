@@ -125,10 +125,17 @@ def heels(M, J, wpos, black_uv, ink_w=0.008, theta=0.4, toe_back=0.8, segs=10, s
     P = M['pos'].reshape(-1, 3).copy(); N = M['nor'].reshape(-1, 3).copy(); INK = M['ink'].reshape(-1, 3).astype(np.float64) / 100000
     names = [b['name'] for b in J['bones']]
     if shoe is not None:   # backless (Andrew): the shoe's back above the sole goes, so the foot's own heel shows behind
-        P0 = P; back = shoe & (P0[:, 1] > 0.016) & (P0[:, 2] < np.array(wpos['foot_l'])[2] + 0.0)
+        P0 = P; az = np.array(wpos['foot_l'])[2]
         for grp in (M['groups'], M['inkGroups']):
             if '' in grp:
-                t = grp[''].reshape(-1, 3).astype(np.int64); grp[''] = t[~back[t].all(1)].ravel().astype(grp[''].dtype)
+                t = grp[''].reshape(-1, 3).astype(np.int64); cc = P0[t].mean(1)
+                # the back of the shoe: behind the arch (a line rising toward the toes) and above the sole
+                back = shoe[t].all(1) & (cc[:, 1] > 0.002) & (cc[:, 2] < az + 0.05 - 0.6 * (cc[:, 1] - 0.002))
+                grp[''] = t[~back].ravel().astype(grp[''].dtype)
+        # a clean topline: the shoe's points left behind the cut slide forward onto it
+        cutz = az + 0.05 - 0.6 * (P[:, 1] - 0.002)
+        edge = shoe & (P[:, 1] > 0.002) & (P[:, 2] < cutz) & (np.abs(P[:, 0]) > 0.05)
+        P[edge, 2] = cutz[edge]
     newV = []; newF = []; newUV = []; newSI = []; newSW = []; newN = []; newINK = []
     n0 = M['verts']
     for side in ('l', 'r'):
