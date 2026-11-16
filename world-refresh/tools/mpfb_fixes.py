@@ -71,6 +71,9 @@ def fix_mouth(M):
     cu, cv = (c[:, 0] - cx) / hx, (c[:, 1] - cy) / hy
     inside = lambda q: (np.abs((q[:, 0] - cx) / hx) < 1.05) & (np.abs((q[:, 1] - cy) / hy) < 1.05) & (q[:, 2] > zfit(np.clip((q[:, 0] - cx) / hx, -1, 1), np.clip((q[:, 1] - cy) / hy, -1, 1)) - 0.04)
     cut = inside(c)
+    # (and what is left of its walls a little outside it: steep sideways triangles in front of the face's surface)
+    wide = (np.abs((c[:, 0] - cx) / hx) < 1.35) & (np.abs((c[:, 1] - cy) / hy) < 1.3) & (np.abs(nn[:, 0]) > 0.6) & (c[:, 2] > zfit(np.clip((c[:, 0] - cx) / hx, -1, 1), np.clip((c[:, 1] - cy) / hy, -1, 1)) - 0.012)
+    cut |= wide
     keepT = T[~cut]
     for g in list(M['groups'].keys()):   # (the block's walls in any other group go too)
         if g in ('_face', '_mouth'): continue
@@ -87,8 +90,10 @@ def fix_mouth(M):
     PX = np.stack([cx + U * hx, cy + Vv * hy, zfit(U, Vv) - 0.0004], 1).astype(np.float32)
     eps = 1e-3; dzu = (zfit(U + eps, Vv) - zfit(U - eps, Vv)) / (2 * eps) / hx; dzv = (zfit(U, Vv + eps) - zfit(U, Vv - eps)) / (2 * eps) / hy
     # normals: the face's own stored normals are a smooth stylised field (not the surface's); continue that field over the patch
-    cn, *_ = np.linalg.lstsq(_quad(ua[ring], va[ring]), N[ring], rcond=None)
-    NX = _quad(U, Vv) @ cn; NX = (NX / np.linalg.norm(NX, axis=1, keepdims=True)).astype(np.float32)
+    # (blended from the nearest face normals round the opening, inverse-distance, so the shading cannot step at the seam)
+    rr = np.where(ring)[0]; d2 = ((np.stack([cx + U * hx, cy + Vv * hy], 1)[:, None, :] - P[rr][None, :, :2]) ** 2).sum(2)
+    kk = np.argsort(d2, 1)[:, :10]; wgt = 1 / (np.take_along_axis(d2, kk, 1) + 1e-6)
+    NX = (N[rr][kk] * wgt[:, :, None]).sum(1); NX = (NX / np.linalg.norm(NX, axis=1, keepdims=True)).astype(np.float32)
     rid = np.where(ring)[0]
     nearest = rid[np.argmin(((PX[:, None, :2] - P[rid][None, :, :2]) ** 2).sum(2), 1)]
     UV = M['uv'].reshape(-1, 2); FUV = M['fuv'].reshape(-1, 2); SI = M['si'].reshape(-1, 4); SW = M['sw'].reshape(-1, 4); INK = M['ink'].reshape(-1, 3)

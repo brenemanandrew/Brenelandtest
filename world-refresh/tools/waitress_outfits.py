@@ -9,9 +9,10 @@ the pelvis with the thighs taking over toward the hem (so it swings with the wal
 Usage: python3 tools/waitress_outfits.py SRC_DIR OUT_DIR   (SRC_DIR = breneland-live/models/mpfb; writes the 4 .json/.bin/.webp)"""
 import sys, os, json, numpy as np
 from PIL import Image
-sys.path.insert(0, os.path.dirname(__file__)); import mpfb_io, mpfb_fixes
+sys.path.insert(0, os.path.dirname(__file__)); import mpfb_io, mpfb_fixes, anime_head
 
 SRC, OUT = sys.argv[1], sys.argv[2]; os.makedirs(OUT, exist_ok=True)
+HEADS = os.environ.get('HEADS') == '1'
 SZ = 2048
 def sw_xy(k): return 1536 + (k % 16) * 32, 1536 + (k // 16) * 32
 def sw_uv(k): x, y = sw_xy(k); return ((x + 16) / SZ, 1 - (y + 16) / SZ)
@@ -159,7 +160,14 @@ for who in ('zoe', 'asha'):
                     'skirt': {'cloth': lambda P, s, pa=pants: (s == pa) & (P[:, 1] > 0.3), 'top': 0.74, 'hem': hem, 'flare': 0.06, 'uv': lambda t: region_uv(SKIRTD, t)}}
         ink_w = 0.008
         edit(M, None, plan, J, bones, ink_w, (64, 12)); edit(L, None, plan, J, bones, ink_w, (24, 5))
-        hs = mpfb_fixes.HEAD_STYLE[who]; mm = mpfb_fixes.new_head(M, J, style=hs); mpfb_fixes.new_head(L, J, (32, 20), style=hs)   # (a new head from Andrew's art: no box chin)
+        imref = [im]; swc = {}
+        def swf(h, J=J, imref=imref, swc=swc):
+            if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
+            return swc[h]
+        mm = 0
+        if HEADS:   # (new heads: off until Andrew picks a direction; HEADS=1 turns the anime_head.py try on)
+            mm = anime_head.apply(M, J, who, swf); anime_head.apply(L, J, who, swf); im = imref[0]
+            pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
         if when == 'night':   # high heels, the feet part of them; the game lifts her by the new lowest point
             wp = mpfb_fixes.bone_world(J); bu = np.array(sw_uv(k_black), np.float32)
             sh = pal['#17151a']
@@ -171,12 +179,16 @@ for who in ('zoe', 'asha'):
         write(J, M, L, buf, os.path.join(OUT, nid + '.json'))
         print(nid, 'verts', M['verts'], 'tris', M['tris'], 'lod', L['verts'], L['tris'])
 
-# the others with the same box chin: only the mouth fix
+# Belinda and Mina: their new anime heads too
 for nid in ('belinda', 'mina'):
     J, buf, M, L = mpfb_io.load(os.path.join(SRC, nid + '.json'))
-    hs = mpfb_fixes.HEAD_STYLE[nid]; mm = mpfb_fixes.new_head(M, J, style=hs); mpfb_fixes.new_head(L, J, (32, 20), style=hs)
-    for k in ('full', 'half'):
-        f = J['sheet'].get(k)
-        if f and os.path.exists(os.path.join(SRC, f)): import shutil; shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
-    M['tris'] = sum(len(g) for g in M['groups'].values()) // 3; L['tris'] = sum(len(g) for g in L['groups'].values()) // 3
-    write(J, M, L, buf, os.path.join(OUT, nid + '.json')); print(nid, 'mouth verts moved', mm)
+    imref = [Image.open(os.path.join(SRC, J['sheet']['full'])).convert('RGBA')]; swc = {}
+    def swf(h, J=J, imref=imref, swc=swc):
+        if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
+        return swc[h]
+    if not HEADS: break   # (Belinda and Mina are only touched for the new heads)
+    mm = anime_head.apply(M, J, nid, swf); anime_head.apply(L, J, nid, swf)
+    pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
+    imref[0].save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)
+    if J['sheet'].get('half'): imref[0].resize((1024, 1024), Image.LANCZOS).save(os.path.join(OUT, J['sheet']['half']), 'WEBP', lossless=True)
+    write(J, M, L, buf, os.path.join(OUT, nid + '.json')); print(nid, 'new head verts', mm)
