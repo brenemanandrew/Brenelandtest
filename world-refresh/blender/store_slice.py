@@ -17,7 +17,8 @@ def build(night, cut):
     path_up([(-10, -12), (-8.8, -7), (-6.0, -4.6), (-2.6, -3.0)], 0.0, B, seed=9)
     # the cobbled patio before the front
     rnd = random.Random(3)
-    for i in range(70): box(rnd.uniform(-5.5, 7.5), rnd.uniform(-2.8, 1.6), B, rnd.uniform(0.5, 0.8), rnd.uniform(0.45, 0.7), 0.06, '#b9b2a6' if rnd.random() < 0.6 else '#a59e92', rot=rnd.uniform(0, 0.4), bevel=0.04)
+    box(1.0, -0.6, B, 13.6, 4.8, 0.03, '#8f887c', bevel=0)   # (the bed the cobbles sit in)
+    for i in range(70): box(rnd.uniform(-5.5, 7.5), rnd.uniform(-2.8, 1.6), B, rnd.uniform(0.5, 0.8), rnd.uniform(0.45, 0.7), 0.04 + i * 0.0006, '#b9b2a6' if rnd.random() < 0.6 else '#a59e92', rot=rnd.uniform(0, 0.4), bevel=0.04)
     for x, y, s in ((-12, 12, 1.4), (-11, 2, 1.1), (13, 12, 1.3), (14, 2, 1.0), (12, -7, 1.2)): tree(x, y, B if abs(x) < 12.5 else 0, s, col='#2f5a35' if night else '#3f7a3a')
     # ---- walls: stone ground storey, plaster and timber above
     keepW = not cut
@@ -82,8 +83,9 @@ def build(night, cut):
     AX0, AX1, AY0, AY1 = X1, X1 + 3.4, 2.8, 8.5
     if not cut:
         stone_wall(AX0, AX1, AY0 - 0.35, B, B + 3.6, seed=51); stone_wall(AY0, AY1, AX1, B, B + 3.0, seed=52, axis='y')
-        o = box((AX0 + AX1) / 2 + 0.2, (AY0 + AY1) / 2, B + 3.2, AX1 - AX0 + 0.9, AY1 - AY0 + 1.0, 0.18, '#566069', bevel=0); o.rotation_euler = (0, 0.18, 0)
-        for k in range(10): ball(AX0 + rnd.uniform(0.3, 3.2), rnd.uniform(AY0 - 0.3, AY1), B + 3.75 - 0.18 * (rnd.uniform(0.3, 3.2)), rnd.uniform(0.18, 0.35), MOSS, sz=0.35)
+        rv = [(AX0, AY0 - 0.6, B + 3.95), (AX1 + 0.45, AY0 - 0.6, B + 3.05), (AX1 + 0.45, AY1 + 0.4, B + 3.05), (AX0, AY1 + 0.4, B + 3.95)]
+        mesh(rv + [(x, y, z + 0.16) for (x, y, z) in rv], [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1), (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)], '#566069')   # the lean-to roof, high at the house
+        for k in range(10): u = rnd.uniform(0.3, 3.2); ball(AX0 + u, rnd.uniform(AY0 - 0.3, AY1), B + 4.12 - 0.9 * u / 3.85, rnd.uniform(0.18, 0.35), MOSS, sz=0.35)
         box(6.2, AY0 - 0.4, B, 1.1, 0.1, 2.3, '#3a3236', bevel=0.02); beam((5.55, AY0 - 0.45, B + 2.35), (6.85, AY0 - 0.45, B + 2.35), 0.14, TIM)
         box(6.2, AY0 - 0.48, B + 1.15, 0.7, 0.04, 0.85, '#1a0f2a', emit=0, bevel=0.02)
         text('SUMMIT', 6.2, AY0 - 0.51, B + 1.65, 0.14, '#ff6fd8', emit=6 if night else 2.5, ext=0.01)
@@ -95,7 +97,7 @@ def build(night, cut):
     # ---- inside
     box(0, (Y0 + Y1) / 2, B, X1 - X0, Y1 - Y0, 0.06, '#3a2a40' if night else '#a8805a', bevel=0)
     rnd2 = random.Random(8)
-    for i in range(60): box(rnd2.uniform(X0 + 0.3, X1 - 0.3), rnd2.uniform(Y0 + 0.3, Y1 - 0.3), B + 0.06, 0.6, 0.5, 0.01, ('#4a3656' if night else '#b9906a') if rnd2.random() < 0.5 else ('#2f2238' if night else '#9a7652'), rot=rnd2.uniform(0, 0.5), bevel=0)
+    for i in range(60): box(rnd2.uniform(X0 + 0.3, X1 - 0.3), rnd2.uniform(Y0 + 0.3, Y1 - 0.3), B + 0.06, 0.6, 0.5, 0.008 + i * 0.0002, ('#4a3656' if night else '#b9906a') if rnd2.random() < 0.5 else ('#2f2238' if night else '#9a7652'), rot=rnd2.uniform(0, 0.5), bevel=0)
     BOOTH = '#5a2f7a' if night else '#a0472f'
     for y in (3.2, 5.0, 6.8):   # booths along the west wall
         box(X0 + 0.55, y, B, 0.9, 0.12, 1.15, BOOTH, bevel=0.05); box(X0 + 0.55, y + 0.95, B, 0.9, 0.12, 1.15, BOOTH, bevel=0.05)
