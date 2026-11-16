@@ -175,7 +175,8 @@ for who in ('zoe', 'asha'):
         if when == 'night':   # high heels, the feet part of them; the game lifts her by the new lowest point
             wp = mpfb_fixes.bone_world(J); bu = np.array(sw_uv(k_black), np.float32)
             sh = pal['#17151a']
-            fl = mpfb_fixes.heels(M, J, wp, bu, shoe=swatches(M)[:M['verts']] == sh); mpfb_fixes.heels(L, J, wp, bu, shoe=swatches(L)[:L['verts']] == sh); J['floor'] = fl
+            skc = int({v: k2 for k2, v in J['palette'].items()}[J['palette']['4']])   # (her skin)
+            fl = mpfb_fixes.sandals(M, J, bu, sh, skc, style='pump', heel='stiletto'); mpfb_fixes.sandals(L, J, bu, sh, skc, style='pump', heel='stiletto'); J['floor'] = fl   # (clean backless pumps on her own feet)
             print(nid, 'heels: floor', round(fl, 4))
         print(nid, 'mouth verts moved', mm)
         im.save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)

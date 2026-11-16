@@ -125,7 +125,7 @@ def fix_mouth(M):
 
 def _rx(t): c, s = np.cos(t), np.sin(t); return np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
 
-def heels(M, J, wpos, black_uv, ink_w=0.008, theta=0.4, toe_back=0.8, segs=10, shoe=None):
+def heels(M, J, wpos, black_uv, ink_w=0.008, theta=0.4, toe_back=0.8, segs=10, shoe=None, heel='stiletto'):
     """wpos: bone name -> rest world position. Returns the lowest y after (the new floor)."""
     P = M['pos'].reshape(-1, 3).copy(); N = M['nor'].reshape(-1, 3).copy(); INK = M['ink'].reshape(-1, 3).astype(np.float64) / 100000
     names = [b['name'] for b in J['bones']]
@@ -162,7 +162,8 @@ def heels(M, J, wpos, black_uv, ink_w=0.008, theta=0.4, toe_back=0.8, segs=10, s
         hx, hz = back[:, 0].mean(), back[:, 2].mean() + 0.012
         under = foot[(np.abs(foot[:, 0] - hx) < 0.03) & (np.abs(foot[:, 2] - hz) < 0.03)]
         top = under[:, 1].min() + 0.006 if len(under) else floor + 0.06
-        rings = [(top, 0.017, 0.014), (top - (top - floor) * 0.5, 0.009, 0.008), (floor + 0.004, 0.0055, 0.005), (floor, 0.0055, 0.005)]
+        rings = ([(top, 0.019, 0.017), (top - (top - floor) * 0.5, 0.0145, 0.0135), (floor + 0.004, 0.012, 0.011), (floor, 0.012, 0.011)] if heel == 'block' else
+                 [(top, 0.017, 0.014), (top - (top - floor) * 0.5, 0.009, 0.008), (floor + 0.004, 0.0055, 0.005), (floor, 0.0055, 0.005)])
         base = n0 + sum(len(v) for v in newV); V = []; NN = []
         for (y, rx, rz) in rings:
             for i in range(segs):
@@ -359,7 +360,7 @@ def _band(pts, center, axis, width, closed, outward=0.0022, bins=28, keep=None):
     N = np.vstack([ring - center, ring - center]); N /= np.linalg.norm(N, axis=1, keepdims=True)
     return V, np.array(F), N
 
-def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45):
+def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45, style='sandal', heel='block'):
     """Belinda's evening shoes taken a step past Zoe's heels (Andrew): open stiletto sandals. Her shoes go (her own feet are modelled
     under them), and each foot gets a thin sole, a strap over the toes and one round the ankle; then the feet tip into the heel's
     pose with a stiletto (heels()). Returns the new floor."""
@@ -380,13 +381,14 @@ def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45):
         if len(F_) < 10: continue
         parts = []
         # the sole: slices along the foot, its underside, 5 mm thick, a little wider than the foot
-        low = F_[F_[:, 1] < 0.03]; z0 = (low if len(low) else F_)[:, 2].min() - 0.004; z1 = F_[:, 2].max() + 0.004; zs = np.linspace(z0, z1, 16)
+        low = F_[F_[:, 1] < 0.03]; z0 = (low if len(low) else F_)[:, 2].min() + 0.006; z1 = F_[:, 2].max() + 0.003; zs = np.linspace(z0, z1, 16)   # (no shelf behind the heel)
         top, bot = [], []
         for zz in zs:
             d = np.abs(F_[:, 2] - zz); m = d < (z1 - z0) / 20 + 0.004
             if m.sum() < 2: m = d <= np.sort(d)[min(3, len(d) - 1)]
             xs = F_[m, 0]; yb = F_[m, 1].min()
-            wpad = 0.004 * np.sin(np.pi * (zz - z0) / (z1 - z0)) ** 0.3
+            wpad = 0.004 * np.sin(np.pi * (zz - z0) / (z1 - z0)) ** 0.3; nar = 0.3 * max(0, 1 - (zz - z0) / (0.3 * (z1 - z0)))   # (narrower under the heel)
+            xm_ = (xs.min() + xs.max()) / 2; xs = xm_ + (xs - xm_) * (1 - nar)
             top += [(xs.min() - wpad, yb + 0.0006, zz), (xs.max() + wpad, yb + 0.0006, zz)]; bot += [(xs.min() - wpad, yb - 0.0045, zz), (xs.max() + wpad, yb - 0.0045, zz)]
         T_, B_ = np.array(top), np.array(bot); V = np.vstack([T_, B_]); k = len(zs); F = []
         for i in range(k - 1):
@@ -396,15 +398,40 @@ def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45):
             F += [(a, 2 * k + a, 2 * k + d), (a, 2 * k + d, d), (b, c, 2 * k + c), (b, 2 * k + c, 2 * k + b)]   # the edges
         N = np.vstack([np.tile([0, 1.0, 0], (k * 2, 1)), np.tile([0, -1.0, 0], (k * 2, 1))])
         parts.append((V, np.array(F), N))
-        # the toe strap: over the top of the forefoot, just behind the toes
-        zt = ball[2] + 0.028; m = np.abs(F_[:, 2] - zt) < 0.006
-        if m.sum() > 4:
-            c = F_[m].mean(0); c[1] = F_[m, 1].min() + 0.004
-            b_ = _band(F_[m], c, np.array([0, 0, 1.0]), 0.012, False, keep=lambda a: np.sin(a) > -0.05)
-            if b_: parts.append(b_)
+        Tall = M['groups'][''].reshape(-1, 3).astype(np.int64); fset = np.zeros(len(P), bool); fset[foot] = True
+        FT = Tall[fset[Tall].all(1)]
+        zt = ball[2] + 0.028
+        if style == 'pump':   # a closed toe cap: the front of the foot's own skin, 2.5 mm out
+            Nv = M['nor'].reshape(-1, 3); zc_ = ball[2] - 0.03
+            capT = FT[(P[FT][:, :, 2] > zc_ - 0.012).any(1)]
+            cv = np.unique(capT); remap = {v: i for i, v in enumerate(cv)}
+            V = P[cv] + Nv[cv] * 0.0025; V[:, 2] = np.maximum(V[:, 2], zc_ + 0.006 * np.abs(V[:, 0] - ank[0]) / 0.04)   # (a clean, slightly curved topline)
+            F = np.vectorize(remap.get)(capT)
+            A2, B2, C2 = V[F[:, 0]], V[F[:, 1]], V[F[:, 2]]; F = F[np.linalg.norm(np.cross(B2 - A2, C2 - A2), axis=1) > 1e-9]
+            parts.append((V, F, Nv[cv]))
+        else:
+            # the toe strap: thin, over the top of the forefoot just behind the toes
+            m = np.abs(F_[:, 2] - zt) < 0.006
+            if m.sum() > 4:
+                c = F_[m].mean(0); c[1] = F_[m, 1].min() + 0.004
+                b_ = _band(F_[m], c, np.array([0, 0, 1.0]), 0.007, False, keep=lambda a: np.cos(a) > -0.15)
+                if b_: parts.append(b_)
+            # the instep strap: from the ankle strap down the top of the foot to the toe strap (Andrew's reference)
+            if len(FT):
+                FT2 = FT[P[FT].mean(1)[:, 1] < ank[1] - 0.005]   # (the top of the foot only, not the shin)
+                A_, B_, C_ = P[FT2[:, 0]], P[FT2[:, 1]], P[FT2[:, 2]]; cxm = F_[F_[:, 1] < 0.05][:, 0].mean()
+                zs2 = np.linspace(ank[2] + 0.04, zt - 0.004, 12); rows = []
+                for xo in (-0.004, 0.004):
+                    O = np.stack([np.full(len(zs2), cxm + xo), np.full(len(zs2), 0.4), zs2], 1); Dd = np.tile([0, -1.0, 0], (len(zs2), 1))
+                    t = _raycast(O, Dd, A_, B_, C_); rows.append((O + Dd * (t - 0.0025)[:, None], t))
+                ok = ~np.isnan(rows[0][1]) & ~np.isnan(rows[1][1]); k_ = int(ok.sum())
+                if k_ > 2:
+                    V = np.vstack([rows[0][0][ok], rows[1][0][ok]]); F = []
+                    for q in range(k_ - 1): F += [(q, k_ + q, k_ + q + 1), (q, k_ + q + 1, q + 1)]
+                    F = np.array(F); parts.append((V, np.vstack([F, F[:, [0, 2, 1]]]), np.tile([0, 1.0, 0], (len(V), 1))))
         # the ankle strap: round the ankle
         ya = ank[1] - 0.01; m = (np.abs(F_[:, 1] - ya) < 0.006)
-        if m.sum() > 4:
+        if style != 'pump' and m.sum() > 4:
             b_ = _band(F_[m], F_[m].mean(0), np.array([0, 1.0, 0]), 0.008, True)
             if b_: parts.append(b_)
         for V, F, N in parts:
@@ -420,7 +447,7 @@ def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45):
     F = np.vstack(addF).ravel().astype(M['groups'][''].dtype)
     M['groups'][''] = np.concatenate([M['groups'][''], F]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, F.dtype)), F])
     M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
-    return heels(M, J, wp, black_uv, theta=theta)
+    return heels(M, J, wp, black_uv, theta=theta, heel=heel)
 
 def fold_collar(M, blouse_sw, y0=0.965, zc=0.135, hinge_y=1.04):
     """Mina's collar stood out forward off her chest (its wings reached toward her face). Fold the wings down onto the chest about
