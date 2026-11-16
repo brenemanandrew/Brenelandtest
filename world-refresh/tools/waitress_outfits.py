@@ -164,7 +164,7 @@ for who in ('zoe', 'asha'):
         def swf(h, J=J, imref=imref, swc=swc):
             if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
             return swc[h]
-        mm = 0   # (remove_face_shell: tried, off - behind the shell is the mouth's dark inside, not a finished face)
+        mm = (mpfb_fixes.remove_face_shell(M), mpfb_fixes.fill_face_hole(M), mpfb_fixes.keep_lips_only(M, J)); mpfb_fixes.remove_face_shell(L); mpfb_fixes.fill_face_hole(L); mpfb_fixes.keep_lips_only(L, J)   # (the face: its front shell off, the hole filled smoothly)
         if HEADS:   # (new heads: off until Andrew picks a direction; HEADS=1 turns the anime_head.py try on)
             mm = anime_head.apply(M, J, who, swf); anime_head.apply(L, J, who, swf); im = imref[0]
             pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
@@ -186,6 +186,7 @@ for nid in ('belinda', 'mina'):
     def swf(h, J=J, imref=imref, swc=swc):
         if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
         return swc[h]
+    print(nid, 'face: shell cut, hole filled', mpfb_fixes.remove_face_shell(M), mpfb_fixes.fill_face_hole(M), mpfb_fixes.keep_lips_only(M, J), mpfb_fixes.remove_face_shell(L), mpfb_fixes.fill_face_hole(L), mpfb_fixes.keep_lips_only(L, J))
     if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
         hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
         pk = {v: int(k) for k, v in J['palette'].items()}; bu = np.array(sw_uv(pk['#17151a']), np.float32)   # open stiletto sandals (Andrew)

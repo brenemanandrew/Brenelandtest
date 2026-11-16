@@ -532,12 +532,104 @@ def remove_face_shell(M):
         if ((d[:, 0] ** 2 + d[:, 1] ** 2 < 0.007 ** 2) & (dz > 0.004) & (dz < 0.05)).any(): shell[i] = True
     walls = near & (np.abs(nn[:, 0]) > 0.6) & (c[:, 2] > mc[2] - 0.02)
     cut = shell | walls
+    M['_cuttri'] = np.stack([A[cut], B[cut], C[cut]], 1)   # (for fill_face_hole: exactly where the face was cut)
     M['groups']['_face'] = T[~cut].ravel().astype(M['groups']['_face'].dtype)
     if '_face' in M.get('inkGroups', {}):
         it = M['inkGroups']['_face'].reshape(-1, 3).astype(np.int64); ic = P[it].mean(1)
         cutc = c[cut]; keep = np.ones(len(it), bool)
         for j in range(len(it)):
-            if ((cutc - ic[j]) ** 2).sum(1).min() < 0.004 ** 2: keep[j] = False
+            if ((cutc - ic[j]) ** 2).sum(1).min() < 0.009 ** 2: keep[j] = False
         M['inkGroups']['_face'] = it[keep].ravel().astype(M['inkGroups']['_face'].dtype)
     M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
     return int(cut.sum())
+
+def _pip(x, y, poly):
+    """points (x, y arrays) inside a polygon (ray casting)"""
+    inside = np.zeros(len(x), bool); n = len(poly)
+    for i in range(n):
+        x1, y1 = poly[i]; x2, y2 = poly[(i + 1) % n]
+        c = ((y1 > y) != (y2 > y)) & (x < (x2 - x1) * (y - y1) / (y2 - y1 + 1e-12) + x1)
+        inside ^= c
+    return inside
+
+def fill_face_hole(M):
+    """After remove_face_shell: the opening round the mouth filled smoothly. The hole's rim is found (the face's open edges by the
+    mouth), the face round it fitted with a smooth surface (a cubic in x, y), and a fine patch laid on that surface over the hole and
+    a few mm past its rim (just behind the face there, so no seam), with the face's own colour, painted-face coordinates, weights
+    and the face's smooth normals blended from round the rim. The lips stay in front of it."""
+    P = M['pos'].reshape(-1, 3); N = M['nor'].reshape(-1, 3)
+    if '_mouth' not in M['groups']: return 0
+    mv = np.unique(M['groups']['_mouth']); mc = P[mv].mean(0)
+    T = M['groups']['_face'].reshape(-1, 3).astype(np.int64)
+    from collections import Counter
+    CT = M.get('_cuttri')
+    if CT is None or not len(CT): return 0
+    # the rim: the remaining face's open edges near the mouth; the ring: face points within 2.5 cm of the rim
+    E = Counter()
+    for a, b, c in T:
+        for e in ((a, b), (b, c), (c, a)): E[(min(e), max(e))] += 1
+    lo, hi = CT.reshape(-1, 3).min(0) - 0.01, CT.reshape(-1, 3).max(0) + 0.01
+    bv = np.unique([v for e, k in E.items() if k == 1 for v in e if (P[v] > lo).all() and (P[v] < hi).all()])
+    if len(bv) < 6: return 0
+    fv = np.setdiff1d(np.unique(T), mv)
+    d_r = np.sqrt(((P[fv][:, None, :2] - P[bv][None, :, :2]) ** 2).sum(2)).min(1)
+    ring = fv[(d_r < 0.025) & (N[fv, 2] > 0.1)]
+    if len(ring) < 15: return 0
+    # the patch: a 2.5 mm grid over what was cut and 5 mm past it
+    xs = np.arange(lo[0], hi[0], 0.0025); ys = np.arange(lo[1], hi[1], 0.0025)
+    GX, GY = np.meshgrid(xs, ys); gx, gy = GX.ravel(), GY.ravel(); nx_, ny_ = len(xs), len(ys)
+    keep = np.zeros(len(gx), bool)
+    for tri in CT:   # inside a cut triangle (x, y)
+        a2, b2, c2 = tri[0, :2], tri[1, :2], tri[2, :2]; v0, v1 = b2 - a2, c2 - a2; den = v0[0] * v1[1] - v1[0] * v0[1]
+        if abs(den) < 1e-12: continue
+        m = (gx > min(a2[0], b2[0], c2[0]) - 0.005) & (gx < max(a2[0], b2[0], c2[0]) + 0.005) & (gy > min(a2[1], b2[1], c2[1]) - 0.005) & (gy < max(a2[1], b2[1], c2[1]) + 0.005)
+        if not m.any(): continue
+        wx, wy = gx[m] - a2[0], gy[m] - a2[1]; u = (wx * v1[1] - v1[0] * wy) / den; v = (v0[0] * wy - wx * v0[1]) / den
+        keep[np.where(m)[0][(u > -0.45) & (v > -0.45) & (u + v < 1.45)]] = True   # (a little past each: the patch tucks under the rim)
+    # heights: blended from the ring (inverse distance), so the patch meets the face at the rim and stays smooth across
+    Rr = P[ring]; d2 = (gx[:, None] - Rr[None, :, 0]) ** 2 + (gy[:, None] - Rr[None, :, 1]) ** 2
+    kk = np.argsort(d2, 1)[:, :16]; w = 1 / (np.take_along_axis(d2, kk, 1) ** 1.5 + 1e-9)
+    gz = (Rr[kk][:, :, 2] * w).sum(1) / w.sum(1) - 0.0006
+    Vp = np.stack([gx, gy, gz], 1).astype(np.float32)
+    # normals, colour, paint coordinates, weights: from the face round the rim
+    d2 = ((Vp[:, None, :2] - P[ring][None, :, :2]) ** 2).sum(2); kk = np.argsort(d2, 1)[:, :24]; w = 1 / (np.sqrt(np.take_along_axis(d2, kk, 1)) + 1e-4)
+    Np = (N[ring][kk] * w[:, :, None]).sum(1); Np /= np.linalg.norm(Np, axis=1, keepdims=True)
+    FUV = M['fuv'].reshape(-1, 2); fa, *_ = np.linalg.lstsq(np.stack([np.ones(len(ring)), P[ring, 0], P[ring, 1]], 1), FUV[ring], rcond=None)
+    Fp = (np.stack([np.ones(len(Vp)), Vp[:, 0], Vp[:, 1]], 1) @ fa).astype(np.float32)
+    nearest = ring[kk[:, 0]]
+    Fq = []
+    for j in range(ny_ - 1):
+        for i in range(nx_ - 1):
+            a, b, c, d = j * nx_ + i, j * nx_ + i + 1, (j + 1) * nx_ + i + 1, (j + 1) * nx_ + i
+            if keep[a] and keep[b] and keep[c] and keep[d]: Fq += [(a, b, c), (a, c, d)]
+    if not Fq: return 0
+    Fq = np.array(Fq)
+    A_, B_, C_ = Vp[Fq[:, 0]], Vp[Fq[:, 1]], Vp[Fq[:, 2]]
+    if np.cross(B_ - A_, C_ - A_)[:, 2].mean() < 0: Fq = Fq[:, [0, 2, 1]]
+    used = np.unique(Fq); remap = -np.ones(len(Vp), int); remap[used] = np.arange(len(used)); Fq = remap[Fq]
+    Vp, Np, Fp, nearest = Vp[used], Np[used], Fp[used], nearest[used]
+    n0 = M['verts']
+    M['pos'] = np.concatenate([M['pos'], Vp.ravel()]).astype(np.float32); M['nor'] = np.concatenate([M['nor'], Np.ravel()]).astype(np.float32)
+    M['uv'] = np.concatenate([M['uv'], M['uv'].reshape(-1, 2)[nearest].ravel()]).astype(np.float32)
+    M['fuv'] = np.concatenate([M['fuv'], Fp.ravel()]).astype(np.float32)
+    M['si'] = np.concatenate([M['si'], M['si'].reshape(-1, 4)[nearest].ravel()]); M['sw'] = np.concatenate([M['sw'], M['sw'].reshape(-1, 4)[nearest].ravel()])
+    M['ink'] = np.concatenate([M['ink'], np.zeros(len(Vp) * 3, np.int16)])
+    tot = n0 + len(Vp); dt = np.uint16 if tot < 65536 else np.uint32
+    M['groups']['_face'] = np.concatenate([M['groups']['_face'], (Fq + n0).ravel()]).astype(dt)
+    for g in M['groups']: M['groups'][g] = M['groups'][g].astype(dt)
+    for g in M['inkGroups']: M['inkGroups'][g] = M['inkGroups'][g].astype(dt)
+    M['verts'] = tot; M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return len(Fq)
+
+def keep_lips_only(M, J):
+    """The mouth piece without its inside (the dark lining, the teeth, the tongue): only the lips stay, on the smooth filled face."""
+    UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    lip = int({v: k for k, v in J['palette'].items()}.get(J['palette']['0'], 0)) if '0' in J['palette'] else 0   # (palette 0: the lips)
+    t = M['groups']['_mouth'].reshape(-1, 3).astype(np.int64)
+    keep = (sw[t] == lip).all(1)
+    M['groups']['_mouth'] = t[keep].ravel().astype(M['groups']['_mouth'].dtype)
+    if '_mouth' in M['inkGroups']:
+        it = M['inkGroups']['_mouth'].reshape(-1, 3).astype(np.int64); M['inkGroups']['_mouth'] = it[(sw[it] == lip).all(1)].ravel().astype(M['inkGroups']['_mouth'].dtype)
+    M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return int((~keep).sum())
