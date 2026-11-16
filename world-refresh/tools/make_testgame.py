@@ -673,6 +673,19 @@ a = "pts: ['slot:woods-corner', [-130, -28],"
 assert t.count(a) == 1; t = t.replace(a, "pts: [...((typeof location !== 'undefined' && new URLSearchParams(location.search).has('oldworld')) ? ['slot:woods-corner'] : [[-112, -34.6]]), [-130, -28],", 1)
 open(p, 'w').write(t)
 
+# the area's floating name sits over the portal (where you play), not over the empty lawn
+p = os.path.join(OUT, 'js/main.js'); t = open(p).read()
+a = "    ui.areaLabel(new THREE.Vector3(a.x, 4.6, a.z), text, a.game ? a.game.theme : 'soon');"
+assert t.count(a) == 1; t = t.replace(a, "    const lq = a.promptAt;   // (world-refresh: an area played at a spot of its own is named over it)\n    ui.areaLabel(lq ? new THREE.Vector3(lq.x, groundHeight(lq.x, lq.z) + 5.2, lq.z) : new THREE.Vector3(a.x, 4.6, a.z), text, a.game ? a.game.theme : 'soon');", 1)
+open(p, 'w').write(t)
+
+# ---- the unicorn area follow-ups, each its own script run on the built copy (Game Waves session, 2026-11-16): the diorama's holes,
+# the new unicorns, Tess and Rudy roaming town. Each: python3 tools/NAME.py OUT
+for name in ['patch_diorama_fix', 'patch_unicorns_new', 'patch_kids_roam']:
+    f = os.path.join(HERE, name + '.py')
+    if os.path.exists(f):
+        import subprocess as _sp; _sp.run([sys.executable, f, OUT], check=True)
+
 # ---- the Summit Slice waitresses' uniforms (tools/waitress_outfits.py edits the baked MPFB characters): night = the green top and a
 # black skirt, day = red and cream stripes, a cream skirt with a red hem band, Asha's apron red, white sneakers
 import subprocess
