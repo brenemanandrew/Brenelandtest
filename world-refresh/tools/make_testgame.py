@@ -483,7 +483,7 @@ for g in glob.glob(os.path.join(OUT, 'models/refresh/tex/*.glb')) + [os.path.joi
 
 # test hook: window.__cam = {p:[x,y,z], t:[x,y,z]} pins the camera (for screenshots only)
 p = os.path.join(OUT, 'js/main.js'); m = open(p).read()
-hook = "    if (ink.uniforms.uIndoor) ink.uniforms.uIndoor.value = WEATHER.indoor || 0;   // (vibrant pass: softer indoors, none on people there)\n    if (window.__cam) { window.__world = world; camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
+hook = "    if (ink.uniforms.uIndoor) ink.uniforms.uIndoor.value = WEATHER.indoor || 0;   // (vibrant pass: softer indoors, none on people there)\n    window.__pl = player; window.__areas = areas;   // (test hooks: the player and the play areas, for scripted walks)\n    if (window.__cam) { window.__world = world; camera.position.set(...window.__cam.p); camera.lookAt(...window.__cam.t); camera.updateMatrixWorld(); world.sky.position.copy(camera.position); }\n"
 a = '    ui.update(camera, innerWidth, innerHeight);'
 assert m.count(a) == 1; m = m.replace(a, hook + a, 1); open(p, 'w').write(m)   # (before the labels, so name tags follow the pinned camera)
 print('test game written to', OUT)
@@ -775,6 +775,7 @@ if t.count("uniform float uTime, uGlint;") == 1:
 p = os.path.join(OUT, 'js/world.js'); t = open(p).read()
 a = "  updaters.push((dt, t) => { water.material.uniforms.uTime.value = t; });"
 assert t.count(a) == 1, 'water updater'
+if "import { dayPhase } from './daytime.js';" not in t: t = "import { dayPhase } from './daytime.js';   // (world-refresh: the light shafts follow the day)\n" + t
 t = t.replace(a, a + """
   if (!new URLSearchParams(location.search).has('noshafts') && !new URLSearchParams(location.search).has('oldworld')) {
     const g = new THREE.Group(); g.name = 'light-shafts'; root.add(g);
@@ -790,7 +791,8 @@ t = t.replace(a, a + """
       m.scale.set(w, h, 1); m.position.set(x, terrainHeight(x, z) - 0.5, z); m.rotation.set(0, hash01('sh', i, 5) * Math.PI, -0.45); m.renderOrder = 5; m.frustumCulled = true;
       g.add(m); const m2 = m.clone(); m2.rotation.y += Math.PI / 2; g.add(m2);
     }
-    updaters.push((dt, t) => { sm.uniforms.uT.value = t; const sy = sun.position.clone().normalize().y; sm.uniforms.uK.value = Math.max(0, Math.min(1, (sy - 0.08) / 0.25)) * (1 - Math.min(1, (globalThis.__WEATHER_RAIN || 0)));
+    updaters.push((dt, t) => { sm.uniforms.uT.value = t; if (!(t - (sm.__pt || -9) < 1)) { sm.__pt = t; sm.__sun = dayPhase(Date.now()).sun; }   // (the game's own clock: the shadow light stays up at night as moonlight)
+      sm.uniforms.uK.value = Math.max(0, Math.min(1, (sm.__sun - 0.12) / 0.3)) * (1 - Math.min(1, (globalThis.__WEATHER_RAIN || 0)));
       g.rotation.y = 0; });
   }""", 1)
 open(p, 'w').write(t)
