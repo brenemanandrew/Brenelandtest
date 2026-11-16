@@ -60,6 +60,22 @@ def build(cut):
         for x, y, s, sd in ((-4.4, 0.4, 1.0, 1), (-3.4, 0.0, 0.8, 2), (2.5, 0.0, 0.8, 3), (4.6, -0.3, 0.9, 4), (-5.6, 1.2, 1.1, 5)): flowers(x, y, B, s, seed=sd)
         cyl(-6.6, 0.6, B, 0.05, 3.6, '#5a3e28', seg=8)
         mesh([(-6.6, 0.6, B + 3.5), (-5.2, 0.4, B + 3.2), (-5.5, 0.5, B + 2.7), (-6.6, 0.6, B + 2.4)], [(0, 1, 2, 3), (3, 2, 1, 0)], '#f2a6c4')
+        # ---- more outside detail: window boxes, porch lanterns, shutters, a blade sign, a chimney, a rain barrel, path lamps, a fence
+        for wx, ww in ((-3.3, 1.5), (1.9, 1.5)):
+            box(wx, Y0 - 0.42, B + 0.62, ww + 0.2, 0.3, 0.22, '#6b4a2b', bevel=0.02)
+            rb = random.Random(int(wx * 10))
+            for k in range(6): ball(wx - ww / 2 + 0.15 + k * ww / 5.5, Y0 - 0.45, B + 0.9, 0.11, '#4f9a3e'); ball(wx - ww / 2 + 0.15 + k * ww / 5.5, Y0 - 0.52, B + 0.98, 0.06, rb.choice(['#e86a8a', '#f2c14e', '#b48cff', '#ffffff']))
+        for x in (-3.2, 3.2):
+            beam((x, 0.5, B + 2.6), (x, 0.25, B + 2.6), 0.04, '#2b2326'); box(x, 0.2, B + 2.15, 0.18, 0.18, 0.32, '#2b2326', bevel=0.02); ball(x, 0.2, B + 2.32, 0.07, '#ffd27a', emit=3)
+        for sg in (-1, 1): box(sg * 0.75, Y0 - 0.32, B + EAVE + 0.35, 0.35, 0.06, 1.1, '#3f6b3a', bevel=0.02)
+        beam((X0 - 0.3, Y0 - 0.2, B + 3.0), (X0 - 1.1, Y0 - 0.2, B + 3.0), 0.06, '#2b2326')
+        box(X0 - 0.75, Y0 - 0.2, B + 2.2, 0.06, 0.7, 0.7, '#efe0b8', bevel=0.03); box(X0 - 0.75, Y0 - 0.2, B + 2.3, 0.07, 0.5, 0.5, '#3f6b3a', bevel=0.02)
+        box(X1 + 3.2, 8.4, B + 3.2, 0.7, 0.7, 3.4, '#8c877e', bevel=0.05); box(X1 + 3.2, 8.4, B + 6.6, 0.85, 0.85, 0.15, '#7f7a72', bevel=0.03)
+        cyl(X1 + 0.6, 2.6, B, 0.32, 0.8, '#6b4a2b', seg=14); torus(X1 + 0.6, 2.6, B + 0.25, 0.32, 0.025, '#2b2326'); torus(X1 + 0.6, 2.6, B + 0.6, 0.32, 0.025, '#2b2326')
+        for (lx, ly, lz) in ((8.0, -6.0, 0.4), (4.2, -2.6, 0.8), (-2.2, -0.4, B)):
+            cyl(lx + 0.9, ly, lz, 0.04, 1.6, '#2b2326', seg=8); box(lx + 0.9, ly, lz + 1.6, 0.2, 0.2, 0.28, '#2b2326', bevel=0.02); ball(lx + 0.9, ly, lz + 1.74, 0.07, '#ffd27a', emit=3)
+        for x in [-11 + i * 1.2 for i in range(8)]: cyl(x, -2.6, B, 0.05, 0.75, '#8a6240', seg=8)
+        beam((-11, -2.6, B + 0.6), (-2.6, -2.6, B + 0.6), 0.06, '#8a6240'); beam((-11, -2.6, B + 0.3), (-2.6, -2.6, B + 0.3), 0.06, '#8a6240')
         roof(X0, X1, Y0, Y1, B + EAVE, B + RIDGE, '#566069', over=0.6, moss=MOSS, seed=1)
     else:
         # cutaway: no roof, just the gable ends' outline
@@ -99,6 +115,39 @@ def build(cut):
     for k in range(3): box(2.9, 3.4, B + 1.06 + k * 0.07, 0.45, 0.3, 0.06, '#7a5a3c', bevel=0.01)  # old books
     figure(2.4, 4.1, B, '#5a3f6b', '#2b2326', '#2b2326', skin='#d9a77f')                         # the clerk
     plant(X1 - 0.5, Y0 + 0.6, B, 1.1); plant(X0 + 0.5, Y1 - 0.9, B, 0.9)
+    # ---- the shop's displays (Andrew): what is FOR SALE goes on BLANK forms and stands, dressed in the game from the catalogue
+    # (cream forms with a brass tag); everything else on display is decoration, random clothes that cannot be bought
+    BLANK, TAG = '#f3efe6', '#c9a24a'
+    def blank_form(x, y, rot=0.0):
+        cyl(x, y, B, 0.32, 0.12, '#6b4a2b', seg=20); cyl(x, y, B + 0.12, 0.035, 0.9, '#3a2a1c', seg=8)
+        cyl(x, y, B + 1.0, 0.22, 0.32, BLANK, r2=0.17, seg=20); cyl(x, y, B + 1.32, 0.17, 0.42, BLANK, r2=0.26, seg=20)
+        cyl(x, y, B + 1.74, 0.07, 0.12, BLANK, seg=12); ball(x, y, B + 1.98, 0.13, BLANK, sz=1.2)
+        box(x + 0.22, y - 0.3, B + 0.12, 0.12, 0.02, 0.08, TAG, bevel=0.005)
+    for x in (-3.6, -2.5, 0.9, 2.0): blank_form(x, 2.75)                                  # four sale forms in the front windows
+    blank_form(-1.9, 7.4); blank_form(-0.9, 7.4)                                          # two more under the loft (the dressed pair by the mirrors are decoration)
+    box(0.4, 3.3, B, 0.9, 0.5, 0.9, '#6b4a2b', bevel=0.03)                                # accessory stand: three blank hat heads
+    for k in range(3): cyl(0.1 + k * 0.3, 3.3, B + 0.9, 0.025, 0.3, '#3a2a1c', seg=8); ball(0.1 + k * 0.3, 3.3, B + 1.3, 0.11, BLANK, sz=1.15)
+    box(0.4, 3.0, B + 0.9, 0.12, 0.02, 0.08, TAG, bevel=0.005)
+    for (cx, cy) in ((-1.0, 3.0), (0.9, 8.4)):                                            # glass cases, empty, for jewellery and glasses for sale
+        box(cx, cy, B, 1.0, 0.5, 0.75, '#6b4a2b', bevel=0.02); box(cx, cy, B + 0.75, 0.96, 0.46, 0.3, '#d9eef5', rough=0.05, bevel=0.01)
+        box(cx, cy - 0.26, B + 0.6, 0.12, 0.02, 0.08, TAG, bevel=0.005)
+    rr = random.Random(77); DEC = ['#e0564a', '#3f8fd9', '#f0c24f', '#7fb36a', '#b48cff', '#ff8fb8', '#2b3a4e', '#c27a3a', '#3fae5a', '#8a2f4a']
+    def rack(x0, x1, y):                                                                  # decoration: a rail of random clothes
+        for x in (x0, x1): cyl(x, y, B, 0.03, 1.55, '#b08d57', seg=8)
+        beam((x0, y, B + 1.5), (x1, y, B + 1.5), 0.04, '#b08d57')
+        n = int((x1 - x0) / 0.12)
+        for i in range(n): box(x0 + 0.1 + i * (x1 - x0 - 0.2) / max(1, n - 1), y, B + 0.65 + rr.uniform(0, 0.2), 0.06, 0.42, 0.8 - rr.uniform(0, 0.2), rr.choice(DEC), bevel=0.02)
+    rack(-3.6, -1.8, 9.1); rack(-1.4, 0.4, 9.1)
+    cyl(0.6, 6.6, B, 0.05, 1.45, '#b08d57', seg=8); torus(0.6, 6.6, B + 1.42, 0.5, 0.02, '#b08d57')     # a round rack of random tops
+    for i in range(14): a = i * 6.283 / 14; box(0.6 + math.cos(a) * 0.5, 6.6 + math.sin(a) * 0.5, B + 0.75, 0.06, 0.4, 0.66, rr.choice(DEC), rot=a + 1.57, bevel=0.02)
+    for k in range(5): box(X1 - 0.35, 3.0 + k * 0.6, B + 0.05, 0.4, 0.45, 0.25 + rr.uniform(0, 0.15), rr.choice(DEC), bevel=0.04)   # boots and boxes along the east wall
+    # the fitting room in the back west corner: a purple curtain on a rail
+    beam((X0 + 0.1, 7.6, B + 2.2), (X0 + 1.5, 7.6, B + 2.2), 0.04, '#b08d57'); box(X0 + 0.8, 7.6, B + 0.1, 1.3, 0.06, 2.05, PURP, bevel=0.03)
+    # tie beams across the double-height front with pendants on cords, and a garland
+    for y in (3.6, 5.2):
+        beam((X0, y, B + LOFT + 0.4), (X1, y, B + LOFT + 0.4), 0.18, TIM)
+        for x in (-2.0, 0.6, 2.4): beam((x, y, B + LOFT + 0.3), (x, y, B + 2.6), 0.015, '#2b2326'); cyl(x, y, B + 2.35, 0.22, 0.25, '#3f6b3a', r2=0.06, seg=16); ball(x, y, B + 2.38, 0.07, '#ffd27a', emit=4)
+    for i in range(12): f = i / 11; ball(X0 + 0.4 + f * (X1 - X0 - 0.8), Y0 + 0.3, B + 2.9 - math.sin(math.pi * f) * 0.3, 0.05, ['#e86a8a', '#f2c14e', '#7fb36a'][i % 3], emit=2)
     # the curved stair up to the loft, at the back east corner
     spiral(3.1, 6.8, B, 1.25, B + LOFT, '#8a6240', n=14, turn=0.7, start=-math.pi / 2)
     # ---- the loft: Belinda's Spa (over the back half)
@@ -133,6 +182,12 @@ def build(cut):
     figure(2.4, 8.9, ZL, '#2b2326', '#2b2326', '#16141c', skin='#c98e62')                           # Belinda
     plant(X0 + 0.5, LY0 + 0.6, ZL, 1.0); plant(3.9, 9.5, ZL, 0.9)
     for k in range(3): box(1.6 + k * 0.5, Y1 - 0.06, ZL + 1.3 + (k % 2) * 0.3, 0.32, 0.03, 0.4, GOLD, bevel=0.02)
+    # spa extras: a towel shelf, candles, a hanging plant, a folding screen
+    box(X0 + 0.3, 9.5, ZL, 0.4, 0.6, 1.4, '#6b4a2b', bevel=0.02)
+    for k in range(3): box(X0 + 0.3, 9.5, ZL + 0.3 + k * 0.4, 0.36, 0.5, 0.18, ['#f7f1e4', '#f2a6c4', '#b48cff'][k], bevel=0.05)
+    for k in range(3): cyl(0.82 + k * 0.12, 8.75, ZL + 0.7, 0.03, 0.08 + k * 0.03, '#f7f1e4', seg=10); ball(0.82 + k * 0.12, 8.75, ZL + 0.8 + k * 0.03, 0.015, '#ffcc66', emit=10)
+    beam((-2.0, 7.0, ZL + 2.6), (-2.0, 7.0, ZL + 2.1), 0.015, '#2b2326'); cyl(-2.0, 7.0, ZL + 1.85, 0.18, 0.25, '#c86f4a', r2=0.12); [ball(-2.0 + 0.15 * math.cos(k), 7.0 + 0.15 * math.sin(k), ZL + 1.8, 0.1, '#4f9a3e', sz=1.8) for k in range(6)]
+    for k in range(3): o = box(-3.2 + k * 0.45, 6.9, ZL, 0.45, 0.04, 1.6, '#e8d2a8', rot=0.4 if k % 2 else -0.4, bevel=0.02)
     if not cut: ball(0, 9.0, ZL + 2.6, 0.18, '#ffd0a0', emit=5)
     lamp(0, 8.0, ZL + 2.4, 120, (1, 0.8, 0.6), 0.6)   # a pendant
     lamp(0, 4.5, B + 3.0, 160, (1, 0.85, 0.65), 0.8)
