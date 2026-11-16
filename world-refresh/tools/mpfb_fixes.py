@@ -444,3 +444,100 @@ def fold_collar(M, blouse_sw, y0=0.965, zc=0.135, hinge_y=1.04):
     N[sel] /= np.maximum(np.linalg.norm(N[sel], axis=1, keepdims=True), 1e-9)
     M['pos'] = P.ravel().astype(np.float32); M['nor'] = N.ravel().astype(np.float32); M['ink'] = np.round(INK).ravel().astype(np.int16)
     return int(len(sel))
+
+def remove_collar(M, blouse_sw, y0=0.965, zc=0.135):
+    """Mina's collar flap (Andrew's markup: the band from her neck across her chest) goes: the blouse's triangles that stand out in
+    front of her chest above the neckline line. The blouse under it stays."""
+    P = M['pos'].reshape(-1, 3); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    flap = (sw == blouse_sw) & (P[:, 1] > y0) & (P[:, 2] > zc)
+    n = 0
+    for grp in (M['groups'], M['inkGroups']):
+        for g in list(grp.keys()):
+            t = grp[g].reshape(-1, 3).astype(np.int64)
+            if len(t): k = flap[t].sum(1) >= 2; n += int(k.sum()); grp[g] = t[~k].ravel().astype(grp[g].dtype)
+    return n
+
+def belinda_neckline(M, dress_sw, skin_sw, band0=0.955, drop=0.6, sx=0.135):
+    """Belinda's dress (Andrew's markup): the neckline a little lower, and the straps on her shoulders instead of up at her neck.
+    The dress's top band is drawn down toward its lower edge; each strap is moved out to the shoulder as it rises and laid on
+    the skin there."""
+    P = M['pos'].reshape(-1, 3).copy(); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    dress = sw == dress_sw; skin = np.where(sw == skin_sw)[0]
+    top = P[dress & (P[:, 1] < 1.03), 1].max()
+    band = np.where(dress & (P[:, 1] > band0) & (P[:, 1] <= top + 0.004))[0]
+    P[band, 1] = band0 + (P[band, 1] - band0) * (1 - drop)          # the top edge comes down
+    newtop = band0 + (top - band0) * (1 - drop); dy = top - newtop
+    # the old straps go (they ran up beside her neck); new ones rise from the dress's top edge, over the top of each shoulder
+    # (following her skin, a few mm proud), and down to the dress at the back
+    oldst = dress & (P[:, 1] > top + 0.004)
+    for grp in (M['groups'], M['inkGroups']):
+        for g in list(grp.keys()):
+            t_ = grp[g].reshape(-1, 3).astype(np.int64)
+            if len(t_): grp[g] = t_[~oldst[t_].any(1)].ravel().astype(grp[g].dtype)
+    S = P[skin]; SI = M['si'].reshape(-1, 4); SW = M['sw'].reshape(-1, 4)
+    addV, addN, addF, near = [], [], [], []; n0 = M['verts']; base = n0; W = 0.011
+    for sg in (-1, 1):
+        X = sg * sx; m = (np.abs(S[:, 0] - X) < 0.012) & (S[:, 1] > newtop - 0.03)
+        if m.sum() < 8: continue
+        Q = S[m]; cz, cy = Q[:, 2].mean(), newtop - 0.03
+        ang = np.linspace(0.05, np.pi - 0.05, 26)   # from the front (+z) over the top to the back
+        pts = []
+        for a in ang:
+            d = np.array([np.cos(a), np.sin(a)]); rel = np.stack([Q[:, 2] - cz, Q[:, 1] - cy], 1); r = rel @ d
+            ok = np.abs(rel @ np.array([-d[1], d[0]])) < 0.012
+            rr = r[ok].max() if ok.any() else None
+            if rr is not None: pts.append((cz + d[0] * (rr + 0.004), cy + d[1] * (rr + 0.004)))
+        pts = np.array(pts); pts = pts[pts[:, 1] >= newtop - 0.012]
+        if len(pts) < 4: continue
+        V = np.vstack([np.stack([np.full(len(pts), X - W / 2), pts[:, 1], pts[:, 0]], 1), np.stack([np.full(len(pts), X + W / 2), pts[:, 1], pts[:, 0]], 1)])
+        k = len(pts); F = []
+        for q in range(k - 1): F += [(q, q + 1, k + q + 1), (q, k + q + 1, k + q)]
+        nrm = np.stack([np.zeros(k), pts[:, 1] - cy, pts[:, 0] - cz], 1); nrm /= np.linalg.norm(nrm, axis=1, keepdims=True)
+        addV.append(V); addN.append(np.vstack([nrm, nrm])); F = np.array(F)
+        # (both sides of the thin strap)
+        addF.append(np.vstack([F, F[:, [0, 2, 1]]]) + base)
+        near.append(skin[np.argmin(((V[:, None, :] - S[None, :, :]) ** 2).sum(2), 1)]); base += len(V)
+    if addV:
+        V = np.vstack(addV).astype(np.float32); nr = np.concatenate(near); duv = UV[np.where(dress)[0][0]]
+        M['pos'] = np.concatenate([P.ravel(), V.ravel()]).astype(np.float32)
+        M['nor'] = np.concatenate([M['nor'], np.vstack(addN).ravel()]).astype(np.float32)
+        M['uv'] = np.concatenate([M['uv'], np.tile(duv, (len(V), 1)).ravel()]).astype(np.float32)
+        M['fuv'] = np.concatenate([M['fuv'], np.zeros(len(V) * 2, np.float32)])
+        M['si'] = np.concatenate([M['si'], SI[nr].ravel()]); M['sw'] = np.concatenate([M['sw'], SW[nr].ravel()])
+        M['ink'] = np.concatenate([M['ink'], np.round(np.vstack(addN).ravel() * 0.003 * 100000).astype(np.int16)])
+        Fa = np.vstack(addF).ravel().astype(M['groups'][''].dtype)
+        M['groups'][''] = np.concatenate([M['groups'][''], Fa]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, Fa.dtype)), Fa])
+        M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+        return len(band), len(V)
+    M['pos'] = P.ravel().astype(np.float32)
+    return len(band), 0
+
+def remove_face_shell(M):
+    """The 'box chin' (Andrew, seen in profile in the editor): a thin extra shell of face triangles standing in front of the real face
+    round the mouth and chin; the real face, with the lips, is right behind it. Cut the shell away: face triangles near the mouth that
+    have more face (or the lips) behind them within a few cm, and the shell's side walls. The real face stays."""
+    P = M['pos'].reshape(-1, 3)
+    if '_mouth' not in M['groups'] or '_face' not in M['groups']: return 0
+    mv = np.unique(M['groups']['_mouth']); mc = P[mv].mean(0)
+    T = M['groups']['_face'].reshape(-1, 3).astype(np.int64); A, B, C = P[T[:, 0]], P[T[:, 1]], P[T[:, 2]]
+    c = (A + B + C) / 3; nn = np.cross(B - A, C - A); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
+    near = (np.abs(c[:, 0] - mc[0]) < 0.11) & (c[:, 1] > mc[1] - 0.12) & (c[:, 1] < mc[1] + 0.07) & (c[:, 2] > mc[2] - 0.08)
+    idx = np.where(near)[0]
+    behind_pts = np.vstack([c[near], P[mv]])
+    shell = np.zeros(len(T), bool)
+    for i in idx:
+        d = behind_pts[:, :2] - c[i, :2]; dz = c[i, 2] - behind_pts[:, 2]
+        if ((d[:, 0] ** 2 + d[:, 1] ** 2 < 0.007 ** 2) & (dz > 0.004) & (dz < 0.05)).any(): shell[i] = True
+    walls = near & (np.abs(nn[:, 0]) > 0.6) & (c[:, 2] > mc[2] - 0.02)
+    cut = shell | walls
+    M['groups']['_face'] = T[~cut].ravel().astype(M['groups']['_face'].dtype)
+    if '_face' in M.get('inkGroups', {}):
+        it = M['inkGroups']['_face'].reshape(-1, 3).astype(np.int64); ic = P[it].mean(1)
+        cutc = c[cut]; keep = np.ones(len(it), bool)
+        for j in range(len(it)):
+            if ((cutc - ic[j]) ** 2).sum(1).min() < 0.004 ** 2: keep[j] = False
+        M['inkGroups']['_face'] = it[keep].ravel().astype(M['inkGroups']['_face'].dtype)
+    M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return int(cut.sum())

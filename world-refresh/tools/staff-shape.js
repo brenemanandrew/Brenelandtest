@@ -63,6 +63,11 @@ function measure(data, pos, si, sw) {
   const bust = [-1, 1].map(s => { let best = null;
     for (let i = 0; i < n; i++) { const x = pos[i * 3] * s, y = pos[i * 3 + 1], z = pos[i * 3 + 2];
       if (x > 0.03 && x < 0.16 && y < shY && y > shY - 0.3 && wChest[i] > 0.3 && wHead[i] < 0.1 && (!best || z > best[2])) best = [pos[i * 3], y, z]; }
+    if (best && Math.abs(best[0]) < 0.07) {   // (a flat chest: no clear fullest point, so where one would be, on the chest's front)
+      const bx = s * 0.085, by = shY - 0.13; let bz = -9;
+      for (let i = 0; i < n; i++) if (Math.abs(pos[i * 3] - bx) < 0.02 && Math.abs(pos[i * 3 + 1] - by) < 0.02 && wHead[i] < 0.1) bz = Math.max(bz, pos[i * 3 + 2]);
+      if (bz > -9) best = [bx, by, bz];
+    }
     return best; });
   const pel = W.pelvis || [0, 0.75, 0], th = W.thigh_l || [0.1, 0.7, 0];
   return { wHead, eye, chin, top, piv: [0, chin - 0.02, 0.01], bust, hipY: (pel[1] + th[1]) / 2, waistY: pel[1] + (shY - pel[1]) * 0.42, shY, legTop: th[1] - 0.05,
@@ -127,8 +132,17 @@ function deform(data, look, geo) {
     }
     if (wh < 0.5) {
       const bodyK = 1 - wh * 2;
-      if (v('bust')) for (const c of R.bust) if (c) { const dx = x - c[0], dy = y - c[1], dz = z - (c[2] - 0.06), d = Math.hypot(dx, dy, dz), f = gauss(d, 0.075) * sm(-0.04, 0.02, z - (c[2] - 0.09));
-        if (f > 1e-3) { const k = v('bust') * 0.55 * f * bodyK; x += dx * k; y += dy * k * 0.6; z += dz * k * 1.3; } }
+      // the bust, with gravity: the volume goes in mostly below the fullest point (the lower part drops and rounds out, the upper
+      // part rises from the chest in a gentle slope), a little outward, nothing behind the chest's front
+      if (v('bust')) for (const c of R.bust) if (c) {
+        const dx = x - c[0], dy = y - c[1], front = sm(-0.09, -0.04, z - c[2]);
+        const g = Math.exp(-(dx * dx) / (2 * 0.068 * 0.068) - (dy * dy) / (2 * (dy > 0 ? 0.085 : 0.058) ** 2)) * front * bodyK;
+        if (g < 1e-3) continue;
+        const A = v('bust') * 0.085, lower = sm(0.03, -0.035, dy), upperSlope = dy > 0 ? 0.5 + 0.5 * Math.exp(-(dy * dy) / (2 * 0.03 * 0.03)) : 1;
+        z += A * g * upperSlope * (0.85 + 0.25 * lower);
+        y -= A * g * (0.15 + 0.55 * lower) * (A > 0 ? 1 : 0.4);
+        x += Math.sign(dx) * A * 0.22 * g * (0.5 + 0.5 * lower);
+      }
       if (v('waist')) { const f = gauss((y - R.waistY) / 0.08, 1) * bodyK; x *= 1 + v('waist') * 0.25 * f; z *= 1 + v('waist') * 0.12 * f; }
       if (v('hips')) { const f = gauss((y - R.hipY) / 0.11, 1) * bodyK; x *= 1 + v('hips') * 0.3 * f; z *= 1 + v('hips') * 0.12 * f; }
       if (v('shoulders')) { const f = gauss((y - R.shY) / 0.07, 1) * bodyK; x *= 1 + v('shoulders') * 0.25 * f; }

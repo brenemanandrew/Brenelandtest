@@ -164,7 +164,7 @@ for who in ('zoe', 'asha'):
         def swf(h, J=J, imref=imref, swc=swc):
             if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
             return swc[h]
-        mm = 0
+        mm = 0   # (remove_face_shell: tried, off - behind the shell is the mouth's dark inside, not a finished face)
         if HEADS:   # (new heads: off until Andrew picks a direction; HEADS=1 turns the anime_head.py try on)
             mm = anime_head.apply(M, J, who, swf); anime_head.apply(L, J, who, swf); im = imref[0]
             pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
@@ -189,6 +189,7 @@ for nid in ('belinda', 'mina'):
     if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
         hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
         pk = {v: int(k) for k, v in J['palette'].items()}; bu = np.array(sw_uv(pk['#17151a']), np.float32)   # open stiletto sandals (Andrew)
+        # (belinda_neckline: the lower neckline works, the rebuilt straps do not yet - off until they do)
         fl = mpfb_fixes.sandals(M, J, bu, pk['#17151a'], pk['#c98e62']); mpfb_fixes.sandals(L, J, bu, pk['#17151a'], pk['#c98e62']); J['floor'] = fl; print('belinda sandals, floor', round(fl, 4))
         if not HEADS:
             for kk in ('full', 'half'):
@@ -196,8 +197,8 @@ for nid in ('belinda', 'mina'):
                 if f and os.path.exists(os.path.join(SRC, f)): shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
             for D in (M, L): D['tris'] = sum(len(g) for g in D['groups'].values()) // 3
             write(J, M, L, buf, os.path.join(OUT, nid + '.json')); continue
-    if nid == 'mina':   # her collar folded down (it stood out forward toward her face)
-        bk = int({v: k for k, v in J['palette'].items()}['#efe5cc']); print('mina collar folded', mpfb_fixes.fold_collar(M, bk), mpfb_fixes.fold_collar(L, bk))
+    if nid == 'mina':   # her collar flap removed (Andrew's markup: it stood out, then lay across her chest)
+        bk = int({v: k for k, v in J['palette'].items()}['#efe5cc']); print('mina collar flap removed', mpfb_fixes.remove_collar(M, bk), mpfb_fixes.remove_collar(L, bk))
         if not HEADS:
             for kk in ('full', 'half'):
                 f = J['sheet'].get(kk)
