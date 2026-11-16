@@ -120,10 +120,15 @@ def fix_mouth(M):
 
 def _rx(t): c, s = np.cos(t), np.sin(t); return np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
 
-def heels(M, J, wpos, black_uv, ink_w=0.008, theta=0.4, toe_back=0.8, segs=10):
+def heels(M, J, wpos, black_uv, ink_w=0.008, theta=0.4, toe_back=0.8, segs=10, shoe=None):
     """wpos: bone name -> rest world position. Returns the lowest y after (the new floor)."""
     P = M['pos'].reshape(-1, 3).copy(); N = M['nor'].reshape(-1, 3).copy(); INK = M['ink'].reshape(-1, 3).astype(np.float64) / 100000
     names = [b['name'] for b in J['bones']]
+    if shoe is not None:   # backless (Andrew): the shoe's back above the sole goes, so the foot's own heel shows behind
+        P0 = P; back = shoe & (P0[:, 1] > 0.016) & (P0[:, 2] < np.array(wpos['foot_l'])[2] + 0.0)
+        for grp in (M['groups'], M['inkGroups']):
+            if '' in grp:
+                t = grp[''].reshape(-1, 3).astype(np.int64); grp[''] = t[~back[t].all(1)].ravel().astype(grp[''].dtype)
     newV = []; newF = []; newUV = []; newSI = []; newSW = []; newN = []; newINK = []
     n0 = M['verts']
     for side in ('l', 'r'):
@@ -206,3 +211,90 @@ def round_jaw(M):
     X[:, 1] += 0.012 * roll ** 2
     P[sel] = X; M['pos'] = P.ravel().astype(np.float32)
     return int(len(sel))
+
+def _vnormals(V, F):
+    n = np.zeros_like(V); fn = np.cross(V[F[:, 1]] - V[F[:, 0]], V[F[:, 2]] - V[F[:, 0]])
+    for k in range(3): np.add.at(n, F[:, k], fn)
+    return n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-12)
+
+HEAD_STYLE = {   # from Andrew's art (mall-staff-sheet: his drawings of the sisters and the pizza girls)
+    'belinda': dict(w=1.05, jaw=0.20, cheek=0.05, chin=0.04, drop=0.035),   # round, full cheeks, soft wide jaw
+    'mina':    dict(w=0.93, jaw=0.30, cheek=0.00, chin=0.08, drop=0.035),   # pale oval, narrow and calm
+    'zoe':     dict(w=1.00, jaw=0.27, cheek=0.03, chin=0.06, drop=0.035),   # round, youthful
+    'asha':    dict(w=1.03, jaw=0.42, cheek=0.04, chin=0.13, drop=0.035),   # heart: wide cheekbones, a small pointed chin
+}
+def new_head(M, J, seg=(56, 36), style=None):
+    """A NEW head (Andrew: 'make new heads for them to ditch those weird shapes'): the old head skin (the '_face' group) goes,
+    except the neck below the chin and the ears, and a fresh one goes in its place: a smooth rounded head the old one's size,
+    the lower half easing in to a soft rounded chin, a small nose where the old one was. It carries the painted face (its
+    face-sheet coordinates mapped from the old face by position, so the eyes, brows and blush land where they were), the skin
+    colour, the old head's weights (nearest vertex) and an ink outline. The lips (the mouth piece, with its mouth shapes) are
+    seated on the new surface."""
+    P = M['pos'].reshape(-1, 3); N = M['nor'].reshape(-1, 3); UV = M['uv'].reshape(-1, 2); FUV = M['fuv'].reshape(-1, 2)
+    SI = M['si'].reshape(-1, 4); SW = M['sw'].reshape(-1, 4); INK = M['ink'].reshape(-1, 3)
+    T = M['groups']['_face'].reshape(-1, 3).astype(np.int64); fv = np.unique(T); Fp = P[fv]
+    hj = J['head']; top, chin = hj['top'] - 0.012, hj['chin'] + 0.004
+    xr = np.abs(Fp[:, 0]).max()
+    ear = lambda q: (np.abs(q[:, 0]) > xr - 0.045) & (q[:, 1] > chin + 0.08) & (q[:, 1] < chin + 0.3)
+    zb, zfr = Fp[:, 2].min(), np.percentile(Fp[(np.abs(Fp[:, 0]) < 0.06) & (Fp[:, 1] > chin + 0.15)][:, 2], 60)
+    cy, ry = (top + chin) / 2, (top - chin) / 2
+    cz, rz = (zb + zfr) / 2 + 0.004, (zfr - zb) / 2
+    rx = xr - 0.03
+    # the shape: a lat-long ellipsoid, the lower half drawn in to a chin
+    nu, nv = seg; th = np.linspace(0, np.pi, nv); ph = np.linspace(-np.pi, np.pi, nu, endpoint=False)
+    TH, PH = np.meshgrid(th, ph, indexing='ij'); TH, PH = TH.ravel(), PH.ravel()
+    ux, uy, uz = np.sin(TH) * np.sin(PH), np.cos(TH), np.sin(TH) * np.cos(PH)
+    st = dict(w=1.0, jaw=0.30, cheek=0.0, chin=0.06, drop=0.035); st.update(style or {})
+    low = np.clip(-uy, 0, 1)
+    sx = st['w'] * (1 - st['jaw'] * low ** 1.7 - 0.05 * np.clip(uy, 0, 1) ** 2 + st['cheek'] * np.exp(-((uy + 0.3) / 0.25) ** 2))
+    sz = 1 - np.where(uz > 0, 0.10, 0.0) * low ** 2
+    V = np.stack([ux * rx * sx, cy + uy * ry, cz + uz * rz * sz], 1)
+    # the chin: a little point forward and down at the front of the jaw
+    V[:, 2] += st['chin'] * 0.12 * np.clip(uz, 0, 1) ** 4 * np.exp(-((uy + 0.85) / 0.18) ** 2)
+    V[:, 1] -= st['drop']   # (the head sits lower on the neck: the face, painted where it was, sits higher on the head)
+    # a small nose where the old one was (the old face's most forward point near the middle, above the mouth)
+    mv = np.unique(M['groups']['_mouth']); my1 = P[mv, 1].max()
+    cand = (np.abs(Fp[:, 0]) < 0.02) & (Fp[:, 1] > my1) & (Fp[:, 1] < my1 + 0.08)
+    if cand.any():
+        nz = Fp[cand][np.argmax(Fp[cand][:, 2])]
+        g = np.exp(-((V[:, 0] - 0) ** 2 + (V[:, 1] - nz[1]) ** 2) / (2 * 0.016 ** 2)) * (V[:, 2] > cz)
+        V[:, 2] += 0.012 * g
+    F = []
+    for j in range(nv - 1):
+        for i in range(nu):
+            a, b = j * nu + i, j * nu + (i + 1) % nu; c, d = a + nu, b + nu
+            F += [(a, c, d), (a, d, b)]
+    F = np.array(F, np.int64)
+    Nn = _vnormals(V, F)
+    if (Nn[:, 1][:nu] < 0).mean() > 0.5: F = F[:, [0, 2, 1]]; Nn = _vnormals(V, F)   # (outward)
+    # what goes: the old head skin above the chin line, but not the ears
+    c = P[T].mean(1)
+    gone = (c[:, 1] > chin + 0.01) & ~ear(c)
+    keepT = T[~gone]
+    # the painted face: its sheet coordinates follow position (affine in x, y over the old face's front)
+    front = fv[(N[fv, 2] > 0.35) & (FUV[fv, 0] > 0.0005)]
+    A = np.stack([np.ones(len(front)), P[front, 0], P[front, 1]], 1); fa, *_ = np.linalg.lstsq(A, FUV[front], rcond=None)
+    nf = (np.stack([np.ones(len(V)), V[:, 0], V[:, 1]], 1) @ fa).astype(np.float32)
+    nf[Nn[:, 2] < 0.05] = 0
+    # weights, colour: from the nearest old head vertex
+    near = fv[np.argmin(((V[:, None, :] - Fp[None, :, :]) ** 2).sum(2), 1)]
+    inkw = float(np.median(np.linalg.norm(INK[fv].astype(np.float64) / 100000, axis=1)))
+    # the lips onto the new surface: the mouth piece's front sits on it, its relief kept
+    mz = P[mv, 2].max(); mxy = P[mv].mean(0)
+    surf = V[np.argmin((V[:, 0] - mxy[0]) ** 2 + (V[:, 1] - mxy[1]) ** 2 + (V[:, 2] < cz) * 9)]
+    dz = surf[2] + 0.006 - mz
+    P2 = P.copy(); P2[mv, 2] += dz
+    n0 = M['verts']
+    M['pos'] = np.concatenate([P2.ravel(), V.ravel()]).astype(np.float32)
+    M['nor'] = np.concatenate([M['nor'], Nn.ravel()]).astype(np.float32)
+    M['uv'] = np.concatenate([M['uv'], UV[near].ravel()]).astype(np.float32)
+    M['fuv'] = np.concatenate([M['fuv'], nf.ravel()]).astype(np.float32)
+    M['si'] = np.concatenate([M['si'], SI[near].ravel()]); M['sw'] = np.concatenate([M['sw'], SW[near].ravel()])
+    M['ink'] = np.concatenate([M['ink'], np.round(Nn.ravel() * inkw * 100000).astype(np.int16)])
+    dt = M['groups']['_face'].dtype
+    M['groups']['_face'] = np.concatenate([keepT.ravel(), (F + n0).ravel()]).astype(dt)
+    if '_face' in M['inkGroups']:
+        it = M['inkGroups']['_face'].reshape(-1, 3).astype(np.int64); ic = P[it].mean(1)
+        M['inkGroups']['_face'] = np.concatenate([it[~((ic[:, 1] > chin + 0.01) & ~ear(ic))].ravel(), (F + n0).ravel()]).astype(dt)
+    M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return int(gone.sum())

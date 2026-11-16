@@ -159,10 +159,11 @@ for who in ('zoe', 'asha'):
                     'skirt': {'cloth': lambda P, s, pa=pants: (s == pa) & (P[:, 1] > 0.3), 'top': 0.74, 'hem': hem, 'flare': 0.06, 'uv': lambda t: region_uv(SKIRTD, t)}}
         ink_w = 0.008
         edit(M, None, plan, J, bones, ink_w, (64, 12)); edit(L, None, plan, J, bones, ink_w, (24, 5))
-        mm = mpfb_fixes.fix_mouth(M); mpfb_fixes.fix_mouth(L); mpfb_fixes.round_jaw(M); mpfb_fixes.round_jaw(L)   # (the box on the chin: erased, the jaw rounded)
+        hs = mpfb_fixes.HEAD_STYLE[who]; mm = mpfb_fixes.new_head(M, J, style=hs); mpfb_fixes.new_head(L, J, (32, 20), style=hs)   # (a new head from Andrew's art: no box chin)
         if when == 'night':   # high heels, the feet part of them; the game lifts her by the new lowest point
             wp = mpfb_fixes.bone_world(J); bu = np.array(sw_uv(k_black), np.float32)
-            fl = mpfb_fixes.heels(M, J, wp, bu); mpfb_fixes.heels(L, J, wp, bu); J['floor'] = fl
+            sh = pal['#17151a']
+            fl = mpfb_fixes.heels(M, J, wp, bu, shoe=swatches(M)[:M['verts']] == sh); mpfb_fixes.heels(L, J, wp, bu, shoe=swatches(L)[:L['verts']] == sh); J['floor'] = fl
             print(nid, 'heels: floor', round(fl, 4))
         print(nid, 'mouth verts moved', mm)
         im.save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)
@@ -173,7 +174,7 @@ for who in ('zoe', 'asha'):
 # the others with the same box chin: only the mouth fix
 for nid in ('belinda', 'mina'):
     J, buf, M, L = mpfb_io.load(os.path.join(SRC, nid + '.json'))
-    mm = mpfb_fixes.fix_mouth(M); mpfb_fixes.fix_mouth(L); mpfb_fixes.round_jaw(M); mpfb_fixes.round_jaw(L)
+    hs = mpfb_fixes.HEAD_STYLE[nid]; mm = mpfb_fixes.new_head(M, J, style=hs); mpfb_fixes.new_head(L, J, (32, 20), style=hs)
     for k in ('full', 'half'):
         f = J['sheet'].get(k)
         if f and os.path.exists(os.path.join(SRC, f)): import shutil; shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
