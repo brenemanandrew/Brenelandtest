@@ -571,3 +571,55 @@ assert t.count(a) == 1; t = t.replace(a, "    for (const a of areas) {\n      co
 a = "      if (a && Math.hypot(a.x - px, a.z - pz) > a.promptR + 2.5) dismissed.delete(id);"
 assert t.count(a) == 1; t = t.replace(a, "      if (a && Math.hypot((a.promptAt || a).x - px, (a.promptAt || a).z - pz) > a.promptR + 2.5) dismissed.delete(id);", 1)
 open(p, 'w').write(t)
+
+# ---- the unicorns' table goes (Andrew: the diorama is the new area): no table, cards or chairs; the balloons that were tied
+# to it float free instead, drifting lazily and bouncing off the edges of the area (the plaza and up the path to the portal),
+# never leaving it. Their motion is a pure function of the shared clock (a bounce is a triangle wave), so every screen agrees.
+p = os.path.join(OUT, 'js/areas.js'); t = open(p).read()
+a = "  const top = roundTable(b, x, z, 1.2, '#ffffff', '#f2b8d0');\n  b.add(GEO.cyl12, '#ff8fb8', { x, y: top - 0.1, z, sx: 1.28, sy: 0.18, sz: 1.28 });"
+assert t.count(a) == 1
+t = t.replace(a, "  const tb = NOUNI ? b : { add() { return this; } }, top = NOUNI ? roundTable(b, x, z, 1.2, '#ffffff', '#f2b8d0') : terrainHeight(x, z) + 0.86;   // (world-refresh: no table)\n  tb.add(GEO.cyl12, '#ff8fb8', { x, y: top - 0.1, z, sx: 1.28, sy: 0.18, sz: 1.28 });", 1)
+for a in ["    b.add(GEO.box, ['#b48cff', '#6fb8ff', '#ff6b6b'][i % 3], { x: x + Math.cos(a) * 0.6,",
+          "  b.add(GEO.box, '#ffffff', { x, y: top + 0.1, z, sx: 0.3, sy: 0.2, sz: 0.42 });",
+          "  b.add(GEO.box, '#b48cff', { x, y: top + 0.21, z, sx: 0.3, sy: 0.01, sz: 0.42 });"]:
+    assert t.count(a) == 1, a[:50]; t = t.replace(a, a.replace("b.add(", "tb.add(", 1), 1)
+a = "    chair(b, x + Math.cos(a) * 1.75, z + Math.sin(a) * 1.75, -a - Math.PI / 2, ['#ffc6e0',"
+assert t.count(a) == 1; t = t.replace(a, "    if (NOUNI) chair(b, x + Math.cos(a) * 1.75, z + Math.sin(a) * 1.75, -a - Math.PI / 2, ['#ffc6e0',", 1)
+a = "  ['#ff6fa8', '#6fb8ff', '#fff27a', '#b48cff', '#7ddc7a'].forEach((c, i) => {\n    const a = (i / 5) * TAU;"
+assert t.count(a) == 1
+t = t.replace(a, """  const freeB = [], ufx2 = Math.sin(uf), ufz2 = Math.cos(uf);   // the free balloons (world-refresh)
+  if (!NOUNI) ['#ff6fa8', '#6fb8ff', '#fff27a', '#b48cff', '#7ddc7a', '#ffb347', '#ff6b6b', '#9fe8ff'].forEach((c, i) => {
+    const g2 = new THREE.Group(), ball = new THREE.Mesh(balloonGeometry(), toon(c, { emissive: c, emissiveIntensity: 0.12 }));
+    ball.scale.set(0.36, 0.45, 0.36);
+    const str = new THREE.Mesh(GEO.cyl6, toon('#ffffff')); str.scale.set(0.012, 1.2, 0.012); str.position.y = -1.1;
+    g2.add(shadows(ball, true, false), str); group.add(g2);
+    freeB.push({ g: g2, ball, u0: rnd(), v0: rnd(), h0: rnd(), su: 0.25 + rnd() * 0.2, sv: 0.18 + rnd() * 0.16, sh: 0.1 + rnd() * 0.08, ph: rnd() * TAU });
+  });
+  if (NOUNI) ['#ff6fa8', '#6fb8ff', '#fff27a', '#b48cff', '#7ddc7a'].forEach((c, i) => {
+    const a = (i / 5) * TAU;""", 1)
+a = "    balloons.forEach((bl, i) => {\n      const p = balloonPop(i, t);"
+assert t.count(a) == 1
+t = t.replace(a, """    // the free balloons: inside the area (u across, v back from the plaza's front to just short of the portal), 2.2 to 4.8 m up,
+    // each bouncing between the edges at its own slow pace, with a little sway; one pops now and then and is blown up again
+    const tri = q => { const m = ((q % 2) + 2) % 2; return m < 1 ? m : 2 - m; };
+    freeB.forEach((f, i) => {
+      if (far) { f.g.visible = false; return; }
+      const U0 = -5.5, U1 = 5.5, V0 = -5, V1 = 11.5;
+      const u = U0 + (U1 - U0) * tri(f.u0 * 2 + f.su * t / (U1 - U0)) + 0.25 * Math.sin(t * 0.7 + f.ph);
+      const v = V0 + (V1 - V0) * tri(f.v0 * 2 + f.sv * t / (V1 - V0)) + 0.25 * Math.cos(t * 0.6 + f.ph);
+      const wx = x + ufz2 * u - ufx2 * v, wz = z - ufx2 * u - ufz2 * v;
+      const h = 2.2 + 2.6 * tri(f.h0 * 2 + f.sh * t / 2.6) + 0.15 * Math.sin(t * 1.3 + f.ph);
+      f.g.position.set(wx, terrainHeight(wx, wz) + h, wz);
+      f.g.rotation.set(0.12 * Math.sin(t * 0.9 + f.ph), t * 0.2 + f.ph, 0.12 * Math.cos(t * 0.8 + f.ph));
+      const p = balloonPop(i, t), k = p.popped ? (p.since < 0.1 ? 1 + p.since * 5 : 0) : p.inflate;
+      f.g.visible = k > 0.01; f.ball.scale.set(0.36 * k, 0.45 * k, 0.36 * k);
+    });
+""" + a, 1)
+# the sounds' positions (park.js): balloons over the middle of the area, no clouds, the arch at the rainbow, the 'table' at the portal
+a = "      balloons: balloons.map(bl => ({ x: bl.x, y: bl.y + bl.h + 0.34, z: bl.z, ph: bl.ph })),\n      sparks: sparks.map(s => s.userData), clouds, arch: { x: archX, y: archY + 2.6, z: archZ }, table: { x, z },"
+assert t.count(a) == 1
+t = t.replace(a, """      balloons: NOUNI ? balloons.map(bl => ({ x: bl.x, y: bl.y + bl.h + 0.34, z: bl.z, ph: bl.ph })) : freeB.slice(0, 3).map((f, i) => { const v = 1 + i * 4; return { x: x - ufx2 * v, y: terrainHeight(x, z) + 3.4, z: z - ufz2 * v, ph: f.ph }; }),
+      sparks: sparks.map(s => s.userData), clouds: NOUNI ? clouds : [], arch: NOUNI ? { x: archX, y: archY + 2.6, z: archZ } : { x: uw(0, -0.33)[0], y: terrainHeight(x, z) + 6, z: uw(0, -0.33)[1] }, table: NOUNI ? { x, z } : { x: uniPortal[0], z: uniPortal[1] },""", 1)
+a = "  return {\n    tableR: 1.3,\n    far: lod, // its moving folk"
+assert t.count(a) == 1; t = t.replace(a, "  return {\n    tableR: NOUNI ? 1.3 : 0,\n    far: lod, // its moving folk", 1)
+open(p, 'w').write(t)
