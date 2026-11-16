@@ -1012,3 +1012,35 @@ def short_sleeves(M, J, top_sw, frac=0.55):
     T = M['groups'][''].reshape(-1, 3).astype(np.int64)
     _drop(M, lambda t: cut[t].all(1))
     M['pos'] = P.ravel().astype(np.float32); return int(cut.sum())
+
+def join_cap2(M, cap_sw):
+    """The caps' brims did not meet the crowns (a slot open round the front, Andrew's screenshot from above). Around the crown's
+    middle, each brim point's distance out is remapped so the brim's inner edge lands just inside the crown's rim at that angle,
+    its outer edge where it was."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    P = M['pos'].reshape(-1, 3).copy(); sw = _swatches(M)
+    T = M['groups'][''].reshape(-1, 3).astype(np.int64); cap = T[(sw[T] == cap_sw).all(1)]
+    if not len(cap): return 0
+    _, wid = np.unique(np.round(P * 20000).astype(np.int64), axis=0, return_inverse=True); wid = wid.ravel()
+    Tw = wid[cap]; r = np.r_[Tw[:, 0], Tw[:, 1], Tw[:, 2]]; c = np.r_[Tw[:, 1], Tw[:, 2], Tw[:, 0]]
+    _, lab = connected_components(coo_matrix((np.ones(len(r)), (r, c)), shape=(wid.max() + 1,) * 2), directed=False); tl = lab[Tw[:, 0]]
+    pieces = [np.unique(cap[tl == u]) for u in np.unique(tl)]
+    crown = pieces[int(np.argmax([np.ptp(P[p][:, 1]) for p in pieces]))]
+    brims = [p for p in pieces if P[p][:, 2].max() > P[crown][:, 2].max() + 0.05]
+    if not brims: return 0
+    C = P[crown]; cx, cz = C[:, 0].mean(), C[:, 2].mean(); rim = C[C[:, 1] < C[:, 1].min() + 0.025]
+    ra = np.arctan2(rim[:, 0] - cx, rim[:, 2] - cz); rr = np.hypot(rim[:, 0] - cx, rim[:, 2] - cz)
+    NB = 72; Rm = np.zeros(NB)
+    for k in range(NB):
+        a0 = -np.pi + 2 * np.pi * k / NB; d = np.abs((ra - a0 + np.pi) % (2 * np.pi) - np.pi); Rm[k] = rr[np.argsort(d)[:3]].mean()
+    n = 0
+    for b in brims:
+        B = P[b]; ang = np.arctan2(B[:, 0] - cx, B[:, 2] - cz); rad = np.hypot(B[:, 0] - cx, B[:, 2] - cz)
+        kb = ((ang + np.pi) / (2 * np.pi) * NB).astype(int) % NB
+        rin = np.array([rad[kb == k].min() if (kb == k).any() else 0 for k in range(NB)]); rout = np.array([rad[kb == k].max() if (kb == k).any() else 0 for k in range(NB)])
+        R0 = Rm[kb] - 0.008; ri, ro = rin[kb], rout[kb]
+        nr = np.where(ro - ri > 1e-4, R0 + (rad - ri) * (ro - R0) / np.maximum(ro - ri, 1e-4), rad)
+        nr = np.minimum(nr, rad)   # (only ever inward)
+        P[b, 0] = cx + np.sin(ang) * nr; P[b, 2] = cz + np.cos(ang) * nr; n += len(b)
+    M['pos'] = P.ravel().astype(np.float32); return n

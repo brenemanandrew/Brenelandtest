@@ -172,7 +172,7 @@ for who in ('zoe', 'asha'):
         capc = {'day': '#1d1b21', 'night': '#2f5a3a'}[when]; ck = {v: int(k2) for k2, v in J['palette'].items()}.get(capc)
         for D in (M, L):
             mpfb_fixes.human_hands(D, J); mpfb_fixes.glutes(D, J, 0.03)
-            if ck is not None: mpfb_fixes.join_cap(D, ck)   # (the face: its front shell off, the hole filled smoothly)
+            if ck is not None: mpfb_fixes.join_cap2(D, ck)   # (the face: its front shell off, the hole filled smoothly)
         if HEADS:   # (new heads: off until Andrew picks a direction; HEADS=1 turns the anime_head.py try on)
             mm = anime_head.apply(M, J, who, swf); anime_head.apply(L, J, who, swf); im = imref[0]
             pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
@@ -234,3 +234,14 @@ for nid in ('belinda', 'mina'):
     imref[0].save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)
     if J['sheet'].get('half'): imref[0].resize((1024, 1024), Image.LANCZOS).save(os.path.join(OUT, J['sheet']['half']), 'WEBP', lossless=True)
     write(J, M, L, buf, os.path.join(OUT, nid + '.json')); print(nid, 'new head verts', mm)
+
+# the original outfits too (the editor's "Original outfit"): the same cap join, nothing else, written as ID_orig
+for nid in ('zoe_day', 'zoe_night', 'asha_day', 'asha_night'):
+    J, buf, M, L = mpfb_io.load(os.path.join(SRC, nid + '.json'))
+    ck = {v: int(k2) for k2, v in J['palette'].items()}.get({'zoe_night': '#2f5a3a'}.get(nid, '#1d1b21'))
+    if ck is not None:
+        for D in (M, L): mpfb_fixes.join_cap2(D, ck)
+    for D in (M, L): D['tris'] = sum(len(g) for g in D['groups'].values()) // 3
+    sheet = J['sheet']['full']; shutil.copy(os.path.join(SRC, sheet), os.path.join(OUT, nid + '_orig.webp'))
+    J['id'] = nid + '_orig'; J['bin'] = nid + '_orig.bin'; J['sheet'] = {'full': nid + '_orig.webp', 'half': nid + '_orig.webp'}
+    write(J, M, L, buf, os.path.join(OUT, nid + '_orig.json')); print(nid + '_orig', 'cap joined')

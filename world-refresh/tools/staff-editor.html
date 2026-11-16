@@ -116,7 +116,7 @@ function buildTop() {
   chips($('who'), Object.keys(NAMES).map(k => [k, NAMES[k]]), st.who, k => { st.who = k; if (!STAFF[k].includes(st.when)) st.when = 'day'; buildTop(); show(); });
   chips($('when'), STAFF[st.who].map(k => [k, k === 'day' ? 'Day' : 'Evening']), st.when, k => { st.when = k; buildTop(); show(); });
   const v = $('variant');
-  if (st.who === 'zoe' || st.who === 'asha') chips(v, [['new', st.when === 'day' ? 'Striped uniform' : 'Green top, skirt, heels'], ['original', 'Original outfit']], lookOf().variant || 'new', k => { lookOf().variant = k; lookOf().colors = {}; buildTop(); show(); });
+  if (st.who === 'zoe' || st.who === 'asha') chips(v, [['new', st.when === 'day' ? 'Red shirt, skirt' : (st.who === 'zoe' ? 'Tied top, shorts, heels' : 'Short sleeves, skirt, heels')], ['original', 'Original outfit']], lookOf().variant || 'new', k => { lookOf().variant = k; lookOf().colors = {}; buildTop(); show(); });
   else v.innerHTML = '';
   chips($('focus'), [['body', 'Whole body'], ['head', 'Head'], ['feet', 'Feet']], null, k => {
     const H = data?.J.head; if (k === 'head' && H) Object.assign(orbit, { ty: (H.top + H.chin) / 2, dist: 1.6, tx: 0, tz: 0, pitch: 0.05 });

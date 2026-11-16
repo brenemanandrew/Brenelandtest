@@ -1,0 +1,73 @@
+{
+ "belinda": {
+  "day": {
+   "shape": {
+    "bust": 0.4,
+    "skirt": -0.03,
+    "waist": -0.28,
+    "hips": -0.33,
+    "shoulders": -0.2,
+    "legs": -0.01
+   },
+   "colors": {},
+   "variant": "new"
+  }
+ },
+ "mina": {
+  "day": {
+   "shape": {},
+   "colors": {},
+   "variant": "new"
+  }
+ },
+ "zoe": {
+  "day": {
+   "shape": {
+    "head": -0.15,
+    "faceW": -0.1,
+    "jaw": 0.18,
+    "chin": 0.5,
+    "chinLen": 0.16,
+    "eyeSize": 0.1,
+    "eyeHeight": 0.09,
+    "eyeTilt": -0.29,
+    "nose": 0.78,
+    "mouthSize": 0.06,
+    "bust": 0.22,
+    "skirt": -0.19
+   },
+   "colors": {},
+   "variant": "new"
+  },
+  "night": {
+   "shape": {},
+   "colors": {},
+   "variant": "original"
+  }
+ },
+ "asha": {
+  "day": {
+   "shape": {},
+   "colors": {},
+   "variant": "original"
+  },
+  "night": {
+   "shape": {
+    "waist": 0.05,
+    "skirt": -0.15,
+    "mouthSize": 0.15,
+    "mouthHeight": -0.17,
+    "faceW": -0.02,
+    "jaw": 0.01,
+    "chin": -0.16,
+    "chinLen": 0.41,
+    "cheek": 0,
+    "head": -0.01,
+    "nose": 1,
+    "bust": 0.3
+   },
+   "colors": {},
+   "variant": "new"
+  }
+ }
+}

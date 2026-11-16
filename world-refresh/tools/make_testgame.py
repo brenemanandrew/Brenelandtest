@@ -697,7 +697,7 @@ shutil.copy(os.path.join(WR, 'tools/staff-shape.js'), os.path.join(OUT, 'js/staf
 shutil.copy(os.path.join(WR, 'tools/staff-editor.html'), os.path.join(OUT, 'staff-editor.html'))
 if os.path.exists(os.path.join(WR, 'models/staff-looks.json')): shutil.copy(os.path.join(WR, 'models/staff-looks.json'), os.path.join(OUT, 'models/staff-looks.json'))
 LIVEM = os.path.join(REPO, 'breneland-live/models/mpfb')
-for nid in ('zoe_day', 'zoe_night', 'asha_day', 'asha_night'):   # the original outfits, under their own names
+for nid in ():   # (the original outfits are written by waitress_outfits.py now, caps joined)
     Jo = json.load(open(os.path.join(LIVEM, nid + '.json')))
     shutil.copy(os.path.join(LIVEM, Jo['bin']), os.path.join(OUT, 'models/mpfb', nid + '_orig.bin'))
     shutil.copy(os.path.join(LIVEM, Jo['sheet']['full']), os.path.join(OUT, 'models/mpfb', nid + '_orig.webp'))
