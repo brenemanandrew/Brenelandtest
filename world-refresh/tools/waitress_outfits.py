@@ -193,6 +193,7 @@ for nid in ('belinda', 'mina'):
         pk = {v: int(k) for k, v in J['palette'].items()}; bu = np.array(sw_uv(pk['#17151a']), np.float32)   # open stiletto sandals (Andrew)
         # (belinda_neckline: the lower neckline works, the rebuilt straps do not yet - off until they do)
         fl = mpfb_fixes.sandals(M, J, bu, pk['#17151a'], pk['#c98e62']); mpfb_fixes.sandals(L, J, bu, pk['#17151a'], pk['#c98e62']); J['floor'] = fl; print('belinda sandals, floor', round(fl, 4))
+        print('belinda thong', mpfb_fixes.thong(M, J, pk['#c98e62'], bu), mpfb_fixes.thong(L, J, pk['#c98e62'], bu))   # (after the sandals: it shares the shoes' black)
         if not HEADS:
             for kk in ('full', 'half'):
                 f = J['sheet'].get(kk)

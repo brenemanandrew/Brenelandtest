@@ -674,3 +674,84 @@ def rest_bust(M, J, sag=0.04, back=0.022):
         done += int((k > 0.05).sum())
     M['pos'] = P.ravel().astype(np.float32)
     return done
+
+def _raycast(O, D, A, B, C):
+    """first hit distance of rays O + t D (each) on triangles A, B, C (Moller-Trumbore); nan where none"""
+    e1, e2 = B - A, C - A; out = np.full(len(O), np.nan)
+    for i in range(len(O)):
+        p = np.cross(D[i], e2); det = (e1 * p).sum(1); ok = np.abs(det) > 1e-12
+        inv = np.where(ok, 1 / np.where(ok, det, 1), 0); s = O[i] - A; u = (s * p).sum(1) * inv
+        q = np.cross(s, e1); v = (q * D[i]).sum(1) * inv; t = (q * e2).sum(1) * inv
+        hit = ok & (u >= -1e-4) & (v >= -1e-4) & (u + v <= 1 + 1e-4) & (t > 0)
+        if hit.any(): out[i] = t[hit].min()
+    return out
+
+def thong(M, J, skin_sw, black_uv, off=0.0022):
+    """A standard black thong for Belinda (Andrew): a waistband round her hips, a front panel narrowing to the crotch, a thin strip
+    underneath and a thin strap up the back, each laid on her skin (rays cast onto it) a couple of mm proud, weighted like the skin
+    under it."""
+    P = M['pos'].reshape(-1, 3); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    T = M['groups'][''].reshape(-1, 3).astype(np.int64); skin = sw == skin_sw
+    c = P[T].mean(1); st = T[skin[T].all(1) & (c[:, 1] > 0.45) & (c[:, 1] < 0.72) & (np.abs(c[:, 0]) < 0.27)]
+    A, B, C = P[st[:, 0]], P[st[:, 1]], P[st[:, 2]]
+    sv = np.unique(st); SP = P[sv]
+    yc = SP[np.abs(SP[:, 0]) < 0.02][:, 1].min() + 0.004          # the crotch
+    yb, ybs = 0.622, 0.645                                         # waistband: front centre, sides
+    cz = SP[np.abs(SP[:, 1] - 0.6) < 0.02][:, 2].mean()
+    def hit(O, D):
+        t = _raycast(O, D, A, B, C); return O + D * (t - off)[:, None], t
+    parts = []
+    nu = 7; U = np.linspace(-1, 1, nu)
+    rows = []
+    # back strap (top -> bottom), underside (back -> front), front panel (bottom -> top)
+    for v in np.linspace(0, 1, 9):
+        y = ybs - 0.008 + (yc - ybs + 0.008) * v; w = 0.006 + 0.004 * v
+        O = np.stack([U * w, np.full(nu, y), np.full(nu, cz - 0.4)], 1); rows.append(hit(O, np.tile([0, 0, 1.0], (nu, 1))))
+    for v in np.linspace(0.1, 0.9, 5):
+        z = cz - 0.06 + 0.13 * v; w = 0.012 + 0.006 * v
+        O = np.stack([U * w, np.full(nu, yc - 0.2), np.full(nu, z)], 1); rows.append(hit(O, np.tile([0, 1.0, 0], (nu, 1))))
+    for v in np.linspace(0, 1, 10):
+        y = yc + (yb - yc) * v; w = 0.016 + 0.08 * v ** 1.3
+        O = np.stack([U * w, np.full(nu, y), np.full(nu, cz + 0.4)], 1); rows.append(hit(O, np.tile([0, 0, -1.0], (nu, 1))))
+    R = np.array([r[0] for r in rows]); okr = np.array([~np.isnan(r[1]) for r in rows])
+    V = R.reshape(-1, 3); F = []
+    for j in range(len(rows) - 1):
+        for i in range(nu - 1):
+            a, b, c_, d = j * nu + i, j * nu + i + 1, (j + 1) * nu + i + 1, (j + 1) * nu + i
+            if okr[j, i] and okr[j, i + 1] and okr[j + 1, i + 1] and okr[j + 1, i]: F += [(a, b, c_), (a, c_, d)]
+    parts.append((V, np.array(F)))
+    # the waistband: round the hips, its height rising from the front centre to the sides and back
+    na = 120; ang = np.linspace(-np.pi, np.pi, na, endpoint=False); band = []
+    for h in (-0.006, 0.006):
+        yy = yb + (ybs - yb) * (1 - np.clip(np.cos(ang), 0, 1)) + h
+        O = np.stack([np.zeros(na), yy, np.full(na, cz)], 1) + np.stack([np.sin(ang), np.zeros(na), np.cos(ang)], 1) * 0.4
+        Dd = -np.stack([np.sin(ang), np.zeros(na), np.cos(ang)], 1); tb = _raycast(O, Dd, A, B, C); band.append((O + Dd * (tb - 0.0035)[:, None], tb))
+    for k_ in range(2):   # (a ray that slipped between triangles: its point from its neighbours round the ring)
+        Vb, tb = band[k_]; ok = ~np.isnan(tb)
+        if ok.sum() > 3 and (~ok).any():
+            idx_ = np.arange(na)
+            for d in range(3): Vb[~ok, d] = np.interp(idx_[~ok], idx_[ok], Vb[ok, d], period=na)
+            band[k_] = (Vb, np.zeros(na))
+    V2 = np.vstack([band[0][0], band[1][0]]); ok2 = np.r_[~np.isnan(band[0][1]), ~np.isnan(band[1][1])]; F2 = []
+    for i in range(na):
+        j = (i + 1) % na; q = (i, j, na + j, na + i)
+        if all(ok2[k] for k in q): F2 += [(i, j, na + j), (i, na + j, na + i)]
+    parts.append((V2, np.array(F2)))
+    SI = M['si'].reshape(-1, 4); SWt = M['sw'].reshape(-1, 4); n0 = M['verts']; base = n0
+    addV, addF, addN, near = [], [], [], []
+    for V, F in parts:
+        if not len(F): continue
+        V = np.nan_to_num(V)
+        nr = sv[np.argmin(((V[:, None, :] - SP[None, :, :]) ** 2).sum(2), 1)]
+        nn = V - np.array([0, V[:, 1].mean(), cz]); nn /= np.maximum(np.linalg.norm(nn, axis=1, keepdims=True), 1e-9)
+        addV.append(V); addN.append(nn); near.append(nr); addF.append(np.vstack([F, F[:, [0, 2, 1]]]) + base); base += len(V)
+    V = np.vstack(addV).astype(np.float32); nr = np.concatenate(near); Nn = np.vstack(addN)
+    M['pos'] = np.concatenate([M['pos'], V.ravel()]).astype(np.float32); M['nor'] = np.concatenate([M['nor'], Nn.ravel()]).astype(np.float32)
+    M['uv'] = np.concatenate([M['uv'], np.tile(black_uv, (len(V), 1)).ravel()]).astype(np.float32); M['fuv'] = np.concatenate([M['fuv'], np.zeros(len(V) * 2, np.float32)])
+    M['si'] = np.concatenate([M['si'], SI[nr].ravel()]); M['sw'] = np.concatenate([M['sw'], SWt[nr].ravel()])
+    M['ink'] = np.concatenate([M['ink'], np.round(Nn.ravel() * 0.002 * 100000).astype(np.int16)])
+    Fa = np.vstack(addF).ravel().astype(M['groups'][''].dtype)
+    M['groups'][''] = np.concatenate([M['groups'][''], Fa]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, Fa.dtype)), Fa])
+    M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return len(Fa) // 3
