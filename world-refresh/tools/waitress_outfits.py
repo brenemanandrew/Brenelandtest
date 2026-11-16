@@ -156,7 +156,7 @@ for who in ('zoe', 'asha'):
             uvp = [(lambda P, s, sh=shirt: s == sh, stripe_uv),                                                         # stripes
                    (lambda P, s, so=shoe: (s == so) & (P[:, 1] < 0.2), np.array(sw_uv(k_white), np.float32))]          # white sneakers
             if who == 'asha': uvp.append((lambda P, s, a=pal['#1b191e']: s == a, np.array(sw_uv(k_red), np.float32)))   # her apron red
-            plan = {'uv': uvp, 'hide': lambda P, s, pa=pants, h=hem: (s == pa) & (P[:, 1] < h + 0.03),
+            plan = {'uv': uvp, 'hide': lambda P, s, pa=pants, h=hem: (s == pa) & (P[:, 1] < 0.74),   # (all of the trousers under the skirt: the skirt slider can shorten it)
                     'skirt': {'cloth': lambda P, s, pa=pants: (s == pa) & (P[:, 1] > 0.3), 'top': 0.74, 'hem': hem, 'flare': 0.06, 'uv': lambda t: region_uv(SKIRTD, t)}}
         ink_w = 0.008
         edit(M, None, plan, J, bones, ink_w, (64, 12)); edit(L, None, plan, J, bones, ink_w, (24, 5))
@@ -189,6 +189,7 @@ for nid in ('belinda', 'mina'):
     print(nid, 'box island removed', mpfb_fixes.remove_box_island(M), mpfb_fixes.remove_box_island(L))
     if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
         hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
+        print('belinda bust at rest', mpfb_fixes.rest_bust(M, J), mpfb_fixes.rest_bust(L, J))
         pk = {v: int(k) for k, v in J['palette'].items()}; bu = np.array(sw_uv(pk['#17151a']), np.float32)   # open stiletto sandals (Andrew)
         # (belinda_neckline: the lower neckline works, the rebuilt straps do not yet - off until they do)
         fl = mpfb_fixes.sandals(M, J, bu, pk['#17151a'], pk['#c98e62']); mpfb_fixes.sandals(L, J, bu, pk['#17151a'], pk['#c98e62']); J['floor'] = fl; print('belinda sandals, floor', round(fl, 4))

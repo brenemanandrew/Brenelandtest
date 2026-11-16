@@ -11,7 +11,7 @@ export const SLIDERS = [
   ['chin', 'Chin (soft - pointed)', -0.5, 0.5, 'Face'], ['chinLen', 'Chin length', -0.5, 0.5, 'Face'], ['cheek', 'Cheeks', -0.5, 0.5, 'Face'],
   ['eyeSize', 'Eye size', -0.4, 0.6, 'Eyes, nose, mouth'], ['eyeSpace', 'Eye spacing', -0.5, 0.5, 'Eyes, nose, mouth'], ['eyeHeight', 'Eye height', -0.5, 0.5, 'Eyes, nose, mouth'],
   ['eyeTilt', 'Eye tilt', -0.5, 0.5, 'Eyes, nose, mouth'], ['nose', 'Nose', -0.5, 1.0, 'Eyes, nose, mouth'], ['mouthSize', 'Mouth size', -0.4, 0.5, 'Eyes, nose, mouth'], ['mouthHeight', 'Mouth height', -0.5, 0.5, 'Eyes, nose, mouth'],
-  ['bust', 'Bust', -0.6, 0.8, 'Body'], ['waist', 'Waist', -0.5, 0.5, 'Body'], ['hips', 'Hips', -0.5, 0.5, 'Body'],
+  ['bust', 'Bust', -0.6, 0.8, 'Body'], ['skirt', 'Skirt length (short - long)', -0.6, 0.6, 'Body'], ['waist', 'Waist', -0.5, 0.5, 'Body'], ['hips', 'Hips', -0.5, 0.5, 'Body'],
   ['shoulders', 'Shoulders', -0.4, 0.4, 'Body'], ['legs', 'Leg thickness', -0.4, 0.4, 'Body'],
 ];
 export const FACE_SHAPES = {   // presets for the face sliders (the eyes, nose and mouth keep theirs)
@@ -149,6 +149,24 @@ function deform(data, look, geo) {
       if (v('legs') && y < R.legTop) { const cx = x > 0 ? 0.1 : -0.1, f = sm(0.0, 0.15, R.legTop - y) * bodyK; x = cx + (x - cx) * (1 + v('legs') * 0.35 * f); z *= 1 + v('legs') * 0.3 * f; }
     }
     p[i * 3] = x; p[i * 3 + 1] = y; p[i * 3 + 2] = z;
+  }
+  // the skirt's length: below its waistband the skirt stretches or shortens toward the waist (the legs are modelled under it)
+  if (v('skirt')) {
+    if (R.skirt === undefined) {
+      const J = data.J, uv = g.attributes.uv.array, id = J.id, pal = Object.fromEntries(Object.entries(J.palette || {}).map(([k2, c]) => [c, +k2]));
+      const sk = ({ belinda: '#1f6b3a', mina: '#5d5c5e' })[J.cid];
+      const rect = id.endsWith('_orig') ? null : /_day$/.test(id) ? [512, 1024] : /_night$/.test(id) ? [1024, 1536] : null;
+      const kk = sk !== undefined ? pal[sk] : undefined, ids = [];
+      for (let i = 0; i < n; i++) { const px = uv[i * 2] * 2048, py = (1 - uv[i * 2 + 1]) * 2048;
+        const inPal = kk !== undefined && px >= 1536 + (kk % 16) * 32 && px < 1568 + (kk % 16) * 32 && py >= 1536 + Math.floor(kk / 16) * 32 && py < 1568 + Math.floor(kk / 16) * 32;
+        const inRect = rect && py >= 1536 && px >= rect[0] && px < rect[1];
+        const apron = /^asha_day/.test(id) && !id.endsWith('_orig') && pal['#c7392f'] !== undefined && px >= 1536 + (pal['#c7392f'] % 16) * 32 && px < 1568 + (pal['#c7392f'] % 16) * 32 && py >= 1536 + Math.floor(pal['#c7392f'] / 16) * 32 && py < 1568 + Math.floor(pal['#c7392f'] / 16) * 32;
+        if (inPal || inRect || apron) ids.push(i); }
+      let top = -9; for (const i of ids) top = Math.max(top, o[i * 3 + 1]);
+      R.skirt = ids.length ? { ids, top: Math.min(top, R.waistY + 0.02) } : null;
+    }
+    if (R.skirt) { const k = 1 + v('skirt') * 0.9, T = R.skirt.top;
+      for (const i of R.skirt.ids) { const y = p[i * 3 + 1]; if (y < T) p[i * 3 + 1] = T - (T - y) * k; } }
   }
   // the mouth (its own piece): size and height; the nose: how far it stands out
   const mi = geo['_mouth']?.index?.array;

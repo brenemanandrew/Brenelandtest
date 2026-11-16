@@ -651,3 +651,26 @@ def remove_box_island(M):
         it = M['inkGroups']['_face'].reshape(-1, 3).astype(np.int64); M['inkGroups']['_face'] = it[~gone_v[it].all(1)].ravel().astype(M['inkGroups']['_face'].dtype)
     M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
     return int((~keep).sum())
+
+def rest_bust(M, J, sag=0.04, back=0.022):
+    """Belinda's bust stood straight out. Let it rest: the fuller it stands off the chest the more it settles - down and a little in -
+    toward a rounded teardrop, the upper slope easing in, the lower curve filling; the dress over it follows (all by position)."""
+    P = M['pos'].reshape(-1, 3).copy(); W = bone_world(J); names = [b['name'] for b in J['bones']]
+    si = M['si'].reshape(-1, 4); sw = M['sw'].reshape(-1, 4) / 255
+    cb = [names.index(x) for x in ('spine_03', 'spine_02', 'clavicle_l', 'clavicle_r') if x in names]
+    wC = sum((si == b) * sw for b in cb).sum(1); shY = W['clavicle_l'][1]
+    done = 0
+    for s in (-1, 1):
+        m = (P[:, 0] * s > 0.03) & (P[:, 0] * s < 0.16) & (P[:, 1] < shY) & (P[:, 1] > shY - 0.3) & (wC > 0.3)
+        if not m.any(): continue
+        a = P[np.where(m)[0][np.argmax(P[m, 2])]].copy()
+        dx, dy = P[:, 0] - a[0], P[:, 1] - a[1]
+        g = np.exp(-dx ** 2 / (2 * 0.07 ** 2) - dy ** 2 / (2 * (np.where(dy > 0, 0.09, 0.07)) ** 2))
+        t = np.clip((P[:, 2] - (a[2] - 0.09)) / 0.09, 0, 1)            # how far off the chest
+        k = g * t ** 1.5 * (P[:, 2] > a[2] - 0.12)
+        up = np.clip(dy / 0.06, 0, 1)
+        P[:, 1] -= sag * k * (1 - 0.4 * up)
+        P[:, 2] -= back * k * (0.6 + 0.8 * up)                          # (the upper slope eases in more than the lower curve)
+        done += int((k > 0.05).sum())
+    M['pos'] = P.ravel().astype(np.float32)
+    return done
