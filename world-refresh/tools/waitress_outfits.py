@@ -9,7 +9,7 @@ the pelvis with the thighs taking over toward the hem (so it swings with the wal
 Usage: python3 tools/waitress_outfits.py SRC_DIR OUT_DIR   (SRC_DIR = breneland-live/models/mpfb; writes the 4 .json/.bin/.webp)"""
 import sys, os, json, numpy as np
 from PIL import Image
-sys.path.insert(0, os.path.dirname(__file__)); import mpfb_io
+sys.path.insert(0, os.path.dirname(__file__)); import mpfb_io, mpfb_fixes
 
 SRC, OUT = sys.argv[1], sys.argv[2]; os.makedirs(OUT, exist_ok=True)
 SZ = 2048
@@ -159,7 +159,23 @@ for who in ('zoe', 'asha'):
                     'skirt': {'cloth': lambda P, s, pa=pants: (s == pa) & (P[:, 1] > 0.3), 'top': 0.74, 'hem': hem, 'flare': 0.06, 'uv': lambda t: region_uv(SKIRTD, t)}}
         ink_w = 0.008
         edit(M, None, plan, J, bones, ink_w, (64, 12)); edit(L, None, plan, J, bones, ink_w, (24, 5))
+        mm = mpfb_fixes.fix_mouth(M); mpfb_fixes.fix_mouth(L); mpfb_fixes.round_jaw(M); mpfb_fixes.round_jaw(L)   # (the box on the chin: erased, the jaw rounded)
+        if when == 'night':   # high heels, the feet part of them; the game lifts her by the new lowest point
+            wp = mpfb_fixes.bone_world(J); bu = np.array(sw_uv(k_black), np.float32)
+            fl = mpfb_fixes.heels(M, J, wp, bu); mpfb_fixes.heels(L, J, wp, bu); J['floor'] = fl
+            print(nid, 'heels: floor', round(fl, 4))
+        print(nid, 'mouth verts moved', mm)
         im.save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)
         if J['sheet'].get('half'): im.resize((1024, 1024), Image.LANCZOS).save(os.path.join(OUT, J['sheet']['half']), 'WEBP', lossless=True)
         write(J, M, L, buf, os.path.join(OUT, nid + '.json'))
         print(nid, 'verts', M['verts'], 'tris', M['tris'], 'lod', L['verts'], L['tris'])
+
+# the others with the same box chin: only the mouth fix
+for nid in ('belinda', 'mina'):
+    J, buf, M, L = mpfb_io.load(os.path.join(SRC, nid + '.json'))
+    mm = mpfb_fixes.fix_mouth(M); mpfb_fixes.fix_mouth(L); mpfb_fixes.round_jaw(M); mpfb_fixes.round_jaw(L)
+    for k in ('full', 'half'):
+        f = J['sheet'].get(k)
+        if f and os.path.exists(os.path.join(SRC, f)): import shutil; shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
+    M['tris'] = sum(len(g) for g in M['groups'].values()) // 3; L['tris'] = sum(len(g) for g in L['groups'].values()) // 3
+    write(J, M, L, buf, os.path.join(OUT, nid + '.json')); print(nid, 'mouth verts moved', mm)
