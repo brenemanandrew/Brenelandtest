@@ -755,3 +755,86 @@ def thong(M, J, skin_sw, black_uv, off=0.0022):
     M['groups'][''] = np.concatenate([M['groups'][''], Fa]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, Fa.dtype)), Fa])
     M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
     return len(Fa) // 3
+
+def rest_bust2(M, J, skin_sw, sag=0.05):
+    """Belinda's bust at rest, take 2 (Andrew: it stuck straight out): her skin is reshaped - the fullest point settles lower and a
+    little in, the upper slope runs longer and straighter from the chest to it, the lower curve fills - and everything over it (the
+    dress) moves exactly as the skin under it does, so the dress follows the body."""
+    P = M['pos'].reshape(-1, 3); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    W = bone_world(J); shY = W['clavicle_l'][1]; skin = np.where(sw == skin_sw)[0]
+    Q = P.copy(); S = P[skin]
+    for s in (-1, 1):
+        m = (S[:, 0] * s > 0.04) & (S[:, 0] * s < 0.17) & (S[:, 1] < shY - 0.04) & (S[:, 1] > shY - 0.3)
+        if not m.any(): continue
+        a = S[np.where(m)[0][np.argmax(S[m, 2])]].copy()
+        X = P[skin]; dx, dy = X[:, 0] - a[0], X[:, 1] - a[1]
+        g = np.exp(-dx ** 2 / (2 * 0.065 ** 2) - dy ** 2 / (2 * np.where(dy > 0, 0.08, 0.06) ** 2))
+        t = np.clip((X[:, 2] - (a[2] - 0.08)) / 0.08, 0, 1); k = g * t ** 1.4
+        Y = X[:, 1] - sag * k; Z = X[:, 2] - 0.012 * k
+        # the upper slope: a straight run from the chest (6 cm above the new fullest point) down and out to it
+        ya, za = a[1] - sag * 0.85, a[2] - 0.012
+        up = (Y > ya) & (Y < ya + 0.1) & (np.abs(dx) < 0.075) & (X[:, 2] > a[2] - 0.12)
+        line = za - (Y - ya) * 0.5 - 0.035 * (dx / 0.075) ** 2
+        Z = np.where(up, np.maximum(Z, line * np.clip(1 - (Y - ya) / 0.1, 0, 1) + Z * np.clip((Y - ya) / 0.1, 0, 1)), Z)
+        Q[skin, 1] = np.where(k > 1e-3, Y, Q[skin, 1]); Q[skin, 2] = np.where((k > 1e-3) | up, Z, Q[skin, 2])
+    # everything else near the chest follows the skin under it (nearest skin point's move)
+    d = Q[skin] - P[skin]; moved = np.linalg.norm(d, axis=1) > 1e-5
+    if moved.any():
+        Sm = P[skin][moved]; dm = d[moved]
+        others = np.setdiff1d(np.arange(len(P)), skin)
+        near = others[(np.abs(P[others, 1] - (shY - 0.15)) < 0.2) & (np.abs(P[others, 0]) < 0.22) & (P[others, 2] > 0.05)]
+        for i in near:
+            dd = ((Sm - P[i]) ** 2).sum(1); j = np.argsort(dd)[:4]; w = 1 / (dd[j] + 1e-6)
+            if dd[j[0]] < 0.035 ** 2: Q[i] = P[i] + (dm[j] * w[:, None]).sum(0) / w.sum()
+        # and never under the skin: each such point at least 5 mm in front of the reshaped skin at its x, y
+        QS = Q[skin]; fr = QS[:, 2] > 0.1
+        for i in near:
+            d2 = (QS[fr, 0] - Q[i, 0]) ** 2 + (QS[fr, 1] - Q[i, 1]) ** 2; j = np.argsort(d2)[:3]
+            if d2[j[0]] < 0.012 ** 2: zs = QS[fr][j, 2].max(); Q[i, 2] = max(Q[i, 2], zs + 0.005)
+    M['pos'] = Q.ravel().astype(np.float32)
+    return int(moved.sum())
+
+def shoulder_straps(M, J, dress_sw, skin_sw, X=0.15, width=0.011, off=0.003):
+    """Belinda's straps (Andrew: firmly on her shoulders, not up by her neck): the old ones go; new ones rise from the dress's top
+    edge at the front, over the top of each shoulder and down to the dress at the back, laid on her skin."""
+    P = M['pos'].reshape(-1, 3); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    dress = sw == dress_sw; skin = sw == skin_sw
+    top = P[dress & (P[:, 1] < 1.03), 1].max()
+    old = dress & (P[:, 1] > top + 0.004)
+    for grp in (M['groups'], M['inkGroups']):
+        for g in list(grp.keys()):
+            t_ = grp[g].reshape(-1, 3).astype(np.int64)
+            if len(t_): grp[g] = t_[~old[t_].any(1)].ravel().astype(grp[g].dtype)
+    T = M['groups'][''].reshape(-1, 3).astype(np.int64); c = P[T].mean(1)
+    st = T[skin[T].all(1) & (c[:, 1] > top - 0.05) & (c[:, 1] < 1.14) & (np.abs(np.abs(c[:, 0]) - X) < 0.05)]
+    A, B, C = P[st[:, 0]], P[st[:, 1]], P[st[:, 2]]; sv = np.unique(st); SP = P[sv]
+    SI = M['si'].reshape(-1, 4); SWt = M['sw'].reshape(-1, 4); duv = UV[np.where(dress)[0][0]]
+    addV, addF, addN, near = [], [], [], []; base = M['verts']
+    for sg in (-1, 1):
+        cz = SP[np.abs(SP[:, 0] - sg * X) < 0.015][:, 2].mean(); cy = top - 0.01
+        ang = np.linspace(0.02, np.pi - 0.02, 40); rows = []
+        for xo in (-width / 2, width / 2):
+            Dd = np.stack([np.zeros(len(ang)), np.sin(ang), np.cos(ang)], 1); O = np.array([sg * X + xo, cy, cz]) + Dd * 0.4
+            t = _raycast(O, -Dd, A, B, C); rows.append((O - Dd * (t - off)[:, None], t))
+        ok = ~np.isnan(rows[0][1]) & ~np.isnan(rows[1][1])
+        V = np.vstack([rows[0][0][ok], rows[1][0][ok]]); k = int(ok.sum())
+        if k < 4: continue
+        keep = V[:k, 1] >= top - 0.006; idx = np.where(keep)[0]
+        F = []
+        for a_, b_ in zip(idx[:-1], idx[1:]):
+            if b_ == a_ + 1: F += [(a_, b_, k + b_), (a_, k + b_, k + a_)]
+        F = np.array(F); nn = V - np.array([sg * X, cy, cz]); nn /= np.linalg.norm(nn, axis=1, keepdims=True)
+        addV.append(V); addN.append(nn); addF.append(np.vstack([F, F[:, [0, 2, 1]]]) + base)
+        near.append(sv[np.argmin(((V[:, None, :] - SP[None, :, :]) ** 2).sum(2), 1)]); base += len(V)
+    if not addV: return 0
+    V = np.vstack(addV).astype(np.float32); nr = np.concatenate(near); Nn = np.vstack(addN)
+    M['pos'] = np.concatenate([M['pos'], V.ravel()]).astype(np.float32); M['nor'] = np.concatenate([M['nor'], Nn.ravel()]).astype(np.float32)
+    M['uv'] = np.concatenate([M['uv'], np.tile(duv, (len(V), 1)).ravel()]).astype(np.float32); M['fuv'] = np.concatenate([M['fuv'], np.zeros(len(V) * 2, np.float32)])
+    M['si'] = np.concatenate([M['si'], SI[nr].ravel()]); M['sw'] = np.concatenate([M['sw'], SWt[nr].ravel()])
+    M['ink'] = np.concatenate([M['ink'], np.round(Nn.ravel() * 0.002 * 100000).astype(np.int16)])
+    Fa = np.vstack(addF).ravel().astype(M['groups'][''].dtype)
+    M['groups'][''] = np.concatenate([M['groups'][''], Fa]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, Fa.dtype)), Fa])
+    M['verts'] = base; M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return len(Fa) // 3

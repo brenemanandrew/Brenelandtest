@@ -162,11 +162,35 @@ function deform(data, look, geo) {
         const inRect = rect && py >= 1536 && px >= rect[0] && px < rect[1];
         const apron = /^asha_day/.test(id) && !id.endsWith('_orig') && pal['#c7392f'] !== undefined && px >= 1536 + (pal['#c7392f'] % 16) * 32 && px < 1568 + (pal['#c7392f'] % 16) * 32 && py >= 1536 + Math.floor(pal['#c7392f'] / 16) * 32 && py < 1568 + Math.floor(pal['#c7392f'] / 16) * 32;
         if (inPal || inRect || apron) ids.push(i); }
-      let top = -9; for (const i of ids) top = Math.max(top, o[i * 3 + 1]);
-      R.skirt = ids.length ? { ids, top: Math.min(top, R.waistY + 0.02) } : null;
+      let top = -9, hem = 9; for (const i of ids) { top = Math.max(top, o[i * 3 + 1]); hem = Math.min(hem, o[i * 3 + 1]); }
+      top = Math.min(top, R.waistY + 0.02);
+      // its radius down its length (from its middle at the top): a short skirt takes the shape the skirt has that far down, so it
+      // hugs the hips instead of keeping the hem's flare
+      let cx = 0, cz = 0, nc = 0; for (const i of ids) if (o[i * 3 + 1] > top - 0.05 && o[i * 3 + 1] <= top) { cx += o[i * 3]; cz += o[i * 3 + 2]; nc++; }
+      cx = nc ? cx / nc : 0; cz = nc ? cz / nc : 0;
+      const NB = 24, sum = new Float32Array(NB), cnt = new Float32Array(NB);
+      for (const i of ids) { const y = o[i * 3 + 1]; if (y > top) continue; const f = Math.min(NB - 1, Math.floor((top - y) / (top - hem) * NB)); sum[f] += Math.hypot(o[i * 3] - cx, o[i * 3 + 2] - cz); cnt[f]++; }
+      const prof = Array.from(sum, (v2, j) => (cnt[j] ? v2 / cnt[j] : 0)); for (let j = 1; j < NB; j++) if (!prof[j]) prof[j] = prof[j - 1]; for (let j = NB - 2; j >= 0; j--) if (!prof[j]) prof[j] = prof[j + 1];
+      for (let j = 1; j < NB; j++) prof[j] = Math.max(prof[j], prof[j - 1]);   // (it only widens toward the hem)
+      // the body under it: its radius by height and angle (the arms and the skirt left out), so a short skirt never cuts into her
+      const HB = 40, AB = 32, body = new Float32Array(HB * AB), isSk = new Uint8Array(n); for (const i of ids) isSk[i] = 1;
+      const y0 = hem - 0.05, hy = (top - y0) / HB;
+      for (let i = 0; i < n; i++) { if (isSk[i] || R.wHead[i] > 0.1) continue; const y = o[i * 3 + 1]; if (y < y0 || y > top) continue;
+        const dx = o[i * 3] - cx, dz = o[i * 3 + 2] - cz, r = Math.hypot(dx, dz); if (r > 0.27) continue;
+        const hb = Math.min(HB - 1, Math.floor((y - y0) / hy)), ab = Math.floor(((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI)) * AB) % AB;
+        body[hb * AB + ab] = Math.max(body[hb * AB + ab], r); }
+      R.skirt = ids.length ? { ids, top, hem, cx, cz, prof, NB, body, HB, AB, y0, hy } : null;
     }
-    if (R.skirt) { const k = 1 + v('skirt') * 0.9, T = R.skirt.top;
-      for (const i of R.skirt.ids) { const y = p[i * 3 + 1]; if (y < T) p[i * 3 + 1] = T - (T - y) * k; } }
+    if (R.skirt) { const sk = R.skirt, k = 1 + v('skirt') * 0.9, T = sk.top;
+      const rAt = f => { const x = Math.max(0, Math.min(sk.NB - 1.001, f * sk.NB - 0.5)), j = Math.floor(x), t = x - j; return sk.prof[j] * (1 - t) + sk.prof[Math.min(sk.NB - 1, j + 1)] * t; };
+      for (const i of sk.ids) { const y = p[i * 3 + 1]; if (y >= T) continue;
+        p[i * 3 + 1] = T - (T - y) * k;
+        if (k < 1) { const f = (T - y) / (T - sk.hem), r0 = rAt(f), r1 = rAt(f * k), ease = Math.min(1, f / 0.25), sc = r0 > 1e-4 ? 1 + (r1 / r0 - 1) * ease * ease * (3 - 2 * ease) : 1;
+          let dx = (p[i * 3] - sk.cx) * sc, dz = (p[i * 3 + 2] - sk.cz) * sc; const r = Math.hypot(dx, dz) || 1e-6;
+          const hb = Math.max(0, Math.min(sk.HB - 1, Math.floor((p[i * 3 + 1] - sk.y0) / sk.hy))), ab = Math.floor(((Math.atan2(dz, dx) + Math.PI) / (2 * Math.PI)) * sk.AB) % sk.AB;
+          let need = 0; for (let e = -1; e <= 1; e++) for (let q = -1; q <= 1; q++) { const h2 = hb + e; if (h2 < 0 || h2 >= sk.HB) continue; need = Math.max(need, sk.body[h2 * sk.AB + ((ab + q + sk.AB) % sk.AB)]); }
+          if (need && r < need + 0.01) { const f2 = (need + 0.01) / r; dx *= f2; dz *= f2; }
+          p[i * 3] = sk.cx + dx; p[i * 3 + 2] = sk.cz + dz; } } }
   }
   // the mouth (its own piece): size and height; the nose: how far it stands out
   const mi = geo['_mouth']?.index?.array;
