@@ -4,7 +4,7 @@ stone wing, on a raised spot with a flagstone path up to it. Ground floor boutiq
 import sys, math, random; sys.path.insert(0, 'blender'); from kit_store import *
 B = 1.0                                   # the plateau's top: the building's ground
 X0, X1, Y0, Y1 = -4.5, 4.5, 2.0, 10.0     # the main block (front at Y0)
-LOFT, EAVE, RIDGE = 3.3, 5.0, 8.4         # loft floor, eaves, ridge (over B)
+LOFT, EAVE, RIDGE = 3.3, 6.0, 9.4         # loft floor, eaves, ridge (over B): eaves high enough for full-height loft walls (Andrew)
 TIM, PLA, FLOOR, MOSS = '#4a3526', '#f1e6cf', '#c89a62', '#6f8f3a'
 GOLD, PURP, ROSE = '#c9a24a', '#6b3f8a', '#c0566e'
 
