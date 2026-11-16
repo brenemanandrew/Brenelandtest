@@ -836,3 +836,142 @@ t = t.replace(a, a + r"""
       const bx = u.door.x + 4.6, badge = new THREE.Mesh(new THREE.CircleGeometry(0.62, 40), lit(tx, { transparent: false, depthWrite: true })); badge.position.set(bx, (L.canopy.y + 0.26 + L.canopy.y + 1.95) / 2, zf - 0.02); badge.rotation.y = Math.PI; g.add(badge); }
   }""", 1)
 open(p, 'w').write(t)
+
+# ---- Breneland Games & Hobbies restyled after Andrew's sheet (concepts/andrew_game_store_design.jpg): plaster and dark timber
+# framing on a stone base, a mossy pitched slate roof (gable to the street), an owl post, bench, lanterns and flower boxes out front, a
+# warm wood loft, a better dragon (still hanging over the tables, still swaying), and a wooden back door with a window (same lettering).
+# Same footprint, walls, windows, doors, colliders and routines; ?oldstore keeps the old look
+p = os.path.join(OUT, 'js/game-store-build.js'); t = open(p).read()
+import re as _re
+a = "const C = {\n  brick: '#c4573c', brickDark: '#9a4230', trim: '#f3e6c8', side: '#d9a86c', sideDark: '#c28f55', roof: '#5b6168', roofLip: '#e8e2d6',"
+assert t.count(a) == 1, 'store palette'
+t = t.replace(a, "const OLDSTORE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('oldstore');\nconst C = {\n  brick: OLDSTORE ? '#c4573c' : '#efe2c4', brickDark: OLDSTORE ? '#9a4230' : '#8c877e', trim: OLDSTORE ? '#f3e6c8' : '#4a3526', side: OLDSTORE ? '#d9a86c' : '#efe2c4', sideDark: OLDSTORE ? '#c28f55' : '#8c877e', roof: '#5b6168', roofLip: OLDSTORE ? '#e8e2d6' : '#4a3526',", 1)
+a = "wallIn: '#f3dfb0', wainscot: '#7a4b2a', loftWall: '#4f8a86',"
+assert t.count(a) == 1, 'store palette 2'
+t = t.replace(a, "wallIn: OLDSTORE ? '#f3dfb0' : '#f0dcb4', wainscot: '#7a4b2a', loftWall: OLDSTORE ? '#4f8a86' : '#a07448',", 1)
+# the dragon: a bronze one with bat wings, a long neck and a spiked tail (replaces the cartoon one; same group, strings and sway)
+i0 = t.index('function dragon(b) {'); i1 = t.index('// ---- build it.')
+t = t[:i0] + r"""function wingGeo(side) {   // a bat-wing membrane in the x-z plane (y up), its shoulder at the origin, toward +x (side 1) or -x
+  const pts = [[0, 0], [0.55, 0.32], [1.25, 0.42], [1.05, 0.05], [1.12, -0.18], [0.82, -0.12], [0.78, -0.42], [0.5, -0.3], [0.32, -0.55], [0.1, -0.32]];
+  const s = new THREE.Shape(); pts.forEach(([x, z], i) => (i ? s.lineTo : s.moveTo).call(s, x * side, z));
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.02, bevelEnabled: false }); g.rotateX(Math.PI / 2); return g;
+}
+function dragon(b) {
+  if (OLDSTORE) return oldDragon(b);
+  const G = '#b06a2c', Gd = '#7a4520', belly = '#f0d9a0', mem = '#c24a36', horn = '#fff1d6', eye = '#ffd23a';
+  // the body (toward +z is the head), chest, hips
+  b.add(SPH, G, { x: 0, y: 0, z: 0.1, sx: 0.3, sy: 0.27, sz: 0.62 });
+  b.add(SPH, belly, { x: 0, y: -0.09, z: 0.14, sx: 0.22, sy: 0.19, sz: 0.52 });
+  b.add(SPH, G, { x: 0, y: 0.04, z: 0.55, sx: 0.27, sy: 0.27, sz: 0.3 });
+  // a curving neck of segments up to the head
+  for (let i = 0; i < 6; i++) { const t2 = (i + 1) / 6; b.add(SPH, i % 2 ? G : Gd, { x: Math.sin(t2 * 1.4) * 0.06, y: 0.12 + t2 * t2 * 0.5, z: 0.7 + t2 * 0.55, sx: 0.15 - t2 * 0.04, sy: 0.15 - t2 * 0.04, sz: 0.15 }); }
+  const hx = 0.05, hy = 0.7, hz = 1.32;
+  b.add(SPH, G, { x: hx, y: hy, z: hz, sx: 0.17, sy: 0.15, sz: 0.2 });                       // the skull
+  b.add(SPH, G, { x: hx, y: hy - 0.05, z: hz + 0.22, sx: 0.11, sy: 0.08, sz: 0.17 });        // the snout
+  b.add(SPH, belly, { x: hx, y: hy - 0.11, z: hz + 0.16, sx: 0.09, sy: 0.04, sz: 0.15 });    // the jaw
+  for (const k of [-1, 1]) {
+    b.add(SPH, eye, { x: hx + k * 0.1, y: hy + 0.05, z: hz + 0.1, sx: 0.045, sy: 0.04, sz: 0.035 });
+    b.add(SPH, C.ink, { x: hx + k * 0.115, y: hy + 0.05, z: hz + 0.125, sx: 0.015, sy: 0.035, sz: 0.012 });
+    b.add(GEO.cone6, horn, { x: hx + k * 0.09, y: hy + 0.13, z: hz - 0.1, sx: 0.035, sy: 0.24, sz: 0.035, rx: -1.15, rz: -k * 0.25 });
+    b.add(GEO.cone6, horn, { x: hx + k * 0.14, y: hy + 0.03, z: hz - 0.08, sx: 0.025, sy: 0.12, sz: 0.025, rx: -1.3, rz: -k * 0.9 });
+    b.add(SPH, Gd, { x: hx + k * 0.04, y: hy - 0.02, z: hz + 0.38, sx: 0.02, sy: 0.015, sz: 0.015 });
+    // legs, drawn up as in flight, with pale claws
+    for (const [lz, ly] of [[0.5, -0.2], [-0.25, -0.2]]) {
+      b.add(SPH, G, { x: k * 0.22, y: ly, z: lz, sx: 0.09, sy: 0.15, sz: 0.1, rx: 0.6 });
+      b.add(SPH, Gd, { x: k * 0.24, y: ly - 0.12, z: lz - 0.1, sx: 0.06, sy: 0.05, sz: 0.09 });
+      for (const c of [-1, 0, 1]) b.add(GEO.cone6, horn, { x: k * 0.24 + c * 0.03, y: ly - 0.15, z: lz - 0.19, sx: 0.012, sy: 0.05, sz: 0.012, rx: -1.8 });
+    }
+    // the wing: an arm, three finger bones, the membrane between
+    const wx = k * 0.18, wy = 0.2, wz = 0.38;
+    b.add(GEO.cyl6, Gd, { x: wx + k * 0.3, y: wy + 0.18, z: wz, sx: 0.035, sy: 0.7, sz: 0.035, rz: -k * 1.0 });
+    for (const [fx, fz] of [[1.25, 0.42], [1.12, -0.18], [0.78, -0.42]]) {
+      const L = Math.hypot(fx, fz) * 1.25, ang = Math.atan2(fz, fx);
+      b.add(GEO.cyl6, Gd, { x: wx + k * Math.cos(ang) * L / 2, y: wy + 0.36, z: wz + Math.sin(ang) * L / 2, sx: 0.022, sy: L, sz: 0.022, rz: -k * Math.PI / 2, ry: -k * ang });
+    }
+    b.add(wingGeo(k), mem, { x: wx, y: wy + 0.36, z: wz, sx: 1.25, sy: 1, sz: 1.25, rz: k * 0.12 });
+  }
+  // spikes down the back and a long tail curling to a spade
+  for (let i = 0; i < 7; i++) b.add(GEO.cone6, Gd, { x: 0, y: 0.26 - i * 0.015, z: 0.6 - i * 0.16, sx: 0.04, sy: 0.12, sz: 0.05, rx: -0.3 });
+  let tx = 0, ty = 0, tz = -0.45;
+  for (let i = 0; i < 12; i++) { const t2 = i / 11; tx = Math.sin(t2 * 3.0) * 0.28; ty = -0.02 - t2 * 0.15 + Math.sin(t2 * 2.0) * 0.12; tz = -0.5 - t2 * 1.15;
+    b.add(SPH, i % 2 ? G : Gd, { x: tx, y: ty, z: tz, sx: 0.13 - t2 * 0.09, sy: 0.12 - t2 * 0.08, sz: 0.13 - t2 * 0.07 });
+    if (i % 2 === 0 && i < 10) b.add(GEO.cone6, Gd, { x: tx, y: ty + 0.1 - t2 * 0.06, z: tz, sx: 0.03, sy: 0.08, sz: 0.035, rx: -0.3 }); }
+  b.add(GEO.cone6, mem, { x: tx, y: ty, z: tz - 0.12, sx: 0.12, sy: 0.18, sz: 0.02, rx: -Math.PI / 2 });
+}
+function oldDragon(b) {""" + t[i0 + len('function dragon(b) {'):i1] + t[i1:]
+# the back door: wood with a window in its upper half (same lettering on the glass), a brass knob
+a = """    add(W / 2, R0 / 2, 0, W, R0, 0.05, C.ink);                                   // the bottom rail
+    add(W / 2, H - R1 / 2, 0, W, R1, 0.05, C.ink);                               // the top rail
+    for (const x of [S / 2, W - S / 2]) add(x, (R0 + H - R1) / 2, 0, S, H - R0 - R1, 0.05, C.ink); // the stiles, between the rails
+    for (const zz of [-0.045, 0.045]) add(W - 0.14, 1.0, zz, 0.04, 0.32, 0.03, '#e0b54a');        // the push bar, both faces
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 2 * S, H - R0 - R1),"""
+assert t.count(a) == 1, 'back door leaf'
+t = t.replace(a, """    const DW = OLDSTORE ? C.ink : '#6b4a2b', DP = OLDSTORE ? C.ink : '#7a5232', GY0 = OLDSTORE ? R0 : 1.05;   // (world-refresh: a wooden door, glass in its upper half)
+    add(W / 2, R0 / 2, 0, W, R0, 0.05, DW);                                      // the bottom rail
+    add(W / 2, H - R1 / 2, 0, W, R1, 0.05, DW);                                  // the top rail
+    for (const x of [S / 2, W - S / 2]) add(x, (R0 + H - R1) / 2, 0, S, H - R0 - R1, 0.05, DW); // the stiles, between the rails
+    if (!OLDSTORE) { add(W / 2, (R0 + GY0) / 2, 0, W - 2 * S, GY0 - R0, 0.035, DP); add(W / 2, GY0 - 0.04, 0, W - 2 * S, 0.08, 0.05, DW);
+      for (const zz of [-0.03, 0.03]) add(W / 2, (R0 + GY0) / 2, zz, W - 2 * S - 0.16, GY0 - R0 - 0.16, 0.01, DW);   // a raised panel, both faces
+      for (const zz of [-0.05, 0.05]) add(W - 0.12, 1.0, zz, 0.07, 0.07, 0.05, '#e0b54a'); }                          // the brass knob
+    else for (const zz of [-0.045, 0.045]) add(W - 0.14, 1.0, zz, 0.04, 0.32, 0.03, '#e0b54a');                        // the push bar, both faces
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 2 * S, H - GY0 - R1),""", 1)
+a = "    glass.position.set(W / 2, (R0 + H - R1) / 2, 0);"
+assert t.count(a) == 1, 'back door glass'
+t = t.replace(a, "    glass.position.set(W / 2, (GY0 + H - R1) / 2, 0);", 1)
+for a2, b2 in (("for (const x of [OD.x0, OD.x1 - JW]) bb.boxMinMax(x, thr, zIn, x + JW, OD.y1 - JW, zOut, C.ink);", "for (const x of [OD.x0, OD.x1 - JW]) bb.boxMinMax(x, thr, zIn, x + JW, OD.y1 - JW, zOut, OLDSTORE ? C.ink : C.woodDark);"),
+               ("bb.boxMinMax(OD.x0 + JW, OD.y1 - JW, zIn, OD.x1 - JW, OD.y1, zOut, C.ink);", "bb.boxMinMax(OD.x0 + JW, OD.y1 - JW, zIn, OD.x1 - JW, OD.y1, zOut, OLDSTORE ? C.ink : C.woodDark);")):
+    assert t.count(a2) == 1, a2[:40]; t = t.replace(a2, b2, 1)
+# outside: timber framing, a stone base, the pitched roof, the porch things
+a = "  fb.build(sides.front, 'store-front');"
+assert t.count(a) == 1, 'front build'
+t = t.replace(a, r"""  if (!OLDSTORE) {   // (world-refresh: timbers between the upper windows, lanterns by the door, an owl post, a bench, flower boxes)
+    const TB = '#4a3526', yb = gy + 3.75, yt = top - 0.05;
+    for (const x of [sx - 4.95, sx - 3.05, sx - 0.95, sx + 0.95, sx + 3.05, sx + 4.95]) fb.boxMinMax(x - 0.09, yb, z0 - 0.1, x + 0.09, yt, z0 + 0.01, TB);
+    for (const [xa, xb] of [[sx - 3.05, sx - 0.95], [sx + 0.95, sx + 3.05]]) { const L = Math.hypot(xb - xa, yt - yb);
+      for (const sg of [1, -1]) fb.add(GEO.box, TB, { x: (xa + xb) / 2, y: (yb + yt) / 2, z: z0 - 0.05, sx: L, sy: 0.14, sz: 0.1, rz: sg * Math.atan2(yt - yb, xb - xa) }); }
+    for (const [xa, xb] of [[minX + 0.15, sx - 4.95], [sx + 4.95, maxX - 0.15]]) { fb.add(GEO.box, TB, { x: (xa + xb) / 2, y: (yb + yt) / 2, z: z0 - 0.05, sx: Math.hypot(xb - xa, yt - yb), sy: 0.14, sz: 0.1, rz: (xa < sx ? 1 : -1) * Math.atan2(yt - yb, xb - xa) }); }
+    for (const k of [-1, 1]) { fb.add(GEO.box, TB, { x: sx + k * 1.3, y: gy + 2.3, z: minZ - 0.12, sx: 0.06, sy: 0.06, sz: 0.25 }); fb.add(GEO.box, '#2b2326', { x: sx + k * 1.3, y: gy + 2.1, z: minZ - 0.25, sx: 0.16, sy: 0.26, sz: 0.16 }); fBulbs.add(GEO.box, '#ffd27a', { x: sx + k * 1.3, y: gy + 2.1, z: minZ - 0.25, sx: 0.11, sy: 0.18, sz: 0.11 }); }
+    const ox = sx + 2.75, oz = minZ - 0.7;   // the carved owl on its post
+    fb.add(GEO.cyl8, '#6b4a2b', { x: ox, y: gy + 0.85, z: oz, sx: 0.18, sy: 1.7, sz: 0.18 }); fb.add(SPH, '#8a6240', { x: ox, y: gy + 1.95, z: oz, sx: 0.28, sy: 0.34, sz: 0.26 }); fb.add(SPH, '#8a6240', { x: ox, y: gy + 2.38, z: oz, sx: 0.22, sy: 0.2, sz: 0.2 });
+    for (const k of [-1, 1]) { fb.add(SPH, '#f0c24f', { x: ox + k * 0.08, y: gy + 2.4, z: oz - 0.18, sx: 0.06, sy: 0.06, sz: 0.03 }); fb.add(SPH, C.ink, { x: ox + k * 0.08, y: gy + 2.4, z: oz - 0.2, sx: 0.025, sy: 0.025, sz: 0.01 }); fb.add(GEO.cone6, '#8a6240', { x: ox + k * 0.12, y: gy + 2.56, z: oz, sx: 0.04, sy: 0.1, sz: 0.04 }); }
+    colliders.push({ type: 'circle', x: ox, z: oz, r: 0.3 });
+    const bx = sx + 4.6, bz = minZ - 0.8;   // a bench under the east window
+    fb.boxMinMax(bx - 0.8, gy + 0.42, bz - 0.25, bx + 0.8, gy + 0.5, bz + 0.25, '#7a5a3c'); fb.boxMinMax(bx - 0.8, gy + 0.5, bz + 0.2, bx + 0.8, gy + 0.95, bz + 0.27, '#7a5a3c');
+    for (const k of [-1, 1]) fb.boxMinMax(bx + k * 0.7 - 0.05, gy, bz - 0.22, bx + k * 0.7 + 0.05, gy + 0.42, bz + 0.22, '#5a3e28');
+    colliders.push({ type: 'box', minX: bx - 0.85, maxX: bx + 0.85, minZ: bz - 0.3, maxZ: bz + 0.3 });
+    for (const w of WIN) { fb.boxMinMax(w.a0 + 0.1, w.y0 - 0.32, z0 - 0.38, w.a1 - 0.1, w.y0 - 0.12, z0 - 0.02, '#6b4a2b');   // flower boxes under the shop windows
+      for (let x = w.a0 + 0.3; x < w.a1 - 0.2; x += 0.42) { fb.add(SPH, '#4f9a3e', { x, y: w.y0 - 0.05, z: z0 - 0.2, sx: 0.15, sy: 0.12, sz: 0.13 }); fb.add(SPH, ['#e86a8a', '#f2c14e', '#b48cff', '#ffffff'][Math.round(x * 7) & 3], { x: x + 0.05, y: w.y0 + 0.03, z: z0 - 0.3, sx: 0.06, sy: 0.06, sz: 0.06 }); } }
+  }
+  fb.build(sides.front, 'store-front');""", 1)
+a = "    b.build(sides[name], 'store-' + name);\n    buildPanes(name);\n  };"
+assert t.count(a) == 1, 'side build'
+t = t.replace(a, r"""    if (!OLDSTORE) {   // (world-refresh: a stone base and timber framing outside)
+      const xo = dir > 0 ? x0 - 0.08 : x1 + 0.08, xs = dir > 0 ? x0 - 0.04 : x1 + 0.04, TB = '#4a3526', yb = gy + 3.65;
+      b.boxMinMax(Math.min(xo, xs), gy, minZ + 0.1, Math.max(xo, xs), gy + 0.95, maxZ + 0.04, '#8c877e');
+      b.boxMinMax(Math.min(xo, xs) - 0.02, yb - 0.09, minZ + 0.1, Math.max(xo, xs) + 0.02, yb + 0.09, maxZ, TB);
+      const posts = name === 'west' ? [minZ + 1.2, minZ + 3.4, minZ + 11.6, maxZ - 1.2] : [minZ + 1.2, minZ + 4.6, minZ + 8.0, minZ + 11.4, maxZ - 1.2];
+      for (const z of posts) b.boxMinMax(Math.min(xo, xs) - 0.02, gy + 0.95, z - 0.09, Math.max(xo, xs) + 0.02, top - 0.25, z + 0.09, TB);
+      for (let i = 0; i + 1 < posts.length; i++) { const za = posts[i], zb2 = posts[i + 1]; if (zb2 - za > 5) continue; const L = Math.hypot(zb2 - za, top - 0.25 - yb);
+        b.add(GEO.box, TB, { x: (xo + xs) / 2, y: (yb + top - 0.25) / 2, z: (za + zb2) / 2, sx: 0.06, sy: 0.14, sz: L, rx: (i % 2 ? 1 : -1) * Math.atan2(top - 0.25 - yb, zb2 - za) }); }
+    }
+    b.build(sides[name], 'store-' + name);
+    buildPanes(name);
+  };""", 1)
+a = "  rb.build(sides.roof, 'store-roof');"
+assert t.count(a) == 1, 'roof build'
+t = t.replace(a, r"""  if (!OLDSTORE) {   // (world-refresh: a pitched slate roof, the gable to the street, moss on it, a ridge beam, a stone chimney)
+    const y0 = top + 0.25, rise = 4.0, half = (maxX - minX) / 2 + 0.55, ang = Math.atan2(rise, half), L = Math.hypot(half, rise), zc = (minZ + maxZ) / 2 + 0.1, dz = maxZ - minZ + 1.0;
+    for (const k of [-1, 1]) {
+      rb.add(GEO.box, '#566069', { x: sx + k * half / 2, y: y0 + rise / 2 + 0.12, z: zc, sx: L + 0.1, sy: 0.24, sz: dz, rz: -k * ang });
+      for (let s = 1; s < 7; s++) { const f = s / 7; rb.add(GEO.box, '#454c55', { x: sx + k * half * (1 - f), y: y0 + rise * f + 0.26, z: zc, sx: 0.06, sy: 0.05, sz: dz }); }
+      for (let m = 0; m < 16; m++) { const f = ((m * 37) % 100) / 115 + 0.05, zz = minZ + ((m * 53) % 100) / 100 * (maxZ - minZ); rb.add(SPH, '#6f8f3a', { x: sx + k * half * (1 - f), y: y0 + rise * f + 0.28, z: zz, sx: 0.45, sy: 0.12, sz: 0.35 }); }
+    }
+    rb.add(GEO.box, '#5a3e28', { x: sx, y: y0 + rise + 0.25, z: zc, sx: 0.3, sy: 0.3, sz: dz + 0.1 });
+    const tri = new THREE.Shape(); tri.moveTo(-half + 0.5, 0); tri.lineTo(half - 0.5, 0); tri.lineTo(0, rise - 0.3); tri.lineTo(-half + 0.5, 0);
+    const gableGeo = new THREE.ExtrudeGeometry(tri, { depth: 0.22, bevelEnabled: false });
+    for (const gz of [minZ + 0.06, maxZ - 0.28]) rb.add(gableGeo, '#efe2c4', { x: sx, y: y0, z: gz });
+    for (const gz of [minZ - 0.02, maxZ + 0.02]) { rb.add(GEO.box, '#4a3526', { x: sx, y: y0 + 0.05, z: gz, sx: 2 * half - 1, sy: 0.16, sz: 0.1 }); rb.add(GEO.box, '#4a3526', { x: sx, y: y0 + (rise - 0.3) / 2, z: gz, sx: 0.16, sy: rise - 0.3, sz: 0.1 }); }
+    rb.boxMinMax(sx + 4.2, y0, maxZ - 3.4, sx + 5.0, y0 + rise + 0.6, maxZ - 2.6, '#8c877e'); rb.boxMinMax(sx + 4.1, y0 + rise + 0.6, maxZ - 3.5, sx + 5.1, y0 + rise + 0.75, maxZ - 2.5, '#7f7a72');
+  }
+  rb.build(sides.roof, 'store-roof');""", 1)
+open(p, 'w').write(t)
