@@ -153,7 +153,7 @@ for who in ('zoe', 'asha'):
             k_white, im = add_swatch(J, im, '#f4f1ea'); k_red, im = add_swatch(J, im, '#c7392f')
             hem = 0.36 if who == 'asha' else 0.38
             stripe_uv = lambda Pm: np.stack([np.full(len(Pm), (STRIPE[0] + 256) / SZ), 1 - (STRIPE[1] + 8 + (1.1 - Pm[:, 1]) * STRIPE_K * SZ) / SZ], 1).astype(np.float32)
-            uvp = [(lambda P, s, sh=shirt: s == sh, stripe_uv),                                                         # stripes
+            uvp = [                                                                                                      # (the shirt stays Andrew's solid red)
                    (lambda P, s, so=shoe: (s == so) & (P[:, 1] < 0.2), np.array(sw_uv(k_white), np.float32))]          # white sneakers
             if who == 'asha': uvp.append((lambda P, s, a=pal['#1b191e']: s == a, np.array(sw_uv(k_red), np.float32)))   # her apron red
             plan = {'uv': uvp, 'hide': lambda P, s, pa=pants, h=hem: (s == pa) & (P[:, 1] < 0.74),   # (all of the trousers under the skirt: the skirt slider can shorten it)
@@ -164,7 +164,11 @@ for who in ('zoe', 'asha'):
         def swf(h, J=J, imref=imref, swc=swc):
             if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
             return swc[h]
-        mm = (mpfb_fixes.remove_box_island(M), mpfb_fixes.remove_box_island(L))   # (the face: its front shell off, the hole filled smoothly)
+        mm = (mpfb_fixes.remove_box_island(M), mpfb_fixes.remove_box_island(L))
+        capc = {'day': '#1d1b21', 'night': '#2f5a3a'}[when]; ck = {v: int(k2) for k2, v in J['palette'].items()}.get(capc)
+        for D in (M, L):
+            mpfb_fixes.human_hands(D, J); mpfb_fixes.glutes(D, J, 0.03)
+            if ck is not None: mpfb_fixes.join_cap(D, ck)   # (the face: its front shell off, the hole filled smoothly)
         if HEADS:   # (new heads: off until Andrew picks a direction; HEADS=1 turns the anime_head.py try on)
             mm = anime_head.apply(M, J, who, swf); anime_head.apply(L, J, who, swf); im = imref[0]
             pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
@@ -187,6 +191,10 @@ for nid in ('belinda', 'mina'):
         if h not in swc: k, imref[0] = add_swatch(J, imref[0], h); swc[h] = sw_uv(k)
         return swc[h]
     print(nid, 'box island removed', mpfb_fixes.remove_box_island(M), mpfb_fixes.remove_box_island(L))
+    for D in (M, L): mpfb_fixes.human_hands(D, J); mpfb_fixes.glutes(D, J, 0.04 if nid == 'belinda' else 0.03)
+    if nid == 'mina':
+        pm = {v: int(k2) for k2, v in J['palette'].items()}
+        for D in (M, L): mpfb_fixes.tuck_blouse(D, pm['#efe5cc'], pm['#5d5c5e'])
     if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
         hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
         sk4 = int({v: k for k, v in J['palette'].items()}['#c98e62']); dr8 = int({v: k for k, v in J['palette'].items()}['#1f6b3a'])

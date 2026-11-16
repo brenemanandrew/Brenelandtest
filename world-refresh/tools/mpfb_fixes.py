@@ -838,3 +838,72 @@ def shoulder_straps(M, J, dress_sw, skin_sw, X=0.15, width=0.011, off=0.003):
     M['groups'][''] = np.concatenate([M['groups'][''], Fa]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, Fa.dtype)), Fa])
     M['verts'] = base; M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
     return len(Fa) // 3
+
+def _dominant(M):
+    si = M['si'].reshape(-1, 4); sw = M['sw'].reshape(-1, 4); return si[np.arange(len(si)), np.argmax(sw, 1)]
+
+def human_hands(M, J, along=0.8, thick=1.3):
+    """Andrew: the girls' hands looked alien (long thin fingers). Each finger (by the bone it follows) is shortened toward its
+    knuckle and filled out round its own axis; the thumb a little less. The palm stays."""
+    P = M['pos'].reshape(-1, 3).copy(); W = bone_world(J); names = [b['name'] for b in J['bones']]; dom = _dominant(M)
+    n = 0
+    for side in ('l', 'r'):
+        for f in ('index', 'middle', 'ring', 'pinky', 'thumb'):
+            ch = [f'{f}_0{i}_{side}' for i in (1, 2, 3)]
+            if not all(c in names for c in ch): continue
+            K = np.array(W[ch[0]]); E = np.array(W[ch[2]]); ax = E - K; ln = np.linalg.norm(ax)
+            if ln < 1e-4: continue
+            ax /= ln; a_, t_ = (0.9, 1.2) if f == 'thumb' else (along, thick)
+            sel = np.where(np.isin(dom, [names.index(c) for c in ch]))[0]
+            d = P[sel] - K; al = d @ ax; rad = d - al[:, None] * ax
+            P[sel] = K + (al * a_)[:, None] * ax + rad * t_; n += len(sel)
+    M['pos'] = P.ravel().astype(np.float32); return n
+
+def glutes(M, J, A=0.03, lift=0.012):
+    """Shapely butts (Andrew): two rounded lobes pushed out behind the hips and lifted a touch; everything there moves (the skin and
+    whatever she wears over it), so the clothes follow."""
+    P = M['pos'].reshape(-1, 3).copy(); W = bone_world(J); pel = np.array(W['pelvis']); th = np.array(W['thigh_l'])
+    yc = th[1] - 0.04; cz = pel[2]
+    for s in (-1, 1):
+        cx = s * abs(th[0]) * 0.72
+        dx, dy = P[:, 0] - cx, P[:, 1] - yc
+        g = np.exp(-dx ** 2 / (2 * 0.065 ** 2) - dy ** 2 / (2 * np.where(dy > 0, 0.075, 0.055) ** 2))
+        back = np.clip((cz - P[:, 2]) / 0.06, 0, 1)
+        k = g * back
+        P[:, 2] -= A * k; P[:, 1] += lift * k * np.clip(-dy / 0.05 + 0.5, 0, 1)
+    M['pos'] = P.ravel().astype(np.float32); return int((np.abs(P - M['pos'].reshape(-1, 3)) > -1).sum())
+
+def join_cap(M, cap_sw):
+    """The caps' brims were loose of the crowns (a gap at the join). The brim's back edge is drawn up to the crown's lower rim and
+    tucked inside it."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    P = M['pos'].reshape(-1, 3).copy(); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    T = M['groups'][''].reshape(-1, 3).astype(np.int64); cap = T[(sw[T] == cap_sw).all(1)]
+    if not len(cap): return 0
+    _, wid = np.unique(np.round(P * 20000).astype(np.int64), axis=0, return_inverse=True); wid = wid.ravel()
+    Tw = wid[cap]; r = np.r_[Tw[:, 0], Tw[:, 1], Tw[:, 2]]; c = np.r_[Tw[:, 1], Tw[:, 2], Tw[:, 0]]
+    _, lab = connected_components(coo_matrix((np.ones(len(r)), (r, c)), shape=(wid.max() + 1,) * 2), directed=False); tl = lab[Tw[:, 0]]
+    pieces = [np.unique(cap[tl == u]) for u in np.unique(tl)]
+    ext = [np.ptp(P[p][:, 1]) for p in pieces]; crown = pieces[int(np.argmax(ext))]
+    brims = [p for p in pieces if P[p][:, 2].max() > P[crown][:, 2].max() + 0.05]
+    if not brims: return 0
+    C = P[crown]; low = C[C[:, 1] < C[:, 1].min() + 0.02]
+    n = 0
+    for b in brims:
+        B = P[b]; zb = B[:, 2].min(); edge = b[B[:, 2] < zb + 0.03]
+        for i in edge:
+            d = (low[:, 0] - P[i, 0]) ** 2; j = np.argmin(d + (low[:, 2] < 0) * 9)
+            P[i, 1] = (P[i, 1] + low[j, 1]) / 2 + 0.004; P[i, 2] = min(P[i, 2], low[j, 2]) - 0.015; n += 1
+    M['pos'] = P.ravel().astype(np.float32); return n
+
+def tuck_blouse(M, blouse_sw, skirt_sw):
+    """Mina's blouse broke up where it tucks into her skirt (the two fighting): the blouse below the skirt's top is drawn in 8 mm."""
+    P = M['pos'].reshape(-1, 3).copy(); UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    top = P[sw == skirt_sw, 1].max(); sel = np.where((sw == blouse_sw) & (P[:, 1] < top + 0.015))[0]
+    cz = P[sw == skirt_sw][:, 2].mean()
+    d = P[sel][:, [0, 2]] - [0, cz]; r = np.linalg.norm(d, axis=1, keepdims=True); k = np.maximum(0, r - 0.008) / np.maximum(r, 1e-6)
+    P[sel, 0] = d[:, 0] * k[:, 0]; P[sel, 2] = cz + d[:, 1] * k[:, 0]
+    M['pos'] = P.ravel().astype(np.float32); return len(sel)
