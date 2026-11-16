@@ -8,11 +8,11 @@ import { SEAT_COLORS } from './dominoes.js';
 import { ico } from './mt-ui.js';
 import { createGeneric3D } from './generic-3d.js';
 
-export const FILES = { 'word-weave': './word-weave-ui.js', 'missing-pie': './missing-pie-ui.js', 'town-tycoon': './town-tycoon-ui.js' };
+export const FILES = { 'word-weave': './word-weave-ui.js', 'missing-pie': './missing-pie-ui.js', 'town-tycoon': './town-tycoon-ui.js', 'hearthfield': './hearthfield-ui.js', 'pillow-forts': './pillow-forts-ui.js' };
 export const UIS = {};
 // each game's own pieces on the real table (<id>-3d.js: create(parent, table) like createGeneric3D); a missing or broken one
 // falls back to the generic board and pawns
-export const FILES3D = { 'word-weave': './word-weave-3d.js', 'missing-pie': './missing-pie-3d.js', 'town-tycoon': './town-tycoon-3d.js' };
+export const FILES3D = { 'word-weave': './word-weave-3d.js', 'missing-pie': './missing-pie-3d.js', 'town-tycoon': './town-tycoon-3d.js', 'hearthfield': './hearthfield-3d.js', 'pillow-forts': './pillow-forts-3d.js' };
 export const T3D = {};
 const css = new Set();
 export const ready = Promise.all([
