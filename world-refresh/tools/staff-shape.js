@@ -9,9 +9,17 @@ export const SLIDERS = [
   // key, label, min, max, group
   ['head', 'Head size', -0.4, 0.4, 'Face'], ['faceW', 'Face width', -0.3, 0.3, 'Face'], ['jaw', 'Jaw (narrow - wide)', -0.5, 0.5, 'Face'],
   ['chin', 'Chin (soft - pointed)', -0.5, 0.5, 'Face'], ['chinLen', 'Chin length', -0.5, 0.5, 'Face'], ['cheek', 'Cheeks', -0.5, 0.5, 'Face'],
+  ['eyeSize', 'Eye size', -0.4, 0.6, 'Eyes, nose, mouth'], ['eyeSpace', 'Eye spacing', -0.5, 0.5, 'Eyes, nose, mouth'], ['eyeHeight', 'Eye height', -0.5, 0.5, 'Eyes, nose, mouth'],
+  ['eyeTilt', 'Eye tilt', -0.5, 0.5, 'Eyes, nose, mouth'], ['nose', 'Nose', -0.5, 1.0, 'Eyes, nose, mouth'], ['mouthSize', 'Mouth size', -0.4, 0.5, 'Eyes, nose, mouth'], ['mouthHeight', 'Mouth height', -0.5, 0.5, 'Eyes, nose, mouth'],
   ['bust', 'Bust', -0.6, 0.8, 'Body'], ['waist', 'Waist', -0.5, 0.5, 'Body'], ['hips', 'Hips', -0.5, 0.5, 'Body'],
   ['shoulders', 'Shoulders', -0.4, 0.4, 'Body'], ['legs', 'Leg thickness', -0.4, 0.4, 'Body'],
 ];
+export const FACE_SHAPES = {   // presets for the face sliders (the eyes, nose and mouth keep theirs)
+  Round: { faceW: 0.1, jaw: 0.25, chin: -0.35, chinLen: -0.15, cheek: 0.3 }, Oval: { faceW: -0.08, jaw: -0.15, chin: 0.05, chinLen: 0.2, cheek: 0 },
+  Heart: { faceW: 0.06, jaw: -0.42, chin: 0.4, chinLen: 0.1, cheek: 0.25 }, Square: { faceW: 0.05, jaw: 0.45, chin: -0.4, chinLen: -0.1, cheek: 0 },
+  Long: { faceW: -0.15, jaw: -0.1, chin: 0.1, chinLen: 0.45, cheek: -0.1 }, Soft: { faceW: 0.05, jaw: 0.05, chin: -0.25, chinLen: 0, cheek: 0.4 },
+};
+export const FACE_IDS = { belinda: 'belinda', mina: 'mina', zoe: 'zoe_day', asha: 'asha_day' };   // whose painted face (eyes, brows, blush) a look wears
 export const STAFF = { belinda: ['day'], mina: ['day'], zoe: ['day', 'night'], asha: ['day', 'night'] };
 export const MODEL_ID = (who, when, variant) => ({ belinda: 'belinda', mina: 'mina' }[who] || `${who}_${when}`) + (variant === 'original' && (who === 'zoe' || who === 'asha') ? '_orig' : '');
 
@@ -61,8 +69,43 @@ function measure(data, pos, si, sw) {
     faceZ: (() => { let m = -9; for (let i = 0; i < n; i++) if (wHead[i] > 0.9 && Math.abs(pos[i * 3]) < 0.04 && pos[i * 3 + 1] > chin && pos[i * 3 + 1] < eye) m = Math.max(m, pos[i * 3 + 2]); return m; })() };
 }
 
+/** where the painted eyes are: the centres of the iris tile's two irises (tile-local 0..1, v up); once per sheet */
+export async function prepFace(data) {
+  if (data.__eyeC) return data.__eyeC;
+  const J = data.J, img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = '/models/mpfb/' + J.sheet.full; }).catch(() => null);
+  if (!img) return null;
+  const T = img.width / J.face.grid, ti = J.face.iris, x0 = (ti % J.face.grid) * T, y0 = Math.floor(ti / J.face.grid) * T;
+  const c = document.createElement('canvas'); c.width = T; c.height = T; const g = c.getContext('2d'); g.drawImage(img, x0, y0, T, T, 0, 0, T, T);
+  const d = g.getImageData(0, 0, T, T).data, acc = [[0, 0, 0], [0, 0, 0]];
+  for (let y = 0; y < T; y += 2) for (let x = 0; x < T; x += 2) if (d[(y * T + x) * 4 + 3] > 128) { const s = x < T / 2 ? 0 : 1; acc[s][0] += x; acc[s][1] += y; acc[s][2]++; }
+  data.__eyeC = acc.map(a => (a[2] ? [a[0] / a[2] / T, 1 - a[1] / a[2] / T] : null));
+  return data.__eyeC;
+}
+function deformFace(data, look, g) {
+  const A = g.attributes.aFaceUv; if (!A) return;
+  if (!g.userData.origF) g.userData.origF = A.array.slice();
+  const o = g.userData.origF, f = A.array; f.set(o);
+  const L = look?.shape || {}, v = k => L[k] || 0, E = data.__eyeC;
+  if (E && E[0] && E[1] && (v('eyeSize') || v('eyeSpace') || v('eyeHeight') || v('eyeTilt'))) {
+    const s = 1 + v('eyeSize'), R = 0.17;
+    for (let i = 0; i < f.length / 2; i++) {
+      let u = o[i * 2], w = o[i * 2 + 1]; if (!(u > 0.0005)) continue;
+      for (let e = 0; e < 2; e++) {
+        const c = E[e], side = e === 0 ? -1 : 1;
+        const cx = c[0] + side * v('eyeSpace') * 0.06, cy = c[1] + v('eyeHeight') * 0.06;           // where the eye goes
+        const du = u - cx, dv = w - cy, d = Math.hypot(du, dv), k = Math.max(0, 1 - d / R); if (!k) continue;
+        const kk = k * k * (3 - 2 * k), a = -side * v('eyeTilt') * 0.5 * kk, ca = Math.cos(a), sa = Math.sin(a);
+        const ru = (du * ca - dv * sa) / (1 + (s - 1) * kk), rv = (du * sa + dv * ca) / (1 + (s - 1) * kk);  // (sample back toward the painted eye)
+        u = u + ((c[0] + ru) - u) * kk; w = w + ((c[1] + rv) - w) * kk;
+      }
+      f[i * 2] = u; f[i * 2 + 1] = w;
+    }
+  }
+  A.needsUpdate = true;
+}
 function deform(data, look, geo) {
   const g = geo[''], A = g.attributes.position;
+  deformFace(data, look, g);
   if (!g.userData.orig) g.userData.orig = A.array.slice();
   const o = g.userData.orig, p = A.array; p.set(o);
   const L = look?.shape || {};
@@ -93,20 +136,100 @@ function deform(data, look, geo) {
     }
     p[i * 3] = x; p[i * 3 + 1] = y; p[i * 3 + 2] = z;
   }
+  // the mouth (its own piece): size and height; the nose: how far it stands out
+  const mi = geo['_mouth']?.index?.array;
+  if (mi && (v('mouthSize') || v('mouthHeight'))) {
+    const set = R.mouthSet || (R.mouthSet = [...new Set(mi)]);
+    let cx = 0, cy = 0; for (const i of set) { cx += o[i * 3]; cy += o[i * 3 + 1]; } cx /= set.length; cy /= set.length;
+    const k = 1 + v('mouthSize') * 0.6, dy = v('mouthHeight') * 0.03;
+    for (const i of set) { p[i * 3] = cx + (p[i * 3] - cx) * k; p[i * 3 + 1] = cy + (p[i * 3 + 1] - cy) * k + dy; }
+  }
+  if (v('nose')) {
+    if (!R.nose) { let best = -1; for (let i = 0; i < n; i++) if (R.wHead[i] > 0.9 && Math.abs(o[i * 3]) < 0.02 && o[i * 3 + 1] < R.eye - 0.02 && o[i * 3 + 1] > R.chin + 0.06 && (best < 0 || o[i * 3 + 2] > o[best * 3 + 2])) best = i; R.nose = best >= 0 ? [o[best * 3], o[best * 3 + 1], o[best * 3 + 2]] : null; }
+    if (R.nose) for (let i = 0; i < n; i++) { if (R.wHead[i] < 0.5) continue; const d = Math.hypot(o[i * 3] - R.nose[0], (o[i * 3 + 1] - R.nose[1]) * 0.8, o[i * 3 + 2] - R.nose[2]); if (d < 0.05) p[i * 3 + 2] += v('nose') * 0.012 * Math.exp(-(d * d) / (2 * 0.016 * 0.016)); }
+  }
   A.needsUpdate = true;
 }
 export function applyLook(data, look) { deform(data, look, data.geo); deform(data, look, data.lod); }
 
 /** repaint the palette swatches the look names: { index: '#rrggbb' } on a copy of the sheet; calls back with the new texture */
+const IMG = {};
+const loadImg = src => IMG[src] || (IMG[src] = new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; }));
 export function paintLook(mat, data, look, THREE) {
   const cols = look?.colors || {}; const map = mat.userData.origMap || (mat.userData.origMap = mat.map);
-  if (!Object.keys(cols).length) { if (mat.map !== map) { mat.map = map; mat.needsUpdate = true; } return; }
-  const go = () => {
+  const faceFrom = look?.face && FACE_IDS[look.face] && FACE_IDS[look.face] !== data.J.cid && FACE_IDS[look.face] !== data.J.id.replace(/_orig$/, '') ? FACE_IDS[look.face] : null;
+  if (!Object.keys(cols).length && !faceFrom) { if (mat.map !== map) { mat.map = map; mat.needsUpdate = true; } return; }
+  const go = async () => {
     const img = map.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
     const g = c.getContext('2d'); g.drawImage(img, 0, 0); const k = img.width / 2048;
+    if (faceFrom) {   // another of the four's painted face: her face tiles (the expressions, the iris, the masks) over this sheet's
+      const other = await loadImg('/models/mpfb/' + faceFrom + '.webp');
+      if (other) { const T = 512 * k, ok = other.width / 2048; for (let i = 0; i < 8; i++) { const x = (i % 4) * 512, y = Math.floor(i / 4) * 512; g.clearRect(x * k, y * k, T, T); g.drawImage(other, x * ok, y * ok, 512 * ok, 512 * ok, x * k, y * k, T, T); } }
+    }
     for (const [i, col] of Object.entries(cols)) { const n = +i, x = (1536 + (n % 16) * 32) * k, y = (1536 + Math.floor(n / 16) * 32) * k; g.fillStyle = col; g.fillRect(x, y, 32 * k, 32 * k); }
     const t = new THREE.CanvasTexture(c); t.colorSpace = map.colorSpace; t.flipY = map.flipY; t.wrapS = map.wrapS; t.wrapT = map.wrapT; t.anisotropy = map.anisotropy;
     mat.map = t; mat.needsUpdate = true;
   };
   if (map.image && map.image.width) go(); else { const t0 = setInterval(() => { if (map.image && map.image.width) { clearInterval(t0); go(); } }, 100); }
+}
+
+/** Cloth-like motion for a skirt (Andrew: Belinda's skirt should behave like real cloth). On top of the baked clip: the hem trails
+ * the body's movement on a damped spring (it lags when she sets off, swings past when she stops, sways with her hips) and soft waves
+ * run round it. skirtColor: the palette colour of the skirt; the band from `top` (y) to the hem moves, more toward the hem.
+ * Returns { step(dt) } (called after the character's own update each frame). */
+export function addCloth(ch, data, THREE, { skirtColor, top = 0.62 } = {}) {
+  const J = data.J, idx = Object.entries(J.palette || {}).find(([, c]) => c === skirtColor)?.[0];
+  if (idx === undefined) return null;
+  const k = +idx, sx = 1536 + (k % 16) * 32, sy = 1536 + Math.floor(k / 16) * 32;
+  const mark = g => {
+    if (!g || g.attributes.aSkirt) return;
+    const uv = g.attributes.uv.array, p = g.attributes.position.array, n = uv.length / 2, a = new Float32Array(n);
+    let hem = 9; for (let i = 0; i < n; i++) { const x = uv[i * 2] * 2048, y = (1 - uv[i * 2 + 1]) * 2048; if (x >= sx && x < sx + 32 && y >= sy && y < sy + 32) hem = Math.min(hem, p[i * 3 + 1]); }
+    for (let i = 0; i < n; i++) { const x = uv[i * 2] * 2048, y = (1 - uv[i * 2 + 1]) * 2048;
+      if (x >= sx && x < sx + 32 && y >= sy && y < sy + 32) a[i] = Math.max(0, Math.min(1, (top - p[i * 3 + 1]) / (top - hem))); }
+    g.setAttribute('aSkirt', new THREE.BufferAttribute(a, 1));
+  };
+  mark(data.geo['']); mark(data.lod['']);
+  const U = { uSkirt: { value: new THREE.Vector3() }, uSkirtW: { value: 0 }, uSkirtT: { value: 0 }, uSkirtR: { value: 0 } };
+  const patch = m => {
+    if (!m || m.userData.cloth) return; m.userData.cloth = true;
+    const prev = m.onBeforeCompile;
+    m.onBeforeCompile = (sh, r) => {
+      prev?.call(m, sh, r); Object.assign(sh.uniforms, U);
+      sh.vertexShader = 'attribute float aSkirt; uniform vec3 uSkirt; uniform float uSkirtW, uSkirtT, uSkirtR;\n' + sh.vertexShader.replace('#include <skinning_vertex>',
+        `{ float s = aSkirt * aSkirt; vec2 rd = normalize(position.xz - vec2(0.0, 0.02) + 1e-5); float an = atan(rd.y, rd.x);
+           transformed += uSkirt * s;
+           transformed.xz += vec2(-rd.y, rd.x) * s * uSkirtR;   // (the swish: the hem lags her hips' turn)
+           transformed.xz += rd * s * uSkirtW * (0.5 + 0.5 * sin(an * 3.0 - uSkirtT * 4.0)) * 0.6;
+           transformed.y += s * uSkirtW * 0.25 * sin(an * 5.0 + uSkirtT * 3.0); }
+        #include <skinning_vertex>`);
+    };
+    m.customProgramCacheKey = () => 'cloth-skirt'; m.needsUpdate = true;
+  };
+  patch(ch.mat); patch(ch.matBoth);
+  for (const h of Object.values(ch.hulls || {})) { h.material = h.material.clone(); patch(h.material); }
+  // the spring: the hem's lag behind the pelvis's own movement (in her local frame), and how much it ripples
+  const pel = ch.byName?.get('pelvis'), prev = new THREE.Vector3(), cur = new THREE.Vector3(), vel = new THREE.Vector3(), lag = new THREE.Vector3(), lagV = new THREE.Vector3();
+  const inv = new THREE.Matrix4(), pq = new THREE.Quaternion(); let first = true, t = 0, energy = 0, pyaw = null, rot = 0, rotV = 0;
+  return {
+    U,
+    step(dt, fwd = 0) {
+      if (!pel || !dt) return; t += dt;
+      pel.getWorldPosition(cur); ch.root.updateMatrixWorld(); inv.copy(ch.root.matrixWorld).invert(); cur.applyMatrix4(inv);
+      // (the root's own travel: its world move into her frame)
+      const rp = ch.root.getWorldPosition(new THREE.Vector3()); ch.__rp = ch.__rp || rp.clone();
+      const rootMove = rp.clone().sub(ch.__rp); ch.__rp.copy(rp);
+      const q = ch.root.getWorldQuaternion(new THREE.Quaternion()).invert(); rootMove.applyQuaternion(q);
+      if (first) { prev.copy(cur); first = false; }
+      vel.copy(cur).sub(prev).add(rootMove).divideScalar(dt); prev.copy(cur);
+      if (vel.length() > 4) vel.set(0, 0, 0);   // (a clip looping back, a teleport: not motion)
+      vel.z += fwd;   // (walking on the spot, as in the editor: her own speed)
+      pel.getWorldQuaternion(pq); const yaw = Math.atan2(2 * (pq.w * pq.y + pq.x * pq.z), 1 - 2 * (pq.y * pq.y + pq.x * pq.x)); let dy = yaw - (pyaw ?? yaw); dy = Math.atan2(Math.sin(dy), Math.cos(dy)); pyaw = yaw;
+      rotV += (Math.max(-0.12, Math.min(0.12, -dy / dt * 0.05)) - rot) * 70 * dt; rotV *= Math.exp(-6 * dt); rot += rotV * dt;
+      const target = vel.clone().multiplyScalar(-0.07); target.y *= 0.3; target.clampLength(0, 0.09);
+      lagV.add(target.sub(lag).multiplyScalar(60 * dt)).multiplyScalar(Math.exp(-5.5 * dt)); lag.addScaledVector(lagV, dt);
+      energy += (Math.min(1, vel.length() * 0.8) - energy) * Math.min(1, dt * 2);
+      U.uSkirt.value.copy(lag); U.uSkirtW.value = 0.006 + 0.016 * energy; U.uSkirtT.value = t; U.uSkirtR.value = rot;
+    },
+  };
 }

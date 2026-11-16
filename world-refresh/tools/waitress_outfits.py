@@ -188,13 +188,22 @@ for nid in ('belinda', 'mina'):
         return swc[h]
     if nid == 'belinda':   # her hair as one piece (Andrew: no dip in the middle of the crown)
         hk = int({v: k for k, v in J['palette'].items()}['#16141c']); print('belinda hair dip lifted', mpfb_fixes.fill_hair_dip(M, J, hk), mpfb_fixes.fill_hair_dip(L, J, hk))
+        pk = {v: int(k) for k, v in J['palette'].items()}; bu = np.array(sw_uv(pk['#17151a']), np.float32)   # open stiletto sandals (Andrew)
+        fl = mpfb_fixes.sandals(M, J, bu, pk['#17151a'], pk['#c98e62']); mpfb_fixes.sandals(L, J, bu, pk['#17151a'], pk['#c98e62']); J['floor'] = fl; print('belinda sandals, floor', round(fl, 4))
         if not HEADS:
             for kk in ('full', 'half'):
                 f = J['sheet'].get(kk)
                 if f and os.path.exists(os.path.join(SRC, f)): shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
             for D in (M, L): D['tris'] = sum(len(g) for g in D['groups'].values()) // 3
             write(J, M, L, buf, os.path.join(OUT, nid + '.json')); continue
-    if not HEADS: continue   # (Mina is only touched for the new heads)
+    if nid == 'mina':   # her collar folded down (it stood out forward toward her face)
+        bk = int({v: k for k, v in J['palette'].items()}['#efe5cc']); print('mina collar folded', mpfb_fixes.fold_collar(M, bk), mpfb_fixes.fold_collar(L, bk))
+        if not HEADS:
+            for kk in ('full', 'half'):
+                f = J['sheet'].get(kk)
+                if f and os.path.exists(os.path.join(SRC, f)): shutil.copy(os.path.join(SRC, f), os.path.join(OUT, f))
+            for D in (M, L): D['tris'] = sum(len(g) for g in D['groups'].values()) // 3
+            write(J, M, L, buf, os.path.join(OUT, nid + '.json')); continue
     mm = anime_head.apply(M, J, nid, swf); anime_head.apply(L, J, nid, swf)
     pv = anime_head.scale_head(M, J); anime_head.scale_head(L, J); anime_head.scale_head_info(J, pv)
     imref[0].save(os.path.join(OUT, J['sheet']['full']), 'WEBP', lossless=True)

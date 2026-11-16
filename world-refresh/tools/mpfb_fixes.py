@@ -336,3 +336,111 @@ def fill_hair_dip(M, J, hair_sw, k=1.0):
     P[hv, 1] += lift
     M['pos'] = P.ravel().astype(np.float32)
     return int((lift < -0.002).sum())
+
+def _band(pts, center, axis, width, closed, outward=0.0022, bins=28, keep=None):
+    """a thin strap round a slice of the foot: the slice's points (pts) round `center` in the plane across `axis`, pushed out a
+    little; `keep(angle)` limits it to part of the way round (the toe strap: over the top only)"""
+    axis = axis / np.linalg.norm(axis); u = np.cross(axis, [0, 0, 1.0] if abs(axis[2]) < 0.9 else [1.0, 0, 0]); u /= np.linalg.norm(u); v = np.cross(axis, u)
+    d = pts - center; a = np.arctan2(d @ v, d @ u); r = np.sqrt((d @ u) ** 2 + (d @ v) ** 2)
+    edges = np.linspace(-np.pi, np.pi, bins + 1); R = np.full(bins, np.nan)
+    for i in range(bins):
+        m = (a >= edges[i]) & (a < edges[i + 1])
+        if m.any(): R[i] = r[m].max()
+    ok = ~np.isnan(R)
+    if ok.sum() < 4: return None
+    R = np.interp(np.arange(bins), np.arange(bins)[ok], R[ok], period=bins) + outward
+    ang = (edges[:-1] + edges[1:]) / 2
+    sel = np.arange(bins) if keep is None else np.array([i for i in range(bins) if keep(ang[i])])
+    if len(sel) < 3: return None
+    ring = np.array([center + u * np.cos(ang[i]) * R[i] + v * np.sin(ang[i]) * R[i] for i in sel])
+    V = np.vstack([ring - axis * width / 2, ring + axis * width / 2]); n = len(sel); F = []
+    for i in range(n if closed else n - 1):
+        j = (i + 1) % n; F += [(i, j, n + j), (i, n + j, n + i)]
+    N = np.vstack([ring - center, ring - center]); N /= np.linalg.norm(N, axis=1, keepdims=True)
+    return V, np.array(F), N
+
+def sandals(M, J, black_uv, shoe_sw, skin_sw, theta=0.45):
+    """Belinda's evening shoes taken a step past Zoe's heels (Andrew): open stiletto sandals. Her shoes go (her own feet are modelled
+    under them), and each foot gets a thin sole, a strap over the toes and one round the ankle; then the feet tip into the heel's
+    pose with a stiletto (heels()). Returns the new floor."""
+    P = M['pos'].reshape(-1, 3); UV = M['uv'].reshape(-1, 2)
+    px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    shoe = sw == shoe_sw; skin = sw == skin_sw
+    for grp in (M['groups'], M['inkGroups']):   # the old shoes go
+        for g in list(grp.keys()):
+            t = grp[g].reshape(-1, 3).astype(np.int64)
+            if len(t): grp[g] = t[~shoe[t].any(1)].ravel().astype(grp[g].dtype)
+    wp = bone_world(J); n0 = M['verts']; SI = M['si'].reshape(-1, 4); SW = M['sw'].reshape(-1, 4)
+    addV, addN, addF, addW = [], [], [], []; base = n0
+    for side in ('l', 'r'):
+        ank, ball = np.array(wp['foot_' + side]), np.array(wp['ball_' + side])
+        foot = np.where(skin & (np.abs(P[:, 0] - ank[0]) < 0.09) & (P[:, 1] < 0.13) & (P[:, 2] > ank[2] - 0.1))[0]
+        F_ = P[foot]
+        if len(F_) < 10: continue
+        parts = []
+        # the sole: slices along the foot, its underside, 5 mm thick, a little wider than the foot
+        low = F_[F_[:, 1] < 0.03]; z0 = (low if len(low) else F_)[:, 2].min() - 0.004; z1 = F_[:, 2].max() + 0.004; zs = np.linspace(z0, z1, 16)
+        top, bot = [], []
+        for zz in zs:
+            d = np.abs(F_[:, 2] - zz); m = d < (z1 - z0) / 20 + 0.004
+            if m.sum() < 2: m = d <= np.sort(d)[min(3, len(d) - 1)]
+            xs = F_[m, 0]; yb = F_[m, 1].min()
+            wpad = 0.004 * np.sin(np.pi * (zz - z0) / (z1 - z0)) ** 0.3
+            top += [(xs.min() - wpad, yb + 0.0006, zz), (xs.max() + wpad, yb + 0.0006, zz)]; bot += [(xs.min() - wpad, yb - 0.0045, zz), (xs.max() + wpad, yb - 0.0045, zz)]
+        T_, B_ = np.array(top), np.array(bot); V = np.vstack([T_, B_]); k = len(zs); F = []
+        for i in range(k - 1):
+            a, b, c, d = 2 * i, 2 * i + 1, 2 * i + 3, 2 * i + 2
+            F += [(a, c, b), (a, d, c)]                                                    # top (facing up)
+            F += [(2 * k + a, 2 * k + b, 2 * k + c), (2 * k + a, 2 * k + c, 2 * k + d)]    # bottom
+            F += [(a, 2 * k + a, 2 * k + d), (a, 2 * k + d, d), (b, c, 2 * k + c), (b, 2 * k + c, 2 * k + b)]   # the edges
+        N = np.vstack([np.tile([0, 1.0, 0], (k * 2, 1)), np.tile([0, -1.0, 0], (k * 2, 1))])
+        parts.append((V, np.array(F), N))
+        # the toe strap: over the top of the forefoot, just behind the toes
+        zt = ball[2] + 0.028; m = np.abs(F_[:, 2] - zt) < 0.006
+        if m.sum() > 4:
+            c = F_[m].mean(0); c[1] = F_[m, 1].min() + 0.004
+            b_ = _band(F_[m], c, np.array([0, 0, 1.0]), 0.012, False, keep=lambda a: np.sin(a) > -0.05)
+            if b_: parts.append(b_)
+        # the ankle strap: round the ankle
+        ya = ank[1] - 0.01; m = (np.abs(F_[:, 1] - ya) < 0.006)
+        if m.sum() > 4:
+            b_ = _band(F_[m], F_[m].mean(0), np.array([0, 1.0, 0]), 0.008, True)
+            if b_: parts.append(b_)
+        for V, F, N in parts:
+            near = foot[np.argmin(((V[:, None, :] - F_[None, :, :]) ** 2).sum(2), 1)]
+            addV.append(V); addN.append(N); addF.append(F + base); addW.append(near); base += len(V)
+    V = np.vstack(addV).astype(np.float32); near = np.concatenate(addW)
+    M['pos'] = np.concatenate([M['pos'], V.ravel()]).astype(np.float32)
+    M['nor'] = np.concatenate([M['nor'], np.vstack(addN).ravel()]).astype(np.float32)
+    M['uv'] = np.concatenate([M['uv'], np.tile(black_uv, (len(V), 1)).ravel()]).astype(np.float32)
+    M['fuv'] = np.concatenate([M['fuv'], np.zeros(len(V) * 2, np.float32)])
+    M['si'] = np.concatenate([M['si'], SI[near].ravel()]); M['sw'] = np.concatenate([M['sw'], SW[near].ravel()])
+    M['ink'] = np.concatenate([M['ink'], np.round(np.vstack(addN).ravel() * 0.003 * 100000).astype(np.int16)])
+    F = np.vstack(addF).ravel().astype(M['groups'][''].dtype)
+    M['groups'][''] = np.concatenate([M['groups'][''], F]); M['inkGroups'][''] = np.concatenate([M['inkGroups'].get('', np.zeros(0, F.dtype)), F])
+    M['verts'] = n0 + len(V); M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return heels(M, J, wp, black_uv, theta=theta)
+
+def fold_collar(M, blouse_sw, y0=0.965, zc=0.135, hinge_y=1.04):
+    """Mina's collar stood out forward off her chest (its wings reached toward her face). Fold the wings down onto the chest about
+    the neckline: each point in front of the chest turns down about the hinge (its distance out becomes distance down), lying a
+    little proud of the blouse."""
+    P = M['pos'].reshape(-1, 3).copy(); N = M['nor'].reshape(-1, 3).copy(); INK = M['ink'].reshape(-1, 3).astype(np.float64)
+    UV = M['uv'].reshape(-1, 2); px = (UV[:, 0] * 2048).astype(int); py = ((1 - UV[:, 1]) * 2048).astype(int)
+    sw = np.where((px >= 1536) & (py >= 1536), (px - 1536) // 32 + ((py - 1536) // 32) * 16, -1)
+    sel = np.where((sw == blouse_sw) & (P[:, 1] > y0) & (P[:, 2] > zc))[0]
+    if not len(sel): return 0
+    out = P[sel, 2] - zc; up = P[sel, 1] - hinge_y
+    k = np.clip(out / 0.03, 0, 1)                         # (a soft hinge: the root of the wing bends less)
+    ny = hinge_y - out * 0.95 + up * (1 - k) * 0.5
+    nz = zc + 0.012 + out * 0.12 + up * 0.3 * k
+    P[sel, 1] = P[sel, 1] * (1 - k) + ny * k; P[sel, 2] = P[sel, 2] * (1 - k) + nz * k
+    # normals and the ink outline turn with it (forward -> down becomes out of the chest)
+    for arr in (N, INK):
+        y_, z_ = arr[sel, 1].copy(), arr[sel, 2].copy()
+        arr[sel, 1] = y_ * (1 - k) + (-z_) * k * 0.3 + y_ * k * 0.0
+        arr[sel, 2] = z_ * (1 - k) + (np.abs(y_) + np.abs(z_)) * k
+    N[sel] /= np.maximum(np.linalg.norm(N[sel], axis=1, keepdims=True), 1e-9)
+    M['pos'] = P.ravel().astype(np.float32); M['nor'] = N.ravel().astype(np.float32); M['ink'] = np.round(INK).ravel().astype(np.int16)
+    return int(len(sel))

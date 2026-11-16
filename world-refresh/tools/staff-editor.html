@@ -26,7 +26,7 @@
 </head>
 <body>
 <div id="wrap">
-  <div id="view"><div id="hint">Drag to turn, wheel or pinch to zoom</div></div>
+  <div id="view"><div id="hint">Drag to turn, two fingers or right-drag to move, pinch or wheel to zoom</div></div>
   <div id="panel">
     <h1>Staff editor</h1>
     <div class="chips" id="who"></div>
@@ -35,6 +35,12 @@
     <div class="chips" id="variant" style="margin-top:6px"></div>
     <h2>Pose</h2>
     <div class="chips" id="clips"></div>
+    <h2>Camera</h2>
+    <div class="chips" id="focus"></div>
+    <h2>Face shape</h2>
+    <div class="chips" id="shapes"></div>
+    <h2>Face (painted eyes, brows)</h2>
+    <div class="chips" id="faces"></div>
     <div id="sliders"></div>
     <h2>Outfit colours</h2>
     <div id="colors"></div>
@@ -48,7 +54,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { loadBakedCharacter, BakedCharacter } from '/js/baked-character.js';
-import { SLIDERS, STAFF, MODEL_ID, loadLooks, saveLooksLocal, applyLook, paintLook } from '/js/staff-shape.js';
+import { SLIDERS, STAFF, MODEL_ID, FACE_SHAPES, loadLooks, saveLooksLocal, applyLook, paintLook, addCloth, prepFace } from '/js/staff-shape.js';
 
 const NAMES = { belinda: 'Belinda', mina: 'Mina', zoe: 'Zoe', asha: 'Asha' };
 let LOOKS = await loadLooks();
@@ -64,39 +70,43 @@ scene.add(new THREE.HemisphereLight('#fff6e8', '#b8b0a4', 1.6));
 const sun = new THREE.DirectionalLight('#fff3e0', 2.2); sun.position.set(2, 4, 3); sun.castShadow = true; scene.add(sun);
 const floor = new THREE.Mesh(new THREE.CircleGeometry(1.4, 48), new THREE.MeshToonMaterial({ color: '#d9cfbf' })); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const camera = new THREE.PerspectiveCamera(32, 1, 0.05, 50);
-const orbit = { yaw: 0.35, pitch: 0.08, dist: 3.4, ty: 0.85 };
+const orbit = { yaw: 0.35, pitch: 0.08, dist: 3.4, ty: 0.85, tx: 0, tz: 0 };
 { const q = new URLSearchParams(location.search); if (q.get('cam')) { const [a, b, c, d] = q.get('cam').split(',').map(Number); Object.assign(orbit, { yaw: a, pitch: b, dist: c, ty: d }); } if (q.get('who')) st.who = q.get('who'); }   // (?cam=yaw,pitch,dist,height ?who=belinda)
-function placeCam() { const { yaw, pitch, dist, ty } = orbit; camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(0, ty, 0); }
+function placeCam() { const { yaw, pitch, dist, ty, tx, tz } = orbit; camera.position.set(tx + Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitch) * dist, tz + Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(tx, ty, tz); }
+function pan(dx, dy) { const k = orbit.dist * 0.0016; orbit.tx -= Math.cos(orbit.yaw) * dx * k; orbit.tz += Math.sin(orbit.yaw) * dx * k; orbit.ty += dy * k; placeCam(); }
 function resize() { const r = view.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize(); placeCam();
 let drag = null; const pts = new Map();
-renderer.domElement.addEventListener('pointerdown', e => { renderer.domElement.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); drag = { x: e.clientX, y: e.clientY, d: null }; });
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+renderer.domElement.addEventListener('pointerdown', e => { renderer.domElement.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); drag = { x: e.clientX, y: e.clientY, d: null, pan: e.button === 2 || e.shiftKey, mx: null, my: null }; });
 renderer.domElement.addEventListener('pointermove', e => {
   if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
-  if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (drag.d) orbit.dist = Math.min(8, Math.max(0.6, orbit.dist * drag.d / d)); drag.d = d; }
-  else if (drag) { orbit.yaw -= (e.clientX - drag.x) * 0.01; orbit.pitch = Math.max(-0.4, Math.min(1.2, orbit.pitch + (e.clientY - drag.y) * 0.006)); drag.x = e.clientX; drag.y = e.clientY; }
+  if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2; if (drag.d) { orbit.dist = Math.min(8, Math.max(0.25, orbit.dist * drag.d / d)); pan(mx - drag.mx, my - drag.my); } drag.d = d; drag.mx = mx; drag.my = my; }
+  else if (drag && drag.pan) { pan(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; }
+  else if (drag) { orbit.yaw -= (e.clientX - drag.x) * 0.01; orbit.pitch = Math.max(-1.2, Math.min(1.45, orbit.pitch + (e.clientY - drag.y) * 0.006)); drag.x = e.clientX; drag.y = e.clientY; }
   placeCam();
 });
 const up = e => { pts.delete(e.pointerId); if (!pts.size) drag = null; };
 renderer.domElement.addEventListener('pointerup', up); renderer.domElement.addEventListener('pointercancel', up);
-renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); orbit.dist = Math.min(8, Math.max(0.6, orbit.dist * (1 + e.deltaY * 0.001))); placeCam(); }, { passive: false });
+renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); orbit.dist = Math.min(8, Math.max(0.25, orbit.dist * (1 + e.deltaY * 0.001))); placeCam(); }, { passive: false });
 
 // ---- the character
-let ch = null, data = null, loadingId = null;
+let ch = null, data = null, loadingId = null, cloth = null;
 async function show() {
   const look = lookOf(), id = MODEL_ID(st.who, st.when, look.variant);
   loadingId = id; const d = await loadBakedCharacter(id); if (loadingId !== id) return;
   if (!d) { msg('Could not load ' + id); return; }
   if (ch) { scene.remove(ch.root); ch.dispose?.(); }
-  data = d; applyLook(data, look);
+  data = d; await prepFace(data); applyLook(data, look);
   ch = new BakedCharacter(data, { name: 'editor-' + id }); scene.add(ch.root);
   ch.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  cloth = st.who === 'belinda' ? addCloth(ch, data, THREE, { skirtColor: '#1f6b3a' }) : null;
   paintAll(); playClip(); buildColors(); buildClips();
 }
 function paintAll() { if (!ch) return; const look = lookOf(); for (const m of [ch.mat, ch.matBoth]) paintLook(m, data, look, THREE); }
-function playClip() { if (!ch) return; const c = ch.clips?.[st.clip] ? st.clip : 'idle'; try { ch.play(c); } catch (e) { /* (clips differ per character) */ } }
+function playClip() { if (!ch) return; const c = (data?.clips || {})[st.clip] ? st.clip : 'idle'; try { ch.play(c); } catch (e) { /* (clips differ per character) */ } }
 let t0 = performance.now();
-renderer.setAnimationLoop(() => { const t = performance.now(), dt = Math.min(0.05, (t - t0) / 1000); t0 = t; if (ch) { try { ch.update(dt, t / 1000, 0); } catch (e) { /* */ } ch.root.position.set(0, 0, 0); } renderer.render(scene, camera); });
+renderer.setAnimationLoop(() => { const t = performance.now(), dt = Math.min(0.05, (t - t0) / 1000); t0 = t; if (ch) { try { ch.update(dt, t / 1000, st.clip === 'walk' ? (data.walkSpeed || 1) : 0); } catch (e) { /* */ } ch.root.position.set(0, 0, 0); cloth?.step(dt, st.clip === 'walk' ? (data.walkSpeed || 1) : 0); } renderer.render(scene, camera); });
 
 // ---- the panel
 const $ = id => document.getElementById(id);
@@ -107,10 +117,15 @@ function buildTop() {
   const v = $('variant');
   if (st.who === 'zoe' || st.who === 'asha') chips(v, [['new', st.when === 'day' ? 'Striped uniform' : 'Green top, skirt, heels'], ['original', 'Original outfit']], lookOf().variant || 'new', k => { lookOf().variant = k; lookOf().colors = {}; buildTop(); show(); });
   else v.innerHTML = '';
+  chips($('focus'), [['body', 'Whole body'], ['head', 'Head'], ['feet', 'Feet']], null, k => {
+    const H = data?.J.head; if (k === 'head' && H) Object.assign(orbit, { ty: (H.top + H.chin) / 2, dist: 1.6, tx: 0, tz: 0, pitch: 0.05 });
+    else if (k === 'feet') Object.assign(orbit, { ty: 0.1, dist: 1.1, tx: 0, tz: 0, pitch: 0.2 }); else Object.assign(orbit, { ty: 0.85, dist: 3.4, tx: 0, tz: 0 }); placeCam(); });
+  chips($('shapes'), Object.keys(FACE_SHAPES).map(k => [k, k]), null, k => { const L = lookOf(); L.shape = Object.assign(L.shape || {}, FACE_SHAPES[k]); if (data) applyLook(data, L); buildSliders(); });
+  chips($('faces'), [['', 'Her own'], ['belinda', "Belinda's"], ['mina', "Mina's"], ['zoe', "Zoe's"], ['asha', "Asha's"]], lookOf().face || '', k => { lookOf().face = k || undefined; paintAll(); buildTop(); });
   buildSliders();
 }
 function buildClips() {
-  const have = Object.keys(ch?.clips || data?.clips || {}).filter(c => !['start', 'stop', 'turn_l', 'turn_r'].includes(c));
+  const have = Object.keys(data?.clips || {}).filter(c => !['start', 'stop', 'turn_l', 'turn_r'].includes(c));
   chips($('clips'), have.map(c => [c, c.replace('_', ' ')]), st.clip, k => { st.clip = k; buildClips(); playClip(); });
 }
 function buildSliders() {
@@ -159,7 +174,7 @@ const text = () => JSON.stringify(LOOKS, null, 1);
 $('dl').onclick = () => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text()], { type: 'application/json' })); a.download = 'staff-looks.json'; a.click(); };
 $('copy').onclick = async () => { try { await navigator.clipboard.writeText(text()); msg('Copied.'); } catch (e) { msg('Copy did not work here: use Download.'); } };
 buildTop(); show();
-window.__editor = { st, get ch() { return ch; }, LOOKS };
+window.__editor = { st, get ch() { return ch; }, get cloth() { return cloth; }, LOOKS };
 </script>
 </body>
 </html>

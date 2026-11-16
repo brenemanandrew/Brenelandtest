@@ -713,10 +713,10 @@ export async function loadMpfbCharacters() {
   try { STAFF_LOOKS = await SS.loadLooks(); } catch (e) { STAFF_LOOKS = {}; }   // (world-refresh: Andrew's edits from the staff editor)
   for (const [who, outfits] of Object.entries(STAFF_MODELS)) for (const [k, id0] of Object.entries(outfits)) {
     const look = STAFF_LOOKS[who]?.[k], id = look?.variant === 'original' ? id0 + '_orig' : id0;
-    jobs.push(loadBakedCharacter(id).then(d => { if (d) { if (look) SS.applyLook(d, look); (LOADED[who] = LOADED[who] || {})[k] = d; } }));
+    jobs.push(loadBakedCharacter(id).then(async d => { if (d) { if (look) { await SS.prepFace(d); SS.applyLook(d, look); } (LOADED[who] = LOADED[who] || {})[k] = d; } }));
   }""", 1)
 a = "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n      this.chars[k] = ch;"
 assert t.count(a) == 1, 'mpfb body'
-t = t.replace(a, "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n      this.chars[k] = ch;\n      { const look = STAFF_LOOKS[who]?.[k]; if (look) for (const m of [ch.mat, ch.matBoth]) SS.paintLook(m, d, look, THREE); }", 1)
+t = t.replace(a, "      const ch = new BakedCharacter(d, { name: 'mall-staff-' + d.id });\n      this.chars[k] = ch;\n      { const look = STAFF_LOOKS[who]?.[k]; if (look) for (const m of [ch.mat, ch.matBoth]) SS.paintLook(m, d, look, THREE); }\n      if (who === 'belinda') { const cl = SS.addCloth(ch, d, THREE, { skirtColor: '#1f6b3a' }); if (cl) { const u0 = ch.update.bind(ch); ch.update = (...a) => { const r = u0(...a); cl.step(a[0]); return r; }; } }   // (her skirt moves like cloth)", 1)
 t = "import * as THREE from 'three';\nimport * as SS from './staff-shape.js';\n" + t
 open(p, 'w').write(t)
