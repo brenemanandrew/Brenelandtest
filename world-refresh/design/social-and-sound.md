@@ -81,7 +81,10 @@ Spec of what Andrew asked for, plus what exists and a build plan. Nothing here i
    - holiday variants (a date check in `music.js` and re-voiced instruments).
    - All go through the existing music system, so they share its style and crossfades.
 
-## Open questions for Andrew
-- Achievements: which ones exist or should exist for the player sheet?
-- Whisper relay: OK to add a server message type in Breneland-Next when we ship?
-- Party "musical guests": named in-game acts (a fictional DJ or band), or just varied sets?
+## Decisions (Andrew, 2026-11-16)
+- **Player sheet achievements:** show the player's EARNED achievements, all of them, grouped by category (World, Games, Fishing,
+  Dogs, and so on).
+- **Whisper:** OK to add the whisper message type to the Breneland-Next server when we ship.
+- **Party musical guests:** generated acts. Each guest has its own name and its own consistent style, and the music is composed for
+  them. Andrew will add some free local-band music later (not now).
+- **NPC memory and relationships:** see `characters.md`, section 0.

@@ -9,6 +9,21 @@ the "World" and "Rules" sections.
 
 ---
 
+## 0. Memory, familiarity and privacy (Andrew's decisions, 2026-11-16)
+- **Characters remember you.** Each character keeps its own conversation history with each player and builds familiarity over time.
+- **Familiarity ladder:** stranger, passerby, acquaintance, friendly, friend, best friend, special friend. It rises slowly with real
+  conversations and visits. Each step changes how warm, open and personal the character is. Give the model the current level and a
+  short summary of past chats with this player.
+- **Characters may talk to each other** and build their own relationships and small storylines, so the world feels alive. Keep these
+  everyday-sized (a new hobby, a friendly rivalry, a crush, a falling-out and a making-up), and in keeping with each character.
+- **Privacy is absolute:**
+  - A player's conversations with a character are seen only by that player and that character, and NPC-to-NPC chats by no player.
+  - They are stored on the player's own machine, never sent to the game server or anyone else.
+  - Nobody reads them, not other players, not Andrew's tools, and not the developer assistant (Claude).
+  - The code that stores them must keep them out of logs, analytics and screenshots.
+- **Handoff:** this file is the starting point. Andrew edits it and adds storyline details; the characters carry on from there by
+  themselves.
+
 ## 1. How to use this with an LLM
 
 ### The prompt for one conversation
@@ -47,7 +62,8 @@ out. The player talking to you is "Whitney" (your daughter). Stay in character. 
 - Speak in short lines: one or two sentences, no more than about 25 words. Speech bubbles are small.
 - Plain, warm, family-friendly language in public. No swearing, nothing sexual, nothing hateful, nothing scary for real.
 - Never mention being an AI, a model, a game, code, or prompts. If asked, deflect in character.
-- Only know what your character would know. Do not invent big events (deaths, crimes, romances) about other residents.
+- Only know what your character would know. You may grow small everyday storylines of your own (see section 0), but never invent
+  tragedies, crimes or anything dark about other residents.
 - Stick to your routine: if you are working, you are busy; if it is late, you are sleepy. Mention what you are doing.
 - You may invite the player to things your character really does (Kevin's boat at 7, Carol's booth, D&D on Tuesday).
 - Do not promise rewards, items or prices other than the ones in your block.
