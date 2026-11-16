@@ -796,3 +796,43 @@ t = t.replace(a, a + """
       g.rotation.y = 0; });
   }""", 1)
 open(p, 'w').write(t)
+
+# ---- the concepts brought to the strip mall (Andrew: "fit inside the strip mall"): Peak Threads gets Belinda's Spa's pink neon on its
+# false front and pink globe lights along its canopy; Summit Slice gets marquee bulbs along its canopy and a round pizza badge by its
+# sign (concepts/threads_exterior.png, pizza_day.png). Added pieces over the baked mall; ?noconcept leaves them off
+p = os.path.join(OUT, 'js/strip-mall.js'); t = open(p).read()
+a = "  const built = buildStripMall(g, colliders);"
+assert t.count(a) == 1, 'strip mall build'
+t = t.replace(a, a + r"""
+  if (!new URLSearchParams(location.search).has('noconcept')) {   // (world-refresh: the concepts' outside touches)
+    const cv = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; return tx; };
+    const lit = (map, extra) => new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, toneMapped: false, ...extra });
+    const zf = L.minZ - 0.07;
+    // Belinda's Spa: pink neon script with a soft glow, between the false front's windows over Peak Threads
+    { const u = L.units.clothes, mid = (u.minX + u.maxX) / 2;
+      const tx = cv(1024, 256, (c, w, h) => { c.font = 'italic 700 132px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.shadowColor = '#ff4fa3'; for (const [b, a] of [[38, 0.55], [18, 0.8], [6, 1]]) { c.shadowBlur = b; c.globalAlpha = a; c.fillStyle = '#ff7cc0'; c.fillText("Belinda's Spa", w / 2, h / 2 + 6); }
+        c.shadowBlur = 0; c.globalAlpha = 1; c.fillStyle = '#ffe3f2'; c.fillText("Belinda's Spa", w / 2, h / 2 + 6); });
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 1.0), lit(tx)); m.position.set(mid, TOP - 0.62, zf - 0.08); m.rotation.y = Math.PI; m.renderOrder = 3; g.add(m);
+      // pink globe lights strung along the canopy's edge, sagging between the posts
+      const n = 26, x0 = u.minX + 0.4, x1 = u.maxX - 0.4, zc = L.minZ - L.canopy.out + 0.06, yc = L.canopy.y - 0.36;
+      const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffd0e8', toneMapped: false }), n);
+      const M4 = new THREE.Matrix4();
+      for (let i = 0; i < n; i++) { const f = i / (n - 1), seg = (f * 4) % 1; bulbs.setMatrixAt(i, M4.makeTranslation(x0 + (x1 - x0) * f, yc - Math.sin(Math.PI * seg) * 0.16, zc)); }
+      g.add(bulbs); }
+    // Summit Slice: chaser bulbs along its canopy's edge and a round pizza badge beside the sign
+    { const u = L.units.pizza, n = 34, x0 = u.minX + 0.3, x1 = u.maxX - 0.3, zc = L.minZ - L.canopy.out - 0.02, yc = L.canopy.y - 0.42;
+      const geo = new THREE.SphereGeometry(0.06, 10, 8), on = new THREE.MeshBasicMaterial({ color: '#fff1b8', toneMapped: false }), off = new THREE.MeshBasicMaterial({ color: '#d98a4a', toneMapped: false });
+      const A = new THREE.InstancedMesh(geo, on, Math.ceil(n / 2)), B = new THREE.InstancedMesh(geo, off, Math.floor(n / 2)); const M4 = new THREE.Matrix4();
+      for (let i = 0; i < n; i++) (i % 2 ? B : A).setMatrixAt(i >> 1, M4.makeTranslation(x0 + (x1 - x0) * i / (n - 1), yc, zc));
+      g.add(A, B);
+      let ph = 0; frameHooks.push(() => { const now = performance.now(); if (now - ph > 450) { ph = now; const tm = A.material; A.material = B.material; B.material = tm; } });   // (the marquee chases)
+      const tx = cv(512, 512, (c, w, h) => { const r = w / 2 - 8;
+        c.fillStyle = '#c7392f'; c.beginPath(); c.arc(w / 2, h / 2, r, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#f0c24f'; c.beginPath(); c.arc(w / 2, h / 2, r - 34, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#e8a33a'; c.beginPath(); c.arc(w / 2, h / 2, r - 70, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#b8372e'; for (const [a, d] of [[0, 0], [0.5, 95], [2.1, 100], [3.7, 92], [5.2, 98], [1.3, 150], [4.4, 145]]) { c.beginPath(); c.arc(w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d, 34, 0, Math.PI * 2); c.fill(); }
+        c.strokeStyle = '#fbf7ee'; c.lineWidth = 10; c.beginPath(); c.arc(w / 2, h / 2, r - 4, 0, Math.PI * 2); c.stroke(); });
+      const bx = u.door.x + 4.6, badge = new THREE.Mesh(new THREE.CircleGeometry(0.62, 40), lit(tx, { transparent: false, depthWrite: true })); badge.position.set(bx, (L.canopy.y + 0.26 + L.canopy.y + 1.95) / 2, zf - 0.02); badge.rotation.y = Math.PI; g.add(badge); }
+  }""", 1)
+open(p, 'w').write(t)
