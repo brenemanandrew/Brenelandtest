@@ -627,6 +627,49 @@ a = "  return {\n    tableR: 1.3,\n    far: lod, // its moving folk"
 assert t.count(a) == 1; t = t.replace(a, "  return {\n    tableR: NOUNI ? 1.3 : 0,\n    far: lod, // its moving folk", 1)
 open(p, 'w').write(t)
 
+# ---- the old Unstable Unicorns lawn goes (Andrew 2026-11-16: "remove the old area and pathing, keep the new area"): no rainbow
+# plaza, its sparkles, pink night glow or name board, no unicorn folk or Party Kid (npc lists), no bunting, pole balloons or the
+# game of catch (park.js), and no ring path round the lawn (world.js). The diorama, its free balloons and the play prompt at the
+# portal stay. ?oldworld still shows the old lawn.
+p = os.path.join(OUT, 'js/areas.js'); t = open(p).read()
+a = "  plaza(b, x, z, 6.4, ['#ff9fb8', '#ffc98f', '#fff1a0', '#a8e8a0', '#9fd0ff', '#d0b8ff']);"
+assert t.count(a) == 1; t = t.replace(a, "  if (NOUNI) " + a.lstrip(), 1)
+a = "    sparks.push(s);\n    group.add(soft(s));"
+assert t.count(a) == 1; t = t.replace(a, "    sparks.push(s);\n    if (NOUNI) group.add(soft(s));", 1)
+a = "    npcs: [\n      npcSpec('sprinkles'), npcSpec('moonpie'), npcSpec('clover'), npcSpec('partykid'), npcSpec('noodle'), npcSpec('bean'),"
+assert t.count(a) == 1; t = t.replace(a, "    npcs: !NOUNI ? [] : [\n      npcSpec('sprinkles'), npcSpec('moonpie'), npcSpec('clover'), npcSpec('partykid'), npcSpec('noodle'), npcSpec('bean'),", 1)
+a = "      sparks: sparks.map(s => s.userData),"
+assert t.count(a) == 1; t = t.replace(a, "      sparks: NOUNI ? sparks.map(s => s.userData) : [],", 1)
+a = "      if (game.theme === 'unicorns') addNightSpot("
+assert t.count(a) == 1; t = t.replace(a, "      const OLDUNI = new URLSearchParams(location.search).has('oldworld');\n      if (game.theme === 'unicorns' && OLDUNI) addNightSpot(", 1)
+a = "      addSign(group, slot.x + Math.sin(toHouse) * 6.4,"
+assert t.count(a) == 1; t = t.replace(a, "      if (game.theme !== 'unicorns' || OLDUNI) addSign(group, slot.x + Math.sin(toHouse) * 6.4,", 1)
+open(p, 'w').write(t)
+p = os.path.join(OUT, 'js/park.js'); t = open(p).read()
+a = "    for (let i = 0; i < 2; i++) { // bunting between two poles on the lawn's edge"
+assert t.count(a) == 1; t = t.replace(a, "    const OLDUNI = new URLSearchParams(location.search).has('oldworld');\n    for (let i = 0; i < (OLDUNI ? 2 : 0); i++) { // bunting between two poles on the lawn's edge", 1)
+a = "    for (let i = 0; i < 6; i++) { const a = turn(i * 1.05 + 0.3,"
+assert t.count(a) == 1; t = t.replace(a, "    for (let i = 0; i < (OLDUNI ? 6 : 0); i++) { const a = turn(i * 1.05 + 0.3,", 1)
+a = "    [ballA, ballB] = catchAt(th);\n    for (const [i, [x, z]] of [ballA, ballB].entries()) {"
+assert t.count(a) == 1; t = t.replace(a, "    [ballA, ballB] = catchAt(th);\n    if (OLDUNI) for (const [i, [x, z]] of [ballA, ballB].entries()) {", 1)
+a = "    ball = new THREE.Mesh(GEO.sphere, toon('#ff6b6b'));"
+assert t.count(a) == 1; t = t.replace(a, "    if (OLDUNI) ball = new THREE.Mesh(GEO.sphere, toon('#ff6b6b')); if (ball) {", 1)
+a = "ball.castShadow = true; scene.add(ball);"
+assert t.count(a) == 1; t = t.replace(a, a + " }", 1)
+open(p, 'w').write(t)
+p = os.path.join(OUT, 'js/world.js'); t = open(p).read()
+a = "const rings = Object.keys(refs).filter(id => refs[id] >= 2 && slotsById[id])"
+assert t.count(a) == 1; t = t.replace(a, "const rings = Object.keys(refs).filter(id => refs[id] >= 2 && slotsById[id] && (id !== 'woods-corner' || new URLSearchParams(location.search).has('oldworld')))", 1)
+open(p, 'w').write(t)
+# the park trail runs on across the old lawn to the foot of the diorama's stone path (measured from a top view), and the scouts'
+# trail leaves from it, instead of both stopping at the old plaza's rim
+p = os.path.join(OUT, 'js/layout.js'); t = open(p).read()
+a = "[-82, -27], [-98, -31], 'slot:woods-corner'] }"
+assert t.count(a) == 1; t = t.replace(a, "[-82, -27], [-98, -31], ...((typeof location !== 'undefined' && new URLSearchParams(location.search).has('oldworld')) ? ['slot:woods-corner'] : [[-108, -33.6], [-115, -35.3], [-121, -35.4], [-126, -34.5]])] }", 1)
+a = "pts: ['slot:woods-corner', [-130, -28],"
+assert t.count(a) == 1; t = t.replace(a, "pts: [...((typeof location !== 'undefined' && new URLSearchParams(location.search).has('oldworld')) ? ['slot:woods-corner'] : [[-112, -34.6]]), [-130, -28],", 1)
+open(p, 'w').write(t)
+
 # ---- the Summit Slice waitresses' uniforms (tools/waitress_outfits.py edits the baked MPFB characters): night = the green top and a
 # black skirt, day = red and cream stripes, a cream skirt with a red hem band, Asha's apron red, white sneakers
 import subprocess
