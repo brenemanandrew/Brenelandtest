@@ -633,3 +633,21 @@ def keep_lips_only(M, J):
         it = M['inkGroups']['_mouth'].reshape(-1, 3).astype(np.int64); M['inkGroups']['_mouth'] = it[(sw[it] == lip).all(1)].ravel().astype(M['inkGroups']['_mouth'].dtype)
     M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
     return int((~keep).sum())
+
+def remove_box_island(M):
+    """The 'box chin' is its own small island of face triangles (about 148, loose from the face) standing over the mouth, the real
+    face and mouth complete behind it. Delete that island: every '_face' component but the big one."""
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+    P = M['pos'].reshape(-1, 3); T = M['groups']['_face'].reshape(-1, 3).astype(np.int64)
+    _, wid = np.unique(np.round(P * 20000).astype(np.int64), axis=0, return_inverse=True); wid = wid.ravel()
+    Tw = wid[T]; r = np.r_[Tw[:, 0], Tw[:, 1], Tw[:, 2]]; c = np.r_[Tw[:, 1], Tw[:, 2], Tw[:, 0]]
+    _, lab = connected_components(coo_matrix((np.ones(len(r)), (r, c)), shape=(wid.max() + 1,) * 2), directed=False)
+    tl = lab[Tw[:, 0]]; u, cnt = np.unique(tl, return_counts=True); big = u[np.argmax(cnt)]
+    keep = tl == big
+    gone_v = np.zeros(len(P), bool); gone_v[np.unique(T[~keep])] = True
+    M['groups']['_face'] = T[keep].ravel().astype(M['groups']['_face'].dtype)
+    if '_face' in M.get('inkGroups', {}):
+        it = M['inkGroups']['_face'].reshape(-1, 3).astype(np.int64); M['inkGroups']['_face'] = it[~gone_v[it].all(1)].ravel().astype(M['inkGroups']['_face'].dtype)
+    M['tris'] = sum(len(g) for g in M['groups'].values()) // 3
+    return int((~keep).sum())
