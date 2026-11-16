@@ -640,6 +640,9 @@ a = "    npcs: [\n      npcSpec('sprinkles'), npcSpec('moonpie'), npcSpec('clove
 assert t.count(a) == 1; t = t.replace(a, "    npcs: !NOUNI ? [] : [\n      npcSpec('sprinkles'), npcSpec('moonpie'), npcSpec('clover'), npcSpec('partykid'), npcSpec('noodle'), npcSpec('bean'),", 1)
 a = "      sparks: sparks.map(s => s.userData),"
 assert t.count(a) == 1; t = t.replace(a, "      sparks: NOUNI ? sparks.map(s => s.userData) : [],", 1)
+# (and the free balloons that were tied to the old table go too, Andrew 2026-11-16)
+a = "  if (!NOUNI) ['#ff6fa8', '#6fb8ff', '#fff27a', '#b48cff', '#7ddc7a', '#ffb347', '#ff6b6b', '#9fe8ff'].forEach("
+assert t.count(a) == 1; t = t.replace(a, "  if (false) ['#ff6fa8', '#6fb8ff', '#fff27a', '#b48cff', '#7ddc7a', '#ffb347', '#ff6b6b', '#9fe8ff'].forEach(", 1)
 a = "      if (game.theme === 'unicorns') addNightSpot("
 assert t.count(a) == 1; t = t.replace(a, "      const OLDUNI = new URLSearchParams(location.search).has('oldworld');\n      if (game.theme === 'unicorns' && OLDUNI) addNightSpot(", 1)
 a = "      addSign(group, slot.x + Math.sin(toHouse) * 6.4,"
