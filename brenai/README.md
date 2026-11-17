@@ -20,7 +20,7 @@ fly volumes create brenai_data -a brenai -r iad -s 1 --yes
 fly secrets set -a brenai ANTHROPIC_API_KEY=sk-ant-... APP_PASSWORD=pick-one
 fly deploy --ha=false
 ```
-After that, pushes to `main` that touch `brenai/` deploy through `.github/workflows/brenai-deploy.yml` if the repo has the `FLY_API_TOKEN` secret (`fly tokens create deploy -a brenai`).
+Or from the phone: add repo secrets `FLY_API_TOKEN`, `ANTHROPIC_API_KEY` and `BRENAI_PASSWORD` in GitHub, then rerun "Brenai Deploy" in Actions (it creates the app and volume and copies the keys). Pushes to `main` that touch `brenai/` deploy through `.github/workflows/brenai-deploy.yml` if the repo has the `FLY_API_TOKEN` secret (`fly tokens create deploy -a brenai`).
 
 ## Settings (fly.toml [env] or secrets)
 `MODEL`, `EFFORT` (low/medium/high), `USER_NAME`, `COMPACT_AT`, `LEARN_EVERY`, `APP_PASSWORD` (empty = no login; do not leave it empty on Fly, it spends your API credit).
