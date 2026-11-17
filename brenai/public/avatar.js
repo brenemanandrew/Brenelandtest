@@ -149,16 +149,27 @@
     // ---- touch: tap (where?), stroke over the hair (pet), fast swipe (swat) ----
     let down = null;
     const at = e => R.locate(e);
-    stage.addEventListener('pointerdown', e => { const p = at(e); down = { ...p, sx: p.x, t: now(), path: 0, pet: 0 }; try { stage.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
+    // two fingers = pinch to zoom (renderers that can zoom); it never counts as a poke or a swat
+    const fingers = new Map(); let pinch = 0, multi = false;
+    const spread = () => { const [a, b] = [...fingers.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    stage.addEventListener('wheel', e => { if (R.zoom && R.zoom(e.deltaY * 0.0015)) e.preventDefault(); }, { passive: false });
+    const lift = e => { fingers.delete(e.pointerId); if (!fingers.size) setTimeout(() => { if (!fingers.size) multi = false; }, 250); };
+    stage.addEventListener('pointerup', lift); stage.addEventListener('pointercancel', lift);
+    stage.addEventListener('pointerdown', e => { fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (fingers.size === 2) { multi = true; down = null; pinch = spread(); } });
+    stage.addEventListener('pointermove', e => {
+      if (!fingers.has(e.pointerId)) return; fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (fingers.size === 2 && R.zoom) { const d = spread(); if (pinch > 0) R.zoom((pinch - d) / Math.max(120, stage.clientWidth) * 1.6); pinch = d; }
+    });
+    stage.addEventListener('pointerdown', e => { if (multi) return; const p = at(e); down = { ...p, sx: p.x, t: now(), path: 0, pet: 0 }; try { stage.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
     stage.addEventListener('pointermove', e => {
       const p = at(e); pointerLook = { x: (p.x - 100) / 30, y: (p.y - 100) / 34 }; pointerLookUntil = now() + 1500;
-      if (!down) return;
+      if (!down || multi) return;
       const d = Math.hypot(p.x - down.x, p.y - down.y); down.path += d;
       if (p.y < 92 && now() - down.t > 250) { down.pet += d; if (down.pet > 30) react('pet'); }
       down.x = p.x; down.y = p.y;
     });
     const up = e => {
-      if (!down) return; const p = at(e), d = down, ms = now() - d.t, dx = p.x - d.sx; down = null;
+      if (!down || multi) { down = null; return; } const p = at(e), d = down, ms = now() - d.t, dx = p.x - d.sx; down = null;
       if (Math.abs(dx) > 55 && ms < 380) return touched('swat', Math.sign(dx));
       if (d.pet > 60) return touched('petEnd');
       if (d.path > 25) return;
