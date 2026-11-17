@@ -168,7 +168,7 @@ function fill(el, text) {
   const who = el.dataset.who;
   el.textContent = '';
   for (const p of split(clean(text), who)) {
-    const t = (p.a ? actLine(who, p.a) : p.s).trim(); if (!t) continue;
+    const t = (p.a ? actLine(who, p.a) : p.s.replace(/["\u201c\u201d]/g, '')).trim(); if (!t) continue;
     const d = document.createElement('div'); d.className = p.a ? 'act' : 'say'; d.textContent = t; el.appendChild(d);
   }
 }
@@ -320,7 +320,7 @@ const voice = (() => {
 })();
 
 // ---------- the wheel ----------
-let sheet = null;
+let sheet = null, notes = '';
 const MOODS = ['auto', 'happy', 'playful', 'chill', 'focused', 'excited', 'tired', 'grumpy', 'sad', 'anxious'];
 const LABEL = v => v < 20 ? 'very low' : v < 40 ? 'low' : v < 60 ? 'middle' : v < 80 ? 'high' : 'very high';
 async function saveSettings(patch) {
@@ -407,6 +407,9 @@ function openPanel(k) {
       el('label', { textContent: 'Rapport: ' + sheet.rapport + '/100 (moves on its own as you talk)' }), rp,
       el('label', { textContent: 'Cussing: ' + ['never', 'mild', 'casual', 'free'][sheet.cussLevel] }), cl,
       el('label', {}, dev, ' Let her pick up cussing over time (only once rapport is 60+ and you cuss yourself)'));
+    const nt = el('textarea', { rows: 8, value: notes });
+    const saveN = el('button', { className: 'small', textContent: 'Save notes' }); saveN.onclick = () => api('/api/settings', { notes: nt.value }).then(() => { notes = nt.value; saveN.textContent = 'Saved'; });
+    p.append(el('label', { textContent: 'Her private notes about you (she rewrites these every few messages; edit or clear them if she picked up something wrong)' }), nt, el('div', { className: 'row' }, saveN));
   } else if (k === 'acts') {
     p.append(el('h3', { textContent: 'Action buttons' }), el('div', { className: 'note', textContent: 'Button name on the left, what you do on the right (it shows in the chat as "he ..."). Empty rows are removed.' }));
     const rows = el('div');
@@ -435,7 +438,7 @@ function openPanel(k) {
   }
 }
 async function openWheel() {
-  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet;
+  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || '';
   drawRing(); $('panel').classList.remove('show'); $('wheel').classList.add('open');
 }
 function closeWheel() { $('wheel').classList.remove('open'); }
@@ -445,7 +448,7 @@ $('brainBtn').onclick = () => { document.body.classList.remove('big'); openWheel
 async function brainStatus() {
   try {
     const b = await (await fetch('/api/brain')).json();
-    $('brainDot').textContent = b.online ? '\u25cf PC online' : b.fallback ? '\u25cf Claude' : '\u25cb offline';
+    $('brainDot').textContent = b.online ? '\u25cf PC online' + (b.bridge < b.bridgeLatest ? ' (restart bridge to update)' : '') : b.fallback ? '\u25cf Claude' : '\u25cb offline';
     $('brainDot').style.color = b.online ? '#7bd88f' : b.fallback ? '#d4b8ff' : '#ff9a9a';
   } catch {}
 }

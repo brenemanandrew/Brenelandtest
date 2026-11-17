@@ -42,9 +42,9 @@ const tidy = t => t.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<\|im_end
 
 async function think(job, send) {
   const sys = String(job.system || ''), msgs = Array.isArray(job.messages) ? job.messages : [];
-  const shape = noSys => noSys
+  const shape = noSys => (noSys && sys)
     ? (msgs.length && msgs[0].role === 'user' ? [{ role: 'user', content: sys + '\n\n' + msgs[0].content }, ...msgs.slice(1)] : [{ role: 'user', content: sys }, ...msgs])
-    : [{ role: 'system', content: sys }, ...msgs];
+    : (sys ? [{ role: 'system', content: sys }, ...msgs] : msgs);
   const stream = !!job.stream;
   const call = noSys => {
     const body = { messages: shape(noSys), max_tokens: Math.min(2000, job.max_tokens || 700), temperature: FORCE_TEMP ?? (typeof job.temperature === 'number' ? job.temperature : 0.75), stream, min_p: MIN_P, repeat_penalty: typeof job.repeat_penalty === 'number' ? job.repeat_penalty : REPEAT };
@@ -83,7 +83,7 @@ let ws = null, backoff = 1000, ping = null;
 function connect() {
   st.state = 'connecting'; status();
   try { ws = new WebSocket(SERVER); } catch { return retry(); }
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: TOKEN, model: MODEL }));
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: TOKEN, model: MODEL, v: 2 }));
   ws.onmessage = async ev => {
     let m; try { m = JSON.parse(String(ev.data)); } catch { return; }
     if (m.t === 'welcome') { st.state = 'connected'; st.since = Date.now(); st.note = ''; backoff = 1000; status(); clearInterval(ping); ping = setInterval(() => { try { ws.send('{"t":"ping"}'); } catch {} }, 20000); return; }

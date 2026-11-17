@@ -60,7 +60,7 @@ function onBrainSocket(ws) {
       if (!BRAIN_TOKEN || m.token !== BRAIN_TOKEN) { ws.send(JSON.stringify({ t: 'refused', why: 'token' })); return ws.close(); }
       authed = true; clearTimeout(kill);
       if (brain.ws) { try { brain.ws.send('{"t":"replaced"}'); brain.ws.close(); } catch {} }
-      Object.assign(brain, { ws, model: String(m.model || '').slice(0, 80), since: Date.now() });
+      Object.assign(brain, { ws, model: String(m.model || '').slice(0, 80), since: Date.now(), v: Number(m.v) || 1 });
       ws.send('{"t":"welcome"}');
       console.log('[brain] bridge connected', brain.model);
       return;
@@ -124,12 +124,21 @@ const STAMP = () => new Date().toLocaleString('en-US', { timeZone: 'America/New_
 const systemText = () => systemBlocks().map(b => b.text).join('\n\n');
 
 // The local model gets the log as plain turns, newest kept, oldest dropped to fit the loaded context.
+// Mistral-family chat templates paste the system prompt onto the NEWEST user message, so the model answered her character
+// sheet instead of what he said. So no system prompt here: the sheet goes in as the very first turn, marked as setup, and
+// his newest message is sent bare (no timestamp, no reminder; she was replying to those too).
+function setupText() {
+  const d = new Date(), tz = { timeZone: 'America/New_York' };
+  const hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24;
+  const part = hour < 5 ? 'late night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 22 ? 'evening' : 'late night';
+  const day = d.toLocaleString('en-US', { ...tz, weekday: 'long', month: 'long', day: 'numeric' });
+  return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nIt is ${day}, ${part}.\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
+}
 async function replyLocal(userText, onDelta) {
-  const system = systemText();
-  let budget = CONTEXT_TOKENS - toks(system) - REPLY_TOKENS - 200;
+  const setup = setupText();
+  let budget = CONTEXT_TOKENS - toks(setup) - REPLY_TOKENS - 200;
   const L = LENGTHS[db.settings.length] || LENGTHS.short;
-  // The reminder rides on the newest turn only (never stored): local roleplay models follow what is closest to their reply.
-  const turns = [{ role: 'user', content: `[${STAMP()} Eastern] ${userText}\n\n[Reply as Wizra only, ${L.say}. At most one short action, and it must be inside *asterisks*; everything outside asterisks is words you say out loud, never narration. Say something new: do not reuse an action, phrase or question from your earlier replies.]` }];
+  const turns = [{ role: 'user', content: userText }];
   budget -= toks(turns[0].content);
   for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
     const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: e.text };
@@ -137,6 +146,8 @@ async function replyLocal(userText, onDelta) {
     turns.unshift(t);
   }
   while (turns.length && turns[0].role !== 'user') turns.shift();
+  turns.unshift({ role: 'user', content: setup }, { role: 'assistant', content: '(ready)' });
+  const system = '';
   const text = await brainJob({ system, messages: turns, max_tokens: L.tokens, temperature: tempOf(db.settings.temperature), stream: true,
     repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
   return dropRepeats(cleanLocal(text));
@@ -152,13 +163,13 @@ const norm = u => u.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // Cut any sentence or action she already used, word for word, in her last few replies.
 function dropRepeats(text) {
   const seen = new Set();
-  for (const e of db.log.filter(e => e.who === 'her').slice(-8)) for (const u of units(e.text)) { const n = norm(u); if (n.length > 14) seen.add(n); }
+  for (const e of db.log.filter(e => e.who === 'her').slice(-8)) for (const u of units(e.text)) { const n = norm(u); if (n.length > 5 && n.includes(' ')) seen.add(n); }
   const kept = units(text).filter(u => !seen.has(norm(u))).join('').trim();
   return kept.length >= 2 ? kept : text;
 }
 // roleplay models sometimes prefix the speaker or run on into his line: trim both
 function cleanLocal(t) {
-  t = String(t).replace(/^\s*wizra\s*:\s*/i, '');
+  t = String(t).replace(/^\s*\(ready\)\s*/i, '').replace(/^\s*wizra\s*:\s*/i, '');
   const cut = t.search(new RegExp('\\n\\s*' + USER_NAME + '\\s*:', 'i'));
   t = (cut > 0 ? t.slice(0, cut) : t).replace(/\n\s*\[[^\]]*$/, '').trim();
   // cut off by the length cap: drop the unfinished action, then the unfinished sentence
@@ -235,6 +246,7 @@ function applySettings(body) {
   if (['short', 'medium', 'long'].includes(s.length)) S.length = s.length;
   if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140)]).filter(x => x[0] && x[1]).slice(0, 16);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
+  if (typeof body.notes === 'string') db.profile = body.notes.slice(0, 6000);
   const h = body.sheet || {}, H = db.sheet;
   for (const k of ['birthday', 'backstory']) if (typeof h[k] === 'string') H[k] = h[k].slice(0, 4000);
   for (const k of ['likes', 'dislikes']) if (Array.isArray(h[k])) H[k] = h[k].map(String).map(x => x.trim()).filter(Boolean).slice(0, 60);
@@ -261,7 +273,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 2 });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
@@ -279,7 +291,7 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
-        return json(res, 200, { settings: db.settings, sheet: db.sheet });
+        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile });
       }
 
       if (url.pathname === '/api/reset' && req.method === 'POST') {
