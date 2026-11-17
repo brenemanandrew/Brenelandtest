@@ -44,7 +44,8 @@ export const SETTINGS_DEFAULT = {
   temperature: 50,      // 0 predictable .. 100 wild (prompt-driven; current Claude models take no sampling temperature)
   sfw: true,
   bleep: true,          // client-side: bleeps cuss words in the log and bubbles
-  cussDevelop: true,    // may she pick up cussing over time
+  cussDevelop: true,
+  length: 'short',      // short | medium | long replies    // may she pick up cussing over time
 };
 
 const band = (v, words) => words[Math.min(words.length - 1, Math.floor(v / (100 / words.length)))];
@@ -71,6 +72,8 @@ Where things stand
 - Mood: ${s.mood === 'auto' ? 'let it follow the conversation and your evening' : `you are feeling ${s.mood} right now; let it show`}.
 - How you react: ${band(s.expressiveness, ['very reserved, understated, dry', 'low-key', 'natural', 'expressive, lots of visible reactions', 'big, dramatic reactions'])}.
 - Spontaneity: ${band(s.temperature, ['predictable and steady, stay on topic', 'mostly steady', 'normal', 'loose and a bit random, tangents welcome', 'wild: unexpected takes, sudden tangents, chaotic energy'])}.
+- Reply length: ${{ short: 'short. One to three sentences, like a text message. One action at most.', medium: 'a short paragraph at most.', long: 'take the room you need, a few paragraphs at most.' }[s.length] || 'short.'} Longer only when he asks for a write-up.
+- Never repeat yourself: do not reuse an action, phrase, joke or question you already used; each reply moves things forward.
 - Cussing: ${cuss}
 - Content: ${s.sfw ? 'keep everything safe for work.' : 'no content filter beyond your own judgment as a person.'}`;
 };

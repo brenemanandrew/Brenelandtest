@@ -5,59 +5,66 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>Brenai</title>
 <style>
-  :root { --bg:#0f0c14; --panel:#1a1522; --line:#2e2638; --her:#2c2140; --me:#1f3346; --text:#e9e4f0; --dim:#9b92a8; --act:#b8a6d9; }
+  :root { --bg:#0f0c14; --panel:#1a1522; --line:#3a3046; --text:#e9e4f0; --dim:#9b92a8; --me:#6fa8ff; --her:#ff6b7a; --act:#b79cff; --balloon:#e0566a; --av:104px; }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:16px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; }
-  #app { height:100dvh; display:grid; grid-template-rows: auto 1fr auto; gap:10px; padding:10px; max-width:900px; margin:0 auto; }
+  #app { height:100dvh; display:grid; grid-template-rows: auto auto 1fr auto auto auto; gap:8px; padding:10px; max-width:900px; margin:0 auto; }
+  @media (min-width:700px) { :root { --av:150px; } }
 
-  /* top: her picture (top left) + her chat window */
-  #top { display:grid; grid-template-columns: 96px 1fr; gap:10px; min-height:0; grid-row: 1 / 3; }
-  .who { position:relative; display:flex; flex-direction:column; align-items:center; }
-  .who img { width:96px; height:96px; border-radius:14px; border:2px solid var(--line); object-fit:cover; background:#000; }
-  .who .name { font-size:13px; color:var(--dim); margin-top:4px; }
-  #herCol { padding-top:84px; } /* room for her bubble above her head */
+  /* top: the avatar (tap to expand) with the brain button on its corner, and her word balloon beside it */
+  #top { display:grid; grid-template-columns: var(--av) 1fr; gap:6px; height:var(--av); align-items:center; }
+  #stageSlot { width:var(--av); height:var(--av); }
+  #stageWrap { position:relative; width:var(--av); height:var(--av); }
+  #stage { width:100%; height:100%; border:3px solid var(--line); border-radius:16px; overflow:hidden; background:#000; cursor:pointer; }
+  #stage > * { width:100%; height:100%; display:block; object-fit:cover; }
+  #brainBtn { position:absolute; right:-8px; bottom:-8px; width:34px; height:34px; border-radius:50%; border:2px solid var(--line); background:var(--panel); font-size:17px; line-height:1; padding:0; cursor:pointer; z-index:2; }
+  #stageBack { position:fixed; inset:0; background:rgba(8,6,12,.85); display:none; z-index:12; }
+  body.big #stageBack { display:block; }
+  body.big #stageWrap { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(92vw,78dvh); height:min(92vw,78dvh); z-index:13; }
 
-  #log { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:10px 12px; overflow-y:auto; min-height:0; }
-  .line { margin:6px 0; white-space:pre-wrap; word-wrap:break-word; }
-  .line b { font-weight:600; }
-  .line.her b { color:#d4b8ff; }
-  .line.me b { color:#9fd0ff; }
-  .line .act { color:var(--act); font-style:italic; }
-  .line.err { color:#ff9a9a; font-size:14px; }
+  /* word balloons: pop up, scroll when long, fade after a while */
+  .bwrap { position:relative; display:flex; min-width:0; opacity:0; transform:translateY(4px); transition:opacity .25s, transform .25s; pointer-events:none; }
+  .bwrap.show { opacity:1; transform:none; pointer-events:auto; }
+  .balloon { border:2px solid var(--balloon); border-radius:26px; padding:8px 16px; background:var(--panel); font-size:15px; line-height:1.3; overflow-y:auto; overscroll-behavior:contain; white-space:pre-wrap; word-wrap:break-word; }
+  .bwrap.her { margin-left:14px; max-height:100%; }
+  .bwrap.her .balloon { max-height:var(--av); }
+  .bwrap.her::before { content:""; position:absolute; left:-15px; top:calc(50% - 8px); border:8px solid transparent; border-right-color:var(--balloon); }
+  .bwrap.me { margin-right:14px; justify-self:end; align-self:center; }
+  .bwrap.me .balloon { max-height:72px; }
+  .bwrap.me::after { content:""; position:absolute; right:-15px; top:calc(50% - 8px); border:8px solid transparent; border-left-color:var(--balloon); }
+
+  /* chat area: who is talking (name), what they say, and what they do on its own indented line */
+  #logHead { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; font-weight:800; letter-spacing:.08em; color:var(--dim); padding:0 4px; margin-top:4px; }
+  #brainDot { font-weight:400; letter-spacing:0; }
+  #log { background:var(--panel); border:2px solid var(--line); border-radius:14px; padding:8px 12px; overflow-y:auto; min-height:0; }
+  .msg { display:grid; grid-template-columns: 4.6em 1fr; column-gap:8px; margin:10px 0; }
+  .msg .nm { font-size:13px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding-top:2px; overflow:hidden; text-overflow:ellipsis; }
+  .msg.me .nm { color:var(--me); } .msg.her .nm { color:var(--her); }
+  .msg .say { white-space:pre-wrap; word-wrap:break-word; }
+  .msg .act { padding-left:1.5em; font-weight:700; color:var(--act); }
+  .line.err { color:#ff9a9a; font-size:14px; margin:8px 0; }
   .typing { color:var(--dim); font-style:italic; }
 
-  /* speech bubbles above heads */
-  .bubble { position:absolute; left:0; bottom:calc(100% + 10px); width:max-content; max-width:min(70vw, 420px);
-            padding:8px 12px; border-radius:14px; font-size:15px; line-height:1.3; z-index:5;
-            display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden;
-            opacity:0; transform:translateY(6px); transition:opacity .25s, transform .25s; pointer-events:none; }
-  .bubble.show { opacity:1; transform:none; }
-  .bubble::after { content:""; position:absolute; left:36px; top:100%; border:8px solid transparent; }
-  #herBubble { background:var(--her); border:1px solid #4a3a66; bottom:auto; top:0; }
-  #herBubble::after { display:none; }
-  #herTail { position:absolute; left:40px; top:72px; border:8px solid transparent; border-top-color:#4a3a66; opacity:0; transition:opacity .25s; }
-  #herTail.show { opacity:1; }
-  #meBubble { background:var(--me); border:1px solid #33506b; }
-  #meBubble::after { border-top-color:#33506b; }
+  /* action buttons: quick things you do that she reacts to */
+  #acts { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+  #acts button { flex:none; padding:5px 10px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; font-size:13px; }
 
-  /* bottom: me + input */
-  #bottom { display:grid; grid-template-columns: 64px 1fr auto auto; gap:8px; align-items:end; grid-row:3; }
-  #meCol img { width:64px; height:64px; }
-  #meCol .bubble { left:0; }
-  #in { width:100%; resize:none; max-height:30vh; min-height:46px; padding:12px; border-radius:12px; border:1px solid var(--line);
-        background:var(--panel); color:var(--text); font:inherit; }
-  #send { height:46px; padding:0 16px; border-radius:12px; border:0; background:#6b4fa3; color:#fff; font:inherit; font-weight:600; }
+  /* bottom: your balloon, your icon, the chat bar with the mic */
+  #bottom { display:grid; grid-template-columns: 1fr 72px; gap:6px; height:72px; align-items:center; }
+  #meIcon { width:72px; height:72px; border:3px solid var(--line); border-radius:14px; }
+  #bar { display:flex; gap:8px; align-items:flex-end; }
+  #barTag { align-self:center; font-weight:800; font-size:14px; border:2px solid var(--line); border-radius:8px; padding:4px 8px; }
+  #inWrap { position:relative; flex:1; min-width:0; }
+  #heardBar { position:absolute; left:14px; right:14px; bottom:100%; height:3px; background:#b04a72; transform-origin:left; transform:scaleX(0); }
+  #in { display:block; width:100%; resize:none; max-height:30vh; min-height:44px; padding:10px 16px; border-radius:22px; border:2px solid var(--line); background:var(--panel); color:var(--text); font:inherit; }
+  #mic, #send { flex:none; height:44px; width:44px; border-radius:50%; border:2px solid var(--line); background:var(--panel); color:var(--dim); font-size:19px; padding:0; }
+  #send { color:#fff; background:#6b4fa3; border-color:#6b4fa3; font-size:16px; }
   #send:disabled { opacity:.5; }
-  #mic { height:46px; width:46px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--dim); font-size:20px; padding:0; }
   #mic.on { color:#fff; background:#7a2e4a; border-color:#b04a72; }
   #mic.on.hearing { animation:pulse 1s infinite; }
   @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(176,74,114,.6); } 50% { box-shadow:0 0 0 8px rgba(176,74,114,0); } }
   #mic[hidden] { display:none; }
-  #heardBar { position:absolute; left:0; right:0; bottom:100%; height:3px; background:#b04a72; transform-origin:left; transform:scaleX(0); }
-  #inWrap { position:relative; }
-  #menu { position:fixed; top:10px; right:12px; background:none; border:0; color:var(--dim); font-size:20px; }
 
-  #herCol img { cursor:pointer; }
   /* settings wheel */
   #wheel { position:fixed; inset:0; background:rgba(8,6,12,.82); display:none; z-index:15; overflow-y:auto; }
   #wheel.open { display:block; }
@@ -85,6 +92,7 @@
   #panel .scale { display:flex; justify-content:space-between; font-size:12px; color:var(--dim); }
   #panel .note { font-size:12px; color:var(--dim); margin-top:6px; }
   #closeWheel { position:fixed; top:10px; right:14px; font-size:26px; background:none; border:0; color:var(--text); z-index:16; }
+  #newChat { display:block; margin:0 auto 14px; padding:8px 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; font-size:14px; }
   #login { position:fixed; inset:0; background:var(--bg); display:none; place-items:center; z-index:20; }
   #login form { display:grid; gap:10px; width:260px; }
   #login input, #login button { padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; }
@@ -93,32 +101,34 @@
 <body>
 <div id="app">
   <div id="top">
-    <div class="who" id="herCol">
-      <div class="bubble" id="herBubble"></div>
-      <div id="herTail"></div>
-      <img src="wizra.svg" alt="Wizra">
-      <div class="name">Wizra</div><div class="name" id="brainDot" title="Her brain: the model on your PC">...</div>
-    </div>
-    <div id="log"></div>
+    <div id="stageSlot"><div id="stageWrap">
+      <!-- The VTuber avatar mounts in #stage (replace the img). data-talking and data-mood on #stage follow the chat. -->
+      <div id="stage" title="Tap to expand"><img src="wizra.svg" alt="Wizra"></div>
+      <button id="brainBtn" title="Her settings">&#129504;</button>
+    </div></div>
+    <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
   </div>
+  <div id="logHead"><span>CHAT AREA</span><span id="brainDot">...</span></div>
+  <div id="log"></div>
+  <div id="acts"></div>
   <div id="bottom">
-    <div class="who" id="meCol">
-      <div class="bubble" id="meBubble"></div>
-      <img src="me.svg" alt="You">
-      <div class="name" id="meName">You</div>
-    </div>
-    <div id="inWrap"><div id="heardBar"></div><textarea id="in" rows="1" placeholder="Talk, or type. *Asterisks* for actions."></textarea></div>
-    <button id="mic" title="Voice input (tap to turn on or off)" hidden>&#127908;</button>
-    <button id="send">Send</button>
+    <div class="bwrap me" id="meWrap"><div class="balloon" id="meBubble"></div></div>
+    <img id="meIcon" src="me.svg" alt="You">
+  </div>
+  <div id="bar">
+    <span id="barTag">Chat</span>
+    <div id="inWrap"><div id="heardBar"></div><textarea id="in" rows="1" enterkeyhint="send" placeholder="Talk or type, *actions*"></textarea></div>
+    <button id="mic" title="Mic mute / unmute" hidden>&#127908;</button>
+    <button id="send" title="Send">&#10148;</button>
   </div>
 </div>
-<button id="menu" title="New conversation">&#8635;</button>
-<div id="wheel"><button id="closeWheel" title="Close">&times;</button><div id="ring"></div><div id="panel"></div></div>
+<div id="stageBack"></div>
+<div id="wheel"><button id="closeWheel" title="Close">&times;</button><div id="ring"></div><div id="panel"></div><button id="newChat">New conversation</button></div>
 <div id="login"><form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form></div>
 
 <script>
 const $ = id => document.getElementById(id);
-const log = $('log'), input = $('in'), sendBtn = $('send');
+const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else
@@ -135,35 +145,42 @@ const CUSS = /\b(f+u+c+k\w*|motherf\w*|sh[i1]t\w*|bullshit\w*|bitch\w*|bastard\w
 let settings = { bleep: true };
 const clean = t => settings.bleep ? t.replace(CUSS, w => w[0] + '#'.repeat(Math.max(2, w.length - 1))) : t;
 
+// An action reads as a line of its own: "he grabs the cookies", "she crosses her arms."
+function actLine(who, a) {
+  a = a.trim();
+  if (/^(he|she|they|i|wizra|his|her|their)\b/i.test(a) || a.toLowerCase().startsWith(myName.toLowerCase())) return a;
+  return (who === 'her' ? 'she ' : 'he ') + a.charAt(0).toLowerCase() + a.slice(1);
+}
 function fill(el, text) {
-  text = clean(text);
+  const who = el.dataset.who;
   el.textContent = '';
-  for (const p of split(text)) {
-    const span = document.createElement('span');
-    if (p.a) { span.className = 'act'; span.textContent = '*' + p.a + '*'; } else span.textContent = p.s;
-    el.appendChild(span);
+  for (const p of split(clean(text))) {
+    const t = (p.a ? actLine(who, p.a) : p.s).trim(); if (!t) continue;
+    const d = document.createElement('div'); d.className = p.a ? 'act' : 'say'; d.textContent = t; el.appendChild(d);
   }
 }
 function addLine(who, text) {
-  const div = document.createElement('div');
-  div.className = 'line ' + who;
-  const b = document.createElement('b'); b.textContent = (who === 'her' ? 'Wizra' : myName) + ': ';
-  const body = document.createElement('span'); fill(body, text);
-  div.append(b, body); log.appendChild(div);
+  const div = document.createElement('div'); div.className = 'msg ' + who;
+  const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = who === 'her' ? 'Wizra' : myName;
+  const body = document.createElement('div'); body.dataset.who = who; fill(body, text);
+  div.append(nm, body); log.appendChild(div);
   log.scrollTop = log.scrollHeight;
   return body;
 }
 function addError(msg) { const d = document.createElement('div'); d.className = 'line err'; d.textContent = msg; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
+// Word balloons: speech only. They stay while her reply streams, then fade; scrolling or touching one keeps it up.
 const timers = {};
+function hideLater(which, ms) { clearTimeout(timers[which]); timers[which] = setTimeout(() => $(which + 'Wrap').classList.remove('show'), ms); }
 function bubble(which, text, keep) {
-  const el = $(which + 'Bubble'), tail = which === 'her' ? $('herTail') : null;
+  const el = $(which + 'Bubble'), wrap = $(which + 'Wrap');
   const speech = clean(speechOf(text));
   clearTimeout(timers[which]);
-  if (!speech) { el.classList.remove('show'); tail && tail.classList.remove('show'); return; }
-  el.textContent = speech; el.classList.add('show'); tail && tail.classList.add('show');
-  if (!keep) timers[which] = setTimeout(() => { el.classList.remove('show'); tail && tail.classList.remove('show'); }, 6000 + speech.length * 60);
+  if (!speech) { wrap.classList.remove('show'); return; }
+  el.textContent = speech; wrap.classList.add('show');
+  if (keep) el.scrollTop = el.scrollHeight; else { el.scrollTop = 0; hideLater(which, 7000 + speech.length * 70); }
 }
+for (const w of ['her', 'me']) for (const ev of ['scroll', 'pointerdown']) $(w + 'Bubble').addEventListener(ev, () => { if ($(w + 'Wrap').classList.contains('show')) hideLater(w, 9000); }, { passive: true });
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
@@ -173,16 +190,16 @@ async function api(path, body) {
 
 async function load() {
   const r = await api('/api/state'); const s = await r.json();
-  myName = s.name || 'You'; $('meName').textContent = myName; if (s.settings) settings = s.settings;
+  myName = s.name || 'You'; if (s.settings) settings = s.settings; stage.dataset.mood = settings.mood || 'auto';
   log.textContent = '';
   for (const e of s.log) addLine(e.who, e.text);
 }
 
-async function send() {
-  const text = input.value.trim(); if (!text) return;
-  if (sendBtn.disabled) { voice.pending = true; return; } // she is still answering: send this right after
-  voice.reset();
-  input.value = ''; autosize(); sendBtn.disabled = true;
+async function send(quick) {
+  const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
+  if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
+  if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
+  sendBtn.disabled = true; stage.dataset.talking = '1';
   addLine('me', text); bubble('me', text);
   const body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>';
   let full = '';
@@ -206,7 +223,7 @@ async function send() {
   } catch (e) {
     if (e.message !== 'login') { body.parentElement.remove(); addError(e.message); }
   } finally {
-    sendBtn.disabled = false;
+    sendBtn.disabled = false; delete stage.dataset.talking;
     if (!matchMedia('(pointer:coarse)').matches && !voice.on) input.focus();
     if (voice.pending) { voice.pending = false; send(); }
   }
@@ -215,9 +232,17 @@ async function send() {
 function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, innerHeight * 0.3) + 'px'; }
 input.addEventListener('input', autosize);
 input.addEventListener('keydown', e => voice.typed(e));
-input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer:coarse)').matches) { e.preventDefault(); send(); } });
-sendBtn.onclick = send;
-$('menu').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); load(); } };
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+sendBtn.onclick = () => send();
+
+// Action buttons: things you do; she reacts. (Later these can also drive the avatar directly.)
+const ACTS = [['Wave', 'waves at her'], ['Poke', 'pokes her shoulder'], ['High five', 'holds up a hand for a high five'], ['Laugh', 'laughs'], ['Nod', 'nods'], ['Stare', 'stares at her'], ['Snack', 'slides a snack across the desk to her'], ['Shrug', 'shrugs']];
+for (const [name, act] of ACTS) { const b = document.createElement('button'); b.textContent = name; b.onclick = () => send('*' + act + '*'); $('acts').appendChild(b); }
+
+// The avatar: tap to expand to a big view, tap again (or outside) to shrink.
+stage.onclick = () => document.body.classList.toggle('big');
+$('stageBack').onclick = () => document.body.classList.remove('big');
+$('newChat').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); closeWheel(); load(); } };
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
   const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
@@ -289,7 +314,7 @@ function el(tag, props = {}, ...kids) { const e = document.createElement(tag); O
 
 const SEGS = [
   { k: 'mood', name: 'Emotion', sub: () => settings.mood },
-  { k: 'react', name: 'Reactions', sub: () => LABEL(settings.expressiveness) },
+  { k: 'react', name: 'Reactions', sub: () => (settings.length || 'short') + ' replies' },
   { k: 'temp', name: 'Temperature', sub: () => LABEL(settings.temperature) },
   { k: 'sfw', name: 'SFW', sub: () => settings.sfw ? 'on' : 'off', toggle: 'sfw' },
   { k: 'bleep', name: 'Bleep', sub: () => settings.bleep ? 'on' : 'off', toggle: 'bleep' },
@@ -344,7 +369,10 @@ function openPanel(k) {
     for (const m of MOODS) { const c = el('span', { className: 'chip' + (settings.mood === m ? ' sel' : ''), textContent: m }); c.onclick = () => saveSettings({ settings: { mood: m } }).then(() => openPanel('mood')); chips.append(c); }
     p.append(chips, el('div', { className: 'note', textContent: 'auto lets her mood follow the conversation.' }));
   } else if (k === 'react') {
-    p.append(slider('How she reacts', 'expressiveness', 'reserved, dry', 'big, dramatic'));
+    p.append(slider('How she reacts', 'expressiveness', 'reserved, dry', 'big, dramatic'), el('label', { textContent: 'Reply length' }));
+    const chips = el('div', { className: 'chips' });
+    for (const m of ['short', 'medium', 'long']) { const c = el('span', { className: 'chip' + ((settings.length || 'short') === m ? ' sel' : ''), textContent: m }); c.onclick = () => saveSettings({ settings: { length: m } }).then(() => openPanel('react')); chips.append(c); }
+    p.append(chips, el('div', { className: 'note', textContent: 'short = one to three sentences, like texting.' }));
   } else if (k === 'temp') {
     p.append(slider('Temperature', 'temperature', 'predictable', 'wild', 'Real sampling temperature on your PC model (0.3 to 1.2, middle is 0.75), plus a matching hint in her instructions. Lower if she rambles or gets odd.'));
   } else if (k === 'sheet') {
@@ -382,7 +410,7 @@ async function openWheel() {
 }
 function closeWheel() { $('wheel').classList.remove('open'); }
 $('closeWheel').onclick = closeWheel;
-document.querySelector('#herCol img').onclick = () => openWheel().catch(() => {});
+$('brainBtn').onclick = () => { document.body.classList.remove('big'); openWheel().catch(() => {}); };
 
 async function brainStatus() {
   try {

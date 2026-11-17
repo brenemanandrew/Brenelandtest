@@ -47,7 +47,9 @@ async function think(job, send) {
     : [{ role: 'system', content: sys }, ...msgs];
   const stream = !!job.stream;
   const call = noSys => {
-    const body = { messages: shape(noSys), max_tokens: Math.min(2000, job.max_tokens || 700), temperature: FORCE_TEMP ?? (typeof job.temperature === 'number' ? job.temperature : 0.75), stream, min_p: MIN_P, repeat_penalty: REPEAT };
+    const body = { messages: shape(noSys), max_tokens: Math.min(2000, job.max_tokens || 700), temperature: FORCE_TEMP ?? (typeof job.temperature === 'number' ? job.temperature : 0.75), stream, min_p: MIN_P, repeat_penalty: typeof job.repeat_penalty === 'number' ? job.repeat_penalty : REPEAT };
+    for (const k of ['frequency_penalty', 'presence_penalty']) if (typeof job[k] === 'number') body[k] = job[k];
+    if (Array.isArray(job.stop)) body.stop = job.stop.slice(0, 4);
     if (MODEL) body.model = MODEL;
     return fetch(LM_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(170000) });
   };

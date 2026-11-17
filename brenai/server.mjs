@@ -36,13 +36,13 @@ const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 // ---------- the PC brain (bridge over a WebSocket) ----------
 const brain = { ws: null, model: '', served: 0, failed: 0, since: 0 };
 const jobs = new Map(); let jobId = 1;
-function brainJob({ system, messages, max_tokens, temperature, stream }, onDelta) {
+function brainJob({ stream, ...job }, onDelta) {
   return new Promise((resolve, reject) => {
     if (!brain.ws) return reject(new Error('offline'));
     const id = jobId++;
     const timer = setTimeout(() => { jobs.delete(id); reject(new Error('Your PC took too long to answer.')); }, 180000);
     jobs.set(id, { resolve, reject, onDelta, timer });
-    brain.ws.send(JSON.stringify({ t: 'job', id, system, messages, max_tokens, temperature, stream: !!stream }));
+    brain.ws.send(JSON.stringify({ t: 'job', id, ...job, stream: !!stream }));
   });
 }
 function endJob(id, err, text) {
@@ -127,7 +127,9 @@ const systemText = () => systemBlocks().map(b => b.text).join('\n\n');
 async function replyLocal(userText, onDelta) {
   const system = systemText();
   let budget = CONTEXT_TOKENS - toks(system) - REPLY_TOKENS - 200;
-  const turns = [{ role: 'user', content: `[${STAMP()} Eastern] ${userText}` }];
+  const L = LENGTHS[db.settings.length] || LENGTHS.short;
+  // The reminder rides on the newest turn only (never stored): local roleplay models follow what is closest to their reply.
+  const turns = [{ role: 'user', content: `[${STAMP()} Eastern] ${userText}\n\n[Reply as Wizra only, ${L.say}. At most one short action in asterisks. Say something new: do not reuse an action, phrase or question from your earlier replies.]` }];
   budget -= toks(turns[0].content);
   for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
     const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: e.text };
@@ -135,14 +137,34 @@ async function replyLocal(userText, onDelta) {
     turns.unshift(t);
   }
   while (turns.length && turns[0].role !== 'user') turns.shift();
-  const text = await brainJob({ system, messages: turns, max_tokens: REPLY_TOKENS, temperature: tempOf(db.settings.temperature), stream: true }, onDelta);
-  return cleanLocal(text);
+  const text = await brainJob({ system, messages: turns, max_tokens: L.tokens, temperature: tempOf(db.settings.temperature), stream: true,
+    repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
+  return dropRepeats(cleanLocal(text));
+}
+const LENGTHS = {
+  short: { tokens: 130, say: 'in 1 to 3 short sentences' },
+  medium: { tokens: 260, say: 'in a short paragraph at most' },
+  long: { tokens: 600, say: 'as long as the moment needs, a few paragraphs at most' },
+};
+// "*waves* hey. how are you?" -> ['*waves*', ' hey.', ' how are you?']
+const units = t => String(t).match(/\*[^*]+\*|[^*.!?\n]+[.!?]*["')\]]*\s*|\n+/g) || [];
+const norm = u => u.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Cut any sentence or action she already used, word for word, in her last few replies.
+function dropRepeats(text) {
+  const seen = new Set();
+  for (const e of db.log.filter(e => e.who === 'her').slice(-8)) for (const u of units(e.text)) { const n = norm(u); if (n.length > 14) seen.add(n); }
+  const kept = units(text).filter(u => !seen.has(norm(u))).join('').trim();
+  return kept.length >= 2 ? kept : text;
 }
 // roleplay models sometimes prefix the speaker or run on into his line: trim both
 function cleanLocal(t) {
   t = String(t).replace(/^\s*wizra\s*:\s*/i, '');
   const cut = t.search(new RegExp('\\n\\s*' + USER_NAME + '\\s*:', 'i'));
-  return (cut > 0 ? t.slice(0, cut) : t).trim();
+  t = (cut > 0 ? t.slice(0, cut) : t).replace(/\n\s*\[[^\]]*$/, '').trim();
+  // cut off by the length cap: drop the unfinished action, then the unfinished sentence
+  if ((t.match(/\*/g) || []).length % 2) t = t.slice(0, t.lastIndexOf('*')).trim();
+  if (t && !/[.!?*"')\u2026~]$/.test(t)) { const m = t.match(/^[\s\S]*[.!?*"')\u2026]/); if (m && m[0].length > 20) t = m[0]; }
+  return t.trim();
 }
 
 async function reply(userText, onDelta) {
@@ -210,6 +232,7 @@ function applySettings(body) {
   const MOODS = ['auto', 'happy', 'playful', 'chill', 'tired', 'grumpy', 'sad', 'excited', 'anxious', 'focused'];
   if (MOODS.includes(s.mood)) S.mood = s.mood;
   for (const k of ['expressiveness', 'temperature']) if (Number.isFinite(+s[k])) S[k] = Math.max(0, Math.min(100, Math.round(+s[k])));
+  if (['short', 'medium', 'long'].includes(s.length)) S.length = s.length;
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
   const h = body.sheet || {}, H = db.sheet;
   for (const k of ['birthday', 'backstory']) if (typeof h[k] === 'string') H[k] = h[k].slice(0, 4000);
