@@ -218,7 +218,7 @@ async function send(quick) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
-  sendBtn.disabled = true; avatar.setThinking(true); userDid(text);
+  sendBtn.disabled = true; speaker.stop(); avatar.setThinking(true); userDid(text);
   addLine('me', text); bubble('me', text);
   const body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>';
   let full = '';
@@ -234,8 +234,8 @@ async function send(quick) {
         const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
         if (!chunk.startsWith('data: ')) continue;
         const ev = JSON.parse(chunk.slice(6));
-        if (ev.t === 'delta') { full += ev.d; avatar.talk(); avatar.feel(full); fill(body, full); bubble('her', full, true); log.scrollTop = log.scrollHeight; }
-        else if (ev.t === 'done') { full = ev.text; fill(body, full); bubble('her', full); }
+        if (ev.t === 'delta') { full += ev.d; if (!speaker.on) avatar.talk(); avatar.feel(full); fill(body, full); bubble('her', full, true); log.scrollTop = log.scrollHeight; }
+        else if (ev.t === 'done') { full = ev.text; fill(body, full); bubble('her', full); const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out); }
         else if (ev.t === 'error') throw new Error(ev.error);
       }
     }
@@ -308,9 +308,11 @@ const voice = (() => {
     timer = setTimeout(() => { heard = (heard + ' ' + interim).trim(); interim = ''; write(); send(); }, ms);
   }
   function start() {
-    if (!SR || !v.on || running) return;
+    if (!SR || !v.on || running || held) return;
     rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.continuous = true; rec.interimResults = true;
     rec.onresult = e => {
+      if (held) return;                       // that is her voice coming out of the speaker, not you
+      if (speaker.speaking) speaker.stop();   // headphones mode: talking over her cuts her off
       interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
@@ -329,14 +331,47 @@ const voice = (() => {
     show();
   }
   function stop() { clearTimeout(timer); try { rec && rec.stop(); } catch {} running = false; show(); }
+  // while she is speaking out loud the mic is held, so it does not hear her and answer for you
+  let held = false;
+  v.hold = b => { held = b; if (b) { try { rec && rec.stop(); } catch {} } else setTimeout(start, 350); };
   v.set = (patch) => { Object.assign(v, patch); store(); if (v.on) start(); else stop(); show(); };
   v.reset = () => { clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; prefix = heard = interim = ''; };
   // typing by hand takes over: no auto-send of what you are typing; speech after it is added on
   v.typed = e => { if (e.key === 'Enter') return; clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; setTimeout(() => { prefix = input.value; heard = interim = ''; }, 0); };
-  mic.onclick = () => v.set({ on: !v.on });
+  mic.onclick = () => { if (speaker.speaking) return speaker.stop(); v.set({ on: !v.on }); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
   v.start = start;
   show();
+  return v;
+})();
+
+// ---------- her voice (text to speech) ----------
+// The browser's built-in voices. She says only her spoken words, never the actions. Settings are per device because every
+// device has different voices. The mic is held while she talks unless "headphones" is on, where talking over her stops her.
+const speaker = (() => {
+  const SS = window.speechSynthesis, saved = JSON.parse(localStorage.getItem('brenai.speak') || '{}');
+  const v = { supported: !!SS && !!window.SpeechSynthesisUtterance, on: false, voice: saved.voice || '', rate: saved.rate || 1.05, pitch: saved.pitch || 1.1, headphones: !!saved.headphones, speaking: false };
+  v.on = v.supported && saved.on !== false;
+  let pending = 0, tick = null;
+  const store = () => localStorage.setItem('brenai.speak', JSON.stringify({ on: v.on, voice: v.voice, rate: v.rate, pitch: v.pitch, headphones: v.headphones }));
+  v.voices = () => (v.supported ? SS.getVoices() : []).filter(x => /^en/i.test(x.lang));
+  const pick = () => { const all = v.voices(); return all.find(x => x.name === v.voice) || all.find(x => /Aria|Jenny|Samantha|Ava|Google US English|Zira|female/i.test(x.name)) || all[0] || null; };
+  const begin = () => { if (v.speaking) return; v.speaking = true; if (!v.headphones) voice.hold(true); tick = setInterval(() => avatar.talk(), 150); };
+  const end = () => { v.speaking = false; clearInterval(tick); voice.hold(false); };
+  v.say = text => {
+    if (!v.on || !text) return;
+    // one sentence per utterance: some browsers cut a long one off
+    for (const part of text.match(/[^.!?\u2026]+[.!?\u2026]*\s*/g) || [text]) {
+      if (!part.trim()) continue;
+      const u = new SpeechSynthesisUtterance(part.trim()); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate; u.pitch = v.pitch;
+      pending++; u.onstart = begin; u.onend = u.onerror = () => { if (--pending <= 0) { pending = 0; end(); } };
+      SS.speak(u);
+    }
+  };
+  v.stop = () => { if (!v.supported) return; pending = 0; SS.cancel(); if (v.speaking) end(); };
+  v.set = patch => { Object.assign(v, patch); store(); if (!v.on) v.stop(); };
+  // browsers only let a page speak after you have touched it once
+  if (v.supported) addEventListener('pointerdown', () => { try { SS.resume(); if (!SS.speaking) SS.speak(new SpeechSynthesisUtterance('')); } catch {} }, { once: true });
   return v;
 })();
 
@@ -360,7 +395,7 @@ const SEGS = [
   { k: 'sheet', name: 'Character', sub: () => sheet ? 'rapport ' + sheet.rapport : '' },
   { k: 'secret', name: 'Hidden likes', sub: () => sheet ? sheet.hiddenLikes.length + '' : '' },
   { k: 'avatar', name: 'Avatar', sub: () => settings.avatarKind === 'vrm' ? '3D model' : 'cartoon' },
-  { k: 'voice', name: 'Talk to text', sub: () => !voice.supported ? 'n/a' : voice.on ? voice.wait + 's' : 'off' },
+  { k: 'voice', name: 'Voice', sub: () => (voice.on ? 'mic on' : 'mic off') + ', ' + (speaker.on ? 'she talks' : 'silent') },
 ];
 function drawRing() {
   const ring = $('ring'); ring.textContent = '';
@@ -463,16 +498,36 @@ function openPanel(k) {
     save.onclick = () => saveSettings({ settings: { acts: [...rows.children].map(r => [...r.querySelectorAll('input')].map(i => i.value)) } }).then(closeWheel);
     p.append(rows, el('div', { className: 'row' }, add, save));
   } else if (k === 'voice') {
-    p.append(el('h3', { textContent: 'Talk to text' }));
-    if (!voice.supported) { p.append(el('div', { className: 'note', textContent: 'This browser has no speech recognition. Use Chrome, Edge or Safari.' })); return; }
-    const on = el('input', { type: 'checkbox', checked: voice.on }); on.onchange = () => { voice.set({ on: on.checked }); drawRing(); };
-    const w = el('input', { type: 'range', min: 1, max: 8, step: 0.5, value: voice.wait });
-    const lab = el('label', { textContent: 'Send after you stop talking for ' + voice.wait + ' s' });
-    w.oninput = () => { lab.textContent = 'Send after you stop talking for ' + w.value + ' s'; };
-    w.onchange = () => { voice.set({ wait: +w.value }); drawRing(); };
-    p.append(el('label', {}, on, ' Listen (on by default; the mic button by the text box turns it on and off)'), lab, w,
-      el('div', { className: 'scale' }, el('span', { textContent: 'quick' }), el('span', { textContent: 'patient' })),
-      el('div', { className: 'note', textContent: 'A thin bar over the text box fills while it waits. Typing stops the auto-send for that message. Speech is turned into text by your browser (Chrome and Edge use Google or Microsoft servers for this).' }));
+    p.append(el('h3', { textContent: 'Voice conversation' }), el('div', { className: 'note', textContent: 'You talk, she answers out loud, the mic waits while she speaks and listens again when she is done. These settings are saved per device.' }));
+    // --- you: talk to text ---
+    p.append(el('label', { textContent: 'YOUR MIC' }));
+    if (!voice.supported) p.append(el('div', { className: 'note', textContent: 'This browser has no speech recognition. Use Chrome, Edge or Safari.' }));
+    else {
+      const on = el('input', { type: 'checkbox', checked: voice.on }); on.onchange = () => { voice.set({ on: on.checked }); drawRing(); };
+      const w = el('input', { type: 'range', min: 1, max: 8, step: 0.5, value: voice.wait });
+      const lab = el('label', { textContent: 'Send after you stop talking for ' + voice.wait + ' s' });
+      w.oninput = () => { lab.textContent = 'Send after you stop talking for ' + w.value + ' s'; };
+      w.onchange = () => { voice.set({ wait: +w.value }); drawRing(); };
+      p.append(el('label', {}, on, ' Listen to me (the mic button by the text box does the same)'), lab, w, el('div', { className: 'scale' }, el('span', { textContent: 'quick' }), el('span', { textContent: 'patient' })));
+    }
+    // --- her: text to speech ---
+    p.append(el('label', { textContent: 'HER VOICE' }));
+    if (!speaker.supported) { p.append(el('div', { className: 'note', textContent: 'This browser cannot speak text.' })); return; }
+    const son = el('input', { type: 'checkbox', checked: speaker.on }); son.onchange = () => { speaker.set({ on: son.checked }); drawRing(); };
+    const sel = el('select'); sel.style.cssText = 'width:100%;background:#120e18;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:14px';
+    const fillVoices = () => { sel.textContent = ''; sel.append(el('option', { value: '', textContent: 'Pick for me' })); for (const x of speaker.voices()) sel.append(el('option', { value: x.name, textContent: x.name, selected: x.name === speaker.voice })); };
+    fillVoices(); speechSynthesis.onvoiceschanged = fillVoices;
+    sel.onchange = () => speaker.set({ voice: sel.value });
+    const rate = el('input', { type: 'range', min: 0.7, max: 1.5, step: 0.05, value: speaker.rate }); rate.onchange = () => speaker.set({ rate: +rate.value });
+    const pitch = el('input', { type: 'range', min: 0.6, max: 1.6, step: 0.05, value: speaker.pitch }); pitch.onchange = () => speaker.set({ pitch: +pitch.value });
+    const hp = el('input', { type: 'checkbox', checked: speaker.headphones }); hp.onchange = () => speaker.set({ headphones: hp.checked });
+    const test = el('button', { className: 'small', textContent: 'Test her voice' }); test.onclick = () => { speaker.stop(); const was = speaker.on; speaker.on = true; speaker.say('Okay, this is what I sound like. Good enough?'); speaker.on = was; };
+    p.append(el('label', {}, son, ' She speaks her replies out loud'), el('label', { textContent: 'Voice' }), sel,
+      el('label', { textContent: 'Speed' }), rate, el('div', { className: 'scale' }, el('span', { textContent: 'slow' }), el('span', { textContent: 'fast' })),
+      el('label', { textContent: 'Pitch' }), pitch, el('div', { className: 'scale' }, el('span', { textContent: 'low' }), el('span', { textContent: 'high' })),
+      el('label', {}, hp, ' I am on headphones (keep listening while she talks; talking over her cuts her off)'),
+      el('div', { className: 'row' }, test),
+      el('div', { className: 'note', textContent: 'The voices come from this device. Edge has the most natural ones (names ending in "Natural"). Sending a message or tapping the mic button also stops her mid-sentence.' }));
   } else if (k === 'secret') {
     p.append(el('h3', { textContent: 'Hidden likes' }), el('div', { className: 'note', textContent: 'Dashed = still secret, filled = she has told you. Tap one to flip it. She can grow new ones from good moments; those say (grew). She only admits a secret once she trusts you enough.' }), listEditor('', 'hiddenLikes', true));
   }
