@@ -13,6 +13,7 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 ## Layout
 - `site/` - the deployed static app. `index.html` plus `hair/`, `models/`, `cloth/` data files (base64 GLB in small JS files, loaded on demand).
 - `Dockerfile`, `nginx.conf`, `fly.toml`, `.github/workflows/fly-deploy.yml` - Fly deploy on push to `main`. Both runs so far FAILED at `flyctl deploy`. Likely missing repo secret `FLY_API_TOKEN` or an app-name mismatch. Unresolved.
+- `brenai/` - separate app: Wizra, a Claude chat persona for brenai.fly.dev (Node, own Dockerfile/fly.toml, deploy workflow `brenai-deploy.yml`). See `brenai/README.md`. Not part of Breneland.
 - `pipeline/` - everything that builds `site/`:
   - `poser/index.html` - the builder source (one file, Three.js r181 from CDN). `<!--MODELS-->` is filled by the build.
   - `scripts/build.py` - builds `poser/index_embedded.html` and the data files, and a test copy in `/home/claude/ptest`.

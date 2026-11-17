@@ -3,6 +3,7 @@ name: Fly Deploy
 on:
   push:
     branches: [main]
+    paths-ignore: ['brenai/**', '.github/workflows/brenai-deploy.yml']
   workflow_dispatch:
 jobs:
   deploy:
