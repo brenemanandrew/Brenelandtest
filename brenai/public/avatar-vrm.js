@@ -127,6 +127,19 @@ export async function create(url) {
   for (const [x, z] of [[-0.35, -0.2], [0.35, -0.2], [-0.35, 0.2], [0.35, 0.2]]) box(0.05, tableTop - floorY - 0.05, 0.05, x, (tableTop - 0.05 + floorY) / 2, feet.z + 0.02 + z, '#2a1d14');
   const rug = new THREE.Mesh(new THREE.CircleGeometry(1.25, 40), mat('#251a30')); rug.rotation.x = -Math.PI / 2; rug.position.set(0, floorY, (hip.z + feet.z) / 2); scene.add(rug);
 
+  // ---- the rest of her room: a floor, a bookshelf to the left and a little counter with a kettle to the right ----
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(3.4, 48), mat('#2b2038')); floor.rotation.x = -Math.PI / 2; floor.position.set(0, floorY - 0.004, hip.z); scene.add(floor);
+  const backZ = hip.z - 1.25;                                    // the line the shelf and counter stand on
+  const SHELF = { x: -1.3, z: backZ }, COUNTER = { x: 1.45, z: backZ + 0.05 };
+  box(0.9, 1.7, 0.04, SHELF.x, floorY + 0.85, SHELF.z - 0.13, '#33241a');                                         // shelf back
+  box(0.04, 1.7, 0.3, SHELF.x - 0.45, floorY + 0.85, SHELF.z, '#3b2a1c'); box(0.04, 1.7, 0.3, SHELF.x + 0.45, floorY + 0.85, SHELF.z, '#3b2a1c');
+  for (let i = 0; i < 5; i++) box(0.9, 0.035, 0.3, SHELF.x, floorY + 0.05 + i * 0.41, SHELF.z, '#3b2a1c');
+  const SPINES = ['#7a1f3a', '#2f4a7a', '#3d6b4f', '#8a6a2a', '#5b3570', '#a04a2a', '#2a6b78', '#6b2a4a'];
+  for (let row = 0; row < 4; row++) { let x = SHELF.x - 0.4, n = 0; while (x < SHELF.x + 0.36) { const wd = 0.03 + ((row * 7 + n * 5) % 4) * 0.009, ht = 0.25 + ((row * 3 + n * 11) % 5) * 0.022; if (!(row === 2 && n === 4)) box(wd, ht, 0.2, x + wd / 2, floorY + 0.07 + row * 0.41 + ht / 2, SHELF.z, SPINES[(row * 3 + n) % SPINES.length]); x += wd + 0.006; n++; } }
+  box(0.7, 0.9, 0.45, COUNTER.x, floorY + 0.45, COUNTER.z, '#3a2148'); box(0.76, 0.04, 0.5, COUNTER.x, floorY + 0.92, COUNTER.z, '#d9cfe6'); // counter + top
+  const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.19, 20), mat('#c9ccd6')); kettle.position.set(COUNTER.x + 0.15, floorY + 1.035, COUNTER.z); scene.add(kettle);
+  const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 16), mat('#6b3a2a')); jar.position.set(COUNTER.x - 0.2, floorY + 1.01, COUNTER.z - 0.05); scene.add(jar);
+
   // ---- props: they rest on the furniture and go to her hands when she uses them ----
   const group = (...kids) => { const g = new THREE.Group(); g.add(...kids); scene.add(g); return g; };
   const slab = (w, h, d, c, x = 0, y = 0, z = 0, ry = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.rotation.y = ry; return m; };
@@ -137,6 +150,7 @@ export async function create(url) {
   const mug = group(cup, handle);
   const REST_AT = { // where each prop sits when she is not holding it: [position, rotation]
     book: [new THREE.Vector3(0.24, tableTop + 0.012, feet.z - 0.08), new THREE.Euler(-Math.PI / 2, 0, 0.4)],
+    bookShelf: [new THREE.Vector3(SHELF.x - 0.19, floorY + 0.07 + 2 * 0.41 + 0.1, SHELF.z + 0.02), new THREE.Euler(0, Math.PI / 2, 0)], // its gap on the shelf
     phone: [new THREE.Vector3(-0.26, tableTop + 0.006, feet.z - 0.1), new THREE.Euler(-Math.PI / 2, 0, -0.3)],
     mug: [new THREE.Vector3(-0.38, seatTop + 0.275, hip.z + 0.22), new THREE.Euler(0, 0.6, 0)],
   };
@@ -145,28 +159,69 @@ export async function create(url) {
   const palmR = raw('rightMiddleProximal') || raw('rightHand'), palmL = raw('leftMiddleProximal') || raw('leftHand');
   const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion(), headPos = new THREE.Vector3();
 
-  // ---- her routine: what she is busy with when left alone. sit -> read / phone / sip / get up and pace -> sit ... ----
-  const STAND_AT = { x: 0.9, z: hip.z + 0.12 };                                   // where she stands up to, beside the chair
-  const PATH = [[0.95, hip.z - 0.85], [-0.9, hip.z - 0.85], [0.95, hip.z - 0.85], [STAND_AT.x, STAND_AT.z]]; // a lap behind the chair and back
-  const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink', pace: 'up and pacing around the room', sitdown: 'sitting back down' };
-  const rt = { act: 'sit', until: 0, nextAt: performance.now() + 15000 + Math.random() * 15000, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT.x, z: STAND_AT.z, yaw: 0, phase: 0, leg: 0, way: 0, head: [0, 0], zoom: 0, gazeProp: null };
+  // ---- her routine: what she is busy with when left alone, and the errands she can run ----
+  // Seated she reads, checks her phone or sips. On her feet she follows a plan: a list of steps (go somewhere, turn, wait
+  // with her hand out, do something), then walks back and sits down, optionally starting something once seated.
+  const STAND_AT = [0.9, hip.z + 0.12];                                            // where she stands up to, beside the chair
+  const R_BACK = [0.95, hip.z - 0.72], L_BACK = [-0.78, hip.z - 0.72];             // round the back of the chair
+  const AT_SHELF = [SHELF.x + 0.12, SHELF.z + 0.5], AT_COUNTER = [COUNTER.x - 0.05, COUNTER.z + 0.52];
+  const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
+  const rt = { act: 'sit', until: 0, nextAt: performance.now() + 15000 + Math.random() * 15000, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
+    steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0 }, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
+  const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), run = fn => ({ run: fn });
+  function plan(label, steps, after = '') {
+    if (rt.stand < 0.05) { rt.x = STAND_AT[0]; rt.z = STAND_AT[1]; rt.yaw = 0; }
+    const home = rt.x < 0 ? [go(L_BACK), go(R_BACK), go(STAND_AT)] : [go(STAND_AT)];                  // the way back to the chair
+    Object.assign(rt, { act: 'up', steps: [...steps, ...(steps.homeIncluded ? [] : home)], i: 0, stepT: 0, label, after });
+  }
+  const ERRAND = {
+    pace: () => plan('up and pacing around the room', [go(R_BACK), go(L_BACK), go(R_BACK)]),
+    fetchbook: () => plan('getting a book from the shelf', [go(R_BACK), go(L_BACK), go(AT_SHELF), face(Math.PI), wait(1.3), run(() => { rt.carry = 'book'; rt.bookHome = 'table'; }), wait(0.5), go(L_BACK), go(R_BACK), go(STAND_AT)], Math.random() < 0.75 ? 'read' : ''),
+    returnbook: () => plan('putting her book back on the shelf', [run(() => { rt.carry = 'book'; }), wait(0.6), go(R_BACK), go(L_BACK), go(AT_SHELF), face(Math.PI), wait(1.2), run(() => { rt.carry = null; rt.bookHome = 'shelf'; }), wait(0.5), go(L_BACK), go(R_BACK), go(STAND_AT)]),
+    fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), wait(2.2), go(STAND_AT)], 'sip'),
+  };
   function startActivity(name) {
     const now = performance.now();
-    if (name === 'sit') { if (rt.stand > 0.5 || rt.act === 'pace') { rt.act = 'pace'; rt.way = PATH.length - 1; rt.lastLap = true; } else rt.act = 'sit'; rt.nextAt = now + 20000 + Math.random() * 25000; return; }
-    if (name === 'pace') { if (rt.act !== 'pace') { rt.act = 'pace'; rt.way = 0; rt.lastLap = false; rt.x = STAND_AT.x; rt.z = STAND_AT.z; rt.yaw = 0; } return; }
-    if (!OVER[name] || rt.stand > 0.05) return;
+    if (name === 'sit') { if (rt.act === 'up') { rt.steps = rt.x < 0 ? [go(L_BACK), go(R_BACK), go(STAND_AT)] : [go(STAND_AT)]; rt.i = 0; rt.after = ''; } else if (rt.act !== 'sitdown') rt.act = 'sit'; rt.nextAt = now + 20000 + Math.random() * 25000; return; }
+    if (name === 'read' && rt.bookHome === 'shelf') name = 'fetchbook';             // nothing to read until she gets a book
+    if (name === 'returnbook' && rt.bookHome === 'shelf') return;
+    if (ERRAND[name]) { if (rt.act !== 'up' && rt.act !== 'sitdown') { if (OVER[rt.act]) rt.act = 'sit'; ERRAND[name](); } return; }
+    if (!OVER[name] || rt.act === 'up' || rt.act === 'sitdown') return;
     rt.act = name; rt.until = now + (name === 'sip' ? 4200 : name === 'phone' ? 14000 + Math.random() * 12000 : 22000 + Math.random() * 22000);
   }
+  const turnTo = (want, dt, rate) => { const d = Math.atan2(Math.sin(want - rt.yaw), Math.cos(want - rt.yaw)); rt.yaw += d * Math.min(1, dt * rate); rt.yaw = Math.atan2(Math.sin(rt.yaw), Math.cos(rt.yaw)); return Math.abs(d); }; // kept within half a turn either way, so "facing front" is always 0
   function routine(s) {
     const now = performance.now(), dt = s.dt, attending = s.talking || s.faceName === 'thinking';
     // on her own schedule
-    if (rt.act === 'sit' && !attending && now > rt.nextAt && !window.WIZRA_STILL) { const r = Math.random(); startActivity(r < 0.32 ? 'read' : r < 0.57 ? 'phone' : r < 0.77 ? 'sip' : 'pace'); }
+    if (rt.act === 'sit' && !attending && now > rt.nextAt && !window.WIZRA_STILL) {
+      const r = Math.random(), onTable = rt.bookHome === 'table';
+      startActivity(r < 0.28 ? 'read' : r < 0.5 ? 'phone' : r < 0.66 ? 'sip' : r < 0.8 ? 'pace' : r < 0.92 ? 'fetchdrink' : onTable ? 'returnbook' : 'fetchbook');
+    }
     if (OVER[rt.act] && now > rt.until) { rt.act = 'sit'; rt.nextAt = now + 14000 + Math.random() * 24000; }
     // standing up / sitting down
-    const up = rt.act === 'pace' ? 1 : 0; rt.stand += Math.sign(up - rt.stand) * Math.min(Math.abs(up - rt.stand), dt * 0.9);
+    const up = rt.act === 'up' ? 1 : 0; rt.stand += Math.sign(up - rt.stand) * Math.min(Math.abs(up - rt.stand), dt * 0.9);
     const k = rt.stand * rt.stand * (3 - 2 * rt.stand);
     for (const n of KEYS) { const a = POSE[n] || [0, 0, 0], b = standOf(n), c = CUR[n]; c[0] = a[0] + (b[0] - a[0]) * k; c[1] = a[1] + (b[1] - a[1]) * k; c[2] = a[2] + (b[2] - a[2]) * k; }
-    // what she is holding
+    // the plan she is following on her feet; she stops and turns to you when you talk to her
+    let moving = false, holdWant = rt.carry ? 0.5 : 0;
+    if (rt.act === 'up' && rt.stand > 0.97) {
+      const st = rt.steps[rt.i];
+      if (!st) { rt.act = 'sitdown'; }
+      else if (attending) turnTo(Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z), dt, 4);
+      else if (st.go) {
+        const dx = st.go[0] - rt.x, dz = st.go[1] - rt.z, d = Math.hypot(dx, dz);
+        if (d < 0.06) rt.i++;
+        else { moving = true; const off = turnTo(Math.atan2(dx, dz), dt, 5), sp = 0.62 * Math.max(0.12, 1 - off); rt.x += dx / d * sp * dt; rt.z += dz / d * sp * dt; rt.phase += sp * dt * 4.6; }
+      }
+      else if (st.face !== undefined) { if (turnTo(st.face, dt, 5) < 0.1) rt.i++; }
+      else if (st.wait) { holdWant = 1; rt.stepT += dt; if (rt.stepT >= st.wait) { rt.stepT = 0; rt.i++; } }
+      else if (st.run) { st.run(); rt.i++; }
+    }
+    if (rt.act === 'sitdown') { // turn to face front, lower into the chair, then get on with whatever she came back to do
+      turnTo(0, dt, 5);
+      if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
+    }
+    // what she is holding while seated
     rt.gazeProp = null; let hp = 0, hy = 0;
     for (const name in OVER) {
       const want = rt.act === name ? (attending ? 0.55 : 1) : 0; rt.ov[name] += (want - rt.ov[name]) * Math.min(1, dt * 3.5);
@@ -175,28 +230,17 @@ export async function create(url) {
       if (rt.act === name && !attending && name !== 'sip') { rt.gazeProp = PROP[name]; hp = 0.28 * wgt; hy = name === 'phone' ? -0.18 * wgt : 0; }
       if (name === 'sip') hp = -0.12 * wgt;
     }
+    // her hand out: reaching for something, or carrying it
+    rt.hold += (holdWant - rt.hold) * Math.min(1, dt * 4);
+    if (rt.hold > 0.002) for (const n in OVER.phone) { const q = OVER.phone[n], c = CUR[n]; c[0] += (q[0] - c[0]) * rt.hold; c[1] += (q[1] - c[1]) * rt.hold; c[2] += (q[2] - c[2]) * rt.hold; }
+    for (const key in rt.carryW) rt.carryW[key] += ((rt.carry === key ? 1 : 0) - rt.carryW[key]) * Math.min(1, dt * 4);
     rt.head[0] += (hp - rt.head[0]) * Math.min(1, dt * 4); rt.head[1] += (hy - rt.head[1]) * Math.min(1, dt * 4);
-    // walking: follow the path; stop and turn to you when you talk to her
-    let moving = false;
-    if (rt.act === 'pace' && rt.stand > 0.97) {
-      const [wx, wz] = PATH[rt.way], dx = wx - rt.x, dz = wz - rt.z, d = Math.hypot(dx, dz);
-      let wantYaw = Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z);
-      if (!attending) {
-        if (d < 0.06) { if (rt.way >= PATH.length - 1) { if (rt.lastLap || Math.random() < 0.6) { rt.act = 'sitdown'; } else rt.way = 0; } else rt.way++; }
-        else { moving = true; wantYaw = Math.atan2(dx, dz); const turn = Math.abs(Math.atan2(Math.sin(wantYaw - rt.yaw), Math.cos(wantYaw - rt.yaw))); const sp = 0.62 * Math.max(0.15, 1 - turn); rt.x += dx / d * sp * dt; rt.z += dz / d * sp * dt; rt.phase += sp * dt * 4.6; }
-      }
-      rt.yaw += Math.atan2(Math.sin(wantYaw - rt.yaw), Math.cos(wantYaw - rt.yaw)) * Math.min(1, dt * 4);
-    }
-    if (rt.act === 'sitdown') { // turn to face front, then lower into the chair
-      rt.yaw += Math.atan2(Math.sin(-rt.yaw), Math.cos(-rt.yaw)) * Math.min(1, dt * 5);
-      if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.nextAt = now + 18000 + Math.random() * 25000; }
-    }
     rt.leg += ((moving ? 1 : 0) - rt.leg) * Math.min(1, dt * 6);
     if (rt.leg > 0.01) {
       const a = rt.leg, ph = rt.phase, sw = Math.sin(ph);
       CUR.leftUpperLeg[0] += -0.5 * sw * a; CUR.rightUpperLeg[0] += 0.5 * sw * a;
       CUR.leftLowerLeg[0] += 0.75 * Math.max(0, Math.cos(ph)) * a; CUR.rightLowerLeg[0] += 0.75 * Math.max(0, -Math.cos(ph)) * a;
-      CUR.leftUpperArm[0] += 0.38 * sw * a; CUR.rightUpperArm[0] += -0.38 * sw * a;
+      CUR.leftUpperArm[0] += 0.38 * sw * a; CUR.rightUpperArm[0] += -0.38 * sw * a * (1 - rt.hold);
       CUR.spine[1] += 0.06 * sw * a; CUR.hips[1] += -0.05 * sw * a;
     }
     for (const n of KEYS) set(n, CUR[n][0], CUR[n][1], CUR[n][2]);
@@ -204,12 +248,13 @@ export async function create(url) {
     vrm.scene.rotation.y = rt.yaw * k;
     rt.zoom = 0.3 * k;
   }
-  function placeProps() { // after her bones are final for the frame
+  function placeProps() { // after her bones are final for the frame: each prop is at rest, in her hands, or somewhere between
     head.getWorldPosition(headPos);
     for (const name in PROP) {
-      const o = PROP[name], [rp, rr] = REST_AT[PROP_KEY[name]], wgt = Math.min(1, rt.ov[name] * 1.6), e = wgt * wgt * (3 - 2 * wgt);
-      palmR.getWorldPosition(tmpA); if (name === 'read') { palmL.getWorldPosition(tmpB); tmpA.add(tmpB).multiplyScalar(0.5); }
-      if (name === 'sip') tmpA.y += 0.03; else tmpA.y += 0.035;
+      const key = PROP_KEY[name], o = PROP[name], [rp, rr] = REST_AT[key === 'book' && rt.bookHome === 'shelf' ? 'bookShelf' : key];
+      const held = Math.max(rt.ov[name] * 1.6, rt.carryW[key] || 0), wgt = Math.min(1, held), e = wgt * wgt * (3 - 2 * wgt), reading = name === 'read' && rt.ov.read > (rt.carryW.book || 0);
+      palmR.getWorldPosition(tmpA); if (reading) { palmL.getWorldPosition(tmpB); tmpA.add(tmpB).multiplyScalar(0.5); }
+      tmpA.y += name === 'sip' ? 0.03 : 0.035;
       o.position.lerpVectors(rp, tmpA, e);
       tmpQ.setFromEuler(rr);
       if (e > 0.001) { o.lookAt(name === 'sip' ? tmpB.set(o.position.x, o.position.y, o.position.z + 1) : headPos); tmpQ2.copy(o.quaternion); o.quaternion.copy(tmpQ).slerp(tmpQ2, e); } else o.quaternion.copy(tmpQ);
@@ -247,7 +292,7 @@ export async function create(url) {
     el,
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
-    activity() { return DOING[rt.act] || ''; },
+    activity() { return rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
     doActivity(name) { startActivity(name); },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
     zoom(d) { if (!document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
@@ -283,7 +328,7 @@ export async function create(url) {
       // the close camera stays on her face wherever she goes
       head.getWorldPosition(tmpA); tmpA.y += eyeUp; eye.lerp(tmpA, Math.min(1, s.dt * 8)); near.set(eye.x, eye.y - 0.035, eye.z);
       renderer.render(scene, camera);
-      if (thumbCb && zoom < 0.03 && rt.act === 'sit' && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
+      if (thumbCb && zoom < 0.03 && rt.act === 'sit' && rt.stand < 0.01 && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
     },
     dispose() { el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
   };
