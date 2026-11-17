@@ -86,6 +86,7 @@
       locate(e) { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 200, y: (e.clientY - r.top) / r.height * 200 }; },
       dispose() { wrap.remove(); },
       presence(mode) { wrap.style.visibility = mode === 'gone' || mode === 'leave' ? 'hidden' : 'visible'; },
+      call(on) { wrap.style.visibility = on ? 'visible' : 'hidden'; },
       thumb(cb) { cb('data:image/svg+xml,' + encodeURIComponent(svg.outerHTML)); }, // a still of her as she is drawn right now
       draw({ face, lid, mouth, look, rot, tx, ty, sq, breathe }) {
         const key = lid + face.brow + mouth;
@@ -138,7 +139,7 @@
   // what she drifts into on her own when nothing is happening, and how she physically takes a touch
   const IDLE = [['shift', 3], ['feet', 2.4], ['tilt', 2], ['lookaway', 2.4], ['lookdown', 2], ['sigh', 2.2], ['flip', 1.6], ['stretch', 3.2], ['leanback', 3]];
   // how she is for the hour after she comes back from somewhere, when it shows: [resting face, what she keeps doing]
-  const STATE = { tipsy: ['tipsy', [['jolt', 1], ['laugh', 1.6], ['shift', 3], ['tilt', 2.4]]], high: ['high', [['tilt', 3], ['lookup', 2.6], ['laugh', 1.8], ['feet', 2.4]]],
+  const STATE = { cagey: ['anxious', [['lookaway', 2], ['lookdown', 1.6], ['shift', 2], ['lookaway', 2.4]]], tipsy: ['tipsy', [['jolt', 1], ['laugh', 1.6], ['shift', 3], ['tilt', 2.4]]], high: ['high', [['tilt', 3], ['lookup', 2.6], ['laugh', 1.8], ['feet', 2.4]]],
     groggy: ['tired', [['yawn', 3], ['slump', 3], ['yawn', 3]]], hyper: ['excited', [['bounce', 2], ['feet', 2.4], ['shift', 2], ['nod', 1.2]]], upset: ['sad', [['lookdown', 3], ['sigh', 2.4], ['lookaway', 3]]] };
   const TOUCH_BODY = { poke: ['jolt', 1.2], boop: ['jolt', 1], pat: ['bounce', 1], swat: ['cringe', 1.6], spam: ['cringe', 2], body: ['lookdown', 1.4], petEnd: ['leanback', 2], gift: ['situp', 2.2], wave: ['wave', 2.2], laugh: ['laugh', 2], stare: ['shift', 2.4] };
 
@@ -277,6 +278,8 @@
       gesture: doGesture,
       // whether she is in the room: 'gone' (already out), 'leave' (walks out now), 'return' (walks back in; opts.sneak = quietly)
       presence(mode, o) { if (R.presence) R.presence(mode, o || {}); },
+      // a video call while she is out: she appears wherever she really is (scene = the backdrop), until call(false)
+      call(on, scene) { if (R.call) R.call(on, scene); },
       // the after-effect that still shows for a while once she is back: '', tipsy, high, groggy, hyper, upset
       setState(kind) { state = STATE[kind] ? kind : ''; if (R.glow) R.glow(state); },
       // her routine (3D model only): what she is busy with right now, in words, and a way to start something

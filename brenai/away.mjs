@@ -113,3 +113,25 @@ export function glowNote(glow, user) {
 }
 
 export const clock = (ms) => new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+
+// ---- video calls while she is out ----
+// Where she really is decides what is behind her on the call. sceneFor(away) -> a backdrop name the page knows how to draw.
+const SCENE_OF = { class: 'classroom', 'her study group': 'library', work: 'cafe', 'her D&D game': 'gamestore', 'out with friends': 'bar', 'an errand': 'street', bed: 'bedroom', 'the bathroom': 'street', somewhere: 'street' };
+const SCENE_LIE = { tipsy: 'bar', high: 'rooftop', groggy: 'bedroom', hyper: 'gamestore', upset: 'car' };
+export const sceneFor = a => (a.out && a.out.lying ? SCENE_LIE[a.out.kind] : SCENE_OF[a.where]) || 'street';
+// Does she pick up? Not from the bathroom, rarely mid-lecture, usually otherwise. With something to hide she is less keen.
+export function picksUp(a, r = Math.random()) {
+  const lying = a.out && a.out.lying;
+  const p = a.where === 'the bathroom' ? 0 : lying ? 0.62 : a.where === 'class' ? 0.22 : a.where === 'bed' ? 0.35 : a.where === 'work' ? 0.45 : a.where === 'her study group' ? 0.6 : 0.88;
+  return r < p;
+}
+const PLACE = { classroom: 'in the back row of a lecture hall, whispering', library: 'at a library table with your study group, keeping your voice down', cafe: 'on a quick break at work', gamestore: 'at the game store, with your group at the table behind you',
+  bar: 'in a loud bar, with coloured lights and music behind you', rooftop: 'out on the fire escape at night, with the city behind you', bedroom: 'in your dark bedroom, in bed', car: 'sitting alone in your parked car', street: 'out walking, on the pavement' };
+export function callNote(a, user) {
+  const scene = sceneFor(a), o = a.out || {};
+  const base = `- RIGHT NOW you are not in the room with ${user}: you are out, and he is VIDEO CALLING you. You picked up on your phone. You are ${PLACE[scene]}; he can see your face and a bit of what is behind you. This is a spoken call: say only what you would say out loud, one or two short sentences, no stage directions. Start by asking what he wants. Talk like a real call: react to what he says, do not recite. When the call has run its course, or you need to go, end it yourself with a goodbye like "talk to you later".`;
+  if (o.lying) return base + ` You told him you were at ${a.where}, and that is NOT where you are (${o.truth}). You are trying to keep the camera tight on your face and the call short, and to sound normal. It shows a little anyway: ${o.tells}. If he asks where you are, stick to your story; if he points out what he can see or hear behind you, squirm, make an excuse, and only admit it if he clearly has you.`;
+  return base + (o.kind ? ` ${o.truth[0].toUpperCase() + o.truth.slice(1)}, and it shows: ${o.tells}.` : ` You really are where you said (${a.where}); you have nothing to hide and may be a little short on time.`);
+}
+export const HANGUP = /\b(talk to (you|ya) (later|soon|tomorrow|tonight)|see (you|ya) (later|soon|tonight|in a bit|when i'?m back)|i('?ve| have)? ?(gotta|got to|have to|need to|should) (go|run|get back|hang up)|bye+\b|good ?night|hanging up|later[.!]?\s*$)/i;
+export const COMING = /\b(on my way|heading (back|home|over)( now)?|coming (back|home|over)( now)?|i'?ll (come|head) (back|home|over)( now)?|be (right )?there( soon| in)?|leaving now|omw)\b/i;

@@ -13,6 +13,8 @@ $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = @("$env:ProgramFiles\nodejs\node.exe", "${env:ProgramFiles(x86)}\nodejs\node.exe", "$env:LOCALAPPDATA\Programs\nodejs\node.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
 if (-not $node) { $node = (Get-Process node -ErrorAction SilentlyContinue | Select-Object -First 1).Path }
 if (-not $node) { Write-Host "Node.js not found. Install it: winget install -e --id OpenJS.NodeJS.LTS"; exit 1 }
+# Node on the PATH for this window: installing her voice runs scripts that call "node" and "npm" by name
+$env:Path = (Split-Path $node) + ";" + $env:Path
 # her voice (Kokoro): installed once, next to the bridge. The package.json keeps npm from installing it somewhere else.
 if (-not (Test-Path "$PSScriptRoot\node_modules\kokoro-js")) {
   if (-not (Test-Path "$PSScriptRoot\package.json")) { Set-Content -Path "$PSScriptRoot\package.json" -Value '{ "name": "wizra-bridge", "private": true, "type": "module" }' -Encoding ascii }

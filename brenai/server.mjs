@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
-import { detectLeave, detectPlan, outcome, glowNote, clock } from './away.mjs';
+import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING } from './away.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -103,6 +103,7 @@ let db = { history: [], log: [], profile: '', sinceLearn: 0 };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(STORE, 'utf8')) }; } catch {}
 db.settings = { ...SETTINGS_DEFAULT, ...(db.settings || {}) };
 db.sheet = { ...structuredClone(SHEET_DEFAULT), ...(db.sheet || {}) };
+db.call = null; // a call does not survive a restart
 function save() {
   const tmp = STORE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(db));
@@ -121,7 +122,7 @@ function authed(req) {
 // ---------- the model call ----------
 function systemBlocks() {
   // Stable first so the cache holds; this only changes when settings, the sheet or the notes change.
-  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') }];
+  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') }];
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -337,21 +338,28 @@ function planDue() {
   leaveNow({ where: p.where || 'somewhere', minutes: 75, cover: /class|study|work/.test(p.where || '') }, p.leaveAt); save();
   return '';
 }
-const awayView = () => db.away ? { where: db.away.where, until: db.away.until, back: clock(db.away.until), due: Date.now() >= db.away.until } : null;
+const awayView = () => { if (db.call && Date.now() - db.call.since > 25 * 60000) db.call = null; return awayView0(); }; // (a call left open is dropped)
+const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || clock(db.away.until), due: Date.now() >= db.away.until && !db.call } : null; // (back = when she said; the real time is hers to keep)
 const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
 function leaveNow(leave, since = Date.now()) {
   const now = since, p = db.plan || {};
   // back when she said she would be, if she said; otherwise however long that kind of outing takes
   const said = p.backAt && p.backAt > now + 5 * 60000 && p.backAt < now + 16 * 3600000 ? p.backAt : 0;
   const where = leave.where === 'somewhere' && p.where ? p.where : leave.where;
-  db.away = { since: now, until: said || now + leave.minutes * 60000 / AWAY_SPEED, where, cover: leave.cover || /class|study|work/.test(where), minutes: said ? Math.round((said - now) / 60000) : leave.minutes };
+  const a = { since: now, where, cover: leave.cover || /class|study|work/.test(where), minutes: said ? Math.round((said - now) / 60000) : leave.minutes };
+  // what she is really doing is settled the moment she walks out (it decides what a video call shows, and how she comes back)
+  a.out = process.env.AWAY_TEST_LIE ? outcome(a, 0, 0.1) : outcome(a);
+  // she is not a train: a few minutes early to half an hour late, later still when she is somewhere she should not be
+  const drift = a.minutes < 12 ? 0 : (Math.random() * (a.out.lying ? 50 : 32) - (a.out.lying ? 0 : 6)) * 60000;
+  a.until = (said || now + leave.minutes * 60000 / AWAY_SPEED) + drift / AWAY_SPEED; a.said = said ? clock(said) : clock(now + leave.minutes * 60000 / AWAY_SPEED);
+  db.away = a;
   db.plan = null;
-  db.log.push({ who: 'sys', text: `Wizra left for ${where}. Back around ${clock(db.away.until)}.`, at: now });
+  db.log.push({ who: 'sys', text: `Wizra left for ${where}. Back around ${a.said}.`, at: now });
   console.log(`[away] left for ${leave.where}, ${leave.minutes} min`);
 }
 // She walks back in: decide what really happened, then let her say something as she arrives (seeing anything he sent meanwhile).
 async function comeBack(onDelta) {
-  const a = db.away, out = process.env.AWAY_TEST_LIE ? outcome(a, 0, 0.1) : outcome(a), now = Date.now(); // (the env switch forces a cover story, for tests)
+  const a = db.away, out = a.out || outcome(a), now = Date.now(); db.call = null;
   const missed = db.log.filter(e => e.who === 'me' && e.at > a.since && e.text).length;
   db.away = null;
   db.glow = out.kind ? { ...out, where: a.where, until: now + 60 * 60000 / AWAY_SPEED } : null;
@@ -447,7 +455,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/reset' && req.method === 'POST') {
-        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; db.plan = null; save();
+        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; db.plan = null; db.call = null; save();
         return json(res, 200, { ok: true });
       }
 
@@ -485,6 +493,48 @@ const server = http.createServer(async (req, res) => {
         }
         return;
       }
+      // ---- video call while she is out. Spoken only: nothing from a call is shown in the chat, just a line that it happened. ----
+      if (url.pathname === '/api/call/start' && req.method === 'POST') {
+        if (!db.away) return json(res, 409, { error: 'She is right here.' });
+        if (busy) return json(res, 409, { error: 'busy' });
+        busy = true;
+        try {
+          if (!(process.env.CALL_TEST_ANSWER ? process.env.CALL_TEST_ANSWER === 'yes' : picksUp(db.away))) { // no answer; she texts back instead
+            const pre = 'tries to video call her; she lets it ring out and sends a short text back instead';
+            db.log.push({ who: 'sys', text: 'You called Wizra. No answer.', at: Date.now() }, { who: 'me', text: '', at: Date.now(), pre, hidden: true });
+            let text = ''; try { text = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text, at: Date.now() }); } catch { db.log.pop(); }
+            save(); return json(res, 200, { answered: false, text });
+          }
+          db.call = { since: Date.now() };
+          const pre = 'video calls her; she picks up';
+          db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true });
+          let text; try { text = await reply(`*${pre}*`, () => {}); } catch (e) { db.log.pop(); db.call = null; throw e; }
+          db.log.push({ who: 'her', text, at: Date.now(), hidden: true });
+          save();
+          const o = db.away.out || {};
+          return json(res, 200, { answered: true, text, scene: sceneFor(db.away), state: o.kind || (o.lying ? 'cagey' : '') });
+        } catch (e) { return json(res, 503, { error: e.message }); } finally { busy = false; }
+      }
+      if (url.pathname === '/api/call/say' && req.method === 'POST') {
+        const { text } = await readBody(req); const msg = String(text || '').trim().slice(0, 2000);
+        if (!db.call || !db.away) return json(res, 409, { error: 'No call.' });
+        if (!msg) return json(res, 400, { error: 'empty' });
+        if (busy) return json(res, 409, { error: 'busy' });
+        busy = true;
+        db.log.push({ who: 'me', text: msg, at: Date.now(), hidden: true });
+        try {
+          const full = await reply(msg, () => {});
+          db.log.push({ who: 'her', text: full, at: Date.now(), hidden: true });
+          const coming = COMING.test(full); if (coming) db.away.until = Math.min(db.away.until, Date.now() + (3 + Math.random() * 4) * 60000);
+          save();
+          return json(res, 200, { text: full, hangup: HANGUP.test(full), coming });
+        } catch (e) { db.log.pop(); return json(res, 503, { error: e.message }); } finally { busy = false; }
+      }
+      if (url.pathname === '/api/call/end' && req.method === 'POST') {
+        if (db.call) { const min = Math.max(1, Math.round((Date.now() - db.call.since) / 60000)); db.log.push({ who: 'sys', text: `Video call with Wizra, ${min} min.`, at: Date.now() }); db.call = null; save(); }
+        return json(res, 200, { ok: true, away: awayView() });
+      }
+
       // The time she named has come: she says goodbye and goes.
       if (url.pathname === '/api/depart' && req.method === 'POST') {
         if (planDue() !== 'say') return json(res, 409, { error: 'Not time yet.' });

@@ -212,6 +212,30 @@
   #callBack { border:0; border-radius:999px; padding:6px 12px; background:rgba(255,255,255,.18); color:#fff; font:inherit; font-size:13px; font-weight:700; }
   .line.sys { text-align:center; font-size:12.5px; color:rgba(255,255,255,.72); margin:14px 0; letter-spacing:.02em; }
   .line.sys::before, .line.sys::after { content:" \00b7 "; opacity:.5; }
+
+  /* ---- the video call ---- */
+  #callBtn { width:38px; height:38px; border-radius:50%; border:0; background:linear-gradient(135deg,#4ade80,#22c55e); color:#fff; padding:8px; box-shadow:0 4px 12px rgba(34,197,94,.45); cursor:pointer; flex:none; }
+  #callBtn svg { width:100%; height:100%; display:block; }
+  #awayNote.plan #callBtn { display:none; }
+  #call { position:fixed; inset:0; display:none; place-items:center; background:rgba(10,6,24,.9); z-index:30; }
+  body.calling #call { display:grid; }
+  :root { --pw:min(84vw, 44dvh); --ph:calc(var(--pw) * 2.02); }
+  #phone { position:relative; width:var(--pw); height:var(--ph); border-radius:38px; background:#0b0b10; box-shadow:0 0 0 3px #2a2a35, 0 0 0 9px #14141c, 0 30px 80px rgba(0,0,0,.7); }
+  #phone::before { content:""; position:absolute; top:14px; left:50%; width:74px; height:20px; margin-left:-37px; border-radius:12px; background:#0b0b10; z-index:34; }
+  /* her picture goes inside the phone: the same avatar box, moved over the phone's screen */
+  body.calling #stageWrap { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:calc(var(--pw) - 16px); height:calc(var(--ph) - 16px); z-index:31; }
+  body.calling #stage { border-radius:31px; box-shadow:none; }
+  body.calling #bigBtn, body.calling #brainBtn { display:none; }
+  #phoneTop { position:absolute; left:0; right:0; top:44px; z-index:33; display:flex; flex-direction:column; align-items:center; gap:2px; color:#fff; text-shadow:0 1px 6px rgba(0,0,0,.8); pointer-events:none; }
+  #callName { font-weight:800; font-size:19px; } #callStatus { font-size:13px; opacity:.9; }
+  #phoneKeys { position:absolute; left:0; right:0; bottom:26px; z-index:33; display:flex; justify-content:center; gap:26px; }
+  #phoneKeys button { width:58px; height:58px; border-radius:50%; border:0; color:#fff; font-size:22px; padding:0; cursor:pointer; box-shadow:0 6px 16px rgba(0,0,0,.45); }
+  #callMic { background:rgba(255,255,255,.25); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); } #callMic.off { background:#fff; color:#333; }
+  #hangUp { background:#ef4444; padding:13px !important; } #hangUp svg { width:100%; height:100%; display:block; }
+  #callType { position:absolute; left:18px; right:18px; bottom:96px; z-index:33; border:0; border-radius:999px; padding:10px 16px; font:inherit; font-size:14px; background:rgba(0,0,0,.55); color:#fff; }
+  #callType[hidden] { display:none; }
+  body.calling.ringing #stageWrap { visibility:hidden; }
+  #phone.ended #phoneKeys { visibility:hidden; }
 </style>
 </head>
 <body>
@@ -225,7 +249,7 @@
     </div></div>
     <div id="herSide">
       <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
-      <div id="awayNote" hidden><span id="awayText"></span><button id="callBack" title="Ask her to come back now">Call her back</button></div>
+      <div id="awayNote" hidden><span id="awayText"></span><button id="callBtn" title="Video call her"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button></div>
     </div>
   </div>
   <div id="logHead"><span>CHAT AREA</span><span id="brainDot">...</span></div>
@@ -248,6 +272,17 @@
   </div>
 </div>
 <div id="stageBack"></div>
+<!-- the video call: a phone on the screen with her on it. Nothing is written during a call; you talk, she answers out loud. -->
+<div id="call">
+  <div id="phone">
+    <div id="phoneTop"><span id="callName">Wizra</span><span id="callStatus">Calling...</span></div>
+    <div id="phoneKeys">
+      <button id="callMic" title="Mute / unmute your mic">&#127908;</button>
+      <button id="hangUp" title="Hang up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14c5-5 13-5 18 0l-2.5 2.5-3.5-1.5v-3a12 12 0 0 0-6 0v3L5.500 16.500z"/></svg></button>
+    </div>
+    <input id="callType" type="text" placeholder="Type to talk" hidden>
+  </div>
+</div>
 <div id="wheel"><button id="closeWheel" title="Close">&times;</button><div id="ring"></div><div id="panel"></div><button id="newChat">New conversation</button></div>
 <div id="login"><form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form></div>
 
@@ -376,6 +411,7 @@ async function comeBack(force) {
 setInterval(async () => { // keep time with the server: is she due back, has the after-effect worn off
   if (document.hidden || $('login').style.display === 'grid') return;
   try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
+    if (phoneCall.on) return;
     if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } }
   } catch {}
 }, 15000);
@@ -429,6 +465,7 @@ async function readReply(r, body, beforeType) {
 
 async function send(quick) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
+  if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
   sendBtn.disabled = true; speaker.stop(); if (!away) { avatar.setThinking(true); userDid(text); }
@@ -500,7 +537,6 @@ $('bigBtn').onclick = () => { const big = document.body.classList.toggle('big');
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
-$('callBack').onclick = () => { if (confirm('Call her back early?')) comeBack(true); };
 $('newChat').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); closeWheel(); load(); } };
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
@@ -613,16 +649,18 @@ const speaker = (() => {
     if (!v.on || !text) return;
     const parts = sentences(text), my = ++gen;
     if (v.engine() !== 'pc') return deviceSay(parts);
+    v.waiting = true;                                           // her PC voice is being made: she is about to speak
     // ask for every line at once (the PC makes them in order), play them back to back
     const clips = parts.map(line => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
     for (let i = 0; i < clips.length; i++) {
       const blob = await clips[i]; if (gen !== my) return;
-      if (!blob) { deviceSay(parts.slice(i)); return; } // the PC voice dropped out: finish on the device voice
-      await playBlob(blob); if (gen !== my) return;
+      if (!blob) { v.waiting = false; deviceSay(parts.slice(i)); return; } // the PC voice dropped out: finish on the device voice
+      v.waiting = false; await playBlob(blob); if (gen !== my) return;
     }
-    end();
+    v.waiting = false; end();
   };
-  v.stop = () => { gen++; try { player.pause(); } catch {} pending = 0; if (v.supported) SS.cancel(); if (v.speaking) end(); };
+  v.busy = () => v.speaking || !!v.waiting || pending > 0 || (v.supported && SS.speaking);
+  v.stop = () => { v.waiting = false; gen++; try { player.pause(); } catch {} pending = 0; if (v.supported) SS.cancel(); if (v.speaking) end(); };
   v.set = patch => { Object.assign(v, patch); store(); if (!v.on) v.stop(); };
   // browsers only let a page speak after you have touched it once
   addEventListener('pointerdown', () => {
@@ -631,6 +669,64 @@ const speaker = (() => {
   }, { once: true });
   return v;
 })();
+
+// ---------- video call ----------
+// Only while she is out. She appears wherever she really is. No text: your speech is sent, her reply is spoken.
+const phoneCall = { on: false, t0: 0, timer: null, ring: null, saved: null, busy: false };
+function ringTone(on) { // a soft two-tone ring while it connects
+  try {
+    if (!on) { clearInterval(phoneCall.ring); phoneCall.ring = null; return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; const ctx = phoneCall.ctx || (phoneCall.ctx = new AC()); ctx.resume();
+    const beep = () => { for (const [f, at] of [[440, 0], [554, 0.22]]) { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; g.gain.setValueAtTime(0.0001, ctx.currentTime + at); g.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + at + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.2); o.connect(g).connect(ctx.destination); o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 0.22); } };
+    beep(); phoneCall.ring = setInterval(beep, 1500);
+  } catch {}
+}
+const callStatus = t => { $('callStatus').textContent = t; };
+const speechDone = () => new Promise(ok => { let n = 0; const t = setInterval(() => { if ((++n > 4 && !speaker.busy()) || n > 500) { clearInterval(t); ok(); } }, 120); });
+async function startCall() {
+  if (!away || phoneCall.on || sendBtn.disabled) return;
+  phoneCall.on = true; phoneCall.busy = true; document.body.classList.remove('big'); document.body.classList.add('calling', 'ringing'); $('phone').classList.remove('ended'); callStatus('Calling...');
+  // for the call: her voice on, your mic on, whatever the usual settings are (put back afterwards)
+  phoneCall.saved = { speak: speaker.on, mic: voice.on }; speaker.on = true; $('callMic').classList.remove('off'); $('callType').hidden = voice.supported;
+  ringTone(true);
+  let d = null;
+  try { const [r] = await Promise.all([api('/api/call/start', {}), new Promise(ok => setTimeout(ok, 2600 + Math.random() * 2500))]); d = await r.json(); if (!r.ok) d = { error: d.error || 'failed' }; } catch (e) { d = { error: e.message }; }
+  ringTone(false);
+  if (!phoneCall.on) return;                                   // you hung up while it rang
+  if (!d || d.error || !d.answered) { callStatus(d && d.error ? 'Could not connect' : 'No answer'); if (d && d.text) { addSys('You called Wizra. No answer.'); addLine('her', d.text); } return endCall(null, 1700); }
+  document.body.classList.remove('ringing'); avatar.call(true, d.scene); avatar.setState(d.state || '');
+  phoneCall.t0 = Date.now(); phoneCall.timer = setInterval(() => { const s = Math.floor((Date.now() - phoneCall.t0) / 1000); callStatus(Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')); }, 500);
+  await herLine(d.text, false);
+  phoneCall.busy = false; voice.set({ on: true }); input.value = ''; voice.reset();
+}
+async function herLine(text, hangup) { // she says it out loud; nothing is written
+  avatar.feel(text); avatar.act(text);
+  const out = speechOf(text, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
+  await speechDone();
+  if (hangup && phoneCall.on) endCall('she', 1700);
+}
+async function callSay(text) {
+  if (!phoneCall.on || phoneCall.busy) return; phoneCall.busy = true; avatar.setThinking(true);
+  try {
+    const r = await api('/api/call/say', { text }); const d = await r.json(); avatar.setThinking(false);
+    if (!phoneCall.on) return;
+    if (!r.ok) { if (r.status === 409 && /No call/.test(d.error || '')) endCall('she', 1500); return; }
+    await herLine(d.text, d.hangup);
+  } catch { avatar.setThinking(false); } finally { phoneCall.busy = false; }
+}
+function endCall(who, wait = 1500) { // who hung up: 'me', 'she', or null when it never connected
+  if (!phoneCall.on) return; phoneCall.on = false;
+  ringTone(false); clearInterval(phoneCall.timer); speaker.stop(); avatar.setThinking(false);
+  if (who) { callStatus('Call ended'); $('phone').classList.add('ended'); }
+  const s = phoneCall.saved; if (s) { speaker.on = s.speak; voice.set({ on: s.mic }); }
+  input.value = ''; voice.reset();
+  fetch('/api/call/end', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then(r => r.json()).then(d => { if (who) addSys('Video call with Wizra.'); }).catch(() => {});
+  setTimeout(() => { document.body.classList.remove('calling', 'ringing'); avatar.call(false); avatar.setState(''); if (away) avatar.presence('gone'); phoneCall.busy = false; }, wait);
+}
+$('callBtn').onclick = startCall;
+$('hangUp').onclick = () => endCall('me', 1400);
+$('callMic').onclick = () => { const on = !voice.on; voice.set({ on }); $('callMic').classList.toggle('off', !on); };
+$('callType').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { callSay(e.target.value.trim()); e.target.value = ''; } });
 
 // ---------- the wheel ----------
 let sheet = null, notes = '';
