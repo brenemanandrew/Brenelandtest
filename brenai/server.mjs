@@ -93,6 +93,22 @@ function ttsJob(text, voice, speed) {
     brain.ws.send(JSON.stringify({ t: 'tts', id, text, voice, speed }));
   });
 }
+// Her voice, sooner: lines are voiced ahead of the page asking for them. The first sentence is sent to the PC as soon as
+// it is complete in the model's stream, the rest the moment the reply is final; the page's requests then find them ready
+// (or already on the way). Keys ignore punctuation and case, so small differences in how the page cuts the text do not matter.
+const ttsCache = new Map(); const ttsKey = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+function voiced(line) {
+  const key = ttsKey(line); if (!key) return Promise.reject(new Error('empty'));
+  const hit = ttsCache.get(key); if (hit && Date.now() - hit.at < 90000) return hit.p;
+  const t0 = Date.now();
+  const p = ttsJob(line, db.settings.ttsVoice || 'af_heart', 1).then(w => { const ms = Date.now() - t0; brain.ttsMs = brain.ttsMs ? Math.round(brain.ttsMs * 0.7 + ms * 0.3) : ms; return w; });
+  p.catch(() => ttsCache.delete(key));
+  ttsCache.set(key, { p, at: Date.now() }); if (ttsCache.size > 24) ttsCache.delete(ttsCache.keys().next().value);
+  return p;
+}
+// what she says out loud, cut the way the page cuts it: no actions, no quote marks, no "She does this." narration
+const spokenLines = text => (String(text).replace(/\*[^*]*\*/g, ' ').replace(/["\u201c\u201d]/g, '').match(/[^.!?\u2026\n]+[.!?\u2026]*["')]*\s*/g) || []).map(x => x.trim()).filter(x => x && !/^(she|wizra)\s+[a-z']+(s|ed)\b/i.test(x));
+function prewarm(text) { if (brain.ws && brain.tts) for (const line of spokenLines(text).slice(0, 4)) voiced(line).catch(() => {}); }
 const tempOf = v => +(0.3 + (Math.max(0, Math.min(100, v)) / 100) * 0.9).toFixed(2);
 // rough token count (about 4 characters a token) to keep the chat inside the loaded context
 const toks = s => Math.ceil(String(s).length / 3.6);
@@ -376,7 +392,9 @@ async function comeBack(onDelta) {
 }
 
 // ---------- http ----------
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
+// changes whenever a new version is deployed: pages left open use it to reload themselves
+const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let s = '';
@@ -392,7 +410,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, build: BUILD, ttsMs: brain.ttsMs || 0, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
@@ -442,7 +460,7 @@ const server = http.createServer(async (req, res) => {
         const line = String(text || '').trim().slice(0, 800);
         if (!line) return json(res, 400, { error: 'empty' });
         try {
-          const wav = Buffer.from(await ttsJob(line, db.settings.ttsVoice || 'af_heart', 1), 'base64');
+          const wav = Buffer.from(await voiced(line), 'base64');
           res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': wav.length, 'cache-control': 'no-store' });
           return res.end(wav);
         } catch (e) { return json(res, 503, { error: e.message }); }
@@ -460,7 +478,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text, doing } = await readBody(req);
+        const { text, doing, voice: wantVoice } = await readBody(req);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
@@ -476,7 +494,14 @@ const server = http.createServer(async (req, res) => {
         const pre = [takeTouches(), seen ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
-          const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => send({ t: 'delta', d }));
+          let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest
+          const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => {
+            send({ t: 'delta', d });
+            if (!wantVoice || early || !brain.tts) return; heard += d;
+            if ((heard.match(/\*/g) || []).length % 2) return;   // in the middle of an action
+            const first = spokenLines(heard.replace(/[^.!?\u2026]*$/, ''))[0]; if (first && first.length > 3) { early = true; voiced(first).catch(() => {}); }
+          });
+          if (wantVoice) prewarm(full);
           db.log.push({ who: 'her', text: full, at: Date.now() });
           db.sinceLearn++;
           notePlan(full); const leave = detectLeave(full); if (leave) leaveNow(leave);
@@ -512,6 +537,7 @@ const server = http.createServer(async (req, res) => {
           db.log.push({ who: 'her', text, at: Date.now(), hidden: true });
           save();
           const o = db.away.out || {};
+          prewarm(text);
           return json(res, 200, { answered: true, text, scene: sceneFor(db.away), state: o.kind || (o.lying ? 'cagey' : '') });
         } catch (e) { return json(res, 503, { error: e.message }); } finally { busy = false; }
       }
@@ -527,6 +553,7 @@ const server = http.createServer(async (req, res) => {
           db.log.push({ who: 'her', text: full, at: Date.now(), hidden: true });
           const coming = COMING.test(full); if (coming) db.away.until = Math.min(db.away.until, Date.now() + (3 + Math.random() * 4) * 60000);
           save();
+          prewarm(full);
           return json(res, 200, { text: full, hangup: HANGUP.test(full), coming });
         } catch (e) { db.log.pop(); return json(res, 503, { error: e.message }); } finally { busy = false; }
       }
@@ -585,7 +612,7 @@ const server = http.createServer(async (req, res) => {
     if (!file.startsWith(path.join(here, 'public'))) return json(res, 403, { error: 'no' });
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); return res.end('not found'); }
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', ...(p.startsWith('vendor') ? { 'cache-control': 'public, max-age=604800' } : {}) });
+      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', ...(p.startsWith('vendor') || p.startsWith('fonts') ? { 'cache-control': 'public, max-age=604800' } : {}) });
       res.end(data);
     });
   } catch (e) {

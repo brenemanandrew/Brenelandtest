@@ -236,6 +236,32 @@
   #callType[hidden] { display:none; }
   body.calling.ringing #stageWrap { visibility:hidden; }
   #phone.ended #phoneKeys { visibility:hidden; }
+
+  /* ================= fonts (hosted with the site, all open licensed) ================= */
+  @font-face { font-family:"Patrick Hand"; src:url(fonts/patrick-hand-latin-400-normal.woff2) format("woff2"); font-display:swap; }
+  @font-face { font-family:"Bangers"; src:url(fonts/bangers-latin-400-normal.woff2) format("woff2"); font-display:swap; }
+  @font-face { font-family:"Fredoka"; font-weight:500; src:url(fonts/fredoka-latin-500-normal.woff2) format("woff2"); font-display:swap; }
+  @font-face { font-family:"Fredoka"; font-weight:700; src:url(fonts/fredoka-latin-700-normal.woff2) format("woff2"); font-display:swap; }
+  html, body, button, input, select, textarea { font-family:"Fredoka", ui-rounded, "Segoe UI", system-ui, sans-serif; font-weight:500; }
+  /* what is said: comic-book hand lettering. what is done: a punchy caption face */
+  .msg .say, .balloon, #in, #callType { font-family:"Patrick Hand", "Fredoka", system-ui, sans-serif; font-weight:400; font-size:1.16em; line-height:1.28; letter-spacing:.01em; }
+  .balloon { font-size:1.08rem; }
+  .msg .act { font-family:"Bangers", "Fredoka", system-ui, sans-serif; font-weight:400; font-size:1.06em; letter-spacing:.055em; line-height:1.25; padding:4px 14px 3px; }
+  #logHead > span:first-child, #barTag { font-family:"Bangers", "Fredoka", sans-serif; font-weight:400; letter-spacing:.09em; font-size:15px; }
+  #in { scrollbar-width:none; overflow-y:auto; } #in::-webkit-scrollbar { display:none; }   /* no scroll bar in the chat bar */
+  /* ---- the hanging sign ---- */
+  #stageWrap { container-type:size; }
+  #outSign { position:absolute; left:7%; right:7%; top:-3%; z-index:3; transform-origin:50% 5%; animation:signSwing 4.2s ease-in-out infinite; pointer-events:none; }
+  #outSign[hidden] { display:none; } body.calling #outSign { display:none; }
+  @keyframes signSwing { 0%,100% { transform:rotate(-2.6deg); } 50% { transform:rotate(2.6deg); } }
+  #outSign .rope { display:block; width:100%; height:27cqh; overflow:visible; }
+  #outSign .board { margin-top:-1.5cqh; padding:4cqh 3cqw 5cqh; border-radius:5cqw; text-align:center; color:#fff6dc; border:0.9cqw solid #5a3414; line-height:1.05;
+    background:repeating-linear-gradient(94deg, rgba(90,52,20,.0) 0 9px, rgba(90,52,20,.16) 9px 11px), linear-gradient(180deg,#d39a58,#b97a3a 55%,#a5672c); box-shadow:0 1.5cqw 0 #5a3414, 0 3cqw 5cqw rgba(0,0,0,.45), inset 0 0.8cqw 0 rgba(255,255,255,.28); }
+  #outSign .board b { display:block; font-family:"Bangers", "Fredoka", sans-serif; font-weight:400; font-size:15.5cqw; letter-spacing:.05em; text-shadow:0 0.6cqw 0 #5a3414; }
+  #outSign .board span { display:block; margin-top:1.5cqh; font-family:"Patrick Hand", "Fredoka", sans-serif; font-size:10.5cqw; color:#3a2008; } #outSign .board i { font-style:normal; font-weight:700; }
+  #outSign #callBtn { position:absolute; left:50%; bottom:-21cqw; width:24cqw; height:24cqw; min-width:30px; min-height:30px; margin-left:-12cqw; padding:5cqw; pointer-events:auto; box-shadow:0 0 0 0.8cqw #fff, 0 1.5cqw 4cqw rgba(0,0,0,.5); animation:ringMe 2.4s ease-in-out infinite; }
+  @keyframes ringMe { 0%,86%,100% { transform:rotate(0); } 89% { transform:rotate(-14deg); } 92% { transform:rotate(12deg); } 95% { transform:rotate(-8deg); } }
+  #awayNote.plan { position:absolute; left:14px; right:0; }
 </style>
 </head>
 <body>
@@ -244,12 +270,18 @@
     <div id="stageSlot"><div id="stageWrap">
       <!-- The avatar lives in #stage. avatar.js draws the current one; the VTuber replaces it by offering the same calls (see avatar.js). -->
       <div id="stage"></div>
+      <!-- she is out: a sign hangs over her window, with the phone to call her on it -->
+      <div id="outSign" hidden>
+        <svg class="rope" viewBox="0 0 100 34" preserveAspectRatio="none"><path d="M12 34 L50 5 L88 34" fill="none" stroke="#e9d3a1" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 34 L50 5 L88 34" fill="none" stroke="#b08a4a" stroke-width="1" stroke-dasharray="2 3"/><circle cx="50" cy="5" r="4.2" fill="#8a8f9a" stroke="#4b4f5a" stroke-width="1"/></svg>
+        <div class="board"><b>WIZRA IS OUT</b><span>Back by <i id="outBack">soon</i></span></div>
+        <button id="callBtn" title="Video call her"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button>
+      </div>
       <button id="bigBtn" title="Expand / shrink">&#10530;</button>
       <button id="brainBtn" title="Her settings">&#129504;</button>
     </div></div>
     <div id="herSide">
       <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
-      <div id="awayNote" hidden><span id="awayText"></span><button id="callBtn" title="Video call her"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button></div>
+      <div id="awayNote" hidden><span id="awayText"></span></div>
     </div>
   </div>
   <div id="logHead"><span>CHAT AREA</span><span id="brainDot">...</span></div>
@@ -380,7 +412,8 @@ function addSys(text) { const d = document.createElement('div'); d.className = '
 let away = null, glow = null, plan = null, returning = false, toldAway = false;
 function setPresence(a, g, instant) {
   const was = away; away = a || null; glow = g || null;
-  if (away) { $('awayText').textContent = 'Out: ' + away.where + '. Back around ' + away.back + '.'; input.placeholder = 'She is out. Leave her a message'; }
+  $('outSign').hidden = !away;
+  if (away) { $('outBack').textContent = away.back; $('outSign').title = 'Out: ' + away.where; input.placeholder = 'She is out. Leave her a message'; }
   else { input.placeholder = 'Talk or type, *actions*'; toldAway = false; }
   showPlan(plan);
   if (away && !was) avatar.presence(instant ? 'gone' : 'leave');
@@ -388,7 +421,7 @@ function setPresence(a, g, instant) {
 }
 // something she said she has later: shown quietly beside her until it happens
 function showPlan(p) {
-  plan = p || null; const note = $('awayNote'); note.hidden = !away && !plan; note.classList.toggle('plan', !away && !!plan);
+  plan = p || null; const note = $('awayNote'); note.hidden = !!away || !plan; note.classList.toggle('plan', !away && !!plan);
   if (!away && plan) $('awayText').textContent = (plan.leave ? 'Leaving' + (plan.where ? ' for ' + plan.where : '') + ' around ' + plan.leave + '.' : '') + (plan.back ? (plan.leave ? ' Back' : 'Says she will be back') + ' around ' + plan.back + '.' : '');
 }
 async function depart() {
@@ -455,6 +488,7 @@ async function readReply(r, body, beforeType) {
       if (!body) body = addLine('her', '');
       const full = ev.text; avatar.setThinking(false); avatar.feel(full); avatar.act(full);
       const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
+      await Promise.race([speaker.ready || Promise.resolve(), new Promise(ok => setTimeout(ok, 2200))]); // words and voice start together
       const flap = speaker.on ? null : setInterval(() => avatar.talk(), 120); // no voice: her mouth keeps time with the typing
       await typeOut(body, full); clearInterval(flap);
       if (ev.away && !ev.returned) { await new Promise(ok => setTimeout(ok, 1400)); addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); plan = null; setPresence(ev.away, null, false); }
@@ -472,7 +506,7 @@ async function send(quick) {
   addLine('me', text); bubble('me', text);
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   try {
-    const r = await api('/api/chat', { text, doing: avatar.activity() });
+    const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc' });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     await readReply(r, body);
   } catch (e) {
@@ -642,19 +676,21 @@ const speaker = (() => {
   const playBlob = blob => new Promise(async done => {
     env = await envelope(blob);
     const url = URL.createObjectURL(blob); player.src = url; player.playbackRate = v.rate;
-    player.onplaying = begin; player.onended = player.onerror = () => { URL.revokeObjectURL(url); env = null; done(); };
+    player.onplaying = () => { begin(); if (v.onFirst) v.onFirst(); }; player.onended = player.onerror = () => { URL.revokeObjectURL(url); env = null; done(); };
     player.play().catch(() => done());
   });
   v.say = async text => {
     if (!v.on || !text) return;
     const parts = sentences(text), my = ++gen;
-    if (v.engine() !== 'pc') return deviceSay(parts);
+    if (v.engine() !== 'pc') { v.ready = Promise.resolve(); return deviceSay(parts); }
     v.waiting = true;                                           // her PC voice is being made: she is about to speak
+    let go; v.ready = new Promise(ok => { go = ok; }); setTimeout(() => go(), 6000);
+    v.onFirst = go;
     // ask for every line at once (the PC makes them in order), play them back to back
     const clips = parts.map(line => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
     for (let i = 0; i < clips.length; i++) {
       const blob = await clips[i]; if (gen !== my) return;
-      if (!blob) { v.waiting = false; deviceSay(parts.slice(i)); return; } // the PC voice dropped out: finish on the device voice
+      if (!blob) { v.waiting = false; if (v.onFirst) v.onFirst(); deviceSay(parts.slice(i)); return; } // the PC voice dropped out: finish on the device voice
       v.waiting = false; await playBlob(blob); if (gen !== my) return;
     }
     v.waiting = false; end();
@@ -882,7 +918,7 @@ function openPanel(k) {
     const son = el('input', { type: 'checkbox', checked: speaker.on }); son.onchange = () => { speaker.set({ on: son.checked }); drawRing(); };
     const selCss = 'width:100%;background:#120e18;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:14px';
     const pc = speaker.engine() === 'pc';
-    p.append(el('div', { className: 'note', textContent: brainInfo.tts ? 'Her own voice (Kokoro, on your PC) is ready. It sounds the same on every device, phones included.' : 'Her own voice (Kokoro) is not running on the PC, so this device\'s voice is used. PC says: ' + (brainInfo.voiceState || 'nothing yet') + '.' }));
+    p.append(el('div', { className: 'note', textContent: brainInfo.tts ? 'Her own voice (Kokoro, on your PC) is ready. It sounds the same on every device, phones included.' + (brainInfo.ttsMs ? ' Your PC is taking about ' + (brainInfo.ttsMs / 1000).toFixed(1) + ' s to voice a line.' : '') : 'Her own voice (Kokoro) is not running on the PC, so this device\'s voice is used. PC says: ' + (brainInfo.voiceState || 'nothing yet') + '.' }));
     // her Kokoro voice: one choice for every device
     const ksel = el('select'); ksel.style.cssText = selCss;
     const LANG = { 'en-us': 'American', 'en-gb': 'British' };
@@ -923,6 +959,8 @@ let brainInfo = {};
 async function brainStatus() {
   try {
     const b = await (await fetch('/api/brain')).json(); brainInfo = b;
+    // a new version of the site went out: pick it up once nothing is in progress
+    if (b.build) { if (!window.__build) window.__build = b.build; else if (b.build !== window.__build && !sendBtn.disabled && !phoneCall.on && !input.value && !$('wheel').classList.contains('open') && !speaker.busy()) return location.reload(); }
     $('brainDot').textContent = b.online ? '\u25cf PC online' + (b.bridge < b.bridgeLatest ? ' (restart bridge to update)' : '') : b.fallback ? '\u25cf Claude' : '\u25cb offline';
     $('brainDot').style.color = b.online ? '#7bd88f' : b.fallback ? '#d4b8ff' : '#ff9a9a';
   } catch {}
