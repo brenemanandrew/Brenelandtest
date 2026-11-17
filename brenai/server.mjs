@@ -424,7 +424,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, { error: 'login' });
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
+      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
 
       if (url.pathname === '/api/away') return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
 
@@ -464,6 +464,15 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': wav.length, 'cache-control': 'no-store' });
           return res.end(wav);
         } catch (e) { return json(res, 503, { error: e.message }); }
+      }
+
+      // His own picture (a small image the page has already shrunk), shown on his portrait and beside his messages.
+      if (url.pathname === '/api/me-avatar' && req.method === 'POST') {
+        const { image } = await readBody(req);
+        if (image === '') { db.meAvatar = ''; save(); return json(res, 200, { me: '' }); }
+        if (typeof image !== 'string' || !/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/.test(image) || image.length > 190000) return json(res, 400, { error: 'That picture could not be used.' });
+        db.meAvatar = image; save();
+        return json(res, 200, { me: image });
       }
 
       if (url.pathname === '/api/touch' && req.method === 'POST') {

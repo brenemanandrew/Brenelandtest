@@ -271,6 +271,10 @@
   #closeWheel:hover { transform:rotate(-4deg) scale(1.08); }
   #closeWheel:active { transform:translateY(3px) rotate(0); box-shadow:0 1px 0 #8a1c1c, 0 3px 6px rgba(0,0,0,.4); }
   @media (min-width:700px) { #closeWheel { right:-34px; } }
+
+  #log { scrollbar-width:none; } #log::-webkit-scrollbar { display:none; }                  /* scrolls, but no scroll bar */
+  .balloon { scrollbar-width:none; } .balloon::-webkit-scrollbar { display:none; }
+  #meIcon { cursor:pointer; object-fit:cover; background:#1d2a36; }
 </style>
 </head>
 <body>
@@ -300,7 +304,8 @@
   <div id="bottom">
     <div class="bwrap me" id="meWrap"><div class="balloon" id="meBubble"></div></div>
     <div id="meBox">
-      <img id="meIcon" src="me.svg" alt="You">
+      <img id="meIcon" src="me.svg" alt="You" title="Tap to choose your picture">
+      <input id="mePick" type="file" accept="image/*" hidden>
       <button id="actBtn" title="Do something">&#9995;</button>
       <div id="actFan"></div>
     </div>
@@ -378,12 +383,15 @@ function fill(el, text) {
 let herThumb = localStorage.getItem('brenai.thumb') || '';
 function addLine(who, text) {
   const div = document.createElement('div'); div.className = 'msg ' + who;
-  const pic = document.createElement('img'); pic.className = 'pic'; pic.alt = who === 'her' ? 'Wizra' : myName; pic.src = who === 'her' ? (herThumb || 'me.svg') : 'me.svg'; if (who === 'her') pic.dataset.her = '1';
+  const pic = document.createElement('img'); pic.className = 'pic'; pic.alt = who === 'her' ? 'Wizra' : myName; pic.src = who === 'her' ? (herThumb || 'me.svg') : (meThumb || 'me.svg'); pic.dataset[who === 'her' ? 'her' : 'me'] = '1';
   const body = document.createElement('div'); body.className = 'body'; body.dataset.who = who; fill(body, text);
   div.append(pic, body); log.appendChild(div);
   log.scrollTop = log.scrollHeight;
   return body;
 }
+// Your own picture: tap your portrait to choose one. It is shrunk here, saved on the server, and used on every device.
+let meThumb = '';
+function setMeThumb(url) { meThumb = url || ''; $('meIcon').src = meThumb || 'me.svg'; for (const i of document.querySelectorAll('img[data-me]')) i.src = meThumb || 'me.svg'; }
 function setHerThumb(url) { herThumb = url; try { localStorage.setItem('brenai.thumb', url); } catch {} for (const i of document.querySelectorAll('img[data-her]')) i.src = url; }
 function addError(msg) { const d = document.createElement('div'); d.className = 'line err'; d.textContent = msg; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
@@ -411,7 +419,7 @@ async function load() {
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
   for (const e of s.log) e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text);
-  plan = s.plan || null; setPresence(s.away, s.glow, true); if (s.depart === 'say') depart();
+  setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); if (s.depart === 'say') depart();
 }
 function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
@@ -569,6 +577,17 @@ function drawActs() {
     });
   }
 }
+$('meIcon').onclick = () => $('mePick').click();
+$('mePick').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = URL.createObjectURL(f); });
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S; const side = Math.min(img.width, img.height);   // centre square, 256 px
+    c.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, S, S);
+    const r = await api('/api/me-avatar', { image: c.toDataURL('image/jpeg', 0.86) }); const d = await r.json();
+    if (r.ok) setMeThumb(d.me); else addError(d.error || 'That picture could not be used.');
+  } catch { addError('That picture could not be opened.'); }
+};
 $('actBtn').onclick = ev => { ev.stopPropagation(); $('meBox').classList.toggle('fan'); };
 addEventListener('pointerdown', ev => { if (!ev.target.closest('#meBox')) $('meBox').classList.remove('fan'); });
 
