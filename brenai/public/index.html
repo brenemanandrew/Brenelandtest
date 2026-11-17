@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>Brenai</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/addons/", "@pixiv/three-vrm": "/vendor/three-vrm.module.min.js" } }</script>
 <style>
   :root { --bg:#0f0c14; --panel:#1a1522; --line:#3a3046; --text:#e9e4f0; --dim:#9b92a8; --me:#6fa8ff; --her:#ff6b7a; --act:#b79cff; --balloon:#e0566a; --av:104px; }
   * { box-sizing: border-box; }
@@ -75,7 +76,7 @@
   #ring { position:relative; width:280px; height:280px; margin:24px auto 8px; }
   #ring .hub { position:absolute; left:90px; top:90px; width:100px; height:100px; border-radius:50%; overflow:hidden; border:2px solid #4a3a66; cursor:pointer; }
   #ring .hub svg { pointer-events:none; }
-  #ring .seg { position:absolute; width:76px; height:76px; margin:-38px 0 0 -38px; border-radius:50%; border:1px solid #4a3a66; background:#221a2e;
+  #ring .seg { position:absolute; width:72px; height:72px; margin:-36px 0 0 -36px; border-radius:50%; border:1px solid #4a3a66; background:#221a2e;
                color:var(--text); font:600 12px/1.15 system-ui, sans-serif; display:grid; place-items:center; text-align:center; padding:4px; cursor:pointer; }
   #ring .seg.on { background:#4b3672; }
   #ring .seg small { display:block; font-weight:400; color:var(--dim); font-size:11px; }
@@ -208,7 +209,7 @@ async function api(path, body) {
 
 async function load() {
   const r = await api('/api/state'); const s = await r.json();
-  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood);
+  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
   for (const e of s.log) addLine(e.who, e.text);
 }
@@ -254,6 +255,18 @@ input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) {
 sendBtn.onclick = () => send();
 
 // Action buttons: things you do; she reacts. (Later these can also drive the avatar directly.)
+// Which picture she uses: the cartoon, or the uploaded 3D model. Swaps live; the cartoon stays up until the model is ready.
+let avatarShown = 'puppet', avatarNote = '';
+async function applyAvatar() {
+  const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + settings.avatarV : 'puppet';
+  if (want === avatarShown) return; avatarShown = want; avatarNote = '';
+  if (want === 'puppet') return avatar.setRenderer(null);
+  try {
+    const m = await import('./avatar-vrm.js'); const r = await m.create('/api/avatar?v=' + settings.avatarV);
+    if (avatarShown === want) avatar.setRenderer(r); else r.dispose();
+  } catch (e) { console.error(e); if (avatarShown === want) { avatarShown = 'puppet'; avatarNote = 'The 3D model could not be shown on this device (' + e.message + '). Showing the cartoon.'; avatar.setRenderer(null); } }
+}
+
 function drawActs() {
   const row = $('acts'); row.textContent = '';
   for (const [name, act] of settings.acts || []) { const b = document.createElement('button'); b.textContent = name; b.title = act; b.onclick = () => send('*' + act + '*'); row.appendChild(b); }
@@ -346,6 +359,7 @@ const SEGS = [
   { k: 'bleep', name: 'Bleep', sub: () => settings.bleep ? 'on' : 'off', toggle: 'bleep' },
   { k: 'sheet', name: 'Character', sub: () => sheet ? 'rapport ' + sheet.rapport : '' },
   { k: 'secret', name: 'Hidden likes', sub: () => sheet ? sheet.hiddenLikes.length + '' : '' },
+  { k: 'avatar', name: 'Avatar', sub: () => settings.avatarKind === 'vrm' ? '3D model' : 'cartoon' },
   { k: 'voice', name: 'Talk to text', sub: () => !voice.supported ? 'n/a' : voice.on ? voice.wait + 's' : 'off' },
 ];
 function drawRing() {
@@ -354,7 +368,7 @@ function drawRing() {
   SEGS.forEach((g, i) => {
     const a = -Math.PI / 2 + i * 2 * Math.PI / SEGS.length;
     const b = el('div', { className: 'seg' + (g.toggle && settings[g.toggle] ? ' on' : '') });
-    b.style.left = (140 + 105 * Math.cos(a)) + 'px'; b.style.top = (140 + 105 * Math.sin(a)) + 'px';
+    b.style.left = (140 + 112 * Math.cos(a)) + 'px'; b.style.top = (140 + 112 * Math.sin(a)) + 'px';
     b.append(g.name, el('small', { textContent: g.sub() }));
     b.onclick = () => g.toggle ? saveSettings({ settings: { [g.toggle]: !settings[g.toggle] } }) : openPanel(g.k);
     ring.append(b);
@@ -418,6 +432,24 @@ function openPanel(k) {
     const nt = el('textarea', { rows: 8, value: notes });
     const saveN = el('button', { className: 'small', textContent: 'Save notes' }); saveN.onclick = () => api('/api/settings', { notes: nt.value }).then(() => { notes = nt.value; saveN.textContent = 'Saved'; });
     p.append(el('label', { textContent: 'Her private notes about you (she rewrites these every few messages; edit or clear them if she picked up something wrong)' }), nt, el('div', { className: 'row' }, saveN));
+  } else if (k === 'avatar') {
+    const is3d = settings.avatarKind === 'vrm';
+    p.append(el('h3', { textContent: 'Avatar' }), el('div', { className: 'note', textContent: 'Now showing: ' + (is3d ? '3D model' + (settings.avatarName ? ' (' + settings.avatarName + ')' : '') : 'the cartoon') + (avatarNote ? '. ' + avatarNote : '') }));
+    const file = el('input', { type: 'file', accept: '.vrm' }); file.style.display = 'none';
+    const pick = el('button', { className: 'small', textContent: settings.avatarV ? 'Replace 3D model (.vrm)' : 'Upload 3D model (.vrm)' }); pick.onclick = () => file.click();
+    const status = el('div', { className: 'note' });
+    file.onchange = async () => {
+      const f = file.files[0]; if (!f) return;
+      pick.disabled = true; status.textContent = 'Uploading ' + (f.size / 1e6).toFixed(1) + ' MB...';
+      try {
+        const r = await fetch('/api/avatar', { method: 'POST', headers: { 'content-type': 'application/octet-stream', 'x-name': encodeURIComponent(f.name) }, body: f });
+        const d = await r.json(); if (!r.ok) throw new Error(d.error || 'upload failed');
+        settings = d.settings; status.textContent = 'Uploaded. Loading her in...'; await applyAvatar(); drawRing(); openPanel('avatar');
+      } catch (e) { status.textContent = e.message; pick.disabled = false; }
+    };
+    const row = el('div', { className: 'row' }, pick);
+    if (settings.avatarV) { const sw = el('button', { className: 'small', textContent: is3d ? 'Use the cartoon' : 'Use the 3D model' }); sw.onclick = () => saveSettings({ settings: { avatarKind: is3d ? 'puppet' : 'vrm' } }).then(() => openPanel('avatar')); row.append(sw); }
+    p.append(row, file, status, el('div', { className: 'note', textContent: 'VRM files from VRoid Studio work best. The model is stored on your site behind the login, and every device you use picks up the change.' }));
   } else if (k === 'acts') {
     p.append(el('h3', { textContent: 'Action buttons' }), el('div', { className: 'note', textContent: 'Button name on the left, what you do on the right (it shows in the chat as "he ..."). Empty rows are removed.' }));
     const rows = el('div');

@@ -21,6 +21,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
 const DATA_DIR = process.env.DATA_DIR || path.join(here, 'data');
 const STORE = path.join(DATA_DIR, 'brenai.json');
+const AVATAR = path.join(DATA_DIR, 'avatar.vrm');
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
 const PASSWORD = process.env.APP_PASSWORD || ''; // empty = no login (local only)
@@ -256,6 +257,7 @@ function applySettings(body) {
   if (MOODS.includes(s.mood)) S.mood = s.mood;
   for (const k of ['expressiveness', 'temperature']) if (Number.isFinite(+s[k])) S[k] = Math.max(0, Math.min(100, Math.round(+s[k])));
   if (['short', 'medium', 'long'].includes(s.length)) S.length = s.length;
+  if (s.avatarKind === 'puppet' || (s.avatarKind === 'vrm' && fs.existsSync(AVATAR))) S.avatarKind = s.avatarKind;
   if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140)]).filter(x => x[0] && x[1]).slice(0, 16);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
   if (typeof body.notes === 'string') db.profile = body.notes.slice(0, 6000);
@@ -306,6 +308,28 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile });
       }
 
+      // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
+      if (url.pathname === '/api/avatar') {
+        if (req.method === 'GET') {
+          if (!fs.existsSync(AVATAR)) return json(res, 404, { error: 'no model' });
+          res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(AVATAR).size, 'cache-control': 'private, max-age=31536000, immutable' });
+          return fs.createReadStream(AVATAR).pipe(res);
+        }
+        if (req.method === 'POST') {
+          const tmp = AVATAR + '.upload'; let size = 0, magic = null, tooBig = false;
+          const out = fs.createWriteStream(tmp);
+          await new Promise((resolve, reject) => {
+            req.on('data', c => { if (!magic) magic = c.subarray(0, 4).toString('latin1'); size += c.length; if (size > 120e6) { tooBig = true; req.destroy(); out.destroy(); resolve(); } });
+            req.pipe(out); out.on('finish', resolve); out.on('error', reject); req.on('error', reject);
+          });
+          if (tooBig || magic !== 'glTF' || size < 1000) { fs.rmSync(tmp, { force: true }); return json(res, 400, { error: tooBig ? 'That file is over 120 MB.' : 'That is not a .vrm model file.' }); }
+          fs.renameSync(tmp, AVATAR);
+          Object.assign(db.settings, { avatarKind: 'vrm', avatarV: Date.now(), avatarName: decodeURIComponent(String(req.headers['x-name'] || 'model.vrm')).slice(0, 80) });
+          save();
+          return json(res, 200, { settings: db.settings });
+        }
+      }
+
       if (url.pathname === '/api/touch' && req.method === 'POST') {
         const { kind } = await readBody(req);
         if (TOUCH[kind] && touches.length < 40) touches.push({ kind, at: Date.now() });
@@ -354,7 +378,7 @@ const server = http.createServer(async (req, res) => {
     if (!file.startsWith(path.join(here, 'public'))) return json(res, 403, { error: 'no' });
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); return res.end('not found'); }
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
+      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', ...(p.startsWith('vendor') ? { 'cache-control': 'public, max-age=604800' } : {}) });
       res.end(data);
     });
   } catch (e) {

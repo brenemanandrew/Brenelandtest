@@ -7,6 +7,7 @@
 //   av.setThinking(bool)   she is working on a reply
 //   av.talk()              call on every chunk of her reply while it streams (moves the mouth)
 //   av.feel(text)          her reply so far: picks a passing expression from her words and actions
+//   av.setRenderer(r)    swap what draws her, live (the cartoon below, or the 3D model from avatar-vrm.js)
 //   mount(el, { onTouch(kind) })  onTouch fires when she is touched directly (the page passes it on to her, silently)
 //   av.react(kind, dir)    something was done to her: poke, boop, pat, pet, swat, body, spam, wave, laugh, stare, gift
 // Touch on the avatar itself (tap, stroke, swipe) is handled in here and calls react().
@@ -36,7 +37,6 @@
     <path d="M61 104 C52 30 148 30 139 104 C137 90 131 81 121 77 L115 84 L108 76 L100 84 L92 76 L85 84 L79 77 C69 81 63 90 61 104 Z" fill="${HAIR}"/>
     <path d="M62 96 L57 138 L70 132 Z" fill="${HAIR}"/><path d="M138 96 L143 138 L130 132 Z" fill="${HAIR}"/>
   </g>
-  <text data-p="emote" x="150" y="62" font-size="26" text-anchor="middle" opacity="0"></text>
 </svg>`;
 
   // ---- face shapes ----
@@ -73,10 +73,45 @@
     [/nervous|fidget|bites her lip|\bum+\b|\buh+\b/i, 'anxious'], [/squint|narrow(s|ed)? her eyes|suspicious|side-?eye/i, 'suspicious'], [/!!|omg|oh my god|no way|yes!/i, 'excited'], [/hmm+|thinks|ponder|considers/i, 'thinking'],
   ];
 
-  function mount(stage, opts = {}) {
-    stage.innerHTML = MARKUP;
-    const svg = stage.firstElementChild, P = {};
+  // ---- the cartoon renderer. A renderer draws the state the controller hands it and says where a touch landed. ----
+  // locate() answers in "puppet space": a 200 x 200 square with the face centre at (100,100), the nose at (100,108),
+  // hair above y 80 and the body below y 150. Any other renderer maps its own picture onto the same square.
+  function puppet(stage) {
+    const wrap = document.createElement('div'); wrap.style.cssText = 'width:100%;height:100%'; wrap.innerHTML = MARKUP; stage.appendChild(wrap);
+    const svg = wrap.firstElementChild, P = {}; let shown = '';
     svg.querySelectorAll('[data-p]').forEach(n => { P[n.dataset.p] = n; });
+    return {
+      locate(e) { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 200, y: (e.clientY - r.top) / r.height * 200 }; },
+      dispose() { wrap.remove(); },
+      draw({ face, lid, mouth, look, rot, tx, ty, sq, breathe }) {
+        const key = lid + face.brow + mouth;
+        if (key !== shown) {
+          shown = key;
+          P.lidL.setAttribute('d', (LID[lid] || LID[lid + 'L'])(87)); P.lidR.setAttribute('d', (LID[lid] || LID[lid + 'R'])(113));
+          const eyes = ['open', 'wide', 'half'].includes(lid) ? '' : 'none';
+          for (const n of ['irisL', 'irisR', 'glintL', 'glintR']) P[n].style.display = eyes;
+          P.browL.setAttribute('d', BROW[face.brow][0]); P.browR.setAttribute('d', BROW[face.brow][1]);
+          P.mouth.setAttribute('d', MOUTH[mouth]); P.mouth.setAttribute('fill', mouth === 'wavy' ? 'none' : LIP);
+        }
+        for (const [n, cx] of [['L', 87], ['R', 113]]) {
+          P['iris' + n].setAttribute('cx', cx + look.x); P['iris' + n].setAttribute('cy', 100 + look.y); P['iris' + n].setAttribute('ry', lid === 'half' ? 3 : 4.2);
+          P['glint' + n].setAttribute('cx', cx + 1.3 + look.x); P['glint' + n].setAttribute('cy', 98.6 + look.y);
+        }
+        const blush = face.blush || 0; P.blushL.setAttribute('opacity', blush); P.blushR.setAttribute('opacity', blush);
+        // head: springs + pose + breathing; the back hair lags behind for a little sway
+        P.head.setAttribute('transform', `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) rotate(${rot.toFixed(2)} 100 140) translate(0 ${(140 * (1 - sq)).toFixed(2)}) scale(1 ${sq.toFixed(3)})`);
+        P.hairBack.setAttribute('transform', `translate(${(tx * 0.5).toFixed(2)} ${(ty * 0.5).toFixed(2)}) rotate(${(rot * 0.45).toFixed(2)} 100 140)`);
+        P.body.setAttribute('transform', `translate(0 ${(200 * -0.006 * breathe).toFixed(2)}) scale(1 ${(1 + 0.006 * breathe).toFixed(4)})`);
+      },
+    };
+  }
+
+  // ---- the controller: moods, passing expressions, touch, her reserve, the springs. The same for every renderer. ----
+  function mount(stage, opts = {}) {
+    stage.textContent = ''; stage.style.position = 'relative';
+    let R = puppet(stage);
+    const em = document.createElement('div'); em.style.cssText = 'position:absolute;right:8%;top:8%;font-size:calc(var(--emote, 1) * 22px);line-height:1;opacity:0;pointer-events:none;z-index:2;width:auto;height:auto';
+    stage.appendChild(em);
     let mood = 'neutral', temp = null, tempUntil = 0, thinking = false, talkUntil = 0, emoteUntil = 0;
     let blinkAt = performance.now() + 2000, blinkEnd = 0, glanceAt = 0, gaze = { x: 0, y: 0 }, look = { x: 0, y: 0 }, pointerLook = null, pointerLookUntil = 0;
     const sp = { rot: { x: 0, v: 0 }, tx: { x: 0, v: 0 }, ty: { x: 0, v: 0 }, sq: { x: 0, v: 0 } }; // springs, rest at 0
@@ -84,7 +119,7 @@
     const now = () => performance.now();
 
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
-    function emote(ch, ms = 1400) { P.emote.textContent = ch; emoteUntil = now() + ms; }
+    function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; }
     function kick(rot = 0, tx = 0, ty = 0, sq = 0) { sp.rot.v += rot; sp.tx.v += tx; sp.ty.v += ty; sp.sq.v += sq; }
     // Her reserve: touches add up. irk rises with pokes and swats, fond with pats and pets; both fade over a few minutes.
     // Enough of either changes her resting face and how she takes the next touch.
@@ -113,9 +148,9 @@
 
     // ---- touch: tap (where?), stroke over the hair (pet), fast swipe (swat) ----
     let down = null;
-    const at = e => { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 200, y: (e.clientY - r.top) / r.height * 200 }; };
-    svg.addEventListener('pointerdown', e => { const p = at(e); down = { ...p, sx: p.x, t: now(), path: 0, pet: 0 }; try { svg.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
-    svg.addEventListener('pointermove', e => {
+    const at = e => R.locate(e);
+    stage.addEventListener('pointerdown', e => { const p = at(e); down = { ...p, sx: p.x, t: now(), path: 0, pet: 0 }; try { stage.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
+    stage.addEventListener('pointermove', e => {
       const p = at(e); pointerLook = { x: (p.x - 100) / 30, y: (p.y - 100) / 34 }; pointerLookUntil = now() + 1500;
       if (!down) return;
       const d = Math.hypot(p.x - down.x, p.y - down.y); down.path += d;
@@ -134,47 +169,33 @@
       if (p.y < 80) return touched('pat');
       touched('poke', p.x < 100 ? -1 : 1);
     };
-    svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', () => { down = null; });
+    stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', () => { down = null; });
 
     // ---- the frame loop ----
-    let last = now(), shown = '';
+    let last = now();
     function frame() {
       const t = now(), dt = Math.min(0.05, (t - last) / 1000); last = t;
       for (const k in sp) { const s = sp[k]; s.v += (-170 * s.x - 13 * s.v) * dt; s.x += s.v * dt; }
       irk *= Math.exp(-dt / 90); fond *= Math.exp(-dt / 120);
       const rest = irk >= 2.4 ? 'grumpy' : fond >= 3 && irk < 1.5 ? 'happy' : mood;
-      const face = FACE[(t < tempUntil && temp) || (thinking ? 'thinking' : rest)] || FACE.neutral;
+      const faceName = (t < tempUntil && temp) || (thinking ? 'thinking' : rest);
+      const face = FACE[faceName] || FACE.neutral;
       const talking = t < talkUntil;
       if (t > blinkAt) { blinkEnd = t + 130; blinkAt = t + 1800 + Math.random() * 4200; }
       const blink = t < blinkEnd && !['smile', 'squint', 'dizzy'].includes(face.lid);
       const lid = blink ? 'shut' : face.lid;
-      const mouth = talking ? ((t / 130 | 0) % 3 === 0 ? face.mouth : (t / 130 | 0) % 3 === 1 ? 'talk' : 'talk2') : face.mouth;
-      const key = lid + face.brow + mouth;
-      if (key !== shown) {
-        shown = key;
-        P.lidL.setAttribute('d', (LID[lid] || LID[lid + 'L'])(87)); P.lidR.setAttribute('d', (LID[lid] || LID[lid + 'R'])(113));
-        const eyes = ['open', 'wide', 'half'].includes(lid) ? '' : 'none';
-        for (const n of ['irisL', 'irisR', 'glintL', 'glintR']) P[n].style.display = eyes;
-        P.browL.setAttribute('d', BROW[face.brow][0]); P.browR.setAttribute('d', BROW[face.brow][1]);
-        P.mouth.setAttribute('d', MOUTH[mouth]); P.mouth.setAttribute('fill', mouth === 'wavy' ? 'none' : LIP);
-      }
+      const phase = (t / 130 | 0) % 3;
+      const mouth = talking ? (phase === 0 ? face.mouth : phase === 1 ? 'talk' : 'talk2') : face.mouth;
       // eyes: follow the pointer for a moment, else the expression's resting gaze, else a slow idle glance
       if (t > glanceAt) { gaze = Math.random() < 0.5 ? { x: 0, y: 0 } : { x: (Math.random() - 0.5) * 4, y: (Math.random() - 0.5) * 2 }; glanceAt = t + 1500 + Math.random() * 3000; }
       const want = t < pointerLookUntil && pointerLook ? pointerLook : (face.gx || face.gy) ? { x: face.gx || 0, y: face.gy || 0 } : gaze;
       look.x += (Math.max(-3, Math.min(3, want.x)) - look.x) * Math.min(1, dt * 10); look.y += (Math.max(-3, Math.min(2.5, want.y)) - look.y) * Math.min(1, dt * 10);
-      for (const [n, cx] of [['L', 87], ['R', 113]]) {
-        P['iris' + n].setAttribute('cx', cx + look.x); P['iris' + n].setAttribute('cy', 100 + look.y); P['iris' + n].setAttribute('ry', lid === 'half' ? 3 : 4.2);
-        P['glint' + n].setAttribute('cx', cx + 1.3 + look.x); P['glint' + n].setAttribute('cy', 98.6 + look.y);
-      }
-      const blush = face.blush || 0; P.blushL.setAttribute('opacity', blush); P.blushR.setAttribute('opacity', blush);
-      // head: springs + pose + breathing; the back hair lags behind for a little sway
       const breathe = Math.sin(t / 900), rot = sp.rot.x * 0.06 + (face.tilt || 0) + (talking ? Math.sin(t / 160) * 0.8 : 0);
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
-      P.head.setAttribute('transform', `translate(${tx.toFixed(2)} ${ty.toFixed(2)}) rotate(${rot.toFixed(2)} 100 140) translate(0 ${(140 * (1 - sq)).toFixed(2)}) scale(1 ${sq.toFixed(3)})`);
-      P.hairBack.setAttribute('transform', `translate(${(tx * 0.5).toFixed(2)} ${(ty * 0.5).toFixed(2)}) rotate(${(rot * 0.45).toFixed(2)} 100 140)`);
-      P.body.setAttribute('transform', `translate(0 ${(200 * -0.006 * breathe).toFixed(2)}) scale(1 ${(1 + 0.006 * breathe).toFixed(4)})`);
-      const eo = Math.max(0, Math.min(1, (emoteUntil - t) / 300)); P.emote.setAttribute('opacity', eo); P.emote.setAttribute('y', 62 - (1 - eo) * 6);
-      if (svg.isConnected) requestAnimationFrame(frame);
+      try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, look, rot, tx, ty, sq, breathe }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
+      const eo = Math.max(0, Math.min(1, (emoteUntil - t) / 300)); em.style.opacity = eo; em.style.transform = `translateY(${(eo - 1) * 6}px)`;
+      em.style.setProperty('--emote', Math.max(1, stage.clientWidth / 104));
+      if (stage.isConnected) requestAnimationFrame(frame); else R.dispose();
     }
     requestAnimationFrame(frame);
 
@@ -184,7 +205,9 @@
       talk() { talkUntil = now() + 350; thinking = false; },
       feel(text) { text = String(text).slice(-140); for (const [re, face] of FEEL) if (re.test(text)) { show(face, 5000); return face; } return null; },
       react,
+      // swap the picture live; null goes back to the cartoon
+      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); },
     };
   }
-  window.WizraAvatar = { mount, markup: MARKUP };
+  window.WizraAvatar = { mount };
 })();
