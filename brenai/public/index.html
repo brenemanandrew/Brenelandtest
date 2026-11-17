@@ -134,14 +134,24 @@ const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 let myName = 'You';
 
-// "*waves* hey" -> segments; actions are inside asterisks, speech is everything else
-function split(text) {
-  const out = []; const re = /\*([^*]+)\*/g; let last = 0, m;
-  while ((m = re.exec(text))) { if (m.index > last) out.push({ s: text.slice(last, m.index) }); out.push({ a: m[1] }); last = re.lastIndex; }
-  if (last < text.length) out.push({ s: text.slice(last) });
+// "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
+// an asterisk that never closes (her reply is still streaming, or the model forgot), and for Wizra a sentence that
+// narrates her in third person without asterisks ("She crosses her arms.").
+const NARR = /^\s*(she|wizra)\s+[a-z']+(s|ed)\b/i;
+function split(text, who) {
+  const out = []; const re = /\*([^*]+)\*|\*([^*]*)$/g; let last = 0, m;
+  const say = t => {
+    if (who !== 'her') { if (t) out.push({ s: t }); return; }
+    for (const sent of t.match(/[^.!?\n]+[.!?]*["')]*\s*|\n+/g) || []) {
+      if (NARR.test(sent)) out.push({ a: sent.trim() });
+      else if (out.length && out[out.length - 1].s !== undefined) out[out.length - 1].s += sent; else out.push({ s: sent });
+    }
+  };
+  while ((m = re.exec(text))) { if (m.index > last) say(text.slice(last, m.index)); const a = (m[1] ?? m[2]).trim(); if (a) out.push({ a }); last = re.lastIndex; }
+  if (last < text.length) say(text.slice(last));
   return out;
 }
-const speechOf = text => split(text).filter(p => p.s).map(p => p.s).join(' ').replace(/\s+/g, ' ').trim();
+const speechOf = (text, who) => split(text, who).filter(p => p.s).map(p => p.s).join(' ').replace(/["“”]/g, '').replace(/\s+/g, ' ').trim();
 
 // Bleep filter (display only; what she actually said is kept). Covers common words and their -ing/-ed/-s forms.
 const CUSS = /\b(f+u+c+k\w*|motherf\w*|sh[i1]t\w*|bullshit\w*|bitch\w*|bastard\w*|ass(hole|holes|hat|es)?|dumbass\w*|jackass\w*|damn\w*|goddamn\w*|hell|crap\w*|piss\w*|dick\w*|cock\w*|prick\w*|cunt\w*|twat\w*|wtf|stfu|lmfao)\b/gi;
@@ -157,7 +167,7 @@ function actLine(who, a) {
 function fill(el, text) {
   const who = el.dataset.who;
   el.textContent = '';
-  for (const p of split(clean(text))) {
+  for (const p of split(clean(text), who)) {
     const t = (p.a ? actLine(who, p.a) : p.s).trim(); if (!t) continue;
     const d = document.createElement('div'); d.className = p.a ? 'act' : 'say'; d.textContent = t; el.appendChild(d);
   }
@@ -177,7 +187,7 @@ const timers = {};
 function hideLater(which, ms) { clearTimeout(timers[which]); timers[which] = setTimeout(() => $(which + 'Wrap').classList.remove('show'), ms); }
 function bubble(which, text, keep) {
   const el = $(which + 'Bubble'), wrap = $(which + 'Wrap');
-  const speech = clean(speechOf(text));
+  const speech = clean(speechOf(text, which));
   clearTimeout(timers[which]);
   if (!speech) { wrap.classList.remove('show'); return; }
   el.textContent = speech; wrap.classList.add('show');

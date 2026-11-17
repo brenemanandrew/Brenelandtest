@@ -129,7 +129,7 @@ async function replyLocal(userText, onDelta) {
   let budget = CONTEXT_TOKENS - toks(system) - REPLY_TOKENS - 200;
   const L = LENGTHS[db.settings.length] || LENGTHS.short;
   // The reminder rides on the newest turn only (never stored): local roleplay models follow what is closest to their reply.
-  const turns = [{ role: 'user', content: `[${STAMP()} Eastern] ${userText}\n\n[Reply as Wizra only, ${L.say}. At most one short action in asterisks. Say something new: do not reuse an action, phrase or question from your earlier replies.]` }];
+  const turns = [{ role: 'user', content: `[${STAMP()} Eastern] ${userText}\n\n[Reply as Wizra only, ${L.say}. At most one short action, and it must be inside *asterisks*; everything outside asterisks is words you say out loud, never narration. Say something new: do not reuse an action, phrase or question from your earlier replies.]` }];
   budget -= toks(turns[0].content);
   for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
     const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: e.text };
@@ -162,7 +162,7 @@ function cleanLocal(t) {
   const cut = t.search(new RegExp('\\n\\s*' + USER_NAME + '\\s*:', 'i'));
   t = (cut > 0 ? t.slice(0, cut) : t).replace(/\n\s*\[[^\]]*$/, '').trim();
   // cut off by the length cap: drop the unfinished action, then the unfinished sentence
-  if ((t.match(/\*/g) || []).length % 2) t = t.slice(0, t.lastIndexOf('*')).trim();
+  if ((t.match(/\*/g) || []).length % 2) { const c = t.slice(0, t.lastIndexOf('*')).trim(); t = c.length > 20 ? c : t + '*'; }
   if (t && !/[.!?*"')\u2026~]$/.test(t)) { const m = t.match(/^[\s\S]*[.!?*"')\u2026]/); if (m && m[0].length > 20) t = m[0]; }
   return t.trim();
 }
