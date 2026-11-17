@@ -136,13 +136,14 @@ export async function create(url) {
 
   const em = vrm.expressionManager, has = n => em && em.getExpression(n);
   const w = {}; for (const n of NAMES) w[n] = 0;
-  let size = '';
+  let size = '', thumbCb = null;
   const v3 = new THREE.Vector3();
   const project = (x, y, z) => { const r = renderer.domElement.getBoundingClientRect(); v3.set(x, y, z).project(camera); return { x: r.left + (v3.x + 1) / 2 * r.width, y: r.top + (1 - v3.y) / 2 * r.height }; };
   const UNIT = 0.0027; // metres per puppet-space unit (her face is about 80 units tall there)
 
   return {
     el,
+    thumb(cb) { thumbCb = cb; },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
     zoom(d) { if (!document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
     locate(e) { // screen -> puppet space, measured from her eye line
@@ -172,6 +173,7 @@ export async function create(url) {
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY;
       vrm.update(s.dt); // spring bones: hair and clothes swing with the head
       renderer.render(scene, camera);
+      if (thumbCb && zoom < 0.03 && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
     },
     dispose() { el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
   };

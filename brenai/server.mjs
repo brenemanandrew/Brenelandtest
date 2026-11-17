@@ -280,7 +280,7 @@ function applySettings(body) {
   if (['short', 'medium', 'long'].includes(s.length)) S.length = s.length;
   if (typeof s.ttsVoice === 'string' && /^[a-z]{2}_[a-z0-9_]{1,24}$/.test(s.ttsVoice)) S.ttsVoice = s.ttsVoice;
   if (s.avatarKind === 'puppet' || (s.avatarKind === 'vrm' && fs.existsSync(AVATAR))) S.avatarKind = s.avatarKind;
-  if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140)]).filter(x => x[0] && x[1]).slice(0, 16);
+  if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140), String(x[2] || '').trim().slice(0, 8)]).filter(x => x[0] && x[1]).slice(0, 18);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
   if (typeof body.notes === 'string') db.profile = body.notes.slice(0, 6000);
   const h = body.sheet || {}, H = db.sheet;

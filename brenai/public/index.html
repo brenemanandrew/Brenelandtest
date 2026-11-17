@@ -153,6 +153,47 @@
   #login { background:linear-gradient(170deg,#1f1a4a,#6a3586); }
   #login input, #login button { background:rgba(255,255,255,.12); border-radius:999px; }
   #login button { background:var(--grad); border:0; font-weight:700; }
+
+  /* ================= layout 3 (Andrew's sketch, 2026-11-17 evening) ================= */
+  :root { --me:92px; --band:54px; --pic:36px; }
+  #app { grid-template-rows: auto auto 1fr auto auto; }
+  #logWrap { position:relative; min-height:0; border:1px solid var(--line); border-radius:20px; background:rgba(20,12,45,.38); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); overflow:hidden; }
+  /* the chat text never shows in the corner your portrait covers: that corner of the scroller is masked out, and the
+     newest message always stops above it */
+  #log { height:100%; border:0; border-radius:0; background:none; backdrop-filter:none; -webkit-backdrop-filter:none; padding:10px 12px calc(var(--me) - var(--band) + 10px) 12px;
+    --cw:calc(var(--me) + 16px); --ch:calc(var(--me) - var(--band) + 4px);
+    -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - var(--ch)) no-repeat, linear-gradient(#000 0 0) bottom left / calc(100% - var(--cw)) var(--ch) no-repeat;
+            mask: linear-gradient(#000 0 0) top / 100% calc(100% - var(--ch)) no-repeat, linear-gradient(#000 0 0) bottom left / calc(100% - var(--cw)) var(--ch) no-repeat; }
+  .msg { grid-template-columns: var(--pic) 1fr; column-gap:10px; margin:12px 0; align-items:start; }
+  .msg .pic { width:var(--pic); height:var(--pic); border-radius:50%; object-fit:cover; background:#2f2256; box-shadow:0 0 0 2px #fff; }
+  .msg.her .pic { box-shadow:0 0 0 2px var(--her); } .msg.me .pic { box-shadow:0 0 0 2px var(--me); }
+  .msg .body { min-width:0; padding-top:calc((var(--pic) - 1.4em) / 2); }
+  .msg .say { margin-bottom:4px; }
+  .msg .act { display:block; width:fit-content; max-width:100%; padding:3px 14px; margin:4px 0; border:1.5px solid #fff; border-radius:999px; font-style:normal; font-weight:700; }
+  .msg.her .act { color:var(--her); } .msg.me .act { color:var(--me); }
+  #bottom { grid-template-columns: 1fr var(--me); grid-template-rows: var(--band); height:var(--band); align-items:center; gap:10px; position:relative; z-index:3; }
+  .bwrap.me .balloon { max-height:var(--band); }
+  #meBox { position:relative; width:var(--me); height:var(--me); align-self:end; }
+  #meIcon { width:100%; height:100%; display:block; }
+  #actBtn { position:absolute; left:-12px; top:-12px; width:40px; height:40px; border-radius:50%; border:0; background:var(--grad); color:#fff; font-size:19px; line-height:1; padding:0; box-shadow:0 4px 12px rgba(0,0,0,.35); cursor:pointer; z-index:2; transition:transform .15s; }
+  #meBox.fan #actBtn { transform:rotate(-20deg) scale(1.08); }
+  #actFan { position:absolute; left:8px; top:8px; width:0; height:0; z-index:1; }
+  .fanItem { position:absolute; left:0; top:0; width:48px; height:48px; margin:-24px 0 0 -24px; border-radius:50%; border:0; background:#fff; color:#3a2358; font:inherit; padding:0; display:grid; place-items:center;
+             box-shadow:0 4px 12px rgba(0,0,0,.35); opacity:0; transform:translate(0,0) scale(.3); pointer-events:none; transition:transform .2s cubic-bezier(.3,1.4,.5,1), opacity .15s; cursor:pointer; }
+  #meBox.fan .fanItem { opacity:1; transform:translate(var(--x), var(--y)) scale(1); pointer-events:auto; }
+  .fanItem span { font-size:22px; line-height:1; }
+  .fanItem small { position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:1px; font-size:10px; font-weight:700; color:#fff; white-space:nowrap; text-shadow:0 1px 3px #000, 0 0 6px #000; }
+  #panel .actrow input.ico { flex:0 0 46px; text-align:center; padding:8px 2px; } #panel .actrow input:nth-child(2) { flex:0 0 28%; }
+  /* sized for the screen it is on */
+  @media (min-width:900px) {
+    :root { --av:200px; --me:124px; --band:64px; --pic:44px; }
+    html, body { font-size:17.5px; }
+    #app { max-width:1180px; padding:16px 22px; gap:10px; }
+    .balloon { font-size:17px; padding:12px 20px; }
+    .fanItem { width:54px; height:54px; margin:-27px 0 0 -27px; } .fanItem span { font-size:25px; } .fanItem small { font-size:11px; }
+    #in { min-height:50px; padding:12px 20px; } #mic, #send { width:50px; height:50px; }
+  }
+  @media (max-width:380px) { :root { --av:92px; --me:80px; --band:50px; } }
 </style>
 </head>
 <body>
@@ -167,11 +208,16 @@
     <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
   </div>
   <div id="logHead"><span>CHAT AREA</span><span id="brainDot">...</span></div>
-  <div id="log"></div>
-  <div id="acts"></div>
+  <div id="logWrap"><div id="log"></div></div>
+  <!-- bottom band: your word balloon on the left; your portrait on the right rises over the chat area's corner (the chat
+       text keeps clear of it), with the action wheel button on its top left corner -->
   <div id="bottom">
     <div class="bwrap me" id="meWrap"><div class="balloon" id="meBubble"></div></div>
-    <img id="meIcon" src="me.svg" alt="You">
+    <div id="meBox">
+      <img id="meIcon" src="me.svg" alt="You">
+      <button id="actBtn" title="Do something">&#9995;</button>
+      <div id="actFan"></div>
+    </div>
   </div>
   <div id="bar">
     <span id="barTag">Chat</span>
@@ -189,7 +235,7 @@
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 // Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
-const avatar = WizraAvatar.mount(stage, { onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
+const avatar = WizraAvatar.mount(stage, { onThumb: url => setHerThumb(url), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -230,14 +276,18 @@ function fill(el, text) {
     const d = document.createElement('div'); d.className = p.a ? 'act' : 'say'; d.textContent = t; el.appendChild(d);
   }
 }
+// One message: a small round picture of who it is (a still image), what they said beside it, and each action in its own
+// outlined strip underneath.
+let herThumb = '';
 function addLine(who, text) {
   const div = document.createElement('div'); div.className = 'msg ' + who;
-  const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = who === 'her' ? 'Wizra' : myName;
-  const body = document.createElement('div'); body.dataset.who = who; fill(body, text);
-  div.append(nm, body); log.appendChild(div);
+  const pic = document.createElement('img'); pic.className = 'pic'; pic.alt = who === 'her' ? 'Wizra' : myName; pic.src = who === 'her' ? (herThumb || 'me.svg') : 'me.svg'; if (who === 'her') pic.dataset.her = '1';
+  const body = document.createElement('div'); body.className = 'body'; body.dataset.who = who; fill(body, text);
+  div.append(pic, body); log.appendChild(div);
   log.scrollTop = log.scrollHeight;
   return body;
 }
+function setHerThumb(url) { herThumb = url; for (const i of document.querySelectorAll('img[data-her]')) i.src = url; }
 function addError(msg) { const d = document.createElement('div'); d.className = 'line err'; d.textContent = msg; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
 // Word balloons: speech only. They stay while her reply streams, then fade; scrolling or touching one keeps it up.
@@ -319,13 +369,30 @@ async function applyAvatar() {
   } catch (e) { console.error(e); if (avatarShown === want) { avatarShown = 'puppet'; avatarNote = 'The 3D model could not be shown on this device (' + e.message + '). Showing the cartoon.'; avatar.setRenderer(null); } }
 }
 
+// The action wheel: a fan of icon buttons that opens from the corner of your portrait. Each is something you do; she reacts.
+const ACT_ICONS = [[/wave|hello|\bhi\b/i, '\ud83d\udc4b'], [/poke|prod|jab/i, '\ud83d\udc49'], [/high five/i, '\ud83d\ude4c'], [/laugh|giggle|grin/i, '\ud83d\ude04'], [/nod/i, '\ud83d\ude42'], [/stare|glare|look/i, '\ud83d\udc40'],
+  [/snack|cookie|food|pizza/i, '\ud83c\udf6a'], [/shrug/i, '\ud83e\udd37'], [/hug/i, '\ud83e\udd17'], [/coffee|drink|tea/i, '\u2615'], [/pat|pet|ruffle/i, '\ud83e\udef3'], [/kiss/i, '\ud83d\ude18'], [/dice|roll/i, '\ud83c\udfb2'], [/clap/i, '\ud83d\udc4f'], [/wink/i, '\ud83d\ude09'], [/gift|hand|give/i, '\ud83c\udf81']];
+const iconFor = (name, act, icon) => icon || (ACT_ICONS.find(([re]) => re.test(name + ' ' + act)) || [0, '\u2728'])[1];
 function drawActs() {
-  const row = $('acts'); row.textContent = '';
-  for (const [name, act] of settings.acts || []) { const b = document.createElement('button'); b.textContent = name; b.title = act; b.onclick = () => send('*' + act + '*'); row.appendChild(b); }
-  const e = document.createElement('button'); e.textContent = '\u270e'; e.title = 'Edit these buttons'; e.className = 'edit';
-  e.onclick = () => openWheel().then(() => openPanel('acts')).catch(() => {});
-  row.appendChild(e);
+  const fan = $('actFan'); fan.textContent = '';
+  const items = (settings.acts || []).map(([name, act, icon]) => ({ icon: iconFor(name, act, icon), name, go: () => send('*' + act + '*') }));
+  items.push({ icon: '\u270e', name: 'Edit', go: () => openWheel().then(() => openPanel('acts')).catch(() => {}) });
+  // rings of a quarter circle, opening up and to the left of the button
+  const rings = [[3, 64], [4, 122], [6, 180], [8, 238]]; let i = 0;
+  for (const [count, r] of rings) {
+    const here = items.slice(i, i + count); i += count;
+    here.forEach((it, k) => {
+      const ang = (176 + (here.length === 1 ? 47 : k * 98 / (here.length - 1))) * Math.PI / 180;
+      const b = document.createElement('button'); b.className = 'fanItem'; b.title = it.name;
+      b.style.setProperty('--x', (r * Math.cos(ang)).toFixed(1) + 'px'); b.style.setProperty('--y', (r * Math.sin(ang)).toFixed(1) + 'px'); b.style.transitionDelay = (i * 6 + k * 14) + 'ms';
+      const ic = document.createElement('span'); ic.textContent = it.icon; const lb = document.createElement('small'); lb.textContent = it.name;
+      b.append(ic, lb); b.onclick = ev => { ev.stopPropagation(); $('meBox').classList.remove('fan'); it.go(); };
+      fan.appendChild(b);
+    });
+  }
 }
+$('actBtn').onclick = ev => { ev.stopPropagation(); $('meBox').classList.toggle('fan'); };
+addEventListener('pointerdown', ev => { if (!ev.target.closest('#meBox')) $('meBox').classList.remove('fan'); });
 
 // The avatar: tap to expand to a big view, tap again (or outside) to shrink.
 $('bigBtn').onclick = () => document.body.classList.toggle('big');
@@ -575,16 +642,17 @@ function openPanel(k) {
     if (settings.avatarV) { const sw = el('button', { className: 'small', textContent: is3d ? 'Use the cartoon' : 'Use the 3D model' }); sw.onclick = () => saveSettings({ settings: { avatarKind: is3d ? 'puppet' : 'vrm' } }).then(() => openPanel('avatar')); row.append(sw); }
     p.append(row, file, status, el('div', { className: 'note', textContent: 'VRM files from VRoid Studio work best. The model is stored on your site behind the login, and every device you use picks up the change.' }));
   } else if (k === 'acts') {
-    p.append(el('h3', { textContent: 'Action buttons' }), el('div', { className: 'note', textContent: 'Button name on the left, what you do on the right (it shows in the chat as "he ..."). Empty rows are removed.' }));
+    p.append(el('h3', { textContent: 'Action wheel' }), el('div', { className: 'note', textContent: 'Icon (any emoji), name, and what you do (it shows in the chat as "he ..."). Empty rows are removed.' }));
     const rows = el('div');
-    const addRow = (n = '', a = '') => {
-      const x = el('button', { className: 'small', textContent: '\u00d7' }); const r = el('div', { className: 'row actrow' }, el('input', { type: 'text', value: n, placeholder: 'Name', maxLength: 20 }), el('input', { type: 'text', value: a, placeholder: 'what you do, e.g. waves at her', maxLength: 140 }), x);
+    const addRow = (n = '', a = '', ic = '') => {
+      const x = el('button', { className: 'small', textContent: '\u00d7' });
+      const r = el('div', { className: 'row actrow' }, el('input', { type: 'text', value: ic || (n ? iconFor(n, a, '') : ''), placeholder: '\u2728', maxLength: 8, className: 'ico' }), el('input', { type: 'text', value: n, placeholder: 'Name', maxLength: 20 }), el('input', { type: 'text', value: a, placeholder: 'what you do, e.g. waves at her', maxLength: 140 }), x);
       x.onclick = () => r.remove(); rows.append(r);
     };
-    for (const [n, a] of settings.acts || []) addRow(n, a);
+    for (const [n, a, ic] of settings.acts || []) addRow(n, a, ic);
     const add = el('button', { className: 'small', textContent: '+ Add button' }); add.onclick = () => addRow();
     const save = el('button', { className: 'small', textContent: 'Save' });
-    save.onclick = () => saveSettings({ settings: { acts: [...rows.children].map(r => [...r.querySelectorAll('input')].map(i => i.value)) } }).then(closeWheel);
+    save.onclick = () => saveSettings({ settings: { acts: [...rows.children].map(r => { const [ic, n, a] = [...r.querySelectorAll('input')].map(i => i.value); return [n, a, ic]; }) } }).then(closeWheel);
     p.append(rows, el('div', { className: 'row' }, add, save));
   } else if (k === 'voice') {
     p.append(el('h3', { textContent: 'Voice conversation' }), el('div', { className: 'note', textContent: 'You talk, she answers out loud, the mic waits while she speaks and listens again when she is done. These settings are saved per device.' }));

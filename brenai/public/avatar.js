@@ -84,6 +84,7 @@
     return {
       locate(e) { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 200, y: (e.clientY - r.top) / r.height * 200 }; },
       dispose() { wrap.remove(); },
+      thumb(cb) { cb('data:image/svg+xml,' + encodeURIComponent(svg.outerHTML)); }, // a still of her as she is drawn right now
       draw({ face, lid, mouth, look, rot, tx, ty, sq, breathe }) {
         const key = lid + face.brow + mouth;
         if (key !== shown) {
@@ -234,6 +235,9 @@
       if (stage.isConnected) requestAnimationFrame(frame); else R.dispose();
     }
     requestAnimationFrame(frame);
+    // a still picture of her face for the chat log, taken once she has been drawn
+    function askThumb() { const mine = R; setTimeout(() => { if (R === mine && R.thumb && opts.onThumb) { try { R.thumb(opts.onThumb); } catch {} } }, 900); }
+    askThumb();
 
     return {
       setMood(m) { mood = FACE[m] ? m : 'neutral'; },
@@ -250,7 +254,7 @@
       },
       gesture: doGesture,
       // swap the picture live; null goes back to the cartoon
-      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); },
+      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); askThumb(); },
     };
   }
   window.WizraAvatar = { mount };
