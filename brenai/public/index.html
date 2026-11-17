@@ -405,7 +405,9 @@ $('actBtn').onclick = ev => { ev.stopPropagation(); $('meBox').classList.toggle(
 addEventListener('pointerdown', ev => { if (!ev.target.closest('#meBox')) $('meBox').classList.remove('fan'); });
 
 // The avatar: tap to expand to a big view, tap again (or outside) to shrink.
-$('bigBtn').onclick = () => document.body.classList.toggle('big');
+// enlarging her: she notices you (not every single time)
+let noticedAt = 0;
+$('bigBtn').onclick = () => { const big = document.body.classList.toggle('big'); if (big && Date.now() - noticedAt > 90000 && !avatar.activity()) { noticedAt = Date.now(); setTimeout(() => { avatar.react('wave'); }, 500); } };
 // Things you do to her in the chat (typed or from the action buttons) also land on the avatar straight away.
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
@@ -485,7 +487,6 @@ const speaker = (() => {
   const store = () => localStorage.setItem('brenai.speak', JSON.stringify({ on: v.on, voice: v.voice, rate: v.rate, pitch: v.pitch, headphones: v.headphones, engine: v.device ? 'device' : 'pc' }));
   v.voices = () => (v.supported ? SS.getVoices() : []).filter(x => /^en/i.test(x.lang));
   const pick = () => { const all = v.voices(); return all.find(x => x.name === v.voice) || all.find(x => /Aria|Jenny|Samantha|Ava|Google US English|Zira|female/i.test(x.name)) || all[0] || null; };
-  const begin = () => { if (v.speaking) return; v.speaking = true; if (!v.headphones) voice.hold(true); tick = setInterval(() => avatar.talk(), 150); };
   const end = () => { v.speaking = false; clearInterval(tick); voice.hold(false); };
   // Two engines: her Kokoro voice on the PC (same voice on every device), or this device's own voices as the fallback.
   v.device = saved.engine === 'device';
@@ -500,9 +501,23 @@ const speaker = (() => {
       SS.speak(u);
     }
   }
-  const playBlob = blob => new Promise(done => {
+  // Her mouth follows her actual voice: the clip is a plain 16-bit WAV, so its loudness over time is read straight from it
+  // (one value per 40 ms) and looked up by the playback position.
+  async function envelope(blob) {
+    try {
+      const d = new DataView(await blob.arrayBuffer()); if (d.getUint16(34, true) !== 16) return null;
+      const rate = d.getUint32(24, true), win = Math.round(rate * 0.04), n = Math.floor((d.byteLength - 44) / 2), out = [];
+      let peak = 0.02;
+      for (let i = 0; i + win <= n; i += win) { let sum = 0; for (let j = 0; j < win; j += 4) { const x = d.getInt16(44 + (i + j) * 2, true) / 32768; sum += x * x; } const r = Math.sqrt(sum / (win / 4)); out.push(r); if (r > peak) peak = r; }
+      return out.map(x => Math.min(1, x / (peak * 0.7)));
+    } catch { return null; }
+  }
+  let env = null;
+  const begin = () => { if (v.speaking) return; v.speaking = true; if (!v.headphones) voice.hold(true); clearInterval(tick); tick = setInterval(() => { const lvl = env && !player.paused ? env[Math.floor(player.currentTime / 0.04)] : undefined; avatar.talk(lvl); }, 40); };
+  const playBlob = blob => new Promise(async done => {
+    env = await envelope(blob);
     const url = URL.createObjectURL(blob); player.src = url; player.playbackRate = v.rate;
-    player.onplaying = begin; player.onended = player.onerror = () => { URL.revokeObjectURL(url); done(); };
+    player.onplaying = begin; player.onended = player.onerror = () => { URL.revokeObjectURL(url); env = null; done(); };
     player.play().catch(() => done());
   });
   v.say = async text => {

@@ -148,7 +148,9 @@ function setupText() {
   return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nIt is ${day}, ${part}.\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
 }
 // ---- silent touches: what he did to the avatar since her last reply. Never shown in the chat; she just knows. ----
-const TOUCH = { poke: ['pokes her cheek', 'pokes her cheek %n times'], boop: ['boops her nose', 'boops her nose %n times'], pat: ['pats her on the head', 'pats her on the head %n times'],
+const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the bookshelf'], pointcounter: ['points her to the kettle', 'points her to the kettle'], pointchair: ['pats her chair for her to sit back down', 'pats her chair for her to sit back down'],
+  pointfloor: ['beckons her over', 'beckons her over'], pointbook: ['taps her book', 'taps her book'], pointphone: ['taps her phone', 'taps her phone'], pointmug: ['taps her mug', 'taps her mug'],
+  poke: ['pokes her cheek', 'pokes her cheek %n times'], boop: ['boops her nose', 'boops her nose %n times'], pat: ['pats her on the head', 'pats her on the head %n times'],
   petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
 let touches = [];
 function takeTouches() {

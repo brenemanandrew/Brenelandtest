@@ -5,7 +5,7 @@
 //   const av = WizraAvatar.mount(stageElement)
 //   av.setMood(name)       base mood: auto, happy, playful, chill, focused, excited, tired, grumpy, sad, anxious
 //   av.setThinking(bool)   she is working on a reply
-//   av.talk()              call on every chunk of her reply while it streams (moves the mouth)
+//   av.talk(level)         call while she is speaking; level 0..1 is how loud her voice is right now (optional)
 //   av.feel(text)          her reply so far: picks a passing expression from her words and actions
 //   av.setRenderer(r)    swap what draws her, live (the cartoon below, or the 3D model from avatar-vrm.js)
 //   mount(el, { onTouch(kind) })  onTouch fires when she is touched directly (the page passes it on to her, silently)
@@ -148,7 +148,7 @@
     const taps = [];
     const now = () => performance.now();
 
-    let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
+    let voice = null; let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
     function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + 9000 + Math.random() * 14000; if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
     function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; }
@@ -206,6 +206,9 @@
       if (Math.abs(dx) > 55 && ms < 380) return touched('swat', Math.sign(dx));
       if (d.pet > 60) return touched('petEnd');
       if (d.path > 25) return;
+      // a tap that is not on her: it may be on something in her room, and then she goes and deals with it
+      const onHer = Math.abs(p.x - 100) < 58 && p.y > 28 && p.y < 330;
+      if (!onHer && R.pick) { const hit = R.pick(e); if (hit) { const what = R.direct(hit); if (what) { show('surprised', 500); doGesture('nod', 1.2); if (opts.onTouch) opts.onTouch(what); } } return; }
       const t = now(); taps.push(t); while (taps.length && t - taps[0] > 2500) taps.shift();
       if (taps.length >= 4) { taps.length = 0; return touched('spam'); }
       if (Math.hypot(p.x - 100, p.y - 108) < 9) return touched('boop');
@@ -229,7 +232,7 @@
       const blink = t < blinkEnd && !['smile', 'squint', 'dizzy'].includes(face.lid);
       const lid = blink ? 'shut' : face.lid;
       const phase = (t / 130 | 0) % 3;
-      const mouth = talking ? (phase === 0 ? face.mouth : phase === 1 ? 'talk' : 'talk2') : face.mouth;
+      const mouth = !talking ? face.mouth : voice != null ? (voice > 0.42 ? 'talk' : voice > 0.12 ? 'talk2' : face.mouth) : (phase === 0 ? face.mouth : phase === 1 ? 'talk' : 'talk2');
       // eyes: follow the pointer for a moment, else the expression's resting gaze, else a slow idle glance
       if (t > glanceAt) { gaze = Math.random() < 0.5 ? { x: 0, y: 0 } : { x: (Math.random() - 0.5) * 4, y: (Math.random() - 0.5) * 2 }; glanceAt = t + 1500 + Math.random() * 3000; }
       const want = t < pointerLookUntil && pointerLook ? pointerLook : (face.gx || face.gy) ? { x: face.gx || 0, y: face.gy || 0 } : gaze;
@@ -241,7 +244,7 @@
       if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { if (idleAt) doGesture(...IDLE[Math.random() * IDLE.length | 0]); idleAt = t + 9000 + Math.random() * 14000; }
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
-      try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
+      try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, voice: talking ? voice : null, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
       const eo = Math.max(0, Math.min(1, (emoteUntil - t) / 300)); em.style.opacity = eo; em.style.transform = `translateY(${(eo - 1) * 6}px)`;
       em.style.setProperty('--emote', Math.max(1, stage.clientWidth / 104));
       if (stage.isConnected) requestAnimationFrame(frame); else R.dispose();
@@ -254,7 +257,8 @@
     return {
       setMood(m) { mood = FACE[m] ? m : 'neutral'; },
       setThinking(b) { thinking = !!b; },
-      talk() { talkUntil = now() + 350; thinking = false; },
+      // level: how loud her voice is right now (0..1) when the page knows; leave it out and her mouth just keeps time
+      talk(level) { talkUntil = now() + 350; thinking = false; voice = typeof level === 'number' ? level : null; },
       feel(text) { text = String(text).slice(-140); for (const [re, face] of FEEL) if (re.test(text)) { show(face, 5000); return face; } return null; },
       react,
       // her finished reply: any action in it that is a gesture she can do gets done (the first one found)
