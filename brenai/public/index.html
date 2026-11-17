@@ -721,7 +721,15 @@ const speaker = (() => {
   v.device = saved.engine === 'device';
   v.engine = () => (!v.device && brainInfo.tts) ? 'pc' : 'device';
   const player = new Audio(); let gen = 0;
-  const sentences = text => (text.match(/[^.!?\u2026]+[.!?\u2026]*\s*/g) || [text]).map(x => x.trim()).filter(Boolean);
+  // how her words are cut into clips (the server cuts them the same way, to have them ready)
+  function speechChunks(text) {
+    // dots used as a pause ("well.. what do you think?") become a comma: one flowing line with a short breath, not two clips
+    const t = String(text).replace(/\s*(?:\.{2,}|\u2026)+\s*/g, ', ').replace(/\s*[\u2014\u2013]\s*|\s+-\s+/g, ', ').replace(/,(\s*,)+/g, ',').replace(/,\s*([.!?])/g, '$1').replace(/^[,\s]+|[,\s]+$/g, '');
+    const parts = (t.match(/[^.!?\n]+[.!?]*["')]*\s*/g) || []).map(x => x.trim()).filter(Boolean);
+    const out = []; for (const p of parts) { if (out.length && out[out.length - 1].length < 55) out[out.length - 1] += ' ' + p; else out.push(p); } // short sentences ride together, so there is no gap between them
+    return out;
+  }
+  const sentences = text => { const c = speechChunks(text); return c.length ? c : [text]; };
   function deviceSay(parts) {
     if (!v.supported) return;
     for (const part of parts) { // one sentence per utterance: some browsers cut a long one off

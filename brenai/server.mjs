@@ -98,16 +98,24 @@ function ttsJob(text, voice, speed) {
 // (or already on the way). Keys ignore punctuation and case, so small differences in how the page cuts the text do not matter.
 const ttsCache = new Map(); const ttsKey = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 function voiced(line) {
-  const key = ttsKey(line); if (!key) return Promise.reject(new Error('empty'));
+  const voice = db.settings.ttsVoice || 'af_heart', words = ttsKey(line); if (!words) return Promise.reject(new Error('empty'));
+  const key = voice + '|' + words;                       // the same words in another voice are a different recording
   const hit = ttsCache.get(key); if (hit && Date.now() - hit.at < 90000) return hit.p;
   const t0 = Date.now();
-  const p = ttsJob(line, db.settings.ttsVoice || 'af_heart', 1).then(w => { const ms = Date.now() - t0; brain.ttsMs = brain.ttsMs ? Math.round(brain.ttsMs * 0.7 + ms * 0.3) : ms; return w; });
+  const p = ttsJob(line, voice, 1).then(w => { const ms = Date.now() - t0; brain.ttsMs = brain.ttsMs ? Math.round(brain.ttsMs * 0.7 + ms * 0.3) : ms; return w; });
   p.catch(() => ttsCache.delete(key));
   ttsCache.set(key, { p, at: Date.now() }); if (ttsCache.size > 24) ttsCache.delete(ttsCache.keys().next().value);
   return p;
 }
 // what she says out loud, cut the way the page cuts it: no actions, no quote marks, no "She does this." narration
-const spokenLines = text => (String(text).replace(/\*[^*]*\*/g, ' ').replace(/["\u201c\u201d]/g, '').match(/[^.!?\u2026\n]+[.!?\u2026]*["')]*\s*/g) || []).map(x => x.trim()).filter(x => x && !/^(she|wizra)\s+[a-z']+(s|ed)\b/i.test(x));
+function speechChunks(text) {
+  // dots used as a pause ("well.. what do you think?") become a comma: one flowing line with a short breath, not two clips
+  const t = String(text).replace(/\s*(?:\.{2,}|\u2026)+\s*/g, ', ').replace(/\s*[\u2014\u2013]\s*|\s+-\s+/g, ', ').replace(/,(\s*,)+/g, ',').replace(/,\s*([.!?])/g, '$1').replace(/^[,\s]+|[,\s]+$/g, '');
+  const parts = (t.match(/[^.!?\n]+[.!?]*["')]*\s*/g) || []).map(x => x.trim()).filter(Boolean);
+  const out = []; for (const p of parts) { if (out.length && out[out.length - 1].length < 55) out[out.length - 1] += ' ' + p; else out.push(p); } // short sentences ride together, so there is no gap between them
+  return out;
+}
+const spokenLines = text => speechChunks((String(text).replace(/\*[^*]*\*/g, ' ').replace(/["\u201c\u201d]/g, '').match(/[^.!?\u2026\n]+[.!?\u2026]*["')]*\s*/g) || []).map(x => x.trim()).filter(x => x && !/^(she|wizra)\s+[a-z']+(s|ed)\b/i.test(x)).join(' '));
 function prewarm(text) { if (brain.ws && brain.tts) for (const line of spokenLines(text).slice(0, 4)) voiced(line).catch(() => {}); }
 const tempOf = v => +(0.3 + (Math.max(0, Math.min(100, v)) / 100) * 0.9).toFixed(2);
 // rough token count (about 4 characters a token) to keep the chat inside the loaded context
@@ -508,7 +516,7 @@ const server = http.createServer(async (req, res) => {
             send({ t: 'delta', d });
             if (!wantVoice || early || !brain.tts) return; heard += d;
             if ((heard.match(/\*/g) || []).length % 2) return;   // in the middle of an action
-            const first = spokenLines(heard.replace(/[^.!?\u2026]*$/, ''))[0]; if (first && first.length > 3) { early = true; voiced(first).catch(() => {}); }
+            const done = spokenLines(heard.replace(/[^.!?]*$/, '')); if (done[0] && (done.length > 1 || done[0].length >= 55)) { early = true; voiced(done[0]).catch(() => {}); } // (a short first sentence waits: it will be joined to the next)
           });
           if (wantVoice) prewarm(full);
           db.log.push({ who: 'her', text: full, at: Date.now() });
