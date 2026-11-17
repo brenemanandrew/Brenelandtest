@@ -4,7 +4,8 @@ Chat with Wizra. Her brain is **your PC's model** (MN-Violet-Lotus-12B in Bionic
 
 ## What it does
 - Her picture top left with the chat window; you at the bottom. Everything goes in the log; spoken text (anything outside `*asterisks*`) also pops up as a bubble over the speaker's head.
-- Tap her picture for the settings wheel: Emotion, Reactions, Temperature, SFW, Bleep, Character (birthday, backstory, likes, dislikes, rapport, cussing), Hidden likes.
+- Talk to text is on by default (Chrome, Edge, Safari): it listens, and once you stop talking for 2.5 s (adjustable) it sends. The mic button by the text box turns it off; typing holds that message back.
+- Tap her picture for the settings wheel: Emotion, Reactions, Temperature, SFW, Bleep, Character (birthday, backstory, likes, dislikes, rapport, cussing), Hidden likes, Talk to text.
 - She learns you: every 6 of your messages a side call rewrites her private notes on how you talk, moves rapport up or down, marks secret likes she admitted, can grow a new secret like from a good moment, and can raise her cussing one step (only if allowed, rapport 60+, and you cuss yourself).
 - Bleep only changes what is shown; the real text is kept, so turning it off shows the original.
 - Temperature is a real sampling temperature on the PC model (0.3 to 1.2). On the Claude backup it only steers her instructions.

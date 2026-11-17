@@ -41,13 +41,20 @@
   #meBubble::after { border-top-color:#33506b; }
 
   /* bottom: me + input */
-  #bottom { display:grid; grid-template-columns: 64px 1fr auto; gap:10px; align-items:end; grid-row:3; }
+  #bottom { display:grid; grid-template-columns: 64px 1fr auto auto; gap:8px; align-items:end; grid-row:3; }
   #meCol img { width:64px; height:64px; }
   #meCol .bubble { left:0; }
   #in { width:100%; resize:none; max-height:30vh; min-height:46px; padding:12px; border-radius:12px; border:1px solid var(--line);
         background:var(--panel); color:var(--text); font:inherit; }
   #send { height:46px; padding:0 16px; border-radius:12px; border:0; background:#6b4fa3; color:#fff; font:inherit; font-weight:600; }
   #send:disabled { opacity:.5; }
+  #mic { height:46px; width:46px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--dim); font-size:20px; padding:0; }
+  #mic.on { color:#fff; background:#7a2e4a; border-color:#b04a72; }
+  #mic.on.hearing { animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(176,74,114,.6); } 50% { box-shadow:0 0 0 8px rgba(176,74,114,0); } }
+  #mic[hidden] { display:none; }
+  #heardBar { position:absolute; left:0; right:0; bottom:100%; height:3px; background:#b04a72; transform-origin:left; transform:scaleX(0); }
+  #inWrap { position:relative; }
   #menu { position:fixed; top:10px; right:12px; background:none; border:0; color:var(--dim); font-size:20px; }
 
   #herCol img { cursor:pointer; }
@@ -100,7 +107,8 @@
       <img src="me.svg" alt="You">
       <div class="name" id="meName">You</div>
     </div>
-    <textarea id="in" rows="1" placeholder="Say something. *Asterisks* for actions."></textarea>
+    <div id="inWrap"><div id="heardBar"></div><textarea id="in" rows="1" placeholder="Talk, or type. *Asterisks* for actions."></textarea></div>
+    <button id="mic" title="Voice input (tap to turn on or off)" hidden>&#127908;</button>
     <button id="send">Send</button>
   </div>
 </div>
@@ -171,7 +179,9 @@ async function load() {
 }
 
 async function send() {
-  const text = input.value.trim(); if (!text || sendBtn.disabled) return;
+  const text = input.value.trim(); if (!text) return;
+  if (sendBtn.disabled) { voice.pending = true; return; } // she is still answering: send this right after
+  voice.reset();
   input.value = ''; autosize(); sendBtn.disabled = true;
   addLine('me', text); bubble('me', text);
   const body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>';
@@ -195,19 +205,77 @@ async function send() {
     }
   } catch (e) {
     if (e.message !== 'login') { body.parentElement.remove(); addError(e.message); }
-  } finally { sendBtn.disabled = false; input.focus(); }
+  } finally {
+    sendBtn.disabled = false;
+    if (!matchMedia('(pointer:coarse)').matches && !voice.on) input.focus();
+    if (voice.pending) { voice.pending = false; send(); }
+  }
 }
 
 function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, innerHeight * 0.3) + 'px'; }
 input.addEventListener('input', autosize);
+input.addEventListener('keydown', e => voice.typed(e));
 input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer:coarse)').matches) { e.preventDefault(); send(); } });
 sendBtn.onclick = send;
 $('menu').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); load(); } };
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
   const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
-  if (r.ok) { $('login').style.display = 'none'; load(); } else $('pw').value = '';
+  if (r.ok) { $('login').style.display = 'none'; load(); voice.start(); } else $('pw').value = '';
 };
+// ---------- voice input (talk to text) ----------
+// The browser's own speech recognition (Chrome, Edge, Safari; not Firefox). On by default; remembered per device.
+// It keeps listening; once you stop talking for `wait` seconds, what it heard is sent to Wizra.
+const voice = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const saved = JSON.parse(localStorage.getItem('brenai.voice') || '{}');
+  const v = { supported: !!SR, on: SR ? saved.on !== false : false, wait: saved.wait || 2.5, pending: false };
+  let rec = null, running = false, prefix = '', heard = '', interim = '', timer = null, barT = null, gestureHook = false;
+  const mic = $('mic'), bar = $('heardBar');
+  const store = () => localStorage.setItem('brenai.voice', JSON.stringify({ on: v.on, wait: v.wait }));
+  const show = () => { mic.hidden = !SR; mic.classList.toggle('on', v.on); mic.classList.toggle('hearing', v.on && running); };
+  const write = () => { input.value = (prefix + ' ' + heard + ' ' + interim).replace(/\s+/g, ' ').trim(); autosize(); };
+  function countdown() {
+    clearTimeout(timer); cancelAnimationFrame(barT);
+    if (!(heard + interim).trim()) { bar.style.transform = 'scaleX(0)'; return; }
+    const t0 = performance.now(), ms = v.wait * 1000;
+    const tick = () => { const f = Math.min(1, (performance.now() - t0) / ms); bar.style.transform = `scaleX(${f})`; if (f < 1) barT = requestAnimationFrame(tick); };
+    tick();
+    timer = setTimeout(() => { heard = (heard + ' ' + interim).trim(); interim = ''; write(); send(); }, ms);
+  }
+  function start() {
+    if (!SR || !v.on || running) return;
+    rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.continuous = true; rec.interimResults = true;
+    rec.onresult = e => {
+      interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) heard += ' ' + t; else interim += t;
+      }
+      write(); countdown();
+    };
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        // no permission yet (or the browser wants a tap first): try again on the next tap
+        if (!gestureHook) { gestureHook = true; addEventListener('pointerdown', () => { gestureHook = false; start(); }, { once: true }); }
+      }
+    };
+    rec.onend = () => { running = false; show(); if (v.on && !document.hidden) setTimeout(start, 400); };
+    try { rec.start(); running = true; } catch { running = false; }
+    show();
+  }
+  function stop() { clearTimeout(timer); try { rec && rec.stop(); } catch {} running = false; show(); }
+  v.set = (patch) => { Object.assign(v, patch); store(); if (v.on) start(); else stop(); show(); };
+  v.reset = () => { clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; prefix = heard = interim = ''; };
+  // typing by hand takes over: no auto-send of what you are typing; speech after it is added on
+  v.typed = e => { if (e.key === 'Enter') return; clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; setTimeout(() => { prefix = input.value; heard = interim = ''; }, 0); };
+  mic.onclick = () => v.set({ on: !v.on });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
+  v.start = start;
+  show();
+  return v;
+})();
+
 // ---------- the wheel ----------
 let sheet = null;
 const MOODS = ['auto', 'happy', 'playful', 'chill', 'focused', 'excited', 'tired', 'grumpy', 'sad', 'anxious'];
@@ -227,6 +295,7 @@ const SEGS = [
   { k: 'bleep', name: 'Bleep', sub: () => settings.bleep ? 'on' : 'off', toggle: 'bleep' },
   { k: 'sheet', name: 'Character', sub: () => sheet ? 'rapport ' + sheet.rapport : '' },
   { k: 'secret', name: 'Hidden likes', sub: () => sheet ? sheet.hiddenLikes.length + '' : '' },
+  { k: 'voice', name: 'Talk to text', sub: () => !voice.supported ? 'n/a' : voice.on ? voice.wait + 's' : 'off' },
 ];
 function drawRing() {
   const ring = $('ring'); ring.textContent = '';
@@ -292,6 +361,17 @@ function openPanel(k) {
       el('label', { textContent: 'Rapport: ' + sheet.rapport + '/100 (moves on its own as you talk)' }), rp,
       el('label', { textContent: 'Cussing: ' + ['never', 'mild', 'casual', 'free'][sheet.cussLevel] }), cl,
       el('label', {}, dev, ' Let her pick up cussing over time (only once rapport is 60+ and you cuss yourself)'));
+  } else if (k === 'voice') {
+    p.append(el('h3', { textContent: 'Talk to text' }));
+    if (!voice.supported) { p.append(el('div', { className: 'note', textContent: 'This browser has no speech recognition. Use Chrome, Edge or Safari.' })); return; }
+    const on = el('input', { type: 'checkbox', checked: voice.on }); on.onchange = () => { voice.set({ on: on.checked }); drawRing(); };
+    const w = el('input', { type: 'range', min: 1, max: 8, step: 0.5, value: voice.wait });
+    const lab = el('label', { textContent: 'Send after you stop talking for ' + voice.wait + ' s' });
+    w.oninput = () => { lab.textContent = 'Send after you stop talking for ' + w.value + ' s'; };
+    w.onchange = () => { voice.set({ wait: +w.value }); drawRing(); };
+    p.append(el('label', {}, on, ' Listen (on by default; the mic button by the text box turns it on and off)'), lab, w,
+      el('div', { className: 'scale' }, el('span', { textContent: 'quick' }), el('span', { textContent: 'patient' })),
+      el('div', { className: 'note', textContent: 'A thin bar over the text box fills while it waits. Typing stops the auto-send for that message. Speech is turned into text by your browser (Chrome and Edge use Google or Microsoft servers for this).' }));
   } else if (k === 'secret') {
     p.append(el('h3', { textContent: 'Hidden likes' }), el('div', { className: 'note', textContent: 'Dashed = still secret, filled = she has told you. Tap one to flip it. She can grow new ones from good moments; those say (grew). She only admits a secret once she trusts you enough.' }), listEditor('', 'hiddenLikes', true));
   }
@@ -312,7 +392,7 @@ async function brainStatus() {
   } catch {}
 }
 brainStatus(); setInterval(brainStatus, 20000);
-load().catch(() => {});
+load().then(() => voice.start()).catch(() => {});
 </script>
 </body>
 </html>
