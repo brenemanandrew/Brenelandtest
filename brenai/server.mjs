@@ -383,8 +383,8 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
         // what he did to her since her last reply, and what he can see her doing right now: both ride silently in front of his words
-        const busy = String(doing || '').replace(/[^a-z ]/gi, '').trim().slice(0, 60);
-        const pre = [takeTouches(), busy ? 'sees that she is ' + busy : ''].filter(Boolean).join(', ');
+        const seen = String(doing || '').replace(/[^a-z ]/gi, '').trim().slice(0, 60);
+        const pre = [takeTouches(), seen ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => send({ t: 'delta', d }));
