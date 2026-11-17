@@ -11,11 +11,14 @@ run at the same time on the one loaded model. When this bridge is off, the page 
    - GitHub repo secret `BRENAI_BRAIN_TOKEN` (Settings > Secrets and variables > Actions), then rerun "Brenai Deploy" in Actions.
      (Or from the PC: `fly secrets set -a brenai BRENAI_BRAIN_TOKEN=<secret>`.)
    - On the PC, PowerShell: `setx BRENAI_BRAIN_TOKEN "<secret>"`, then open a new PowerShell.
-2. Put `wizra-bridge.mjs` and `start-wizra.ps1` in one folder on the PC (e.g. `F:\Projects\Brenai`). Needs Node 22+ (you have it for the town bridge).
+2. Get the files (Node 22+ needed, you have it for the town bridge). This downloads them from the site into `C:\Users\<you>\Brenai`:
+   ```
+   $d = "$env:USERPROFILE\Brenai"; New-Item -ItemType Directory -Force $d | Out-Null; cd $d; foreach ($f in 'wizra-bridge.mjs','start-wizra.ps1') { Invoke-WebRequest "https://brenai.fly.dev/bridge/$f" -OutFile $f }; dir
+   ```
 
 ## Each time
 ```
-powershell -ExecutionPolicy Bypass -File .\start-wizra.ps1
+cd "$env:USERPROFILE\Brenai"; powershell -ExecutionPolicy Bypass -File .\start-wizra.ps1
 ```
 It loads the model with a **32k context** (her long memory; the town only needs 8k, and 32k fits on your card: about 7 GB model
 plus about 5 GB of context), starts Bionic's server on port 1234 and runs the bridge. The status line should say
