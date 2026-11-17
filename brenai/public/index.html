@@ -101,6 +101,58 @@
   #login { position:fixed; inset:0; background:var(--bg); display:none; place-items:center; z-index:20; }
   #login form { display:grid; gap:10px; width:260px; }
   #login input, #login button { padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; }
+
+  /* ================= theme: twilight (2026-11-17). Warmer and brighter than the first near-black look. ================= */
+  :root { --bg:#241a45; --panel:rgba(255,255,255,.08); --solid:#2f2256; --line:rgba(255,255,255,.2); --text:#fbf7ff; --dim:#cfc3ea; --me:#7fd0ff; --her:#ff9cc4; --act:#d3b6ff; --balloon:#ff9cc4; --grad:linear-gradient(135deg,#ff8fc0,#a98bff); }
+  html, body { font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; }
+  body { background:
+      radial-gradient(2px 2px at 12% 18%, rgba(255,255,255,.55), transparent 60%), radial-gradient(1.5px 1.5px at 78% 9%, rgba(255,255,255,.5), transparent 60%),
+      radial-gradient(2px 2px at 64% 31%, rgba(255,255,255,.35), transparent 60%), radial-gradient(1.5px 1.5px at 31% 44%, rgba(255,255,255,.3), transparent 60%),
+      radial-gradient(1.5px 1.5px at 90% 52%, rgba(255,255,255,.3), transparent 60%),
+      radial-gradient(120% 60% at 50% 110%, #ff8fb8 0%, rgba(255,143,184,0) 60%), linear-gradient(170deg,#1f1a4a 0%,#3a2470 38%,#6a3586 72%,#b05a8f 100%) fixed; }
+  #stage { border:0; border-radius:22px; box-shadow:0 0 0 3px rgba(255,255,255,.85), 0 0 0 6px rgba(255,156,196,.55), 0 10px 30px rgba(255,120,180,.35); }
+  #brainBtn, #bigBtn { border:0; background:#fff; color:#6a3aa8; box-shadow:0 3px 10px rgba(0,0,0,.3); }
+  .balloon { border-width:0; background:#fff; color:#3a2358; border-radius:22px; box-shadow:0 6px 18px rgba(0,0,0,.25); font-weight:500; }
+  .bwrap.her .balloon { background:linear-gradient(135deg,#fff,#ffe3f0); } .bwrap.her::before { border-right-color:#fff; }
+  .bwrap.me .balloon { background:linear-gradient(135deg,#e6f6ff,#fff); } .bwrap.me::after { border-left-color:#fff; }
+  #logHead { color:rgba(255,255,255,.75); }
+  #log { border:1px solid var(--line); border-radius:20px; background:rgba(20,12,45,.38); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .msg .nm { border-radius:8px; }
+  .msg .act { font-weight:600; font-style:italic; }
+  #acts button { border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.12); padding:6px 13px; font-weight:600; }
+  #acts button:active { background:rgba(255,255,255,.3); }
+  #meIcon { border:0; border-radius:20px; box-shadow:0 0 0 3px rgba(255,255,255,.85), 0 0 0 6px rgba(127,208,255,.5); }
+  #barTag { border:0; background:rgba(255,255,255,.16); border-radius:999px; padding:6px 12px; }
+  #in { border:1px solid var(--line); background:rgba(20,12,45,.45); }
+  #in::placeholder { color:rgba(255,255,255,.55); }
+  #mic { border:0; background:rgba(255,255,255,.16); color:#fff; }
+  #mic.on { background:linear-gradient(135deg,#ff6fa5,#ff9c6f); }
+  #send { border:0; background:var(--grad); box-shadow:0 4px 14px rgba(255,120,190,.45); }
+  #heardBar { background:#ffd166; }
+  /* the wheel: an icon in a coloured bubble, the name and its state underneath */
+  #wheel { background:rgba(28,18,60,.86); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+  #ring { width:344px; height:372px; margin:22px auto 0; }
+  #ring .hub { left:112px; top:104px; width:120px; height:120px; border:0; box-shadow:0 0 0 3px #fff, 0 0 0 7px rgba(255,156,196,.5), 0 8px 26px rgba(0,0,0,.4); }
+  #ring .seg { width:84px; height:auto; margin:-34px 0 0 -42px; border:0; background:none; padding:0; display:flex; flex-direction:column; align-items:center; gap:2px; font-size:12px; }
+  #ring .seg .ic { width:54px; height:54px; border-radius:50%; display:grid; place-items:center; color:#fff; background:linear-gradient(135deg, hsl(var(--hue) 85% 68%), hsl(calc(var(--hue) + 40) 80% 60%)); box-shadow:0 5px 14px hsl(var(--hue) 80% 50% / .45); transition:transform .12s; }
+  #ring .seg:active .ic { transform:scale(.92); }
+  #ring .seg .ic svg { width:28px; height:28px; }
+  #ring .seg.off .ic { background:rgba(255,255,255,.14); box-shadow:none; color:rgba(255,255,255,.6); }
+  #ring .seg.on { background:none; }
+  #ring .seg b { font-weight:700; white-space:nowrap; }
+  #ring .seg small { color:rgba(255,255,255,.7); font-size:11px; line-height:1.1; white-space:nowrap; }
+  #panel { background:rgba(255,255,255,.1); border:1px solid var(--line); border-radius:20px; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  #panel textarea, #panel input[type=text], #panel select { background:rgba(20,12,45,.5) !important; border:1px solid var(--line) !important; border-radius:12px; }
+  #panel select option { background:#2f2256; color:#fff; }
+  #panel input[type=range] { accent-color:#ff8fc0; } #panel input[type=checkbox] { accent-color:#ff8fc0; }
+  #panel .chip { background:rgba(20,12,45,.45); border-radius:999px; }
+  #panel .chip.sel { background:var(--grad); border-color:transparent; color:#fff; }
+  #panel button.small { background:var(--grad); border-radius:999px; font-weight:700; padding:8px 16px; }
+  #panel .actrow button { background:rgba(255,255,255,.14); border:0; }
+  #newChat { border-radius:999px; background:rgba(255,255,255,.14); }
+  #login { background:linear-gradient(170deg,#1f1a4a,#6a3586); }
+  #login input, #login button { background:rgba(255,255,255,.12); border-radius:999px; }
+  #login button { background:var(--grad); border:0; font-weight:700; }
 </style>
 </head>
 <body>
@@ -410,25 +462,38 @@ async function saveSettings(patch) {
 function redrawLog() { load().catch(() => {}); }
 function el(tag, props = {}, ...kids) { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids); return e; }
 
+// wheel icons: 24 x 24, drawn with strokes
+const ICON = {
+  mood: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2M9 9.5v.6M15 9.5v.6"/>',
+  react: '<path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4 4v-4H6a2 2 0 0 1-2-2z"/><path d="M8.5 10h.01M12 10h.01M15.5 10h.01"/>',
+  temp: '<path d="M10 14.5V5a2 2 0 1 1 4 0v9.5a4 4 0 1 1-4 0z"/><path d="M12 10v7"/>',
+  sfw: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
+  bleep: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9.5l4 5M21 9.5l-4 5"/>',
+  sheet: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.6-1.5 1.7-2 3-2s2.4.5 3 2M15 10h3M15 14h3"/>',
+  secret: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  avatar: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.8-4 3.5-6 7-6s6.2 2 7 6"/><path d="M19 3v4M17 5h4"/>',
+  voice: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M9 21h6"/>',
+};
 const SEGS = [
   { k: 'mood', name: 'Emotion', sub: () => settings.mood },
-  { k: 'react', name: 'Reactions', sub: () => (settings.length || 'short') + ' replies' },
-  { k: 'temp', name: 'Temperature', sub: () => LABEL(settings.temperature) },
+  { k: 'react', name: 'Replies', sub: () => settings.length || 'short' },
+  { k: 'temp', name: 'Wildness', sub: () => LABEL(settings.temperature) },
   { k: 'sfw', name: 'SFW', sub: () => settings.sfw ? 'on' : 'off', toggle: 'sfw' },
   { k: 'bleep', name: 'Bleep', sub: () => settings.bleep ? 'on' : 'off', toggle: 'bleep' },
-  { k: 'sheet', name: 'Character', sub: () => sheet ? 'rapport ' + sheet.rapport : '' },
+  { k: 'sheet', name: 'Character', sub: () => sheet ? '\u2665 ' + sheet.rapport : '' },
   { k: 'secret', name: 'Hidden likes', sub: () => sheet ? sheet.hiddenLikes.length + '' : '' },
   { k: 'avatar', name: 'Avatar', sub: () => settings.avatarKind === 'vrm' ? '3D model' : 'cartoon' },
-  { k: 'voice', name: 'Voice', sub: () => (voice.on ? 'mic on' : 'mic off') + ', ' + (speaker.on ? 'she talks' : 'silent') },
+  { k: 'voice', name: 'Voice', sub: () => speaker.on ? 'she talks' : 'silent' },
 ];
 function drawRing() {
   const ring = $('ring'); ring.textContent = '';
   const hub = el('div', { className: 'hub', onclick: closeWheel }); WizraAvatar.mount(hub); ring.append(hub);
   SEGS.forEach((g, i) => {
     const a = -Math.PI / 2 + i * 2 * Math.PI / SEGS.length;
-    const b = el('div', { className: 'seg' + (g.toggle && settings[g.toggle] ? ' on' : '') });
-    b.style.left = (140 + 112 * Math.cos(a)) + 'px'; b.style.top = (140 + 112 * Math.sin(a)) + 'px';
-    b.append(g.name, el('small', { textContent: g.sub() }));
+    const b = el('div', { className: 'seg' + (g.toggle ? (settings[g.toggle] ? ' on' : ' off') : '') });
+    b.style.left = (172 + 134 * Math.cos(a)) + 'px'; b.style.top = (164 + 134 * Math.sin(a)) + 'px'; b.style.setProperty('--hue', (300 + i * 40) % 360);
+    const ic = el('span', { className: 'ic' }); ic.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[g.k] + '</svg>';
+    b.append(ic, el('b', { textContent: g.name }), el('small', { textContent: g.sub() }));
     b.onclick = () => g.toggle ? saveSettings({ settings: { [g.toggle]: !settings[g.toggle] } }) : openPanel(g.k);
     ring.append(b);
   });
@@ -539,7 +604,7 @@ function openPanel(k) {
     const son = el('input', { type: 'checkbox', checked: speaker.on }); son.onchange = () => { speaker.set({ on: son.checked }); drawRing(); };
     const selCss = 'width:100%;background:#120e18;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:14px';
     const pc = speaker.engine() === 'pc';
-    p.append(el('div', { className: 'note', textContent: brainInfo.tts ? 'Her own voice (Kokoro, on your PC) is ready. It sounds the same on every device.' : 'Her own voice (Kokoro) is not running on the PC right now, so this device\'s voice is used. Restart the bridge with the start line to install and load it.' }));
+    p.append(el('div', { className: 'note', textContent: brainInfo.tts ? 'Her own voice (Kokoro, on your PC) is ready. It sounds the same on every device, phones included.' : 'Her own voice (Kokoro) is not running on the PC, so this device\'s voice is used. PC says: ' + (brainInfo.voiceState || 'nothing yet') + '.' }));
     // her Kokoro voice: one choice for every device
     const ksel = el('select'); ksel.style.cssText = selCss;
     const LANG = { 'en-us': 'American', 'en-gb': 'British' };
@@ -549,7 +614,7 @@ function openPanel(k) {
     // this device's voices (fallback)
     const sel = el('select'); sel.style.cssText = selCss;
     const fillVoices = () => { sel.textContent = ''; sel.append(el('option', { value: '', textContent: 'Pick for me' })); for (const x of speaker.voices()) sel.append(el('option', { value: x.name, textContent: x.name, selected: x.name === speaker.voice })); };
-    if (speaker.supported) { fillVoices(); speechSynthesis.onvoiceschanged = fillVoices; }
+    if (speaker.supported) { fillVoices(); speechSynthesis.onvoiceschanged = fillVoices; setTimeout(fillVoices, 600); setTimeout(fillVoices, 2000); } // phones hand the list over late
     sel.onchange = () => speaker.set({ voice: sel.value });
     const rate = el('input', { type: 'range', min: 0.7, max: 1.5, step: 0.05, value: speaker.rate }); rate.onchange = () => speaker.set({ rate: +rate.value });
     const pitch = el('input', { type: 'range', min: 0.6, max: 1.6, step: 0.05, value: speaker.pitch }); pitch.onchange = () => speaker.set({ pitch: +pitch.value });
@@ -557,7 +622,7 @@ function openPanel(k) {
     const test = el('button', { className: 'small', textContent: 'Test her voice' }); test.onclick = () => { speaker.stop(); const was = speaker.on; speaker.on = true; speaker.say('Okay, this is what I sound like. Good enough?'); speaker.on = was; };
     p.append(el('label', {}, son, ' She speaks her replies out loud'));
     if (brainInfo.tts) p.append(el('label', { textContent: 'Her voice' }), ksel, el('label', {}, dev, ' Use this device\'s voice instead'));
-    if (!pc) p.append(el('label', { textContent: 'Device voice' }), sel);
+    if (!pc) p.append(el('label', { textContent: 'Device voice' }), sel, el('div', { className: 'note', textContent: 'Android and some phones ignore this choice and use the phone\'s own voice (Android: Settings > Accessibility > Text-to-speech output). Her PC voice is the way to pick a voice on a phone.' }));
     p.append(
       el('label', { textContent: 'Speed' }), rate, el('div', { className: 'scale' }, el('span', { textContent: 'slow' }), el('span', { textContent: 'fast' })),
       ...(pc ? [] : [el('label', { textContent: 'Pitch' }), pitch, el('div', { className: 'scale' }, el('span', { textContent: 'low' }), el('span', { textContent: 'high' }))]),

@@ -36,16 +36,16 @@ let tts = null, voices = [], voiceState = process.env.WIZRA_VOICE === 'off' ? 'o
 async function loadVoice() {
   if (voiceState === 'off') return;
   let KokoroTTS;
-  try { ({ KokoroTTS } = await import('kokoro-js')); } catch { voiceState = 'not installed (run start-wizra.ps1)'; return status(); }
+  try { ({ KokoroTTS } = await import('kokoro-js')); } catch (e) { voiceState = /Cannot find|ERR_MODULE_NOT_FOUND/.test(String(e)) ? 'not installed (kokoro-js is missing next to the bridge; run start-wizra.ps1)' : 'could not start: ' + String(e?.message || e).slice(0, 140); sendCaps(); return status(); }
   try {
-    voiceState = 'loading'; status();
+    voiceState = 'loading (first time downloads about 90 MB)'; sendCaps(); status();
     tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: process.env.WIZRA_VOICE_QUALITY || 'q8', device: 'cpu' });
     voices = Object.entries(tts.voices).map(([id, v]) => ({ id, name: v.name || id, lang: v.language || '', gender: v.gender || '' }));
     voiceState = 'on'; sendCaps();
-  } catch (e) { voiceState = 'failed: ' + String(e?.message || e).slice(0, 50); }
+  } catch (e) { voiceState = 'failed: ' + String(e?.message || e).slice(0, 140); sendCaps(); }
   status();
 }
-function sendCaps() { if (tts && ws && st.state === 'connected') { try { ws.send(JSON.stringify({ t: 'caps', tts: true, voices })); } catch {} } }
+function sendCaps() { if (ws && st.state === 'connected') { try { ws.send(JSON.stringify({ t: 'caps', tts: !!tts, voices, voiceState })); } catch {} } }
 // plain 16-bit WAV: every phone browser plays it, and it is half the size of the float one
 function wav16(f32, rate) {
   const b = Buffer.alloc(44 + f32.length * 2);
@@ -117,7 +117,7 @@ let ws = null, backoff = 1000, ping = null;
 function connect() {
   st.state = 'connecting'; status();
   try { ws = new WebSocket(SERVER); } catch { return retry(); }
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: TOKEN, model: MODEL, v: 3 }));
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: TOKEN, model: MODEL, v: 4 }));
   ws.onmessage = async ev => {
     let m; try { m = JSON.parse(String(ev.data)); } catch { return; }
     if (m.t === 'welcome') { st.state = 'connected'; st.since = Date.now(); st.note = ''; backoff = 1000; status(); clearInterval(ping); ping = setInterval(() => { try { ws.send('{"t":"ping"}'); } catch {} }, 20000); sendCaps(); return; }

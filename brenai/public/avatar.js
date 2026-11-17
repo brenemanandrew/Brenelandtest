@@ -16,7 +16,7 @@
   const SKIN = '#f4ecef', HAIR = '#0b0b10', INK = '#111', LIP = '#4a1f3a';
   const MARKUP = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" style="display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none">
-  <defs><radialGradient id="wzbg" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#3a2a4a"/><stop offset="1" stop-color="#140f1c"/></radialGradient></defs>
+  <defs><radialGradient id="wzbg" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#8a5bb8"/><stop offset="1" stop-color="#2a1b4d"/></radialGradient></defs>
   <rect width="200" height="200" fill="url(#wzbg)"/>
   <g data-p="hairBack"><path d="M38 114 C30 28 170 28 162 114 L170 204 L30 204 Z" fill="${HAIR}"/></g>
   <g data-p="body">

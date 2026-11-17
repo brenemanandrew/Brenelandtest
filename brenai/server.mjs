@@ -68,13 +68,13 @@ function onBrainSocket(ws) {
     }
     if (m.t === 'delta') { const j = jobs.get(m.id); if (j && j.onDelta && typeof m.d === 'string') j.onDelta(m.d); }
     else if (m.t === 'done') endJob(m.id, null, String(m.text || ''));
-    else if (m.t === 'caps') { brain.tts = !!m.tts; brain.voices = Array.isArray(m.voices) ? m.voices.slice(0, 80).map(v => ({ id: String(v.id).slice(0, 30), name: String(v.name).slice(0, 30), lang: String(v.lang).slice(0, 8), gender: String(v.gender).slice(0, 10) })) : []; console.log('[brain] voice ready,', brain.voices.length, 'voices'); }
+    else if (m.t === 'caps') { brain.voiceState = String(m.voiceState || (m.tts ? 'on' : '')).slice(0, 200); brain.tts = !!m.tts; brain.voices = Array.isArray(m.voices) ? m.voices.slice(0, 80).map(v => ({ id: String(v.id).slice(0, 30), name: String(v.name).slice(0, 30), lang: String(v.lang).slice(0, 8), gender: String(v.gender).slice(0, 10) })) : []; console.log('[brain] voice:', brain.voiceState, brain.voices.length, 'voices'); }
     else if (m.t === 'audio') { const j = jobs.get(m.id); if (j) { clearTimeout(j.timer); jobs.delete(m.id); j.resolve(String(m.wav || '')); } }
     else if (m.t === 'fail') endJob(m.id, 'Your PC could not answer (' + String(m.why || 'error').slice(0, 60) + '). Is Bionic running with the model loaded?');
   });
   ws.on('close', () => {
     if (brain.ws !== ws) return;
-    brain.ws = null; brain.tts = false; brain.voices = []; console.log('[brain] bridge disconnected');
+    brain.ws = null; brain.tts = false; brain.voices = []; brain.voiceState = ''; console.log('[brain] bridge disconnected');
     for (const id of [...jobs.keys()]) endJob(id, 'Your PC went offline mid-answer.');
   });
   ws.on('error', () => {});
@@ -309,7 +309,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 3, tts: brain.tts, voices: brain.voices });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);

@@ -16,7 +16,7 @@ const NAMES = ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blink', 'aa', '
 
 export async function create(url) {
   const el = document.createElement('div');
-  el.style.cssText = 'width:100%;height:100%;background:radial-gradient(circle at 50% 40%, #3a2a4a, #140f1c 75%)';
+  el.style.cssText = 'width:100%;height:100%;background:radial-gradient(circle at 50% 35%, #8a5bb8, #4a2d7a 55%, #2a1b4d 100%)';
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.domElement.style.cssText = 'width:100%;height:100%;display:block;touch-action:none';

@@ -13,10 +13,15 @@ $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = @("$env:ProgramFiles\nodejs\node.exe", "${env:ProgramFiles(x86)}\nodejs\node.exe", "$env:LOCALAPPDATA\Programs\nodejs\node.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
 if (-not $node) { $node = (Get-Process node -ErrorAction SilentlyContinue | Select-Object -First 1).Path }
 if (-not $node) { Write-Host "Node.js not found. Install it: winget install -e --id OpenJS.NodeJS.LTS"; exit 1 }
-# her voice (Kokoro): installed once, next to the bridge
+# her voice (Kokoro): installed once, next to the bridge. The package.json keeps npm from installing it somewhere else.
 if (-not (Test-Path "$PSScriptRoot\node_modules\kokoro-js")) {
+  if (-not (Test-Path "$PSScriptRoot\package.json")) { Set-Content -Path "$PSScriptRoot\package.json" -Value '{ "name": "wizra-bridge", "private": true, "type": "module" }' -Encoding ascii }
   $npm = Join-Path (Split-Path $node) "npm.cmd"
-  if (Test-Path $npm) { Write-Host "Installing her voice (one time, a minute or two)..."; Push-Location $PSScriptRoot; & $npm install kokoro-js --no-fund --no-audit --loglevel=error; Pop-Location }
-  else { Write-Host "npm not found next to Node; she will use the device voice instead." }
+  if (-not (Test-Path $npm)) { $npm = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source }
+  if ($npm) {
+    Write-Host "Installing her voice (one time, a minute or two)..."
+    Push-Location $PSScriptRoot; & $npm install kokoro-js --no-fund --no-audit; Pop-Location
+    if (Test-Path "$PSScriptRoot\node_modules\kokoro-js") { Write-Host "Voice installed." } else { Write-Host "The voice did NOT install (see the npm messages above). She will use the device voice for now." }
+  } else { Write-Host "npm was not found, so her voice could not be installed. She will use the device voice for now." }
 }
 & $node "$PSScriptRoot\wizra-bridge.mjs"
