@@ -121,6 +121,15 @@
     [/laugh|giggl|snicker|cackl|snort|chuckl/i, 'laugh', 2.2], [/\bsigh|exhales|huffs?/i, 'sigh', 2.2], [/bounc(es|ing)|bops|hops in her seat/i, 'bounce', 2], [/\bdanc|sways? to|grooves?|shimm/i, 'dance', 3.5],
     [/cring|winc|recoil|shudder|shrinks? back/i, 'cringe', 2], [/jumps?|startl|flinch|jolts?/i, 'jolt', 1.4],
   ];
+  // bigger things she does, also read from her actions: these change what she is busy with (see the routine in avatar-vrm.js)
+  const ROUTINE = [
+    [/sits? (back )?down|flops? (back )?(down|into|onto)|(drops?|sinks?|settles?|plops?) (back )?(down )?(into|onto|in) (her|the) (chair|seat|armchair)|returns? to her (chair|seat)/i, 'sit'],
+    [/gets? up|stands? up|gets? to her feet|rises? (from|to)|\bpac(es|ing)\b|walks? (around|over|off|away|across)|wanders?|strolls?/i, 'pace'],
+    [/(puts?|sets?|tosses?|lays?) (down )?(her |the )?(book|phone)|closes? (her|the) book|pockets? her phone/i, 'sit'],
+    [/(picks? up|grabs?|opens?|reads?|reading|flips? through|goes back to|returns? to|buries herself in) (her |the |a )?(book|novel|notes|tome|rulebook)|turns? (a|the) page/i, 'read'],
+    [/(checks?|grabs?|picks? up|pulls? out|scrolls?|looks? at|glances? at|taps? (at|on)|types? on) (through )?(her |the )?phone|\bscroll(s|ing)?\b|\btexts?\b/i, 'phone'],
+    [/\bsips?\b|takes? a (sip|drink|swig|gulp)|drinks?|picks? up her (mug|cup|coffee|drink)/i, 'sip'],
+  ];
   // what she drifts into on her own when nothing is happening, and how she physically takes a touch
   const IDLE = [['shift', 3], ['feet', 2.4], ['tilt', 2], ['lookaway', 2.4], ['lookdown', 2], ['sigh', 2.2], ['flip', 1.6], ['stretch', 3.2], ['leanback', 3]];
   const TOUCH_BODY = { poke: ['jolt', 1.2], boop: ['jolt', 1], pat: ['bounce', 1], swat: ['cringe', 1.6], spam: ['cringe', 2], body: ['lookdown', 1.4], petEnd: ['leanback', 2], gift: ['situp', 2.2], wave: ['wave', 2.2], laugh: ['laugh', 2], stare: ['shift', 2.4] };
@@ -226,7 +235,7 @@
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
       // a gesture in progress: name, seconds since it began, and an ease in/out weight 0..1
       // left alone for a while, she moves on her own
-      if (!gesture && !talking && !thinking && t > idleAt) { if (idleAt) doGesture(...IDLE[Math.random() * IDLE.length | 0]); idleAt = t + 9000 + Math.random() * 14000; }
+      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { if (idleAt) doGesture(...IDLE[Math.random() * IDLE.length | 0]); idleAt = t + 9000 + Math.random() * 14000; }
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
       try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
@@ -247,12 +256,16 @@
       react,
       // her finished reply: any action in it that is a gesture she can do gets done (the first one found)
       act(text) {
+        for (const m of String(text).matchAll(/\*([^*]+)\*/g)) { const hit = ROUTINE.find(([re]) => re.test(m[1])); if (hit && R.doActivity) { R.doActivity(hit[1]); break; } }
         const found = [];
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) for (const [re, name, dur] of GEST) if (re.test(m[1])) { found.push([name, dur]); break; }
         let wait = 0; for (const [name, dur] of found.slice(0, 3)) { setTimeout(() => doGesture(name, dur), wait); wait += dur * 1000 * 0.85; }
         return found.map(f => f[0]);
       },
       gesture: doGesture,
+      // her routine (3D model only): what she is busy with right now, in words, and a way to start something
+      activity() { return R.activity ? R.activity() : ''; },
+      routine(name) { if (R.doActivity) R.doActivity(name); },
       // swap the picture live; null goes back to the cartoon
       setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); askThumb(); },
     };

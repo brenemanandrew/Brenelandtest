@@ -375,14 +375,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text } = await readBody(req);
+        const { text, doing } = await readBody(req);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
         busy = true;
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
-        const pre = takeTouches();
+        // what he did to her since her last reply, and what he can see her doing right now: both ride silently in front of his words
+        const busy = String(doing || '').replace(/[^a-z ]/gi, '').trim().slice(0, 60);
+        const pre = [takeTouches(), busy ? 'sees that she is ' + busy : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => send({ t: 'delta', d }));

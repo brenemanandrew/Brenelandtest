@@ -325,7 +325,7 @@ async function send(quick) {
   const body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>';
   let full = '';
   try {
-    const r = await api('/api/chat', { text });
+    const r = await api('/api/chat', { text, doing: avatar.activity() });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
     for (;;) {
