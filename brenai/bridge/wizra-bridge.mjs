@@ -14,6 +14,7 @@
 //   WIZRA_MIN_P         default 0.05 (trims odd low-chance words)
 //   WIZRA_REPEAT_PENALTY default 1.08
 //   WIZRA_TEMP          force a temperature (normally the slider on her wheel decides)
+//   WIZRA_VOICE=off     skip her Kokoro voice (WIZRA_VOICE_QUALITY=fp32 for the bigger, slightly better voice model)
 //   LM_NO_SYSTEM=1      fold the instructions into the first message, for chat templates without a system role
 // Privacy: nothing either of you says is printed or written here. The status line shows counts only.
 const SERVER = process.env.BRENAI_SERVER || 'wss://brenai.fly.dev/brain';
@@ -28,10 +29,43 @@ if (typeof WebSocket !== 'function') { console.error('This needs Node 22 or newe
 if (TOKEN.length < 12) { console.error('Set BRENAI_BRAIN_TOKEN first (12+ characters, the same secret as on Fly). See README.md next to this file.'); process.exit(1); }
 
 const st = { state: 'starting', served: 0, failed: 0, since: 0, note: '' };
+
+// ---- her voice: Kokoro (the kokoro-js package next to this file; start-wizra.ps1 installs it). Runs on the CPU, so it does
+// not take graphics memory from the model. First start downloads the voice model (about 90 MB) and keeps it. ----
+let tts = null, voices = [], voiceState = process.env.WIZRA_VOICE === 'off' ? 'off' : 'starting', voiceQueue = Promise.resolve();
+async function loadVoice() {
+  if (voiceState === 'off') return;
+  let KokoroTTS;
+  try { ({ KokoroTTS } = await import('kokoro-js')); } catch { voiceState = 'not installed (run start-wizra.ps1)'; return status(); }
+  try {
+    voiceState = 'loading'; status();
+    tts = await KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', { dtype: process.env.WIZRA_VOICE_QUALITY || 'q8', device: 'cpu' });
+    voices = Object.entries(tts.voices).map(([id, v]) => ({ id, name: v.name || id, lang: v.language || '', gender: v.gender || '' }));
+    voiceState = 'on'; sendCaps();
+  } catch (e) { voiceState = 'failed: ' + String(e?.message || e).slice(0, 50); }
+  status();
+}
+function sendCaps() { if (tts && ws && st.state === 'connected') { try { ws.send(JSON.stringify({ t: 'caps', tts: true, voices })); } catch {} } }
+// plain 16-bit WAV: every phone browser plays it, and it is half the size of the float one
+function wav16(f32, rate) {
+  const b = Buffer.alloc(44 + f32.length * 2);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + f32.length * 2, 4); b.write('WAVEfmt ', 8); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34); b.write('data', 36); b.writeUInt32LE(f32.length * 2, 40);
+  for (let i = 0; i < f32.length; i++) b.writeInt16LE(Math.round(Math.max(-1, Math.min(1, f32[i])) * 32767), 44 + i * 2);
+  return b;
+}
+function speak(m) { // one line of hers -> a WAV, sent back as base64; lines are done one at a time
+  voiceQueue = voiceQueue.then(async () => {
+    try {
+      const audio = await tts.generate(String(m.text || '').slice(0, 800), { voice: tts.voices[m.voice] ? m.voice : 'af_heart', speed: Math.max(0.6, Math.min(1.6, Number(m.speed) || 1)) });
+      ws.send(JSON.stringify({ t: 'audio', id: m.id, wav: wav16(audio.audio, audio.sampling_rate).toString('base64') }));
+    } catch (e) { try { ws.send(JSON.stringify({ t: 'fail', id: m.id, why: 'voice ' + String(e?.message || 'error').slice(0, 30) })); } catch {} }
+  });
+}
 let lastLine = '';
 function status() {
   const up = st.since ? Math.round((Date.now() - st.since) / 60000) + ' min' : '-';
-  const line = `Wizra brain: ${st.state} | replies ${st.served} | failed ${st.failed} | up ${up}${st.note ? ' | ' + st.note : ''}`;
+  const line = `Wizra brain: ${st.state} | replies ${st.served} | failed ${st.failed} | voice ${voiceState} | up ${up}${st.note ? ' | ' + st.note : ''}`;
   if (line === lastLine) return;
   lastLine = line;
   if (!process.stdout.isTTY) console.log(line); else process.stdout.write('\r' + line.padEnd(110));
@@ -83,12 +117,13 @@ let ws = null, backoff = 1000, ping = null;
 function connect() {
   st.state = 'connecting'; status();
   try { ws = new WebSocket(SERVER); } catch { return retry(); }
-  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: TOKEN, model: MODEL, v: 2 }));
+  ws.onopen = () => ws.send(JSON.stringify({ t: 'auth', token: TOKEN, model: MODEL, v: 3 }));
   ws.onmessage = async ev => {
     let m; try { m = JSON.parse(String(ev.data)); } catch { return; }
-    if (m.t === 'welcome') { st.state = 'connected'; st.since = Date.now(); st.note = ''; backoff = 1000; status(); clearInterval(ping); ping = setInterval(() => { try { ws.send('{"t":"ping"}'); } catch {} }, 20000); return; }
+    if (m.t === 'welcome') { st.state = 'connected'; st.since = Date.now(); st.note = ''; backoff = 1000; status(); clearInterval(ping); ping = setInterval(() => { try { ws.send('{"t":"ping"}'); } catch {} }, 20000); sendCaps(); return; }
     if (m.t === 'refused') { st.state = 'refused'; st.note = 'the token was refused: BRENAI_BRAIN_TOKEN must match the Fly secret'; status(); backoff = 60000; return; }
     if (m.t === 'replaced') { st.state = 'replaced'; st.note = 'another bridge signed in; this one stops'; status(); process.stdout.write('\n'); process.exit(0); }
+    if (m.t === 'tts' && Number.isInteger(m.id)) { if (tts) speak(m); else ws.send(JSON.stringify({ t: 'fail', id: m.id, why: 'voice ' + voiceState })); return; }
     if (m.t === 'job' && Number.isInteger(m.id)) {
       try {
         const text = await think(m, d => { try { ws.send(JSON.stringify({ t: 'delta', id: m.id, d })); } catch {} });
@@ -106,3 +141,4 @@ function connect() {
 function retry() { setTimeout(connect, backoff); backoff = Math.min(30000, Math.max(backoff, 1000) * 2); }
 process.on('SIGINT', () => { process.stdout.write('\n'); process.exit(0); });
 connect();
+loadVoice();

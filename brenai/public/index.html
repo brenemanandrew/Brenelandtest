@@ -235,7 +235,7 @@ async function send(quick) {
         if (!chunk.startsWith('data: ')) continue;
         const ev = JSON.parse(chunk.slice(6));
         if (ev.t === 'delta') { full += ev.d; if (!speaker.on) avatar.talk(); avatar.feel(full); fill(body, full); bubble('her', full, true); log.scrollTop = log.scrollHeight; }
-        else if (ev.t === 'done') { full = ev.text; fill(body, full); bubble('her', full); const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out); }
+        else if (ev.t === 'done') { full = ev.text; fill(body, full); bubble('her', full); avatar.act(full); const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out); }
         else if (ev.t === 'error') throw new Error(ev.error);
       }
     }
@@ -350,28 +350,52 @@ const voice = (() => {
 // device has different voices. The mic is held while she talks unless "headphones" is on, where talking over her stops her.
 const speaker = (() => {
   const SS = window.speechSynthesis, saved = JSON.parse(localStorage.getItem('brenai.speak') || '{}');
-  const v = { supported: !!SS && !!window.SpeechSynthesisUtterance, on: false, voice: saved.voice || '', rate: saved.rate || 1.05, pitch: saved.pitch || 1.1, headphones: !!saved.headphones, speaking: false };
-  v.on = v.supported && saved.on !== false;
+  const v = { supported: !!SS && !!window.SpeechSynthesisUtterance, on: true, voice: saved.voice || '', rate: saved.rate || 1.05, pitch: saved.pitch || 1.1, headphones: !!saved.headphones, speaking: false };
+  v.on = saved.on !== false;
   let pending = 0, tick = null;
-  const store = () => localStorage.setItem('brenai.speak', JSON.stringify({ on: v.on, voice: v.voice, rate: v.rate, pitch: v.pitch, headphones: v.headphones }));
+  const store = () => localStorage.setItem('brenai.speak', JSON.stringify({ on: v.on, voice: v.voice, rate: v.rate, pitch: v.pitch, headphones: v.headphones, engine: v.device ? 'device' : 'pc' }));
   v.voices = () => (v.supported ? SS.getVoices() : []).filter(x => /^en/i.test(x.lang));
   const pick = () => { const all = v.voices(); return all.find(x => x.name === v.voice) || all.find(x => /Aria|Jenny|Samantha|Ava|Google US English|Zira|female/i.test(x.name)) || all[0] || null; };
   const begin = () => { if (v.speaking) return; v.speaking = true; if (!v.headphones) voice.hold(true); tick = setInterval(() => avatar.talk(), 150); };
   const end = () => { v.speaking = false; clearInterval(tick); voice.hold(false); };
-  v.say = text => {
-    if (!v.on || !text) return;
-    // one sentence per utterance: some browsers cut a long one off
-    for (const part of text.match(/[^.!?\u2026]+[.!?\u2026]*\s*/g) || [text]) {
-      if (!part.trim()) continue;
-      const u = new SpeechSynthesisUtterance(part.trim()); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate; u.pitch = v.pitch;
+  // Two engines: her Kokoro voice on the PC (same voice on every device), or this device's own voices as the fallback.
+  v.device = saved.engine === 'device';
+  v.engine = () => (!v.device && brainInfo.tts) ? 'pc' : 'device';
+  const player = new Audio(); let gen = 0;
+  const sentences = text => (text.match(/[^.!?\u2026]+[.!?\u2026]*\s*/g) || [text]).map(x => x.trim()).filter(Boolean);
+  function deviceSay(parts) {
+    if (!v.supported) return;
+    for (const part of parts) { // one sentence per utterance: some browsers cut a long one off
+      const u = new SpeechSynthesisUtterance(part); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate; u.pitch = v.pitch;
       pending++; u.onstart = begin; u.onend = u.onerror = () => { if (--pending <= 0) { pending = 0; end(); } };
       SS.speak(u);
     }
+  }
+  const playBlob = blob => new Promise(done => {
+    const url = URL.createObjectURL(blob); player.src = url; player.playbackRate = v.rate;
+    player.onplaying = begin; player.onended = player.onerror = () => { URL.revokeObjectURL(url); done(); };
+    player.play().catch(() => done());
+  });
+  v.say = async text => {
+    if (!v.on || !text) return;
+    const parts = sentences(text), my = ++gen;
+    if (v.engine() !== 'pc') return deviceSay(parts);
+    // ask for every line at once (the PC makes them in order), play them back to back
+    const clips = parts.map(line => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
+    for (let i = 0; i < clips.length; i++) {
+      const blob = await clips[i]; if (gen !== my) return;
+      if (!blob) { deviceSay(parts.slice(i)); return; } // the PC voice dropped out: finish on the device voice
+      await playBlob(blob); if (gen !== my) return;
+    }
+    end();
   };
-  v.stop = () => { if (!v.supported) return; pending = 0; SS.cancel(); if (v.speaking) end(); };
+  v.stop = () => { gen++; try { player.pause(); } catch {} pending = 0; if (v.supported) SS.cancel(); if (v.speaking) end(); };
   v.set = patch => { Object.assign(v, patch); store(); if (!v.on) v.stop(); };
   // browsers only let a page speak after you have touched it once
-  if (v.supported) addEventListener('pointerdown', () => { try { SS.resume(); if (!SS.speaking) SS.speak(new SpeechSynthesisUtterance('')); } catch {} }, { once: true });
+  addEventListener('pointerdown', () => {
+    try { if (v.supported) { SS.resume(); if (!SS.speaking) SS.speak(new SpeechSynthesisUtterance('')); } } catch {}
+    try { player.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='; player.play().catch(() => {}); } catch {}
+  }, { once: true });
   return v;
 })();
 
@@ -447,7 +471,7 @@ function openPanel(k) {
     p.append(slider('How she reacts', 'expressiveness', 'reserved, dry', 'big, dramatic'), el('label', { textContent: 'Reply length' }));
     const chips = el('div', { className: 'chips' });
     for (const m of ['short', 'medium', 'long']) { const c = el('span', { className: 'chip' + ((settings.length || 'short') === m ? ' sel' : ''), textContent: m }); c.onclick = () => saveSettings({ settings: { length: m } }).then(() => openPanel('react')); chips.append(c); }
-    p.append(chips, el('div', { className: 'note', textContent: 'short = one to three sentences, like texting.' }));
+    p.append(chips, el('div', { className: 'note', textContent: 'short = one or two sentences and one action, like real back-and-forth talk.' }));
   } else if (k === 'temp') {
     p.append(slider('Temperature', 'temperature', 'predictable', 'wild', 'Real sampling temperature on your PC model (0.3 to 1.2, middle is 0.75), plus a matching hint in her instructions. Lower if she rambles or gets odd.'));
   } else if (k === 'sheet') {
@@ -512,22 +536,34 @@ function openPanel(k) {
     }
     // --- her: text to speech ---
     p.append(el('label', { textContent: 'HER VOICE' }));
-    if (!speaker.supported) { p.append(el('div', { className: 'note', textContent: 'This browser cannot speak text.' })); return; }
     const son = el('input', { type: 'checkbox', checked: speaker.on }); son.onchange = () => { speaker.set({ on: son.checked }); drawRing(); };
-    const sel = el('select'); sel.style.cssText = 'width:100%;background:#120e18;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:14px';
+    const selCss = 'width:100%;background:#120e18;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;font-size:14px';
+    const pc = speaker.engine() === 'pc';
+    p.append(el('div', { className: 'note', textContent: brainInfo.tts ? 'Her own voice (Kokoro, on your PC) is ready. It sounds the same on every device.' : 'Her own voice (Kokoro) is not running on the PC right now, so this device\'s voice is used. Restart the bridge with the start line to install and load it.' }));
+    // her Kokoro voice: one choice for every device
+    const ksel = el('select'); ksel.style.cssText = selCss;
+    const LANG = { 'en-us': 'American', 'en-gb': 'British' };
+    for (const x of (brainInfo.voices || []).filter(x => /^en/.test(x.lang || 'en'))) ksel.append(el('option', { value: x.id, textContent: x.name + ' (' + (LANG[x.lang] || x.lang) + ', ' + (x.gender || '').toLowerCase() + ')', selected: x.id === (settings.ttsVoice || 'af_heart') }));
+    ksel.onchange = () => saveSettings({ settings: { ttsVoice: ksel.value } });
+    const dev = el('input', { type: 'checkbox', checked: speaker.device }); dev.onchange = () => { speaker.set({ device: dev.checked }); openPanel('voice'); };
+    // this device's voices (fallback)
+    const sel = el('select'); sel.style.cssText = selCss;
     const fillVoices = () => { sel.textContent = ''; sel.append(el('option', { value: '', textContent: 'Pick for me' })); for (const x of speaker.voices()) sel.append(el('option', { value: x.name, textContent: x.name, selected: x.name === speaker.voice })); };
-    fillVoices(); speechSynthesis.onvoiceschanged = fillVoices;
+    if (speaker.supported) { fillVoices(); speechSynthesis.onvoiceschanged = fillVoices; }
     sel.onchange = () => speaker.set({ voice: sel.value });
     const rate = el('input', { type: 'range', min: 0.7, max: 1.5, step: 0.05, value: speaker.rate }); rate.onchange = () => speaker.set({ rate: +rate.value });
     const pitch = el('input', { type: 'range', min: 0.6, max: 1.6, step: 0.05, value: speaker.pitch }); pitch.onchange = () => speaker.set({ pitch: +pitch.value });
     const hp = el('input', { type: 'checkbox', checked: speaker.headphones }); hp.onchange = () => speaker.set({ headphones: hp.checked });
     const test = el('button', { className: 'small', textContent: 'Test her voice' }); test.onclick = () => { speaker.stop(); const was = speaker.on; speaker.on = true; speaker.say('Okay, this is what I sound like. Good enough?'); speaker.on = was; };
-    p.append(el('label', {}, son, ' She speaks her replies out loud'), el('label', { textContent: 'Voice' }), sel,
+    p.append(el('label', {}, son, ' She speaks her replies out loud'));
+    if (brainInfo.tts) p.append(el('label', { textContent: 'Her voice' }), ksel, el('label', {}, dev, ' Use this device\'s voice instead'));
+    if (!pc) p.append(el('label', { textContent: 'Device voice' }), sel);
+    p.append(
       el('label', { textContent: 'Speed' }), rate, el('div', { className: 'scale' }, el('span', { textContent: 'slow' }), el('span', { textContent: 'fast' })),
-      el('label', { textContent: 'Pitch' }), pitch, el('div', { className: 'scale' }, el('span', { textContent: 'low' }), el('span', { textContent: 'high' })),
+      ...(pc ? [] : [el('label', { textContent: 'Pitch' }), pitch, el('div', { className: 'scale' }, el('span', { textContent: 'low' }), el('span', { textContent: 'high' }))]),
       el('label', {}, hp, ' I am on headphones (keep listening while she talks; talking over her cuts her off)'),
       el('div', { className: 'row' }, test),
-      el('div', { className: 'note', textContent: 'The voices come from this device. Edge has the most natural ones (names ending in "Natural"). Sending a message or tapping the mic button also stops her mid-sentence.' }));
+      el('div', { className: 'note', textContent: 'Sending a message or tapping the mic button stops her mid-sentence.' }));
   } else if (k === 'secret') {
     p.append(el('h3', { textContent: 'Hidden likes' }), el('div', { className: 'note', textContent: 'Dashed = still secret, filled = she has told you. Tap one to flip it. She can grow new ones from good moments; those say (grew). She only admits a secret once she trusts you enough.' }), listEditor('', 'hiddenLikes', true));
   }
@@ -540,9 +576,10 @@ function closeWheel() { $('wheel').classList.remove('open'); }
 $('closeWheel').onclick = closeWheel;
 $('brainBtn').onclick = () => { document.body.classList.remove('big'); openWheel().catch(() => {}); };
 
+let brainInfo = {};
 async function brainStatus() {
   try {
-    const b = await (await fetch('/api/brain')).json();
+    const b = await (await fetch('/api/brain')).json(); brainInfo = b;
     $('brainDot').textContent = b.online ? '\u25cf PC online' + (b.bridge < b.bridgeLatest ? ' (restart bridge to update)' : '') : b.fallback ? '\u25cf Claude' : '\u25cb offline';
     $('brainDot').style.color = b.online ? '#7bd88f' : b.fallback ? '#d4b8ff' : '#ff9a9a';
   } catch {}

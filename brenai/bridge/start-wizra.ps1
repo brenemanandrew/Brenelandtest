@@ -13,4 +13,10 @@ $node = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $node) { $node = @("$env:ProgramFiles\nodejs\node.exe", "${env:ProgramFiles(x86)}\nodejs\node.exe", "$env:LOCALAPPDATA\Programs\nodejs\node.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
 if (-not $node) { $node = (Get-Process node -ErrorAction SilentlyContinue | Select-Object -First 1).Path }
 if (-not $node) { Write-Host "Node.js not found. Install it: winget install -e --id OpenJS.NodeJS.LTS"; exit 1 }
+# her voice (Kokoro): installed once, next to the bridge
+if (-not (Test-Path "$PSScriptRoot\node_modules\kokoro-js")) {
+  $npm = Join-Path (Split-Path $node) "npm.cmd"
+  if (Test-Path $npm) { Write-Host "Installing her voice (one time, a minute or two)..."; Push-Location $PSScriptRoot; & $npm install kokoro-js --no-fund --no-audit --loglevel=error; Pop-Location }
+  else { Write-Host "npm not found next to Node; she will use the device voice instead." }
+}
 & $node "$PSScriptRoot\wizra-bridge.mjs"

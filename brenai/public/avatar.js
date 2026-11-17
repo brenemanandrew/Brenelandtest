@@ -9,6 +9,7 @@
 //   av.feel(text)          her reply so far: picks a passing expression from her words and actions
 //   av.setRenderer(r)    swap what draws her, live (the cartoon below, or the 3D model from avatar-vrm.js)
 //   mount(el, { onTouch(kind) })  onTouch fires when she is touched directly (the page passes it on to her, silently)
+//   av.act(text)           her finished reply: plays the first gesture found in her actions (wave, nod, shrug, stretch...)
 //   av.react(kind, dir)    something was done to her: poke, boop, pat, pet, swat, body, spam, wave, laugh, stare, gift
 // Touch on the avatar itself (tap, stroke, swipe) is handled in here and calls react().
 (function () {
@@ -107,6 +108,22 @@
   }
 
   // ---- the controller: moods, passing expressions, touch, her reserve, the springs. The same for every renderer. ----
+  // things she physically does, read from the actions in her reply: [pattern, gesture, seconds]
+  const GEST = [
+    [/\bwav(e|es|ed|ing)\b|raises? a hand|lifts? a hand|holds up a hand|high[- ]fiv/i, 'wave', 2.6], [/\bnod(s|ded|ding)?\b/i, 'nod', 1.5],
+    [/shak(es|ing) her head/i, 'shake', 1.7], [/\bshrug/i, 'shrug', 1.8], [/\byawn/i, 'yawn', 3], [/\bstretch/i, 'stretch', 3.2],
+    [/\bbows?\b|dips her head/i, 'bow', 2], [/lean(s|ed|ing)? (in|forward|closer)|sits? forward|scoots? (closer|forward)/i, 'lean', 3], [/lean(s|ed|ing)? back|sinks? (back|into)|settles? (back|into)|reclin/i, 'leanback', 3],
+    [/sits? up|straightens?( up)?|perks? up/i, 'situp', 2.6], [/slump|deflat|droops?|sags?/i, 'slump', 3],
+    [/wiggl|kick(s|ing)? her (feet|foot|boots?)|taps? her (foot|boot)|swing(s|ing)? her (feet|legs)|bounces her (foot|leg)/i, 'feet', 2.8], [/shift(s|ed|ing)? in her (seat|chair)|squirms?|fidget/i, 'shift', 3],
+    [/tilt(s|ed|ing)? her head|cock(s|ed)? her head/i, 'tilt', 2.2], [/headbang|bangs her head|bobs her head/i, 'headbang', 2.6], [/flips? her hair|toss(es)? her hair|hair flip/i, 'flip', 1.6],
+    [/looks? away|glances? away|turns? away|averts?|looks? (off )?to the side/i, 'lookaway', 2.6], [/looks? down|stares? at (her|the) (lap|boots|floor|table)|hangs her head/i, 'lookdown', 2.4], [/looks? up|stares? at the ceiling|rolls her eyes/i, 'lookup', 1.8],
+    [/laugh|giggl|snicker|cackl|snort|chuckl/i, 'laugh', 2.2], [/\bsigh|exhales|huffs?/i, 'sigh', 2.2], [/bounc(es|ing)|bops|hops in her seat/i, 'bounce', 2], [/\bdanc|sways? to|grooves?|shimm/i, 'dance', 3.5],
+    [/cring|winc|recoil|shudder|shrinks? back/i, 'cringe', 2], [/jumps?|startl|flinch|jolts?/i, 'jolt', 1.4],
+  ];
+  // what she drifts into on her own when nothing is happening, and how she physically takes a touch
+  const IDLE = [['shift', 3], ['feet', 2.4], ['tilt', 2], ['lookaway', 2.4], ['lookdown', 2], ['sigh', 2.2], ['flip', 1.6], ['stretch', 3.2], ['leanback', 3]];
+  const TOUCH_BODY = { poke: ['jolt', 1.2], boop: ['jolt', 1], pat: ['bounce', 1], swat: ['cringe', 1.6], spam: ['cringe', 2], body: ['lookdown', 1.4], petEnd: ['leanback', 2], gift: ['situp', 2.2], wave: ['wave', 2.2], laugh: ['laugh', 2], stare: ['shift', 2.4] };
+
   function mount(stage, opts = {}) {
     stage.textContent = ''; stage.style.position = 'relative';
     let R = puppet(stage);
@@ -118,6 +135,8 @@
     const taps = [];
     const now = () => performance.now();
 
+    let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
+    function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + 9000 + Math.random() * 14000; if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
     function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; }
     function kick(rot = 0, tx = 0, ty = 0, sq = 0) { sp.rot.v += rot; sp.tx.v += tx; sp.ty.v += ty; sp.sq.v += sq; }
@@ -132,6 +151,7 @@
     }
 
     function react(kind, dir = 1) {
+      if (TOUCH_BODY[kind]) doGesture(...TOUCH_BODY[kind]);
       if (kind === 'poke') { show('flinch', 500); kick(-dir * 260, -dir * 60); setTimeout(() => { show(sour() ? 'grumpy' : 'surprised', 900); }, 480); }
       else if (kind === 'boop') { show('surprised', 500); kick(0, 0, -40, -3); setTimeout(() => { show('blush', 1800); }, 480); }
       else if (kind === 'pat') { show(sour() ? 'suspicious' : 'joy', 1300); kick(0, 0, 90, -4); if (!sour()) emote('✨', 1000); }
@@ -203,7 +223,12 @@
       look.x += (Math.max(-3, Math.min(3, want.x)) - look.x) * Math.min(1, dt * 10); look.y += (Math.max(-3, Math.min(2.5, want.y)) - look.y) * Math.min(1, dt * 10);
       const breathe = Math.sin(t / 900), rot = sp.rot.x * 0.06 + (face.tilt || 0) + (talking ? Math.sin(t / 160) * 0.8 : 0);
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
-      try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, look, rot, tx, ty, sq, breathe }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
+      // a gesture in progress: name, seconds since it began, and an ease in/out weight 0..1
+      // left alone for a while, she moves on her own
+      if (!gesture && !talking && !thinking && t > idleAt) { if (idleAt) doGesture(...IDLE[Math.random() * IDLE.length | 0]); idleAt = t + 9000 + Math.random() * 14000; }
+      let g = null;
+      if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
+      try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
       const eo = Math.max(0, Math.min(1, (emoteUntil - t) / 300)); em.style.opacity = eo; em.style.transform = `translateY(${(eo - 1) * 6}px)`;
       em.style.setProperty('--emote', Math.max(1, stage.clientWidth / 104));
       if (stage.isConnected) requestAnimationFrame(frame); else R.dispose();
@@ -216,6 +241,14 @@
       talk() { talkUntil = now() + 350; thinking = false; },
       feel(text) { text = String(text).slice(-140); for (const [re, face] of FEEL) if (re.test(text)) { show(face, 5000); return face; } return null; },
       react,
+      // her finished reply: any action in it that is a gesture she can do gets done (the first one found)
+      act(text) {
+        const found = [];
+        for (const m of String(text).matchAll(/\*([^*]+)\*/g)) for (const [re, name, dur] of GEST) if (re.test(m[1])) { found.push([name, dur]); break; }
+        let wait = 0; for (const [name, dur] of found.slice(0, 3)) { setTimeout(() => doGesture(name, dur), wait); wait += dur * 1000 * 0.85; }
+        return found.map(f => f[0]);
+      },
+      gesture: doGesture,
       // swap the picture live; null goes back to the cartoon
       setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); },
     };

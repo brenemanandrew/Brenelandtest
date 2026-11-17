@@ -35,7 +35,7 @@ const REPLY_TOKENS = Number(process.env.REPLY_TOKENS || 700);
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
 // ---------- the PC brain (bridge over a WebSocket) ----------
-const brain = { ws: null, model: '', served: 0, failed: 0, since: 0 };
+const brain = { ws: null, model: '', served: 0, failed: 0, since: 0, tts: false, voices: [] };
 const jobs = new Map(); let jobId = 1;
 function brainJob({ stream, ...job }, onDelta) {
   return new Promise((resolve, reject) => {
@@ -68,17 +68,29 @@ function onBrainSocket(ws) {
     }
     if (m.t === 'delta') { const j = jobs.get(m.id); if (j && j.onDelta && typeof m.d === 'string') j.onDelta(m.d); }
     else if (m.t === 'done') endJob(m.id, null, String(m.text || ''));
+    else if (m.t === 'caps') { brain.tts = !!m.tts; brain.voices = Array.isArray(m.voices) ? m.voices.slice(0, 80).map(v => ({ id: String(v.id).slice(0, 30), name: String(v.name).slice(0, 30), lang: String(v.lang).slice(0, 8), gender: String(v.gender).slice(0, 10) })) : []; console.log('[brain] voice ready,', brain.voices.length, 'voices'); }
+    else if (m.t === 'audio') { const j = jobs.get(m.id); if (j) { clearTimeout(j.timer); jobs.delete(m.id); j.resolve(String(m.wav || '')); } }
     else if (m.t === 'fail') endJob(m.id, 'Your PC could not answer (' + String(m.why || 'error').slice(0, 60) + '). Is Bionic running with the model loaded?');
   });
   ws.on('close', () => {
     if (brain.ws !== ws) return;
-    brain.ws = null; console.log('[brain] bridge disconnected');
+    brain.ws = null; brain.tts = false; brain.voices = []; console.log('[brain] bridge disconnected');
     for (const id of [...jobs.keys()]) endJob(id, 'Your PC went offline mid-answer.');
   });
   ws.on('error', () => {});
 }
 
 // Slider 0..100 -> a real sampling temperature for the local model.
+// One spoken line: the PC's Kokoro voice turns it into a WAV (base64 over the socket).
+function ttsJob(text, voice, speed) {
+  return new Promise((resolve, reject) => {
+    if (!brain.ws || !brain.tts) return reject(new Error('no voice'));
+    const id = jobId++;
+    const timer = setTimeout(() => { jobs.delete(id); reject(new Error('voice timeout')); }, 45000);
+    jobs.set(id, { resolve, reject, timer });
+    brain.ws.send(JSON.stringify({ t: 'tts', id, text, voice, speed }));
+  });
+}
 const tempOf = v => +(0.3 + (Math.max(0, Math.min(100, v)) / 100) * 0.9).toFixed(2);
 // rough token count (about 4 characters a token) to keep the chat inside the loaded context
 const toks = s => Math.ceil(String(s).length / 3.6);
@@ -163,16 +175,25 @@ async function replyLocal(userText, onDelta) {
   const system = '';
   const text = await brainJob({ system, messages: turns, max_tokens: L.tokens, temperature: tempOf(db.settings.temperature), stream: true,
     repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
-  return dropRepeats(cleanLocal(text));
+  return trimLength(dropRepeats(cleanLocal(text)), L);
 }
-const LENGTHS = {
-  short: { tokens: 130, say: 'in 1 to 3 short sentences' },
-  medium: { tokens: 260, say: 'in a short paragraph at most' },
-  long: { tokens: 600, say: 'as long as the moment needs, a few paragraphs at most' },
+const LENGTHS = { // tokens: hard cap on the model; say/act: how many spoken sentences and actions survive the trim
+  short: { tokens: 90, say: 2, act: 1 },
+  medium: { tokens: 220, say: 5, act: 2 },
+  long: { tokens: 600, say: 99, act: 9 },
 };
 // "*waves* hey. how are you?" -> ['*waves*', ' hey.', ' how are you?']
 const units = t => String(t).match(/\*[^*]+\*|[^*.!?\n]+[.!?]*["')\]]*\s*|\n+/g) || [];
 const norm = u => u.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Whatever the model wrote, only the first few sentences and actions are kept (roleplay models pad).
+function trimLength(text, L) {
+  let say = 0, act = 0; const out = [];
+  for (const u of units(text)) {
+    if (!u.trim()) { out.push(u); continue; }
+    if (u.trim().startsWith('*')) { if (act++ < L.act) out.push(u); } else if (say++ < L.say) out.push(u); else break;
+  }
+  return out.join('').trim() || text;
+}
 // Cut any sentence or action she already used, word for word, in her last few replies.
 function dropRepeats(text) {
   const seen = new Set();
@@ -257,6 +278,7 @@ function applySettings(body) {
   if (MOODS.includes(s.mood)) S.mood = s.mood;
   for (const k of ['expressiveness', 'temperature']) if (Number.isFinite(+s[k])) S[k] = Math.max(0, Math.min(100, Math.round(+s[k])));
   if (['short', 'medium', 'long'].includes(s.length)) S.length = s.length;
+  if (typeof s.ttsVoice === 'string' && /^[a-z]{2}_[a-z0-9_]{1,24}$/.test(s.ttsVoice)) S.ttsVoice = s.ttsVoice;
   if (s.avatarKind === 'puppet' || (s.avatarKind === 'vrm' && fs.existsSync(AVATAR))) S.avatarKind = s.avatarKind;
   if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140)]).filter(x => x[0] && x[1]).slice(0, 16);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
@@ -287,7 +309,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 2 });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 3, tts: brain.tts, voices: brain.voices });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
@@ -328,6 +350,17 @@ const server = http.createServer(async (req, res) => {
           save();
           return json(res, 200, { settings: db.settings });
         }
+      }
+
+      if (url.pathname === '/api/tts' && req.method === 'POST') {
+        const { text } = await readBody(req);
+        const line = String(text || '').trim().slice(0, 800);
+        if (!line) return json(res, 400, { error: 'empty' });
+        try {
+          const wav = Buffer.from(await ttsJob(line, db.settings.ttsVoice || 'af_heart', 1), 'base64');
+          res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': wav.length, 'cache-control': 'no-store' });
+          return res.end(wav);
+        } catch (e) { return json(res, 503, { error: e.message }); }
       }
 
       if (url.pathname === '/api/touch' && req.method === 'POST') {
@@ -386,7 +419,7 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) json(res, 500, { error: e.message }); else res.end();
   }
 });
-const wss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
+const wss = new WebSocketServer({ noServer: true, maxPayload: 24 << 20 });
 server.on('upgrade', (req, sock, head) => {
   if (new URL(req.url, 'http://x').pathname !== '/brain') return sock.destroy();
   wss.handleUpgrade(req, sock, head, ws => onBrainSocket(ws));
