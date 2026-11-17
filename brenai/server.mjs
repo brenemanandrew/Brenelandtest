@@ -15,6 +15,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
+import { detectLeave, outcome, glowNote, clock } from './away.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -32,6 +33,7 @@ const LEARN_EVERY = Number(process.env.LEARN_EVERY || 6); // user messages betwe
 const BRAIN_TOKEN = process.env.BRENAI_BRAIN_TOKEN || ''; // shared secret with the bridge on the PC
 const CONTEXT_TOKENS = Number(process.env.CONTEXT_TOKENS || 32768); // the context length the model is loaded with in Bionic
 const REPLY_TOKENS = Number(process.env.REPLY_TOKENS || 700);
+const AWAY_SPEED = Number(process.env.AWAY_SPEED || 1);  // tests: how many times faster her outings and the after-effects run
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
 // ---------- the PC brain (bridge over a WebSocket) ----------
@@ -119,7 +121,7 @@ function authed(req) {
 // ---------- the model call ----------
 function systemBlocks() {
   // Stable first so the cache holds; this only changes when settings, the sheet or the notes change.
-  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) }];
+  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') }];
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -168,16 +170,18 @@ async function replyLocal(userText, onDelta) {
   const turns = [{ role: 'user', content: withPre(db.log[db.log.length - 1]) }];
   budget -= toks(turns[0].content);
   for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
-    const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: withPre(e) };
+    const e = db.log[i]; if (e.who === 'sys') continue;        // "Wizra left" lines are for the screen, not for her
+    const t = { role: e.who === 'me' ? 'user' : 'assistant', content: withPre(e) };
     budget -= toks(t.content); if (budget < 0) break;
-    turns.unshift(t);
+    if (turns[0].role === t.role) turns[0].content = t.content + '\n' + turns[0].content; // messages he left while she was out arrive as one turn
+    else turns.unshift(t);
   }
   while (turns.length && turns[0].role !== 'user') turns.shift();
   turns.unshift({ role: 'user', content: setup }, { role: 'assistant', content: '(ready)' });
   const system = '';
   const text = await brainJob({ system, messages: turns, max_tokens: L.tokens, temperature: tempOf(db.settings.temperature), stream: true,
     repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
-  return trimLength(dropRepeats(cleanLocal(text)), L);
+  return trimLength(dropRepeats(dropTags(cleanLocal(text))), L);
 }
 const LENGTHS = { // tokens: hard cap on the model; say/act: how many spoken sentences and actions survive the trim
   short: { tokens: 90, say: 2, act: 1 },
@@ -187,6 +191,14 @@ const LENGTHS = { // tokens: hard cap on the model; say/act: how many spoken sen
 // "*waves* hey. how are you?" -> ['*waves*', ' hey.', ' how are you?']
 const units = t => String(t).match(/\*[^*]+\*|[^*.!?\n]+[.!?]*["')\]]*\s*|\n+/g) || [];
 const norm = u => u.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Stage directions that are only a speech tag ("*she says softly,*", "She sets her book down before asking,") read as
+// broken sentences in a chat: drop them, and drop a last fragment that trails off on a comma.
+const SPEECH_TAG = /\b(says?|said|asks?|asking|adds?|adding|repl(y|ies|ying)|murmurs?|mutters?|whispers?|continues?|continuing|answers?|answering|responds?|responding|speaks?|speaking)\b[^.!?]*[,:]\s*\*?\s*$/i;
+function dropTags(text) {
+  const us = units(text).filter(u => !SPEECH_TAG.test(u.trim()));
+  while (us.length > 1 && /[,:]\s*\*?\s*$/.test(us[us.length - 1].trim())) us.pop();
+  return us.join('').trim() || text;
+}
 // Whatever the model wrote, only the first few sentences and actions are kept (roleplay models pad).
 function trimLength(text, L) {
   let say = 0, act = 0; const out = [];
@@ -247,7 +259,7 @@ async function replyClaude(userText, onDelta) {
 
 // Every few messages, a short side call updates her notes on how the user talks and what they like.
 async function learn() {
-  const recent = db.log.slice(-40).map(e => `${e.who === 'me' ? USER_NAME : 'Wizra'}: ${e.text}`).join('\n');
+  const recent = db.log.filter(e => e.who !== 'sys' && e.text).slice(-40).map(e => `${e.who === 'me' ? USER_NAME : 'Wizra'}: ${e.text}`).join('\n');
   const prompt = LEARN_PROMPT(USER_NAME, db.profile, db.sheet, db.settings, recent);
   let text;
   if (brain.ws) {
@@ -294,6 +306,36 @@ function applySettings(body) {
   save();
 }
 
+// ---------- her comings and goings (away.mjs has the rules) ----------
+// db.away = { since, until, where, cover } while she is out; db.glow = { kind, lying, truth, tells, talk, where, until } for the
+// hour after she is back, while it still shows.
+function currentGlow() { if (db.glow && Date.now() > db.glow.until) { db.glow = null; save(); } return db.glow; }
+const awayView = () => db.away ? { where: db.away.where, until: db.away.until, back: clock(db.away.until), due: Date.now() >= db.away.until } : null;
+const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
+function leaveNow(leave) {
+  const now = Date.now();
+  db.away = { since: now, until: now + leave.minutes * 60000 / AWAY_SPEED, where: leave.where, cover: leave.cover, minutes: leave.minutes };
+  db.log.push({ who: 'sys', text: `Wizra left for ${leave.where}. Back around ${clock(db.away.until)}.`, at: now });
+  console.log(`[away] left for ${leave.where}, ${leave.minutes} min`);
+}
+// She walks back in: decide what really happened, then let her say something as she arrives (seeing anything he sent meanwhile).
+async function comeBack(onDelta) {
+  const a = db.away, out = process.env.AWAY_TEST_LIE ? outcome(a, 0, 0.1) : outcome(a), now = Date.now(); // (the env switch forces a cover story, for tests)
+  const missed = db.log.filter(e => e.who === 'me' && e.at > a.since && e.text).length;
+  db.away = null;
+  db.glow = out.kind ? { ...out, where: a.where, until: now + 60 * 60000 / AWAY_SPEED } : null;
+  db.log.push({ who: 'sys', text: 'Wizra is back.', at: now });
+  const how = out.lying ? 'tries to slip back in quietly from' : 'comes back in from';
+  const pre = `looks up as she ${how} ${a.where}${missed ? '; the messages above were sent while she was out and she is only seeing them now' : ''}`;
+  db.log.push({ who: 'me', text: '', at: now, pre, hidden: true });
+  console.log(`[away] back from ${a.where}${out.kind ? ', ' + out.kind + (out.lying ? ' (cover story)' : '') : ''}`);
+  try {
+    const full = await reply(`*${pre}*`, onDelta);
+    db.log.push({ who: 'her', text: full, at: Date.now() });
+    return full;
+  } finally { save(); }
+}
+
 // ---------- http ----------
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 function readBody(req) {
@@ -325,7 +367,9 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, { error: 'login' });
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.map(({ pre, ...e }) => e), name: USER_NAME, settings: db.settings });
+      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, settings: db.settings, away: awayView(), glow: glowView() });
+
+      if (url.pathname === '/api/away') return json(res, 200, { away: awayView(), glow: glowView() });
 
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
@@ -372,7 +416,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/reset' && req.method === 'POST') {
-        db.history = []; db.log = []; db.sinceLearn = 0; save();
+        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; save();
         return json(res, 200, { ok: true });
       }
 
@@ -385,6 +429,10 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
         // what he did to her since her last reply, and what he can see her doing right now: both ride silently in front of his words
+        if (db.away) { // she is out: the message waits for her
+          db.log.push({ who: 'me', text: msg, at: Date.now() }); save(); busy = false;
+          send({ t: 'away', away: awayView() }); return res.end();
+        }
         const seen = String(doing || '').replace(/[^a-z ]/gi, '').trim().slice(0, 60);
         const pre = [takeTouches(), seen ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
@@ -392,8 +440,9 @@ const server = http.createServer(async (req, res) => {
           const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => send({ t: 'delta', d }));
           db.log.push({ who: 'her', text: full, at: Date.now() });
           db.sinceLearn++;
+          const leave = detectLeave(full); if (leave) leaveNow(leave);
           save();
-          send({ t: 'done', text: full });
+          send({ t: 'done', text: full, away: awayView(), glow: glowView() });
           if (db.sinceLearn >= LEARN_EVERY) { db.sinceLearn = 0; learn().catch(e => console.error('[learn]', e.message)); }
         } catch (e) {
           console.error('[chat]', e.status || '', e.message);
@@ -403,6 +452,28 @@ const server = http.createServer(async (req, res) => {
           busy = false;
           res.end();
         }
+        return;
+      }
+      // She comes back: when her time is up (the page asks), or early if he calls her back.
+      if (url.pathname === '/api/return' && req.method === 'POST') {
+        const { force } = await readBody(req);
+        if (!db.away) return json(res, 409, { error: 'She is not out.' });
+        if (!force && Date.now() < db.away.until) return json(res, 409, { error: 'Not back yet.' });
+        if (busy) return json(res, 409, { error: 'busy' });
+        busy = true;
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+        const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
+        const was = db.away;
+        try {
+          const full = await comeBack(() => {});
+          send({ t: 'done', text: full, away: null, glow: glowView(), returned: true });
+        } catch (e) {
+          console.error('[return]', e.message);
+          while (db.log.length && db.log[db.log.length - 1].hidden) db.log.pop();
+          if (db.log.length && db.log[db.log.length - 1].who === 'sys') db.log.pop();
+          db.away = was; db.glow = null; save();   // could not reach her brain: she is still out, try again later
+          send({ t: 'error', error: e.message });
+        } finally { busy = false; res.end(); }
         return;
       }
       return json(res, 404, { error: 'not found' });

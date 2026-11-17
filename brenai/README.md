@@ -33,6 +33,11 @@ Or from the phone: add repo secrets `BRENAI_BRAIN_TOKEN` and `BRENAI_PASSWORD` (
 ## Local run
 `npm install && ANTHROPIC_API_KEY=... node server.mjs` then http://localhost:8080
 
+## Coming and going
+`away.mjs` holds the rules. When her reply says she is leaving right now (a goodbye, "gotta run", walking out in an action; not a future plan), the server marks her out for a real stretch of time that depends on where she said she was going (bathroom a few minutes, class about an hour and a half, bed until morning). While she is out: the avatar walks to the door and the chair is empty, an "Out" note shows with a "Call her back" button, and anything typed waits for her. When her time is up the page asks the server to bring her back, and she says something as she walks in. About 38% of the time a respectable excuse (class, study group, work) was a cover story: she sneaks in and for the next hour it shows (tipsy, high, groggy, hyper or upset) in her face, body and the way she talks, while her prompt tells her to deny it badly. Honest outings can show too. `AWAY_SPEED` and `AWAY_TEST_LIE` are test switches.
+
+Replies are decided on the server first (trimmed, de-duplicated, speech tags like "she says softly," dropped) and then typed out by the page, so nothing rearranges after it appears.
+
 ## Look
 The "twilight" theme (end of the `<style>` block in `public/index.html`) sits on top of the base layout: gradient sky, white speech bubbles, glassy panels, and a settings wheel of coloured icon bubbles (`ICON` in the script).
 

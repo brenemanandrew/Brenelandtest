@@ -203,6 +203,14 @@
   .fanItem:active { filter:brightness(1.15); }
   #meBox.fan::before { content:""; position:fixed; inset:0; background:rgba(20,10,45,.45); z-index:0; pointer-events:none; }
   @media (min-width:900px) { .fanItem { width:58px; height:58px; margin:-29px 0 0 -29px; } .fanItem span { font-size:27px; } }
+
+  /* she is out */
+  #herSide { position:relative; min-width:0; height:100%; display:flex; align-items:center; }
+  #awayNote { position:absolute; inset:auto 0 auto 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-radius:18px; background:rgba(20,12,45,.55); border:1px dashed rgba(255,255,255,.45); font-size:14px; }
+  #awayNote[hidden] { display:none; }
+  #callBack { border:0; border-radius:999px; padding:6px 12px; background:rgba(255,255,255,.18); color:#fff; font:inherit; font-size:13px; font-weight:700; }
+  .line.sys { text-align:center; font-size:12.5px; color:rgba(255,255,255,.72); margin:14px 0; letter-spacing:.02em; }
+  .line.sys::before, .line.sys::after { content:" \00b7 "; opacity:.5; }
 </style>
 </head>
 <body>
@@ -214,7 +222,10 @@
       <button id="bigBtn" title="Expand / shrink">&#10530;</button>
       <button id="brainBtn" title="Her settings">&#129504;</button>
     </div></div>
-    <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
+    <div id="herSide">
+      <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
+      <div id="awayNote" hidden><span id="awayText"></span><button id="callBack" title="Ask her to come back now">Call her back</button></div>
+    </div>
   </div>
   <div id="logHead"><span>CHAT AREA</span><span id="brainDot">...</span></div>
   <div id="logWrap"><div id="log"></div></div>
@@ -244,7 +255,7 @@
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 // Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
-const avatar = WizraAvatar.mount(stage, { onThumb: url => setHerThumb(url), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
+const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); }, onThumb: url => setHerThumb(url), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -287,7 +298,7 @@ function fill(el, text) {
 }
 // One message: a small round picture of who it is (a still image), what they said beside it, and each action in its own
 // outlined strip underneath.
-let herThumb = '';
+let herThumb = localStorage.getItem('brenai.thumb') || '';
 function addLine(who, text) {
   const div = document.createElement('div'); div.className = 'msg ' + who;
   const pic = document.createElement('img'); pic.className = 'pic'; pic.alt = who === 'her' ? 'Wizra' : myName; pic.src = who === 'her' ? (herThumb || 'me.svg') : 'me.svg'; if (who === 'her') pic.dataset.her = '1';
@@ -296,7 +307,7 @@ function addLine(who, text) {
   log.scrollTop = log.scrollHeight;
   return body;
 }
-function setHerThumb(url) { herThumb = url; for (const i of document.querySelectorAll('img[data-her]')) i.src = url; }
+function setHerThumb(url) { herThumb = url; try { localStorage.setItem('brenai.thumb', url); } catch {} for (const i of document.querySelectorAll('img[data-her]')) i.src = url; }
 function addError(msg) { const d = document.createElement('div'); d.className = 'line err'; d.textContent = msg; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
 // Word balloons: speech only. They stay while her reply streams, then fade; scrolling or touching one keeps it up.
@@ -322,36 +333,98 @@ async function load() {
   const r = await api('/api/state'); const s = await r.json();
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
-  for (const e of s.log) addLine(e.who, e.text);
+  for (const e of s.log) e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text);
+  setPresence(s.away, s.glow, true);
+}
+function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+
+// ---------- whether she is here ----------
+// When she says she is leaving she really goes (the server decides and keeps time). While she is out the chair is empty and
+// what you type waits for her. When she comes back it may show where she has really been.
+let away = null, glow = null, returning = false, toldAway = false;
+function setPresence(a, g, instant) {
+  const was = away; away = a || null; glow = g || null;
+  $('awayNote').hidden = !away;
+  if (away) { $('awayText').textContent = 'Out: ' + away.where + '. Back around ' + away.back + '.'; input.placeholder = 'She is out. Leave her a message'; }
+  else { input.placeholder = 'Talk or type, *actions*'; toldAway = false; }
+  if (away && !was) avatar.presence(instant ? 'gone' : 'leave');
+  avatar.setState(glow ? glow.kind : '');
+}
+async function comeBack(force) {
+  if (!away || returning || sendBtn.disabled) return;
+  returning = true; sendBtn.disabled = true;
+  try {
+    const r = await api('/api/return', { force: !!force });
+    if (!r.ok) return;
+    await readReply(r, null, ev => { setPresence(null, ev.glow); avatar.presence('return', { sneak: !!(ev.glow && ev.glow.sneak) }); addSys('Wizra is back.'); return new Promise(ok => setTimeout(ok, 2600)); });
+  } catch (e) { if (e.message !== 'login') console.error(e); }
+  finally { returning = false; sendBtn.disabled = false; }
+}
+setInterval(async () => { // keep time with the server: is she due back, has the after-effect worn off
+  if (document.hidden || $('login').style.display === 'grid') return;
+  try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
+    if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } }
+  } catch {}
+}, 15000);
+
+// Her reply is decided first, then typed out: nothing is rearranged after it appears. Speech starts with the typing.
+function typeOut(body, text) {
+  const who = body.dataset.who, segs = split(clean(text), who).map(p => ({ cls: p.a ? 'act' : 'say', t: (p.a ? actLine(who, p.a) : p.s.replace(/["“”]/g, '')).trim() })).filter(x => x.t);
+  body.textContent = '';
+  return new Promise(done => {
+    let si = 0, ci = 0, el = null, said = ''; const total = segs.reduce((n, x) => n + x.t.length, 0), per = Math.max(1, Math.round(total / 110)); // about two seconds for a long reply, quicker for a short one
+    const tick = () => {
+      if (si >= segs.length) { bubble('her', text); log.scrollTop = log.scrollHeight; return done(); }
+      const seg = segs[si];
+      if (!el) { el = document.createElement('div'); el.className = seg.cls; body.appendChild(el); }
+      ci = Math.min(seg.t.length, ci + per); el.textContent = seg.t.slice(0, ci);
+      if (seg.cls === 'say') { const b = $('herBubble'); b.textContent = (said + ' ' + el.textContent).trim(); $('herWrap').classList.add('show'); b.scrollTop = b.scrollHeight; clearTimeout(timers.her); }
+      if (ci >= seg.t.length) { if (seg.cls === 'say') said = (said + ' ' + seg.t).trim(); si++; ci = 0; el = null; }
+      log.scrollTop = log.scrollHeight;
+      setTimeout(tick, 24);
+    };
+    tick();
+  });
+}
+// Reads one reply from the server (a chat answer, or what she says as she walks back in) and puts it on the screen.
+async function readReply(r, body, beforeType) {
+  const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read(); if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n\n')) >= 0) {
+      const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
+      if (!chunk.startsWith('data: ')) continue;
+      const ev = JSON.parse(chunk.slice(6));
+      if (ev.t === 'away') { if (body) body.parentElement.remove(); setPresence(ev.away, null, true); if (!toldAway) { toldAway = true; addSys('She is out. She will see this when she is back.'); } return; }
+      if (ev.t === 'error') throw new Error(ev.error);
+      if (ev.t !== 'done') continue; // (the words arrive whole; see typeOut)
+      if (beforeType) await beforeType(ev);
+      if (!body) body = addLine('her', '');
+      const full = ev.text; avatar.setThinking(false); avatar.feel(full); avatar.act(full);
+      const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
+      const flap = speaker.on ? null : setInterval(() => avatar.talk(), 120); // no voice: her mouth keeps time with the typing
+      await typeOut(body, full); clearInterval(flap);
+      if (ev.away && !ev.returned) { await new Promise(ok => setTimeout(ok, 1400)); addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); setPresence(ev.away, null, false); }
+      else if (ev.glow !== undefined && !ev.returned) { glow = ev.glow; avatar.setState(glow ? glow.kind : ''); }
+    }
+  }
 }
 
 async function send(quick) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
-  sendBtn.disabled = true; speaker.stop(); avatar.setThinking(true); userDid(text);
+  sendBtn.disabled = true; speaker.stop(); if (!away) { avatar.setThinking(true); userDid(text); }
   addLine('me', text); bubble('me', text);
-  const body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>';
-  let full = '';
+  let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   try {
     const r = await api('/api/chat', { text, doing: avatar.activity() });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
-    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
-    for (;;) {
-      const { value, done } = await reader.read(); if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i;
-      while ((i = buf.indexOf('\n\n')) >= 0) {
-        const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
-        if (!chunk.startsWith('data: ')) continue;
-        const ev = JSON.parse(chunk.slice(6));
-        if (ev.t === 'delta') { full += ev.d; if (!speaker.on) avatar.talk(); avatar.feel(full); fill(body, full); bubble('her', full, true); log.scrollTop = log.scrollHeight; }
-        else if (ev.t === 'done') { full = ev.text; fill(body, full); bubble('her', full); avatar.act(full); const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out); }
-        else if (ev.t === 'error') throw new Error(ev.error);
-      }
-    }
+    await readReply(r, body);
   } catch (e) {
-    if (e.message !== 'login') { body.parentElement.remove(); addError(e.message); }
+    if (e.message !== 'login') { if (body && body.parentElement && body.parentElement.isConnected) body.parentElement.remove(); addError(e.message); }
   } finally {
     sendBtn.disabled = false; avatar.setThinking(false);
     if (!matchMedia('(pointer:coarse)').matches && !voice.on) input.focus();
@@ -412,6 +485,7 @@ $('bigBtn').onclick = () => { const big = document.body.classList.toggle('big');
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
+$('callBack').onclick = () => { if (confirm('Call her back early?')) comeBack(true); };
 $('newChat').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); closeWheel(); load(); } };
 $('loginForm').onsubmit = async e => {
   e.preventDefault();

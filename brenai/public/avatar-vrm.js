@@ -7,6 +7,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
 const EXPR = {
+  tipsy: { happy: 0.5, blink: 0.28 }, high: { relaxed: 0.55, happy: 0.3, blink: 0.44 },
   neutral: {}, happy: { happy: 0.6 }, playful: { happy: 0.35 }, chill: { relaxed: 0.6 }, focused: { angry: 0.2, blink: 0.25 }, excited: { happy: 1 },
   tired: { relaxed: 0.4, blink: 0.45 }, grumpy: { angry: 0.6 }, sad: { sad: 0.7 }, anxious: { sad: 0.35, surprised: 0.3 }, joy: { happy: 1 },
   blush: { relaxed: 0.5, sad: 0.2 }, surprised: { surprised: 1 }, flinch: { blink: 1, sad: 0.4 }, dizzy: { blink: 0.8, sad: 0.5 }, angry: { angry: 1 },
@@ -106,7 +107,7 @@ export async function create(url) {
   const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0 };
   const hipsNode = B('hips'), hipY0 = hipsNode ? hipsNode.position.y : 0;
   // Her mood also sits in her body, not just her face: [spine lean, head pitch, head yaw, head roll, shoulders up]
-  const BODY = { sad: [0.1, 0.22, 0, 0.05, -0.06], grumpy: [-0.04, 0.08, 0.3, 0, 0.05], tired: [0.06, 0.2, 0, 0.14, -0.08], excited: [0.1, -0.06, 0, 0, 0.08], joy: [-0.03, -0.1, 0, 0.05, 0.06],
+  const BODY = { tipsy: [0.02, 0.03, 0, 0.1, 0], high: [-0.05, -0.05, 0, 0.1, -0.05], sad: [0.1, 0.22, 0, 0.05, -0.06], grumpy: [-0.04, 0.08, 0.3, 0, 0.05], tired: [0.06, 0.2, 0, 0.14, -0.08], excited: [0.1, -0.06, 0, 0, 0.08], joy: [-0.03, -0.1, 0, 0.05, 0.06],
     surprised: [-0.1, -0.08, 0, 0, 0.18], angry: [0.12, 0.12, 0, 0, 0.1], blush: [0, 0.14, 0.36, 0.08, 0.16], thinking: [-0.03, -0.12, 0.2, 0.14, 0], suspicious: [0.04, 0.06, 0.22, -0.1, 0],
     anxious: [0.03, 0.08, 0, 0.04, 0.2], chill: [-0.06, -0.04, 0, 0.06, -0.04], playful: [0.05, 0, 0, 0.12, 0.03], eyeroll: [-0.03, -0.14, 0.15, 0.08, 0], flinch: [-0.1, 0.05, 0, 0, 0.3], dizzy: [0, 0.1, 0, 0.2, 0], focused: [0.1, 0.06, 0, 0, 0], happy: [0.02, -0.04, 0, 0.04, 0.03] };
   const body = [0, 0, 0, 0, 0];
@@ -155,6 +156,18 @@ export async function create(url) {
   box(0.7, 0.9, 0.45, COUNTER.x, floorY + 0.45, COUNTER.z, '#3a2148'); box(0.76, 0.04, 0.5, COUNTER.x, floorY + 0.92, COUNTER.z, '#d9cfe6'); // counter + top
   const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.19, 20), mat('#c9ccd6')); kettle.position.set(COUNTER.x + 0.15, floorY + 1.035, COUNTER.z); scene.add(kettle); tag(kettle, 'counter');
   const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 16), mat('#6b3a2a')); jar.position.set(COUNTER.x - 0.2, floorY + 1.01, COUNTER.z - 0.05); scene.add(jar);
+
+  // the door she leaves and comes back by, out to the right
+  const DOOR = [2.75, hip.z + 0.55];
+  TAG = 'door'; box(0.08, 2.05, 1.0, 3.05, floorY + 1.02, DOOR[1], '#3b2a1c'); box(0.1, 2.15, 0.08, 3.04, floorY + 1.07, DOOR[1] - 0.54, '#2a1d14'); box(0.1, 2.15, 0.08, 3.04, floorY + 1.07, DOOR[1] + 0.54, '#2a1d14');
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), mat('#d9b25a')); knob.position.set(2.99, floorY + 1.0, DOOR[1] + 0.36); scene.add(knob);
+  // flushed cheeks: two soft discs on her face, shown when she blushes (or has been drinking)
+  const rawHead = vrm.humanoid.getRawBoneNode('head');
+  const blushMat = new THREE.MeshBasicMaterial({ color: '#ff5f8f', transparent: true, opacity: 0, depthTest: false });
+  const eyeOff = (vrm.lookAt && vrm.lookAt.offsetFromHeadBone) ? vrm.lookAt.offsetFromHeadBone : new THREE.Vector3(0, 0.07, 0.03);
+  const cheeks = [-1, 1].map(sx => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.014, 20), blushMat); m.scale.set(1.45, 0.8, 1); m.position.set(sx * 0.047, eyeOff.y - 0.04, eyeOff.z + 0.062); m.renderOrder = 20; rawHead.add(m); return m; });
+  const fwd = new THREE.Vector3(), toCam = new THREE.Vector3();
+  let blushNow = 0;
 
   // a floor lamp behind the chair that comes on as it gets dark
   TAG = 'lamp'; box(0.035, 1.5, 0.035, 0.75, floorY + 0.75, backZ + 0.1, '#1c1626'); box(0.3, 0.03, 0.3, 0.75, floorY + 0.015, backZ + 0.1, '#1c1626');
@@ -206,9 +219,9 @@ export async function create(url) {
     else if (z > hip.z + 0.62 && x < 0.8) w.push(go([0.98, z]));
     return [...w, go([x, z])];
   }
-  function plan(label, steps, after = '') {
+  function plan(label, steps, after = '', stayOut = false) {
     if (rt.stand < 0.05) { rt.x = STAND_AT[0]; rt.z = STAND_AT[1]; rt.yaw = 0; }
-    Object.assign(rt, { act: 'up', steps: [go(EXIT), ...steps, run(() => { rt.steps.push(...wayHome()); })], i: (rt.stand > 0.5 ? 1 : 0), stepT: 0, label, after });
+    Object.assign(rt, { act: 'up', steps: [go(EXIT), ...steps, ...(stayOut ? [] : [run(() => { rt.steps.push(...wayHome()); })])], i: (rt.stand > 0.5 ? 1 : 0), stepT: 0, label, after });
   }
   const ERRAND = {
     pace: () => plan('up and pacing around the room', [go(R_BACK), go(L_BACK), go(R_BACK)]),
@@ -217,7 +230,7 @@ export async function create(url) {
     fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), wait(2.2)], 'sip'),
   };
   function startActivity(name) {
-    const now = performance.now();
+    const now = performance.now(); if (rt.act === 'gone' || rt.leaving) return;   // not here, or on her way out
     if (name === 'sit') { if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.after = ''; } else if (rt.act !== 'sitdown') rt.act = 'sit'; rt.nextAt = now + 20000 + Math.random() * 25000; return; }
     if (name === 'read' && rt.bookHome === 'shelf') name = 'fetchbook';             // nothing to read until she gets a book
     if (name === 'returnbook' && rt.bookHome === 'shelf') return;
@@ -225,9 +238,21 @@ export async function create(url) {
     if (!OVER[name] || rt.act === 'up' || rt.act === 'sitdown') return;
     rt.act = name; rt.until = now + (name === 'sip' ? 4200 : name === 'phone' ? 14000 + Math.random() * 12000 : 22000 + Math.random() * 22000);
   }
+  // leaving the room and coming back (the page tells us when; see setPresence there)
+  const vanish = () => { for (const n of KEYS) { const q = POSE[n] || [0, 0, 0]; CUR[n][0] = q[0]; CUR[n][1] = q[1]; CUR[n][2] = q[2]; set(n, q[0], q[1], q[2]); } rt.act = 'gone'; rt.leaving = false; rt.stand = 0; rt.k = 0; rt.leg = 0; rt.carry = null; rt.sneak = false; vrm.scene.visible = false; vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; };
+  function presence(mode, o = {}) {
+    if (mode === 'gone') return vanish();
+    if (mode === 'leave') { if (rt.act === 'gone') return; if (OVER[rt.act]) rt.act = 'sit'; rt.leaving = true; rt.after = ''; if (rt.act === 'up') { rt.steps = [go(DOOR), run(vanish)]; rt.i = 0; rt.label = 'heading out'; } else plan('heading out', [go(DOOR), run(vanish)], '', true); return; }
+    if (mode === 'return') { // she appears at the door and walks to her chair; sneaking is slow, low and watchful
+      vrm.scene.visible = true; if (vrm.springBoneManager) vrm.springBoneManager.reset();
+      Object.assign(rt, { act: 'up', leaving: false, stand: 1, k: 1, x: DOOR[0], z: DOOR[1], yaw: -Math.PI / 2, sneak: !!o.sneak, label: o.sneak ? 'sneaking back in' : 'coming back in', after: '', i: 0, stepT: 0 });
+      rt.steps = wayHome();
+    }
+  }
   const turnTo = (want, dt, rate) => { const d = Math.atan2(Math.sin(want - rt.yaw), Math.cos(want - rt.yaw)); rt.yaw += d * Math.min(1, dt * rate); rt.yaw = Math.atan2(Math.sin(rt.yaw), Math.cos(rt.yaw)); return Math.abs(d); }; // kept within half a turn either way, so "facing front" is always 0
   function routine(s) {
-    const now = performance.now(), dt = s.dt, attending = s.talking || s.faceName === 'thinking';
+    if (rt.act === 'gone') return;                                               // the chair is empty
+    const now = performance.now(), dt = s.dt, attending = (s.talking || s.faceName === 'thinking') && !rt.leaving;
     // on her own schedule
     if (rt.act === 'sit' && !attending && now > rt.nextAt && !window.WIZRA_STILL) {
       const r = Math.random(), onTable = rt.bookHome === 'table';
@@ -250,7 +275,7 @@ export async function create(url) {
       else if (st.go) {
         const dx = st.go[0] - rt.x, dz = st.go[1] - rt.z, d = Math.hypot(dx, dz);
         if (d < 0.06) rt.i++;
-        else { moving = true; const off = turnTo(Math.atan2(dx, dz), dt, 5), sp = 0.62 * Math.max(0.12, 1 - off); rt.x += dx / d * sp * dt; rt.z += dz / d * sp * dt; rt.phase += sp * dt * 4.6; }
+        else { moving = true; const off = turnTo(Math.atan2(dx, dz), dt, 5), sp = (rt.sneak ? 0.3 : rt.glow === 'hyper' ? 0.8 : 0.62) * Math.max(0.12, 1 - off); rt.x += dx / d * sp * dt; rt.z += dz / d * sp * dt; rt.phase += sp * dt * 4.6; }
       }
       else if (st.face !== undefined) { if (turnTo(st.face, dt, 5) < 0.1) rt.i++; }
       else if (st.wait) { holdWant = st.idle ? holdWant : 1; if (st.idle) turnTo(Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z), dt, 4); rt.stepT += dt; if (rt.stepT >= st.wait) { rt.stepT = 0; rt.i++; } }
@@ -258,7 +283,7 @@ export async function create(url) {
     }
     if (rt.act === 'sitdown') { // turn to face front, lower into the chair, then get on with whatever she came back to do
       turnTo(0, dt, 5);
-      if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
+      if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
     }
     // what she is holding while seated
     rt.gazeProp = null; let hp = 0, hy = 0;
@@ -284,6 +309,8 @@ export async function create(url) {
       CUR.leftUpperArm[0] += 0.42 * sw * a; CUR.rightUpperArm[0] += -0.42 * sw * a * (1 - rt.hold);
       CUR.leftLowerArm[1] += (-0.22 - 0.18 * Math.max(0, -sw)) * a; CUR.rightLowerArm[1] += (0.22 + 0.18 * Math.max(0, sw)) * a * (1 - rt.hold);
     }
+    if (rt.sneak && k > 0.5) { CUR.spine[0] += 0.26; CUR.leftUpperLeg[0] -= 0.22; CUR.rightUpperLeg[0] -= 0.22; CUR.leftLowerLeg[0] += 0.4; CUR.rightLowerLeg[0] += 0.4; rt.head[1] = 0.45 * Math.sin(now / 520); } // tiptoeing: bent low, head on a swivel
+    if (rt.glow === 'tipsy' && k > 0.5) { const wob = Math.sin(now / 430); CUR.hips[2] += 0.07 * wob; CUR.spine[2] -= 0.09 * wob; }                // not quite a straight line
     if (k > 0.98 && rt.leg < 0.5) { const sway = Math.sin(now / 1400) * (1 - rt.leg * 2); CUR.hips[2] += 0.035 * sway; CUR.spine[2] -= 0.03 * sway; CUR.leftUpperLeg[2] -= 0.03 * sway; CUR.rightUpperLeg[2] -= 0.03 * sway; } // standing still: shifting her weight
     for (const n of KEYS) set(n, CUR[n][0], CUR[n][1], CUR[n][2]);
     vrm.scene.position.set(rt.x * k, floorY * k + 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, (ka - k) * 0.05 + rt.z * k);
@@ -299,7 +326,7 @@ export async function create(url) {
     return hit ? { tag: hit.object.userData.tag, x: hit.point.x, z: hit.point.z } : null;
   }
   function direct(hit) { // returns what happened, in the words used for the silent note to her (or '' if nothing did)
-    const t = hit.tag;
+    const t = hit.tag; if (rt.act === 'gone' || rt.leaving) return t === 'lamp' ? (lampOn = !(lampLight.intensity > 1), '') : '';
     if (t === 'lamp') { lampOn = !(lampLight.intensity > 1); return ''; }
     if (t === 'shelf') { const had = rt.bookHome === 'table'; startActivity(had ? 'returnbook' : 'fetchbook'); return 'pointshelf'; }
     if (t === 'counter') { startActivity('fetchdrink'); return 'pointcounter'; }
@@ -362,7 +389,8 @@ export async function create(url) {
     el,
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
-    activity() { return rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
+    activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
+    presence, glow(kind) { rt.glow = kind || ''; },
     doActivity(name) { startActivity(name); },
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,
@@ -389,7 +417,8 @@ export async function create(url) {
       if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; }
       const facing = rt.stand > 0.5 ? 0 : camYaw * 0.55; // seated she turns her head to you; on her feet her whole body does
       const roll = -s.rot * Math.PI / 180 * 1.6, yaw = s.tx * 0.045 + (rt.gazeProp ? 0 : s.look.x * 0.045 + facing) + rt.head[1], pitch = s.ty * 0.03 + (rt.gazeProp ? 0 : s.look.y * 0.03) + (1 - s.sq) * 1.5 + rt.head[0];
-      if (head) head.rotation.set(base.head[0] + pitch * 0.6 + gx.head[0] + body[1], yaw * 0.6 + gx.head[1] + body[2], roll * 0.6 + gx.head[2] + body[3]);
+      const drift = rt.glow === 'tipsy' ? 0.07 * Math.sin(s.t / 900) : rt.glow === 'high' ? 0.05 * Math.sin(s.t / 2100) : 0; // a slow loll of the head
+      if (head) head.rotation.set(base.head[0] + pitch * 0.6 + gx.head[0] + body[1] + (rt.glow === 'high' ? 0.03 * Math.sin(s.t / 1700) : 0), yaw * 0.6 + gx.head[1] + body[2], roll * 0.6 + gx.head[2] + body[3] + drift);
       if (neck) neck.rotation.set(CUR.neck[0] + pitch * 0.4, yaw * 0.4, roll * 0.4);
       if (chest) chest.rotation.set(base.chest[0] + body[0] + s.breathe * 0.012, yaw * 0.3, roll * 0.3);
       // shoulders ride up with tension (unless a gesture is using them), hips bounce
@@ -397,10 +426,13 @@ export async function create(url) {
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY;
       vrm.update(s.dt); // spring bones: hair and clothes swing with the head
       placeProps(); lampTick(s.dt);
+      // flushed cheeks, only from the front
+      rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();
+      const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;
       // the close camera stays on her face wherever she goes
       head.getWorldPosition(tmpA); tmpA.y += eyeUp; eye.lerp(tmpA, Math.min(1, s.dt * 8)); near.set(eye.x, eye.y - 0.035, eye.z);
       renderer.render(scene, camera);
-      if (thumbCb && zoom < 0.03 && rt.act === 'sit' && rt.stand < 0.01 && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
+      if (thumbCb && zoom < 0.03 && rt.act === 'sit' && rt.stand < 0.01 && !rt.glow && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
     },
     dispose() { clearInterval(dayTimer); el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
   };

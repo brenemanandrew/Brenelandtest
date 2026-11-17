@@ -58,6 +58,7 @@
   };
   // an expression: lids, brows, mouth, blush 0..1, where the eyes rest (gx, gy), head pose (tilt deg, drop px)
   const FACE = {
+    tipsy: { lid: 'half', brow: 'up', mouth: 'smile', blush: 0.9, tilt: 5 }, high: { lid: 'half', brow: 'flat', mouth: 'smile', tilt: -3, gy: -0.5 },
     neutral: { lid: 'open', brow: 'flat', mouth: 'flat' }, happy: { lid: 'open', brow: 'up', mouth: 'smile' }, playful: { lid: 'open', brow: 'cocked', mouth: 'smirk', tilt: 4 },
     chill: { lid: 'half', brow: 'flat', mouth: 'flat', tilt: -3 }, focused: { lid: 'half', brow: 'angry', mouth: 'flat', gy: 1.5 }, excited: { lid: 'wide', brow: 'up', mouth: 'grin' },
     tired: { lid: 'half', brow: 'sad', mouth: 'pout', tilt: 5, drop: 3, gy: 1.5 }, grumpy: { lid: 'half', brow: 'angry', mouth: 'frown' }, sad: { lid: 'open', brow: 'sad', mouth: 'frown', drop: 2, gy: 2 },
@@ -84,6 +85,7 @@
     return {
       locate(e) { const r = svg.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * 200, y: (e.clientY - r.top) / r.height * 200 }; },
       dispose() { wrap.remove(); },
+      presence(mode) { wrap.style.visibility = mode === 'gone' || mode === 'leave' ? 'hidden' : 'visible'; },
       thumb(cb) { cb('data:image/svg+xml,' + encodeURIComponent(svg.outerHTML)); }, // a still of her as she is drawn right now
       draw({ face, lid, mouth, look, rot, tx, ty, sq, breathe }) {
         const key = lid + face.brow + mouth;
@@ -135,6 +137,9 @@
   ];
   // what she drifts into on her own when nothing is happening, and how she physically takes a touch
   const IDLE = [['shift', 3], ['feet', 2.4], ['tilt', 2], ['lookaway', 2.4], ['lookdown', 2], ['sigh', 2.2], ['flip', 1.6], ['stretch', 3.2], ['leanback', 3]];
+  // how she is for the hour after she comes back from somewhere, when it shows: [resting face, what she keeps doing]
+  const STATE = { tipsy: ['tipsy', [['jolt', 1], ['laugh', 1.6], ['shift', 3], ['tilt', 2.4]]], high: ['high', [['tilt', 3], ['lookup', 2.6], ['laugh', 1.8], ['feet', 2.4]]],
+    groggy: ['tired', [['yawn', 3], ['slump', 3], ['yawn', 3]]], hyper: ['excited', [['bounce', 2], ['feet', 2.4], ['shift', 2], ['nod', 1.2]]], upset: ['sad', [['lookdown', 3], ['sigh', 2.4], ['lookaway', 3]]] };
   const TOUCH_BODY = { poke: ['jolt', 1.2], boop: ['jolt', 1], pat: ['bounce', 1], swat: ['cringe', 1.6], spam: ['cringe', 2], body: ['lookdown', 1.4], petEnd: ['leanback', 2], gift: ['situp', 2.2], wave: ['wave', 2.2], laugh: ['laugh', 2], stare: ['shift', 2.4] };
 
   function mount(stage, opts = {}) {
@@ -148,8 +153,8 @@
     const taps = [];
     const now = () => performance.now();
 
-    let voice = null; let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
-    function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + 9000 + Math.random() * 14000; if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
+    let voice = null, state = ''; let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
+    function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + (STATE[state] ? 5000 + Math.random() * 7000 : 9000 + Math.random() * 14000); if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
     function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; }
     function kick(rot = 0, tx = 0, ty = 0, sq = 0) { sp.rot.v += rot; sp.tx.v += tx; sp.ty.v += ty; sp.sq.v += sq; }
@@ -224,7 +229,7 @@
       const t = now(), dt = Math.min(0.05, (t - last) / 1000); last = t;
       for (const k in sp) { const s = sp[k]; s.v += (-170 * s.x - 13 * s.v) * dt; s.x += s.v * dt; }
       irk *= Math.exp(-dt / 90); fond *= Math.exp(-dt / 120);
-      const rest = irk >= 2.4 ? 'grumpy' : fond >= 3 && irk < 1.5 ? 'happy' : mood;
+      const rest = irk >= 2.4 ? 'grumpy' : STATE[state] ? STATE[state][0] : fond >= 3 && irk < 1.5 ? 'happy' : mood;
       const faceName = (t < tempUntil && temp) || (thinking ? 'thinking' : rest);
       const face = FACE[faceName] || FACE.neutral;
       const talking = t < talkUntil;
@@ -241,7 +246,7 @@
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
       // a gesture in progress: name, seconds since it began, and an ease in/out weight 0..1
       // left alone for a while, she moves on her own
-      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { if (idleAt) doGesture(...IDLE[Math.random() * IDLE.length | 0]); idleAt = t + 9000 + Math.random() * 14000; }
+      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const pool = STATE[state] ? STATE[state][1] : IDLE; if (idleAt) doGesture(...pool[Math.random() * pool.length | 0]); idleAt = t + (STATE[state] ? 5000 + Math.random() * 7000 : 9000 + Math.random() * 14000); }
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
       try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, voice: talking ? voice : null, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
@@ -270,11 +275,15 @@
         return found.map(f => f[0]);
       },
       gesture: doGesture,
+      // whether she is in the room: 'gone' (already out), 'leave' (walks out now), 'return' (walks back in; opts.sneak = quietly)
+      presence(mode, o) { if (R.presence) R.presence(mode, o || {}); },
+      // the after-effect that still shows for a while once she is back: '', tipsy, high, groggy, hyper, upset
+      setState(kind) { state = STATE[kind] ? kind : ''; if (R.glow) R.glow(state); },
       // her routine (3D model only): what she is busy with right now, in words, and a way to start something
       activity() { return R.activity ? R.activity() : ''; },
       routine(name) { if (R.doActivity) R.doActivity(name); },
       // swap the picture live; null goes back to the cartoon
-      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); askThumb(); },
+      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); askThumb(); if (R.glow) R.glow(state); if (opts.onRenderer) opts.onRenderer(); },
     };
   }
   window.WizraAvatar = { mount };
