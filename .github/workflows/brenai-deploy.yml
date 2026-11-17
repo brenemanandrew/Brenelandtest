@@ -1,5 +1,5 @@
 # Deploys brenai/ (Wizra chat) to brenai.fly.dev. Runs on pushes to main that touch brenai/, or by hand (Actions tab).
-# Needs the repo secret FLY_API_TOKEN. If the repo also has ANTHROPIC_API_KEY and BRENAI_PASSWORD secrets, they are copied to the Fly app.
+# Needs the repo secret FLY_API_TOKEN. Repo secrets BRENAI_BRAIN_TOKEN, BRENAI_PASSWORD and (optional backup) ANTHROPIC_API_KEY are copied to the Fly app.
 name: Brenai Deploy
 on:
   push:
@@ -24,9 +24,11 @@ jobs:
         env:
           AK: ${{ secrets.ANTHROPIC_API_KEY }}
           PW: ${{ secrets.BRENAI_PASSWORD }}
+          BT: ${{ secrets.BRENAI_BRAIN_TOKEN }}
         run: |
           args=""
           [ -n "$AK" ] && args="$args ANTHROPIC_API_KEY=$AK"
           [ -n "$PW" ] && args="$args APP_PASSWORD=$PW"
+          [ -n "$BT" ] && args="$args BRENAI_BRAIN_TOKEN=$BT"
           [ -n "$args" ] && flyctl secrets set --stage --app brenai $args || echo "no app secrets in the repo; using what Fly already has"
       - run: flyctl deploy --remote-only --ha=false

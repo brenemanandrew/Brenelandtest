@@ -90,7 +90,7 @@
       <div class="bubble" id="herBubble"></div>
       <div id="herTail"></div>
       <img src="wizra.svg" alt="Wizra">
-      <div class="name">Wizra</div>
+      <div class="name">Wizra</div><div class="name" id="brainDot" title="Her brain: the model on your PC">...</div>
     </div>
     <div id="log"></div>
   </div>
@@ -277,7 +277,7 @@ function openPanel(k) {
   } else if (k === 'react') {
     p.append(slider('How she reacts', 'expressiveness', 'reserved, dry', 'big, dramatic'));
   } else if (k === 'temp') {
-    p.append(slider('Temperature', 'temperature', 'predictable', 'wild', 'Steers how random and tangent-prone she is through her instructions. The current Claude models no longer accept a raw sampling temperature.'));
+    p.append(slider('Temperature', 'temperature', 'predictable', 'wild', 'Real sampling temperature on your PC model (0.3 to 1.2, middle is 0.75), plus a matching hint in her instructions. Lower if she rambles or gets odd.'));
   } else if (k === 'sheet') {
     p.append(el('h3', { textContent: 'Character' }));
     const bd = el('input', { type: 'text', value: sheet.birthday });
@@ -304,6 +304,14 @@ function closeWheel() { $('wheel').classList.remove('open'); }
 $('closeWheel').onclick = closeWheel;
 document.querySelector('#herCol img').onclick = () => openWheel().catch(() => {});
 
+async function brainStatus() {
+  try {
+    const b = await (await fetch('/api/brain')).json();
+    $('brainDot').textContent = b.online ? '\u25cf PC online' : b.fallback ? '\u25cf Claude' : '\u25cb offline';
+    $('brainDot').style.color = b.online ? '#7bd88f' : b.fallback ? '#d4b8ff' : '#ff9a9a';
+  } catch {}
+}
+brainStatus(); setInterval(brainStatus, 20000);
 load().catch(() => {});
 </script>
 </body>

@@ -1,5 +1,8 @@
-// Brenai: a one-person chat with Wizra, a persona running on Claude.
-// No framework: node:http serves public/ and three API routes.
+// Brenai: a one-person chat with Wizra. Her brain is the model on Andrew's PC (Bionic, formerly LM Studio), reached the way
+// Breneland's townsfolk are: a bridge on the PC (bridge/wizra-bridge.mjs) connects OUT to this server's /brain socket and
+// answers jobs. If the bridge is offline and ANTHROPIC_API_KEY is set, Claude answers instead; otherwise she is offline.
+// No framework: node:http serves public/ and the API routes below.
+//   GET  /api/brain   -> { online, model, served, failed } (no login needed)
 //   GET  /api/state   -> { log, name }            (the chat log to redraw the page)
 //   POST /api/chat    -> SSE stream of Wizra's reply ({t:"delta"}, {t:"done"}, {t:"error"})
 //   POST /api/reset   -> clears the conversation (keeps what she learned about you)
@@ -11,6 +14,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
+import { WebSocketServer } from 'ws';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +28,59 @@ const USER_NAME = process.env.USER_NAME || 'Andrew';
 const COMPACT_AT = Number(process.env.COMPACT_AT || 600000); // tokens of history before old turns get summarized
 const LEARN_EVERY = Number(process.env.LEARN_EVERY || 6); // user messages between profile updates
 
-const client = new Anthropic();
+const BRAIN_TOKEN = process.env.BRENAI_BRAIN_TOKEN || ''; // shared secret with the bridge on the PC
+const CONTEXT_TOKENS = Number(process.env.CONTEXT_TOKENS || 32768); // the context length the model is loaded with in Bionic
+const REPLY_TOKENS = Number(process.env.REPLY_TOKENS || 700);
+const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
+
+// ---------- the PC brain (bridge over a WebSocket) ----------
+const brain = { ws: null, model: '', served: 0, failed: 0, since: 0 };
+const jobs = new Map(); let jobId = 1;
+function brainJob({ system, messages, max_tokens, temperature, stream }, onDelta) {
+  return new Promise((resolve, reject) => {
+    if (!brain.ws) return reject(new Error('offline'));
+    const id = jobId++;
+    const timer = setTimeout(() => { jobs.delete(id); reject(new Error('Your PC took too long to answer.')); }, 180000);
+    jobs.set(id, { resolve, reject, onDelta, timer });
+    brain.ws.send(JSON.stringify({ t: 'job', id, system, messages, max_tokens, temperature, stream: !!stream }));
+  });
+}
+function endJob(id, err, text) {
+  const j = jobs.get(id); if (!j) return;
+  clearTimeout(j.timer); jobs.delete(id);
+  if (err) { brain.failed++; j.reject(new Error(err)); } else { brain.served++; j.resolve(text); }
+}
+function onBrainSocket(ws) {
+  let authed = false;
+  const kill = setTimeout(() => { if (!authed) ws.close(); }, 10000);
+  ws.on('message', raw => {
+    let m; try { m = JSON.parse(String(raw)); } catch { return; }
+    if (!authed) {
+      if (m.t !== 'auth') return;
+      if (!BRAIN_TOKEN || m.token !== BRAIN_TOKEN) { ws.send(JSON.stringify({ t: 'refused', why: 'token' })); return ws.close(); }
+      authed = true; clearTimeout(kill);
+      if (brain.ws) { try { brain.ws.send('{"t":"replaced"}'); brain.ws.close(); } catch {} }
+      Object.assign(brain, { ws, model: String(m.model || '').slice(0, 80), since: Date.now() });
+      ws.send('{"t":"welcome"}');
+      console.log('[brain] bridge connected', brain.model);
+      return;
+    }
+    if (m.t === 'delta') { const j = jobs.get(m.id); if (j && j.onDelta && typeof m.d === 'string') j.onDelta(m.d); }
+    else if (m.t === 'done') endJob(m.id, null, String(m.text || ''));
+    else if (m.t === 'fail') endJob(m.id, 'Your PC could not answer (' + String(m.why || 'error').slice(0, 60) + '). Is Bionic running with the model loaded?');
+  });
+  ws.on('close', () => {
+    if (brain.ws !== ws) return;
+    brain.ws = null; console.log('[brain] bridge disconnected');
+    for (const id of [...jobs.keys()]) endJob(id, 'Your PC went offline mid-answer.');
+  });
+  ws.on('error', () => {});
+}
+
+// Slider 0..100 -> a real sampling temperature for the local model.
+const tempOf = v => +(0.3 + (Math.max(0, Math.min(100, v)) / 100) * 0.9).toFixed(2);
+// rough token count (about 4 characters a token) to keep the chat inside the loaded context
+const toks = s => Math.ceil(String(s).length / 3.6);
 
 // ---------- store ----------
 fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -64,7 +120,38 @@ function echoable(content) {
   return content.filter((b, i) => i > lastFb || !['thinking', 'redacted_thinking', 'tool_use'].includes(b.type));
 }
 
+const STAMP = () => new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const systemText = () => systemBlocks().map(b => b.text).join('\n\n');
+
+// The local model gets the log as plain turns, newest kept, oldest dropped to fit the loaded context.
+async function replyLocal(userText, onDelta) {
+  const system = systemText();
+  let budget = CONTEXT_TOKENS - toks(system) - REPLY_TOKENS - 200;
+  const turns = [{ role: 'user', content: `[${STAMP()} Eastern] ${userText}` }];
+  budget -= toks(turns[0].content);
+  for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
+    const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: e.text };
+    budget -= toks(t.content); if (budget < 0) break;
+    turns.unshift(t);
+  }
+  while (turns.length && turns[0].role !== 'user') turns.shift();
+  const text = await brainJob({ system, messages: turns, max_tokens: REPLY_TOKENS, temperature: tempOf(db.settings.temperature), stream: true }, onDelta);
+  return cleanLocal(text);
+}
+// roleplay models sometimes prefix the speaker or run on into his line: trim both
+function cleanLocal(t) {
+  t = String(t).replace(/^\s*wizra\s*:\s*/i, '');
+  const cut = t.search(new RegExp('\\n\\s*' + USER_NAME + '\\s*:', 'i'));
+  return (cut > 0 ? t.slice(0, cut) : t).trim();
+}
+
 async function reply(userText, onDelta) {
+  if (brain.ws) return replyLocal(userText, onDelta);
+  if (client) return replyClaude(userText, onDelta);
+  throw new Error('Wizra is offline: the bridge on your PC is not connected. Start Bionic and the bridge (brenai/bridge/README.md).');
+}
+
+async function replyClaude(userText, onDelta) {
   // The time rides on the user turn (not the system prompt) so the cached prefix stays the same between messages.
   const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   db.history.push({ role: 'user', content: [{ type: 'text', text: `[${now} Eastern]` }, { type: 'text', text: userText }] });
@@ -92,14 +179,15 @@ async function reply(userText, onDelta) {
 // Every few messages, a short side call updates her notes on how the user talks and what they like.
 async function learn() {
   const recent = db.log.slice(-40).map(e => `${e.who === 'me' ? USER_NAME : 'Wizra'}: ${e.text}`).join('\n');
-  const res = await client.messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    output_config: { effort: 'low' },
-    messages: [{ role: 'user', content: LEARN_PROMPT(USER_NAME, db.profile, db.sheet, db.settings, recent) }],
-  });
-  if (res.stop_reason === 'refusal') return;
-  const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  const prompt = LEARN_PROMPT(USER_NAME, db.profile, db.sheet, db.settings, recent);
+  let text;
+  if (brain.ws) {
+    text = await brainJob({ system: 'You are a careful note keeper. Output only valid JSON.', messages: [{ role: 'user', content: prompt }], max_tokens: 900, temperature: 0.3 });
+  } else if (client) {
+    const res = await client.messages.create({ model: MODEL, max_tokens: 8000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: prompt }] });
+    if (res.stop_reason === 'refusal') return;
+    text = res.content.filter(b => b.type === 'text').map(b => b.text).join('');
+  } else return;
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) return;
   let out; try { out = JSON.parse(m[0]); } catch { return; }
@@ -149,6 +237,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
@@ -218,4 +307,9 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) json(res, 500, { error: e.message }); else res.end();
   }
 });
-server.listen(PORT, () => console.log(`brenai on :${PORT} model=${MODEL} effort=${EFFORT} login=${PASSWORD ? 'on' : 'off'}`));
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });
+server.on('upgrade', (req, sock, head) => {
+  if (new URL(req.url, 'http://x').pathname !== '/brain') return sock.destroy();
+  wss.handleUpgrade(req, sock, head, ws => onBrainSocket(ws));
+});
+server.listen(PORT, () => console.log(`brenai on :${PORT} brain=${BRAIN_TOKEN ? 'bridge' : 'NO TOKEN'} claude-fallback=${client ? 'on' : 'off'} login=${PASSWORD ? 'on' : 'off'}`));

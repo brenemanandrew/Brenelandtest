@@ -4,9 +4,10 @@ primary_region = "iad"
 [build]
 
 [env]
-  MODEL = "claude-opus-5-5"
-  EFFORT = "low"
   USER_NAME = "Andrew"
+  CONTEXT_TOKENS = "32768"   # match the context the model is loaded with in Bionic
+  MODEL = "claude-opus-5-5"  # only used as a backup when the PC is offline and ANTHROPIC_API_KEY is set
+  EFFORT = "low"
 
 [mounts]
   source = "brenai_data"
