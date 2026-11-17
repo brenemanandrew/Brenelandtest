@@ -15,7 +15,8 @@
   #top { display:grid; grid-template-columns: var(--av) 1fr; gap:6px; height:var(--av); align-items:center; }
   #stageSlot { width:var(--av); height:var(--av); }
   #stageWrap { position:relative; width:var(--av); height:var(--av); }
-  #stage { width:100%; height:100%; border:3px solid var(--line); border-radius:16px; overflow:hidden; background:#000; cursor:pointer; }
+  #stage { width:100%; height:100%; border:3px solid var(--line); border-radius:16px; overflow:hidden; background:#000; cursor:pointer; touch-action:none; }
+  #bigBtn { position:absolute; left:-8px; bottom:-8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--line); background:var(--panel); color:var(--dim); font-size:15px; line-height:1; padding:0; cursor:pointer; z-index:2; }
   #stage > * { width:100%; height:100%; display:block; object-fit:cover; }
   #brainBtn { position:absolute; right:-8px; bottom:-8px; width:34px; height:34px; border-radius:50%; border:2px solid var(--line); background:var(--panel); font-size:17px; line-height:1; padding:0; cursor:pointer; z-index:2; }
   #stageBack { position:fixed; inset:0; background:rgba(8,6,12,.85); display:none; z-index:12; }
@@ -73,7 +74,7 @@
   #wheel.open { display:block; }
   #ring { position:relative; width:280px; height:280px; margin:24px auto 8px; }
   #ring .hub { position:absolute; left:90px; top:90px; width:100px; height:100px; border-radius:50%; overflow:hidden; border:2px solid #4a3a66; cursor:pointer; }
-  #ring .hub img { width:100%; height:100%; }
+  #ring .hub svg { pointer-events:none; }
   #ring .seg { position:absolute; width:76px; height:76px; margin:-38px 0 0 -38px; border-radius:50%; border:1px solid #4a3a66; background:#221a2e;
                color:var(--text); font:600 12px/1.15 system-ui, sans-serif; display:grid; place-items:center; text-align:center; padding:4px; cursor:pointer; }
   #ring .seg.on { background:#4b3672; }
@@ -105,8 +106,9 @@
 <div id="app">
   <div id="top">
     <div id="stageSlot"><div id="stageWrap">
-      <!-- The VTuber avatar mounts in #stage (replace the img). data-talking and data-mood on #stage follow the chat. -->
-      <div id="stage" title="Tap to expand"><img src="wizra.svg" alt="Wizra"></div>
+      <!-- The avatar lives in #stage. avatar.js draws the current one; the VTuber replaces it by offering the same calls (see avatar.js). -->
+      <div id="stage"></div>
+      <button id="bigBtn" title="Expand / shrink">&#10530;</button>
       <button id="brainBtn" title="Her settings">&#129504;</button>
     </div></div>
     <div class="bwrap her" id="herWrap"><div class="balloon" id="herBubble"></div></div>
@@ -129,9 +131,11 @@
 <div id="wheel"><button id="closeWheel" title="Close">&times;</button><div id="ring"></div><div id="panel"></div><button id="newChat">New conversation</button></div>
 <div id="login"><form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form></div>
 
+<script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
+const avatar = WizraAvatar.mount(stage);
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -203,7 +207,7 @@ async function api(path, body) {
 
 async function load() {
   const r = await api('/api/state'); const s = await r.json();
-  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); stage.dataset.mood = settings.mood || 'auto';
+  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood);
   log.textContent = '';
   for (const e of s.log) addLine(e.who, e.text);
 }
@@ -212,7 +216,7 @@ async function send(quick) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
-  sendBtn.disabled = true; stage.dataset.talking = '1';
+  sendBtn.disabled = true; avatar.setThinking(true); userDid(text);
   addLine('me', text); bubble('me', text);
   const body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>';
   let full = '';
@@ -228,7 +232,7 @@ async function send(quick) {
         const chunk = buf.slice(0, i); buf = buf.slice(i + 2);
         if (!chunk.startsWith('data: ')) continue;
         const ev = JSON.parse(chunk.slice(6));
-        if (ev.t === 'delta') { full += ev.d; fill(body, full); bubble('her', full, true); log.scrollTop = log.scrollHeight; }
+        if (ev.t === 'delta') { full += ev.d; avatar.talk(); avatar.feel(full); fill(body, full); bubble('her', full, true); log.scrollTop = log.scrollHeight; }
         else if (ev.t === 'done') { full = ev.text; fill(body, full); bubble('her', full); }
         else if (ev.t === 'error') throw new Error(ev.error);
       }
@@ -236,7 +240,7 @@ async function send(quick) {
   } catch (e) {
     if (e.message !== 'login') { body.parentElement.remove(); addError(e.message); }
   } finally {
-    sendBtn.disabled = false; delete stage.dataset.talking;
+    sendBtn.disabled = false; avatar.setThinking(false);
     if (!matchMedia('(pointer:coarse)').matches && !voice.on) input.focus();
     if (voice.pending) { voice.pending = false; send(); }
   }
@@ -258,7 +262,10 @@ function drawActs() {
 }
 
 // The avatar: tap to expand to a big view, tap again (or outside) to shrink.
-stage.onclick = () => document.body.classList.toggle('big');
+$('bigBtn').onclick = () => document.body.classList.toggle('big');
+// Things you do to her in the chat (typed or from the action buttons) also land on the avatar straight away.
+const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
+function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
 $('newChat').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); closeWheel(); load(); } };
 $('loginForm').onsubmit = async e => {
@@ -342,7 +349,7 @@ const SEGS = [
 ];
 function drawRing() {
   const ring = $('ring'); ring.textContent = '';
-  const hub = el('div', { className: 'hub', onclick: closeWheel }); hub.append(el('img', { src: 'wizra.svg', alt: 'Wizra' })); ring.append(hub);
+  const hub = el('div', { className: 'hub', onclick: closeWheel }); WizraAvatar.mount(hub); ring.append(hub);
   SEGS.forEach((g, i) => {
     const a = -Math.PI / 2 + i * 2 * Math.PI / SEGS.length;
     const b = el('div', { className: 'seg' + (g.toggle && settings[g.toggle] ? ' on' : '') });

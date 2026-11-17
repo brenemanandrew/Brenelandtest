@@ -31,5 +31,5 @@ Or from the phone: add repo secrets `BRENAI_BRAIN_TOKEN` and `BRENAI_PASSWORD` (
 ## Local run
 `npm install && ANTHROPIC_API_KEY=... node server.mjs` then http://localhost:8080
 
-## Her picture
-`public/wizra.svg` is a placeholder. Drop in `public/wizra.png` and change the two `wizra.svg` references in `index.html`.
+## Her avatar
+`public/avatar.js` draws her as an animated SVG puppet: blinking, breathing, eyes that follow your finger, a mouth that moves while her reply streams, a face per mood, passing expressions picked from her words and actions, and touch reactions (tap face = poke, tap nose = boop, tap head = pat, stroke hair = pet, fast swipe = swat, tap hoodie, four quick taps = annoyed). Actions you do in the chat (typed or buttons) land on her too. The page only uses `mount`, `setMood`, `setThinking`, `talk`, `feel`, `react` (documented at the top of the file), so the VTuber avatar replaces it by offering the same calls.
