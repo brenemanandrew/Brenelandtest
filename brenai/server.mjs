@@ -134,14 +134,26 @@ function setupText() {
   const day = d.toLocaleString('en-US', { ...tz, weekday: 'long', month: 'long', day: 'numeric' });
   return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nIt is ${day}, ${part}.\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
 }
+// ---- silent touches: what he did to the avatar since her last reply. Never shown in the chat; she just knows. ----
+const TOUCH = { poke: ['pokes her cheek', 'pokes her cheek %n times'], boop: ['boops her nose', 'boops her nose %n times'], pat: ['pats her on the head', 'pats her on the head %n times'],
+  petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
+let touches = [];
+function takeTouches() {
+  const fresh = touches.filter(t => Date.now() - t.at < 15 * 60000); touches = [];
+  const n = {}; for (const t of fresh) n[t.kind] = (n[t.kind] || 0) + 1;
+  return Object.keys(n).map(k => TOUCH[k][n[k] > 1 ? 1 : 0].replace('%n', n[k])).join(', ');
+}
+// a log entry as the model sees it: the silent touches ride in front of his words as an action
+const withPre = e => (e.pre ? `*${e.pre}* ` : '') + e.text;
+
 async function replyLocal(userText, onDelta) {
   const setup = setupText();
   let budget = CONTEXT_TOKENS - toks(setup) - REPLY_TOKENS - 200;
   const L = LENGTHS[db.settings.length] || LENGTHS.short;
-  const turns = [{ role: 'user', content: userText }];
+  const turns = [{ role: 'user', content: withPre(db.log[db.log.length - 1]) }];
   budget -= toks(turns[0].content);
   for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
-    const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: e.text };
+    const e = db.log[i], t = { role: e.who === 'me' ? 'user' : 'assistant', content: withPre(e) };
     budget -= toks(t.content); if (budget < 0) break;
     turns.unshift(t);
   }
@@ -287,11 +299,17 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, { error: 'login' });
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log, name: USER_NAME, settings: db.settings });
+      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.map(({ pre, ...e }) => e), name: USER_NAME, settings: db.settings });
 
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
         return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile });
+      }
+
+      if (url.pathname === '/api/touch' && req.method === 'POST') {
+        const { kind } = await readBody(req);
+        if (TOUCH[kind] && touches.length < 40) touches.push({ kind, at: Date.now() });
+        return json(res, 200, { ok: true });
       }
 
       if (url.pathname === '/api/reset' && req.method === 'POST') {
@@ -307,9 +325,10 @@ const server = http.createServer(async (req, res) => {
         busy = true;
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
-        db.log.push({ who: 'me', text: msg, at: Date.now() });
+        const pre = takeTouches();
+        db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
-          const full = await reply(msg, d => send({ t: 'delta', d }));
+          const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => send({ t: 'delta', d }));
           db.log.push({ who: 'her', text: full, at: Date.now() });
           db.sinceLearn++;
           save();

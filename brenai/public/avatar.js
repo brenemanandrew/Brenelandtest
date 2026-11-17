@@ -7,6 +7,7 @@
 //   av.setThinking(bool)   she is working on a reply
 //   av.talk()              call on every chunk of her reply while it streams (moves the mouth)
 //   av.feel(text)          her reply so far: picks a passing expression from her words and actions
+//   mount(el, { onTouch(kind) })  onTouch fires when she is touched directly (the page passes it on to her, silently)
 //   av.react(kind, dir)    something was done to her: poke, boop, pat, pet, swat, body, spam, wave, laugh, stare, gift
 // Touch on the avatar itself (tap, stroke, swipe) is handled in here and calls react().
 (function () {
@@ -72,7 +73,7 @@
     [/nervous|fidget|bites her lip|\bum+\b|\buh+\b/i, 'anxious'], [/squint|narrow(s|ed)? her eyes|suspicious|side-?eye/i, 'suspicious'], [/!!|omg|oh my god|no way|yes!/i, 'excited'], [/hmm+|thinks|ponder|considers/i, 'thinking'],
   ];
 
-  function mount(stage) {
+  function mount(stage, opts = {}) {
     stage.innerHTML = MARKUP;
     const svg = stage.firstElementChild, P = {};
     svg.querySelectorAll('[data-p]').forEach(n => { P[n.dataset.p] = n; });
@@ -85,7 +86,15 @@
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
     function emote(ch, ms = 1400) { P.emote.textContent = ch; emoteUntil = now() + ms; }
     function kick(rot = 0, tx = 0, ty = 0, sq = 0) { sp.rot.v += rot; sp.tx.v += tx; sp.ty.v += ty; sp.sq.v += sq; }
-    const sour = () => ['grumpy', 'tired', 'sad', 'anxious'].includes(mood);
+    // Her reserve: touches add up. irk rises with pokes and swats, fond with pats and pets; both fade over a few minutes.
+    // Enough of either changes her resting face and how she takes the next touch.
+    let irk = 0, fond = 0;
+    const RESERVE = { poke: [1, 0], boop: [0.3, 0.5], pat: [0, 1], petEnd: [-1, 2], swat: [2.5, -1], body: [0.7, 0], spam: [3, -1] };
+    const sour = () => irk >= 2.4 || (irk < 1.5 && fond >= 3 ? false : ['grumpy', 'tired', 'sad', 'anxious'].includes(mood));
+    function touched(kind, dir) {
+      const r = RESERVE[kind] || [0, 0]; irk = Math.max(0, Math.min(8, irk + r[0])); fond = Math.max(0, Math.min(8, fond + r[1]));
+      react(kind, dir); if (opts.onTouch) opts.onTouch(kind);
+    }
 
     function react(kind, dir = 1) {
       if (kind === 'poke') { show('flinch', 500); kick(-dir * 260, -dir * 60); setTimeout(() => { show(sour() ? 'grumpy' : 'surprised', 900); }, 480); }
@@ -115,15 +124,15 @@
     });
     const up = e => {
       if (!down) return; const p = at(e), d = down, ms = now() - d.t, dx = p.x - d.sx; down = null;
-      if (Math.abs(dx) > 55 && ms < 380) return react('swat', Math.sign(dx));
-      if (d.pet > 60) return react('petEnd');
+      if (Math.abs(dx) > 55 && ms < 380) return touched('swat', Math.sign(dx));
+      if (d.pet > 60) return touched('petEnd');
       if (d.path > 25) return;
       const t = now(); taps.push(t); while (taps.length && t - taps[0] > 2500) taps.shift();
-      if (taps.length >= 4) { taps.length = 0; return react('spam'); }
-      if (Math.hypot(p.x - 100, p.y - 108) < 9) return react('boop');
-      if (p.y > 150) return react('body');
-      if (p.y < 80) return react('pat');
-      react('poke', p.x < 100 ? -1 : 1);
+      if (taps.length >= 4) { taps.length = 0; return touched('spam'); }
+      if (Math.hypot(p.x - 100, p.y - 108) < 9) return touched('boop');
+      if (p.y > 150) return touched('body');
+      if (p.y < 80) return touched('pat');
+      touched('poke', p.x < 100 ? -1 : 1);
     };
     svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', () => { down = null; });
 
@@ -132,7 +141,9 @@
     function frame() {
       const t = now(), dt = Math.min(0.05, (t - last) / 1000); last = t;
       for (const k in sp) { const s = sp[k]; s.v += (-170 * s.x - 13 * s.v) * dt; s.x += s.v * dt; }
-      const face = FACE[(t < tempUntil && temp) || (thinking ? 'thinking' : mood)] || FACE.neutral;
+      irk *= Math.exp(-dt / 90); fond *= Math.exp(-dt / 120);
+      const rest = irk >= 2.4 ? 'grumpy' : fond >= 3 && irk < 1.5 ? 'happy' : mood;
+      const face = FACE[(t < tempUntil && temp) || (thinking ? 'thinking' : rest)] || FACE.neutral;
       const talking = t < talkUntil;
       if (t > blinkAt) { blinkEnd = t + 130; blinkAt = t + 1800 + Math.random() * 4200; }
       const blink = t < blinkEnd && !['smile', 'squint', 'dizzy'].includes(face.lid);

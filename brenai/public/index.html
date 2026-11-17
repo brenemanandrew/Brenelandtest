@@ -135,7 +135,8 @@
 <script>
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
-const avatar = WizraAvatar.mount(stage);
+// Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
+const avatar = WizraAvatar.mount(stage, { onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
