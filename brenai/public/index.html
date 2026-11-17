@@ -262,6 +262,15 @@
   #outSign #callBtn { position:absolute; left:50%; bottom:-21cqw; width:24cqw; height:24cqw; min-width:30px; min-height:30px; margin-left:-12cqw; padding:5cqw; pointer-events:auto; box-shadow:0 0 0 0.8cqw #fff, 0 1.5cqw 4cqw rgba(0,0,0,.5); animation:ringMe 2.4s ease-in-out infinite; }
   @keyframes ringMe { 0%,86%,100% { transform:rotate(0); } 89% { transform:rotate(-14deg); } 92% { transform:rotate(12deg); } 95% { transform:rotate(-8deg); } }
   #awayNote.plan { position:absolute; left:14px; right:0; }
+
+  /* the wheel's close button: a cartoon sticker right by the wheel, not off in the corner */
+  #ringWrap { position:relative; width:344px; max-width:100%; margin:0 auto; }
+  #closeWheel { position:absolute; top:26px; right:-4px; left:auto; z-index:17; width:46px; height:46px; padding:9px; border-radius:50%; color:#fff; font-size:0; cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, #ff8f8f, #f03e3e 60%, #d42a2a); border:3px solid #fff; box-shadow:0 4px 0 #8a1c1c, 0 8px 14px rgba(0,0,0,.4); transform:rotate(6deg); transition:transform .1s, box-shadow .1s; }
+  #closeWheel svg { width:100%; height:100%; display:block; filter:drop-shadow(0 1.5px 0 rgba(120,20,20,.7)); }
+  #closeWheel:hover { transform:rotate(-4deg) scale(1.08); }
+  #closeWheel:active { transform:translateY(3px) rotate(0); box-shadow:0 1px 0 #8a1c1c, 0 3px 6px rgba(0,0,0,.4); }
+  @media (min-width:700px) { #closeWheel { right:-34px; } }
 </style>
 </head>
 <body>
@@ -315,7 +324,7 @@
     <input id="callType" type="text" placeholder="Type to talk" hidden>
   </div>
 </div>
-<div id="wheel"><button id="closeWheel" title="Close">&times;</button><div id="ring"></div><div id="panel"></div><button id="newChat">New conversation</button></div>
+<div id="wheel"><div id="ringWrap"><button id="closeWheel" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"><path d="M6.500 6.500l11 11M17.500 6.500l-11 11"/></svg></button><div id="ring"></div></div><div id="panel"></div><button id="newChat">New conversation</button></div>
 <div id="login"><form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form></div>
 
 <script src="avatar.js"></script>
@@ -953,6 +962,7 @@ async function openWheel() {
 }
 function closeWheel() { $('wheel').classList.remove('open'); }
 $('closeWheel').onclick = closeWheel;
+$('wheel').addEventListener('click', e => { if (e.target === $('wheel') || e.target === $('ringWrap')) closeWheel(); }); // tapping the dimmed background closes it too
 $('brainBtn').onclick = () => { document.body.classList.remove('big'); openWheel().catch(() => {}); };
 
 let brainInfo = {};
