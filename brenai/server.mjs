@@ -233,6 +233,7 @@ function applySettings(body) {
   if (MOODS.includes(s.mood)) S.mood = s.mood;
   for (const k of ['expressiveness', 'temperature']) if (Number.isFinite(+s[k])) S[k] = Math.max(0, Math.min(100, Math.round(+s[k])));
   if (['short', 'medium', 'long'].includes(s.length)) S.length = s.length;
+  if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140)]).filter(x => x[0] && x[1]).slice(0, 16);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
   const h = body.sheet || {}, H = db.sheet;
   for (const k of ['birthday', 'backstory']) if (typeof h[k] === 'string') H[k] = h[k].slice(0, 4000);

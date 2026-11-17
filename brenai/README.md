@@ -5,7 +5,7 @@ Chat with Wizra. Her brain is **your PC's model** (MN-Violet-Lotus-12B in Bionic
 ## What it does
 - Layout (Andrew's sketch, 2026-11-17): her avatar top left (tap to expand; the VTuber mounts in `#stage`, which carries `data-talking` and `data-mood`), a brain button on its corner for the settings wheel, her word balloon beside it; the chat area; action buttons; your word balloon and icon bottom right; the chat bar with the mic.
 - Chat area: name in colour (you blue, Wizra red), speech in plain text, each action on its own indented purple line in third person ("he grabs the cookies"). Type actions in `*asterisks*`. Balloons show speech only and scroll when long.
-- Action buttons (Wave, Poke, High five...) send an action she reacts to. The list is `ACTS` in `public/index.html`.
+- Action buttons (Wave, Poke, High five...) send an action she reacts to. The pencil at the end of the row edits them (name + what you do); they are saved on the server, so every device gets the same set.
 - Replies are short by default (Reactions > Reply length: short, medium, long). To stop rambling and repeats on the PC model: a length cap, a reminder on each turn, repeat penalties, and the server drops any sentence or action she already used in her last 8 replies.
 - Talk to text is on by default (Chrome, Edge, Safari): it listens, and once you stop talking for 2.5 s (adjustable) it sends. The mic button by the text box turns it off; typing holds that message back.
 - Tap her picture for the settings wheel: Emotion, Reactions, Temperature, SFW, Bleep, Character (birthday, backstory, likes, dislikes, rapport, cussing), Hidden likes, Talk to text.

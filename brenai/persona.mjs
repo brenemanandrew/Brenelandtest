@@ -45,6 +45,8 @@ export const SETTINGS_DEFAULT = {
   sfw: true,
   bleep: true,          // client-side: bleeps cuss words in the log and bubbles
   cussDevelop: true,
+  // the action buttons under the chat: [label, what you do]; editable from the pencil at the end of the row
+  acts: [['Wave', 'waves at her'], ['Poke', 'pokes her shoulder'], ['High five', 'holds up a hand for a high five'], ['Laugh', 'laughs'], ['Nod', 'nods'], ['Stare', 'stares at her'], ['Snack', 'slides a snack across the desk to her'], ['Shrug', 'shrugs']],
   length: 'short',      // short | medium | long replies    // may she pick up cussing over time
 };
 
