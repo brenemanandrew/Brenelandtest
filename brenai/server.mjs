@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
-import { detectLeave, outcome, glowNote, clock } from './away.mjs';
+import { detectLeave, detectPlan, outcome, glowNote, clock } from './away.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -193,9 +193,19 @@ const units = t => String(t).match(/\*[^*]+\*|[^*.!?\n]+[.!?]*["')\]]*\s*|\n+/g)
 const norm = u => u.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 // Stage directions that are only a speech tag ("*she says softly,*", "She sets her book down before asking,") read as
 // broken sentences in a chat: drop them, and drop a last fragment that trails off on a comma.
-const SPEECH_TAG = /\b(says?|said|asks?|asking|adds?|adding|repl(y|ies|ying)|murmurs?|mutters?|whispers?|continues?|continuing|answers?|answering|responds?|responding|speaks?|speaking)\b[^.!?]*[,:]\s*\*?\s*$/i;
+const SPEECH_TAG = /^\*?\s*(she |wizra )?(just |simply |then |quietly |softly )?(says?|said|asks?|adds?|repl(y|ies)|murmurs?|mutters?|whispers?|continues?|answers?|responds?|speaks?|states?|remarks?)\b/i;
+const TAG_TAIL = /\b(says?|asks?|asking|adds?|adding|repl(y|ies|ying)|murmurs?|whispers?|continues?|continuing|answers?|answering|responds?|responding)\b[^.!?]*[,:]\s*\*?\s*$/i;
+// An action is a glimpse, not a paragraph: keep its first clause ("she narrows her eyes slightly"), not the commentary after it.
+function shortAction(u) {
+  const m = u.match(/^(\s*)\*([^*]+)\*(\s*)$/); if (!m) return u;
+  let a = m[2].trim(); const words = a.split(/\s+/);
+  if (words.length <= 9) return u;
+  const cut = a.search(/,| but | as | while | before | after | and then | because | though | waiting | hoping | trying /i);
+  a = (cut > 12 ? a.slice(0, cut) : words.slice(0, 9).join(' ')).replace(/[\s,;:]+$/, '');
+  return `${m[1]}*${a}*${m[3] || ' '}`;
+}
 function dropTags(text) {
-  const us = units(text).filter(u => !SPEECH_TAG.test(u.trim()));
+  const us = units(text).filter(u => !SPEECH_TAG.test(u.trim()) && !TAG_TAIL.test(u.trim())).map(shortAction);
   while (us.length > 1 && /[,:]\s*\*?\s*$/.test(us[us.length - 1].trim())) us.pop();
   return us.join('').trim() || text;
 }
@@ -310,12 +320,33 @@ function applySettings(body) {
 // db.away = { since, until, where, cover } while she is out; db.glow = { kind, lying, truth, tells, talk, where, until } for the
 // hour after she is back, while it still shows.
 function currentGlow() { if (db.glow && Date.now() > db.glow.until) { db.glow = null; save(); } return db.glow; }
+// db.plan = { leaveAt, backAt, where }: something she said she has later ("class starts at seven", "back around nine").
+const planView = () => { const p = db.plan; return p && (p.leaveAt || p.backAt) && !db.away ? { where: p.where || '', leave: p.leaveAt ? clock(p.leaveAt) : '', back: p.backAt ? clock(p.backAt) : '' } : null; };
+function notePlan(text) {
+  const p = detectPlan(text); if (!p) return;
+  db.plan = db.plan || {};
+  if (p.leaveAt) { db.plan.leaveAt = p.leaveAt; db.plan.where = p.where || db.plan.where || ''; if (db.plan.backAt && db.plan.backAt <= p.leaveAt) db.plan.backAt = 0; }
+  if (p.backAt) db.plan.backAt = p.backAt;
+  console.log('[plan]', JSON.stringify(planView()));
+}
+// Is it time? 'say' = she should say goodbye now (the page is open and it is within a few minutes of the time);
+// if the moment passed with nobody watching, she simply went.
+function planDue() {
+  const p = db.plan, now = Date.now(); if (!p || !p.leaveAt || db.away || now < p.leaveAt) return '';
+  if (now - p.leaveAt < 4 * 60000) return 'say';
+  leaveNow({ where: p.where || 'somewhere', minutes: 75, cover: /class|study|work/.test(p.where || '') }, p.leaveAt); save();
+  return '';
+}
 const awayView = () => db.away ? { where: db.away.where, until: db.away.until, back: clock(db.away.until), due: Date.now() >= db.away.until } : null;
 const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
-function leaveNow(leave) {
-  const now = Date.now();
-  db.away = { since: now, until: now + leave.minutes * 60000 / AWAY_SPEED, where: leave.where, cover: leave.cover, minutes: leave.minutes };
-  db.log.push({ who: 'sys', text: `Wizra left for ${leave.where}. Back around ${clock(db.away.until)}.`, at: now });
+function leaveNow(leave, since = Date.now()) {
+  const now = since, p = db.plan || {};
+  // back when she said she would be, if she said; otherwise however long that kind of outing takes
+  const said = p.backAt && p.backAt > now + 5 * 60000 && p.backAt < now + 16 * 3600000 ? p.backAt : 0;
+  const where = leave.where === 'somewhere' && p.where ? p.where : leave.where;
+  db.away = { since: now, until: said || now + leave.minutes * 60000 / AWAY_SPEED, where, cover: leave.cover || /class|study|work/.test(where), minutes: said ? Math.round((said - now) / 60000) : leave.minutes };
+  db.plan = null;
+  db.log.push({ who: 'sys', text: `Wizra left for ${where}. Back around ${clock(db.away.until)}.`, at: now });
   console.log(`[away] left for ${leave.where}, ${leave.minutes} min`);
 }
 // She walks back in: decide what really happened, then let her say something as she arrives (seeing anything he sent meanwhile).
@@ -367,9 +398,9 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, { error: 'login' });
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, settings: db.settings, away: awayView(), glow: glowView() });
+      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
 
-      if (url.pathname === '/api/away') return json(res, 200, { away: awayView(), glow: glowView() });
+      if (url.pathname === '/api/away') return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
 
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
@@ -416,7 +447,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/reset' && req.method === 'POST') {
-        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; save();
+        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; db.plan = null; save();
         return json(res, 200, { ok: true });
       }
 
@@ -440,9 +471,9 @@ const server = http.createServer(async (req, res) => {
           const full = await reply(pre ? `*${pre}* ${msg}` : msg, d => send({ t: 'delta', d }));
           db.log.push({ who: 'her', text: full, at: Date.now() });
           db.sinceLearn++;
-          const leave = detectLeave(full); if (leave) leaveNow(leave);
+          notePlan(full); const leave = detectLeave(full); if (leave) leaveNow(leave);
           save();
-          send({ t: 'done', text: full, away: awayView(), glow: glowView() });
+          send({ t: 'done', text: full, away: awayView(), glow: glowView(), plan: planView() });
           if (db.sinceLearn >= LEARN_EVERY) { db.sinceLearn = 0; learn().catch(e => console.error('[learn]', e.message)); }
         } catch (e) {
           console.error('[chat]', e.status || '', e.message);
@@ -453,6 +484,24 @@ const server = http.createServer(async (req, res) => {
           res.end();
         }
         return;
+      }
+      // The time she named has come: she says goodbye and goes.
+      if (url.pathname === '/api/depart' && req.method === 'POST') {
+        if (planDue() !== 'say') return json(res, 409, { error: 'Not time yet.' });
+        if (busy) return json(res, 409, { error: 'busy' });
+        busy = true;
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+        const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
+        const p = db.plan, where = p.where || 'what she has on';
+        const pre = `sees her check the time: it is time for her to leave for ${where}`;
+        db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true });
+        let full = '';
+        try { full = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text: full, at: Date.now() }); }
+        catch (e) { console.error('[depart]', e.message); db.log.pop(); }                  // could not reach her brain: she slips out without a word
+        leaveNow({ where: p.where || 'somewhere', minutes: 75, cover: /class|study|work/.test(p.where || '') });
+        save(); busy = false;
+        send({ t: 'done', text: full, away: awayView(), glow: null, plan: null });
+        return res.end();
       }
       // She comes back: when her time is up (the page asks), or early if he calls her back.
       if (url.pathname === '/api/return' && req.method === 'POST') {
@@ -466,7 +515,7 @@ const server = http.createServer(async (req, res) => {
         const was = db.away;
         try {
           const full = await comeBack(() => {});
-          send({ t: 'done', text: full, away: null, glow: glowView(), returned: true });
+          send({ t: 'done', text: full, away: null, glow: glowView(), plan: planView(), returned: true });
         } catch (e) {
           console.error('[return]', e.message);
           while (db.log.length && db.log[db.log.length - 1].hidden) db.log.pop();

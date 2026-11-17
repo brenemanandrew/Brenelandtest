@@ -32,6 +32,39 @@ const STATED = [[/\b(\d{1,3}) ?(min|mins|minutes)\b/i, m => +m[1]], [/\b(a|an|on
   [/\b(a )?couple (of )?hours\b|\b2 ?(hrs|hours)\b/i, () => 120], [/\b(a )?few hours\b|\b3 ?(hrs|hours)\b/i, () => 180], [/\b(a|one) (sec|second|minute|min)\b|\ba few (minutes|mins)\b/i, () => 5]];
 const between = ([a, b], r = Math.random()) => Math.round(a + (b - a) * r);
 
+// ---- plans: "my next class starts at seven", "I'll be back around 9 or 10" ----
+// detectPlan(text, now) -> { leaveAt?, backAt?, where? } in ms. A start time means she heads out about ten minutes before.
+const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, noon: 12, midnight: 0 };
+const T = "(\\d{1,2}(?::\\d{2})?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|noon|midnight)(?:\\s*o'?clock)?\\s*(am|pm|a\\.m\\.|p\\.m\\.|tonight|this evening|(?:tomorrow |this |in the )(?:morning|evening|afternoon|night))?";
+const EVENT = '(class|lecture|lab|seminar|exam|midterm|quiz|study group|study session|work|shift|session|game|campaign|d&d|dnd|practice|appointment|meeting|rehearsal|date)';
+const RE_START = new RegExp('\\b' + EVENT + "\\b[^.!?*]{0,40}?\\b(?:starts?|begins?|is|'s|kicks off)?\\s*(?:at|by|around)\\s+" + T + '(?![\\d:]|\\s*(?:minutes|mins|hours|hrs|percent|%|pages|people|of))', 'i');
+const RE_GO = new RegExp("\\b(?:leave|leaving|head(?:ing)? out|heading (?:to|over)|take off|taking off|out of here|gotta go|have to go|need to go|go)\\b[^.!?*]{0,24}?\\b(?:at|by|around)\\s+" + T + '(?![\\d:]|\\s*(?:minutes|mins|hours|hrs|percent|%))', 'i');
+const RE_BACK = new RegExp("\\b(?:back|home|done|finished|free|out)\\b[^.!?*]{0,18}?\\b(?:around|at|by|about|until|til|till|like)\\s+" + T + "(?:\\s*(?:or|to|-)\\s*" + T + ')?(?![\\d:]|\\s*(?:minutes|mins|hours|hrs|percent|%))', 'i');
+const ET = 'America/New_York';
+// the next time the clock (Eastern) shows this hour and minute after `after`; with no am/pm it is whichever comes first
+function nextAt(tok, half, after) {
+  if (!tok) return null;
+  const w = tok.toLowerCase(); let h, m = 0;
+  if (NUM[w] !== undefined) h = NUM[w]; else { const p = w.split(':'); h = +p[0]; m = +(p[1] || 0); }
+  if (!(h >= 0 && h <= 23) || !(m >= 0 && m < 60)) return null;
+  const hf = (half || '').toLowerCase().replace(/\./g, '');
+  let hours = h > 12 || w === 'midnight' || w === 'noon' ? [h] : /^am|morning/.test(hf) ? [h % 12] : /^pm|tonight|evening|afternoon|night/.test(hf) ? [h % 12 + 12] : [h % 12, h % 12 + 12];
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: ET, hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date(after));
+  const nowMin = (+parts.find(x => x.type === 'hour').value % 24) * 60 + +parts.find(x => x.type === 'minute').value;
+  let best = null;
+  for (const hh of hours) { let d = hh * 60 + m - nowMin; if (d <= 0) d += 1440; const t = after + d * 60000; if (best === null || t < best) best = t; }
+  return best - (best % 60000);
+}
+export function detectPlan(text, now = Date.now()) {
+  const t = String(text || ''), out = {};
+  const s = t.match(RE_START), g = t.match(RE_GO);
+  if (s) { const at = nextAt(s[2], s[3], now); if (at) { out.leaveAt = Math.max(now + 60000, at - 10 * 60000); out.startsAt = at; } for (const [re, name] of WHERE) if (re.test(s[1])) { out.where = name; break; } }
+  else if (g) { const at = nextAt(g[1], g[2], now); if (at) out.leaveAt = at; for (const [re, name] of WHERE) if (re.test(t)) { out.where = name; break; } }
+  const b = t.match(RE_BACK);
+  if (b) { const from = out.startsAt || out.leaveAt || now, a = nextAt(b[1], b[2], from), z = b[3] ? nextAt(b[3], b[4] || b[2], from) : null; if (a) out.backAt = z && z > a ? Math.round((a + (z - a) * Math.random()) / 60000) * 60000 : a; }
+  return out.leaveAt || out.backAt ? out : null;
+}
+
 export function detectLeave(text, now = new Date()) {
   const t = String(text || '');
   if (!GOING.some(re => re.test(t)) || NOT_GOING.test(t)) return null;

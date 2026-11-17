@@ -208,6 +208,7 @@
   #herSide { position:relative; min-width:0; height:100%; display:flex; align-items:center; }
   #awayNote { position:absolute; inset:auto 0 auto 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; border-radius:18px; background:rgba(20,12,45,.55); border:1px dashed rgba(255,255,255,.45); font-size:14px; }
   #awayNote[hidden] { display:none; }
+  #awayNote.plan { font-size:12.5px; padding:6px 12px; border-style:dotted; opacity:.85; top:auto; bottom:2px; } #awayNote.plan #callBack { display:none; }
   #callBack { border:0; border-radius:999px; padding:6px 12px; background:rgba(255,255,255,.18); color:#fff; font:inherit; font-size:13px; font-weight:700; }
   .line.sys { text-align:center; font-size:12.5px; color:rgba(255,255,255,.72); margin:14px 0; letter-spacing:.02em; }
   .line.sys::before, .line.sys::after { content:" \00b7 "; opacity:.5; }
@@ -334,21 +335,33 @@ async function load() {
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
   for (const e of s.log) e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text);
-  setPresence(s.away, s.glow, true);
+  plan = s.plan || null; setPresence(s.away, s.glow, true); if (s.depart === 'say') depart();
 }
 function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
 // ---------- whether she is here ----------
 // When she says she is leaving she really goes (the server decides and keeps time). While she is out the chair is empty and
 // what you type waits for her. When she comes back it may show where she has really been.
-let away = null, glow = null, returning = false, toldAway = false;
+let away = null, glow = null, plan = null, returning = false, toldAway = false;
 function setPresence(a, g, instant) {
   const was = away; away = a || null; glow = g || null;
-  $('awayNote').hidden = !away;
   if (away) { $('awayText').textContent = 'Out: ' + away.where + '. Back around ' + away.back + '.'; input.placeholder = 'She is out. Leave her a message'; }
   else { input.placeholder = 'Talk or type, *actions*'; toldAway = false; }
+  showPlan(plan);
   if (away && !was) avatar.presence(instant ? 'gone' : 'leave');
   avatar.setState(glow ? glow.kind : '');
+}
+// something she said she has later: shown quietly beside her until it happens
+function showPlan(p) {
+  plan = p || null; const note = $('awayNote'); note.hidden = !away && !plan; note.classList.toggle('plan', !away && !!plan);
+  if (!away && plan) $('awayText').textContent = (plan.leave ? 'Leaving' + (plan.where ? ' for ' + plan.where : '') + ' around ' + plan.leave + '.' : '') + (plan.back ? (plan.leave ? ' Back' : 'Says she will be back') + ' around ' + plan.back + '.' : '');
+}
+async function depart() {
+  if (away || returning || sendBtn.disabled) return;
+  returning = true; sendBtn.disabled = true;
+  try { const r = await api('/api/depart', {}); if (r.ok) await readReply(r, null); }
+  catch (e) { if (e.message !== 'login') console.error(e); }
+  finally { returning = false; sendBtn.disabled = false; }
 }
 async function comeBack(force) {
   if (!away || returning || sendBtn.disabled) return;
@@ -363,7 +376,7 @@ async function comeBack(force) {
 setInterval(async () => { // keep time with the server: is she due back, has the after-effect worn off
   if (document.hidden || $('login').style.display === 'grid') return;
   try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
-    if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } }
+    if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } }
   } catch {}
 }, 15000);
 
@@ -401,12 +414,14 @@ async function readReply(r, body, beforeType) {
       if (ev.t === 'error') throw new Error(ev.error);
       if (ev.t !== 'done') continue; // (the words arrive whole; see typeOut)
       if (beforeType) await beforeType(ev);
+      if (ev.plan !== undefined && !ev.away) showPlan(ev.plan);
+      if (!ev.text) { if (ev.away) { addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); plan = null; setPresence(ev.away, null, false); } return; }
       if (!body) body = addLine('her', '');
       const full = ev.text; avatar.setThinking(false); avatar.feel(full); avatar.act(full);
       const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
       const flap = speaker.on ? null : setInterval(() => avatar.talk(), 120); // no voice: her mouth keeps time with the typing
       await typeOut(body, full); clearInterval(flap);
-      if (ev.away && !ev.returned) { await new Promise(ok => setTimeout(ok, 1400)); addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); setPresence(ev.away, null, false); }
+      if (ev.away && !ev.returned) { await new Promise(ok => setTimeout(ok, 1400)); addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); plan = null; setPresence(ev.away, null, false); }
       else if (ev.glow !== undefined && !ev.returned) { glow = ev.glow; avatar.setState(glow ? glow.kind : ''); }
     }
   }
