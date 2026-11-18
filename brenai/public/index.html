@@ -741,7 +741,7 @@ async function load() {
   await loadDev();
   let zone = ''; try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
   const r = await api('/api/state' + (zone ? '?tz=' + encodeURIComponent(zone) : '')); const s = await r.json();
-  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
+  myName = s.name || 'You'; if (s.voiceMod) voiceMod = s.voiceMod; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
   if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
@@ -823,7 +823,7 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
   if (was !== undefined && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
   setPlace.level = visitInfo.level;
   const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
@@ -835,7 +835,12 @@ function setPlace(d, arriving) {
   showInvite();
 }
 function showInvite() {
-  const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite; c.hidden = !inv; if (!inv || c.dataset.for === inv) { if (!inv) c.dataset.for = ''; return; }
+  const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite, due = visitInfo.place || away ? null : visitInfo.due;
+  if (!inv && due && due.place !== 'dorm' && due.place !== 'house') { // a plan the two of you made, for a place of its own: it is time
+    c.hidden = false; if (c.dataset.for === 'due:' + due.id) return; c.dataset.for = 'due:' + due.id; c.textContent = ''; const go = el('button', { textContent: 'Let us go' }), later = el('button', { className: 'no', textContent: 'Not yet' });
+    c.append(el('b', { textContent: 'It is time' }), `${due.title}, at ${due.where}.`, el('div', {}, go, later)); later.onclick = () => { c.hidden = true; };
+    go.onclick = async () => { try { const r = await api('/api/visit', { place: due.place }); const d = await r.json(); if (r.ok) addSys('You two went to ' + due.where + '.'); setPlace(d, true); } catch {} }; return; }
+  c.hidden = !inv; if (!inv || c.dataset.for === inv) { if (!inv) c.dataset.for = ''; return; }
   c.dataset.for = inv; c.textContent = '';
   const yes = el('button', { textContent: inv === 'dorm' ? 'Go over' : 'Sure, come over' }), no = el('button', { className: 'no', textContent: 'Not now' });
   c.append(el('b', { textContent: inv === 'dorm' ? 'She invited you over' : 'She wants to come over' }), inv === 'dorm' ? 'Wizra is asking you over to her dorm room.' : 'Wizra is asking to come hang out at your place.', el('div', {}, yes, no));
@@ -936,7 +941,7 @@ async function readReply(r, body, beforeType) {
 // ---------- her follow-ups: a second message when she has more to say ----------
 // A little after a reply the page asks the server whether she has an afterthought (the game's rate, then she herself, decide).
 // The small arrow after her last line asks her to go on right now.
-let followTimer = 0;
+let followTimer = 0, voiceMod = { rate: 1, pitch: 1 };   // voiceMod: how her temperament shifts her voice (from the server)
 function moreArrow() { for (const b of log.querySelectorAll('.more')) b.remove(); if (away || SANDBOX) return; const last = [...log.querySelectorAll('.msg.her')].pop(); if (!last || last !== log.lastElementChild) return;
   const b = el('button', { className: 'more', title: 'Let her go on', textContent: '\u25B8\u25B8' }); b.onclick = () => followUp(true); last.append(b); }
 function armFollow() { clearTimeout(followTimer); moreArrow(); let tries = 0; const go = () => { if (input.value.trim() || sendBtn.disabled || away || phoneCall.on || document.hidden) return; if (speaker.busy() && tries++ < 8) { followTimer = setTimeout(go, 5000); return; } followUp(false); }; followTimer = setTimeout(go, 16000 + Math.random() * 22000); }
@@ -1172,7 +1177,7 @@ const speaker = (() => {
   function deviceSay(parts) {
     if (!v.supported) return;
     for (const part of parts) { // one sentence per utterance: some browsers cut a long one off
-      const u = new SpeechSynthesisUtterance(part); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate; u.pitch = v.pitch;
+      const u = new SpeechSynthesisUtterance(part); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate * voiceMod.rate; u.pitch = v.pitch * voiceMod.pitch;
       pending++; u.onstart = begin; u.onend = u.onerror = () => { if (--pending <= 0) { pending = 0; end(); } };
       SS.speak(u);
     }
@@ -1192,7 +1197,7 @@ const speaker = (() => {
   const begin = () => { if (v.speaking) return; v.speaking = true; if (!v.headphones) voice.hold(true); clearInterval(tick); tick = setInterval(() => { const lvl = env && !player.paused ? env[Math.floor(player.currentTime / 0.04)] : undefined; avatar.talk(lvl); }, 40); };
   const playBlob = blob => new Promise(async done => {
     env = await envelope(blob);
-    const url = URL.createObjectURL(blob); player.src = url; player.playbackRate = v.rate;
+    const url = URL.createObjectURL(blob); player.src = url; player.playbackRate = v.rate * voiceMod.rate;
     player.onplaying = () => { begin(); if (v.onFirst) v.onFirst(); }; player.onended = player.onerror = () => { URL.revokeObjectURL(url); env = null; done(); };
     player.play().catch(() => done());
   });
@@ -1285,7 +1290,7 @@ $('callMic').onclick = () => { const on = !voice.on; voice.set({ on }); $('callM
 $('callType').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { callSay(e.target.value.trim()); e.target.value = ''; } });
 
 // ---------- the wheel ----------
-let sheet = null, notes = '', memories = { moments: [], pics: [] }, feelingNow = '';
+let sheet = null, notes = '', memories = { moments: [], pics: [] }, feelingNow = '', weekInfo = { week: [], dates: [], places: [] };
 const MOODS = ['auto', 'happy', 'playful', 'chill', 'focused', 'excited', 'tired', 'grumpy', 'sad', 'anxious'];
 const LABEL = v => v < 20 ? 'very low' : v < 40 ? 'low' : v < 60 ? 'middle' : v < 80 ? 'high' : 'very high';
 async function saveSettings(patch) {
@@ -1425,6 +1430,14 @@ function buildPanel(k) {
       fold('likes', '💜', 'Likes', sheet.likes.length, listEditor('', 'likes')), fold('dislikes', '🚫', 'Dislikes', sheet.dislikes.length, listEditor('', 'dislikes')));
     const nt = el('textarea', { rows: 8, value: notes });
     const saveN = el('button', { className: 'small', textContent: 'Save notes' }); saveN.onclick = () => api('/api/settings', { notes: nt.value }).then(() => { notes = nt.value; saveN.textContent = 'Saved'; });
+    { // her week, and the plans you two have made
+      const W = weekInfo, sel = el('select', {}, ...W.places.map(x => el('option', { value: x.id, textContent: x.name }))), dayS = el('select', {}, ...[0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(Date.now() + i * 86400000); return el('option', { value: i, textContent: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'long' }) }); }));
+      const tm = el('input', { type: 'time', value: '19:00' }), ti = el('input', { type: 'text', placeholder: 'What for? e.g. D&D night, study session, stargazing', maxLength: 60 }), add = el('button', { className: 'small', textContent: 'Make the plan' });
+      add.onclick = async () => { const d = new Date(Date.now() + (+dayS.value) * 86400000), [h, m] = tm.value.split(':'); d.setHours(+h || 19, +m || 0, 0, 0); const r = await api('/api/plan', { place: sel.value, at: d.getTime(), title: ti.value }), o = await r.json(); if (!r.ok) return alert(o.error || 'That did not work.'); weekInfo.dates = o.dates; buildPanel('sheet'); };
+      const plans = W.dates.map(d => { const x = el('span', { className: 'x', textContent: ' \u2715', title: 'Drop this plan' }); x.style.cursor = 'pointer'; x.onclick = async () => { const o = await (await api('/api/plan', { remove: d.id })).json(); weekInfo.dates = o.dates; buildPanel('sheet'); }; return el('div', { className: 'memline' }, el('time', { textContent: d.when.replace(/^(\w{3})\w*/, '$1') }), el('span', {}, `${d.title}, ${d.where}`, x)); });
+      p.append(fold('week', '\ud83d\udcc5', 'Her week and your plans', W.dates.length ? W.dates.length + ' planned' : 'nothing planned', ...plans,
+        el('label', { textContent: 'Plan something together' }), el('div', { className: 'row', style: 'flex-wrap:wrap' }, sel, dayS, tm), el('div', { className: 'row', style: 'flex-wrap:wrap' }, ti, add),
+        el('label', { textContent: 'Her usual week' }), ...W.week.map(d => { const r = el('div', { className: 'memline' }, el('time', { textContent: d.day.slice(0, 3) }), el('span', { textContent: d.a + '; ' + d.b })); if (d.today) r.style.fontWeight = '700'; return r; }))); }
     { const day = t => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' }), M = memories, pics = el('div', { className: 'mempics' }, ...M.pics.slice().reverse().map(x => { const im = picEl(x.pic); im.title = day(x.at); return im; }));
       p.append(fold('mem', '📔', 'Memory book', M.moments.length + M.pics.length ? `${M.moments.length} moments, ${M.pics.length} pictures` : 'nothing yet', feelingNow ? el('div', { className: 'note', textContent: 'Right now she is: ' + feelingNow }) : null,
         ...(M.moments.length ? M.moments.map(m => el('div', { className: 'memline' }, el('time', { textContent: day(m.at) }), el('span', { textContent: m.text }))) : [el('div', { className: 'note', textContent: 'Firsts land here as they happen: first visit, first call, first picture, each level.' })]), M.pics.length ? pics : null)); }
@@ -1514,7 +1527,7 @@ function buildPanel(k) {
   }
 }
 async function openWheel() {
-  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || ''; memories = d.memories || { moments: [], pics: [] }; feelingNow = d.feeling || '';
+  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || ''; memories = d.memories || { moments: [], pics: [] }; feelingNow = d.feeling || ''; weekInfo = { week: d.week || [], dates: d.dates || [], places: d.places || [] };
   $('wheel').classList.remove('bar'); drawRing(); $('panel').classList.remove('show'); $('wheel').classList.add('open');
 }
 function closeWheel() { $('wheel').classList.remove('open'); }

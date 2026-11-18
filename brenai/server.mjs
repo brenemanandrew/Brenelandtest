@@ -201,6 +201,8 @@ function systemBlocks() {
   const blocks = [{ type: 'text', text: db.persona ? db.persona.replaceAll('{user}', USER_NAME) : PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') + (db.sheet.path === 'romance' && ROM_STAGE[db.sheet.romLevel] ? '\n- Where the two of you are: ' + ROM_STAGE[db.sheet.romLevel] : '') }];
   if (db.intro === 'first') blocks.push({ type: 'text', text: `IMPORTANT, right now: this is your very first conversation with ${USER_NAME}. A matching service just paired the two of you (you signed up to be someone's research buddy and company in the evenings; he picked you from your profile a minute ago). You have never spoken before and you know nothing about him except his name. Introduce yourself the way you really would, in your own voice and temperament, find out who he is and what he is into, and let him get to know you a little at a time. Do not act like you already know him.` });
   if (db.feeling && Date.now() - db.feeling.at < 72 * 3600000) { const h = Math.round((Date.now() - db.feeling.at) / 3600000); blocks.push({ type: 'text', text: `How you were left feeling about ${USER_NAME} ${h < 1 ? 'a little while ago' : h < 24 ? `about ${h} hour${h === 1 ? '' : 's'} ago` : `${Math.round(h / 24)} day${h < 36 ? '' : 's'} ago`}: ${db.feeling.text}. You still carry that: let it colour how you are with him now (warmer, cooler, teasing, careful, whatever fits), without announcing it, and let it change as the conversation goes.` }); }
+  { const w = WEEK[dayNow()] || WEEK[0], soon = (db.dates || []).filter(d => !d.done && d.at > Date.now() - 3600000 && d.at < Date.now() + 3 * 86400000).map(d => `${d.title} at ${placeLabel(d.place)}, ${whenText(d.at)}`);
+    blocks.push({ type: 'text', text: `Your usual week, for when it comes up (today is ${DAYS[dayNow()]}: ${w[0]}; ${w[1]}): ` + WEEK.map((d, i) => `${DAYS[i].slice(0, 3)}: ${d[0]}; ${d[1]}`).join('. ') + '.' + (soon.length ? ` Plans you and ${USER_NAME} have made: ${soon.join('; ')}. You are looking forward to them; bring one up if the moment fits.` : '') }); }
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -234,6 +236,7 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   poke: ['pokes her cheek', 'pokes her cheek %n times'], boop: ['boops her nose', 'boops her nose %n times'], pat: ['pats her on the head', 'pats her on the head %n times'],
   yousit: ['sits down on the couch next to her', 'sits down on the couch next to her'], yousitbed: ['sits down on the edge of her bed', 'sits down on the edge of her bed'], tvon: ['turns the TV on', 'turns the TV on'], tvoff: ['turns the TV off', 'turns the TV off'],
   cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
+  planned: ['just put a plan with her on the calendar (see the plans in your notes); she can say how she feels about it', ''],
   heartwin: ['kept stroking her hair until she melted: squirming, blushing, happy tears in her eyes, and then a rush of warmth she cannot explain away', ''], heartlose: ['kept fussing with her hair clumsily until she got annoyed and ducked away', ''],
   petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
 // (each player's own list: cur().touches)
@@ -430,6 +433,8 @@ function situationNow() { // what kind of moment it is for her, from where she i
 function outfitNow() {
   const o = outfitData(), sit = situationNow(); fixBond(); const lvl = db.sheet.romLevel;
   for (const s of sit === 'Daily' ? ['Daily'] : [sit, 'Daily']) for (let l = lvl; l >= 0; l--) { const slot = o.slots[l + '|' + s]; if (slot && fs.existsSync(path.join(OUTFITS, slot.file))) return { url: '/api/outfit/' + slot.file + '?v=' + slot.v, key: slot.file + ':' + slot.v, situation: sit, level: lvl, from: `Lv${l} ${s}` }; }
+  const look = db.sheet.look, mine = look && Object.values(o.slots).find(x => new RegExp('\\b' + look + '\\b', 'i').test(x.name || '') && fs.existsSync(path.join(OUTFITS, x.file)));   // the colours this player picked when they met her
+  if (mine) return { url: '/api/outfit/' + mine.file + '?v=' + mine.v, key: mine.file + ':' + mine.v, situation: sit, level: lvl, from: 'the look you picked (' + look + ')' };
   return { url: '', key: '', situation: sit, level: lvl, from: 'her base model' };
 }
 
@@ -533,17 +538,37 @@ const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinit
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
 const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
-const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
+const placeView = () => ({ due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
 function placeNote() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
   return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
 }
+// ---- her week, and plans the two of you make ----
+// Her usual week (what she will say she has on, and what the player can see and plan around). Index 0 is Sunday.
+const WEEK = [
+  ['laundry and catching up on reading', 'usually free in the evening'],
+  ['medieval history lecture, 10 to noon', 'study group, 6 to 8 in the evening'],
+  ['anthropology seminar, 1 to 3', 'her shift at the cafe, 4 to 8'],
+  ['medieval history lecture, 10 to noon', 'free evening'],
+  ['anthropology seminar, 1 to 3', 'her shift at the cafe, 4 to 8'],
+  ['medieval history lecture, 10 to noon', 'her D&D game, 7 to 10 at night'],
+  ['her shift at the cafe, 10 to 2', 'sometimes out with friends at night'],
+];
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const dayNow = () => DAYS.indexOf(new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'long' }));
+const whenText = at => new Date(at).toLocaleString('en-US', { timeZone: TZ, weekday: 'long', hour: 'numeric', minute: '2-digit' });
+const placeLabel = p => p === 'dorm' ? 'her dorm' : p === 'house' ? `${USER_NAME}'s house` : (customMap(p) || {}).name || 'a place';
+// plans: db.dates = [{ id, at, place, title }]. A plan is "on" from ten minutes before until ninety minutes after its time.
+function datesView() { const now = Date.now(); db.dates = (db.dates || []).filter(d => d.at > now - 2 * 3600000); return db.dates.slice().sort((a, b) => a.at - b.at).map(d => ({ ...d, when: whenText(d.at), where: placeLabel(d.place) })); }
+function dateDue() { const now = Date.now(), d = (db.dates || []).find(d => !d.done && now > d.at - 600000 && now < d.at + 90 * 60000); if (!d || db.place || db.away) return null;
+  if ((d.place === 'dorm' || d.place === 'house') && (!db.invite || db.invite.place !== d.place)) db.invite = { place: d.place, at: now }; return { id: d.id, place: d.place, title: d.title, where: placeLabel(d.place) }; }
 // the memory book: firsts and milestones, each kept once ({ key, at, text })
 function remember(key, text) { db.memories = db.memories || []; if (db.memories.some(m => m.key === key)) return; db.memories.push({ key, at: Date.now(), text }); if (db.memories.length > 200) db.memories.shift(); }
 const memoryView = () => ({ moments: (db.memories || []).slice().sort((a, b) => a.at - b.at), pics: db.log.filter(e => e.pic && !e.hidden).slice(-24).map(e => ({ at: e.at, pic: e.pic })), since: (db.log[0] || {}).at || 0 });
-function setPlace(place) { db.place = place || ''; db.invite = null; if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
+function setPlace(place) { db.place = place || ''; db.invite = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
+  if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
 // ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
 // things the player says that she reacts to on the spot (a pose and an emoji), before her words come: edited in the Studio
 const CUES_DEFAULT = [
@@ -632,12 +657,19 @@ const MATCH = [
   [{ shyness: 40, confidence: -25, nerdiness: 10 }, { nerdiness: 15, playfulness: 10 }, { confidence: 25, shyness: -20, nerdiness: -25 }],                 // her vibe: shy bookworm / nerdy gamer / confident rebel
   [{ warmth: 15, playfulness: 15 }, { bluntness: 15, confidence: 10, patience: -10 }, { warmth: 20, patience: 20, shyness: 5 }],                           // you want: to hang out / to be pushed / to be understood
 ];
+const MATCH_HOBBY = [
+  { tags: ['plays D&D', 'paints minis'], likes: ['running homebrew D&D campaigns', 'painting miniatures at 2am'], story: 'Lately most of her free time goes into the campaign she runs and the box of half-painted minis on her desk.' },
+  { tags: ['horror movies', 'dark playlists'], likes: ['midnight horror movie marathons', 'post-punk and darkwave playlists'], story: 'Lately she falls asleep to old horror movies and curates playlists nobody asked for.' },
+  { tags: ['sketches', 'thrifts'], likes: ['sketching in the margins of her notes', 'thrift store treasure hunts'], story: 'Lately she fills sketchbooks faster than she can afford them and haunts every thrift store in town.' },
+];
 const TRAIT_WORD = { sarcasm: ['earnest', 'sarcastic'], warmth: ['cool and guarded', 'warm'], confidence: ['unsure of herself', 'confident'], patience: ['short-fused', 'patient'], playfulness: ['serious', 'playful'], shyness: ['outgoing', 'shy'], nerdiness: ['not much of a nerd', 'a huge nerd'], bluntness: ['gentle with her words', 'blunt'] };
 function matchBlurb(t) {
   const top = Object.keys(TRAIT_WORD).map(k => [k, t[k] - 50]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3).map(([k, d]) => TRAIT_WORD[k][d >= 0 ? 1 : 0]);
   return { name: 'Wizra', age: 22, tags: ['goth', 'plays D&D', 'college student', 'night owl'], line: `${top[0][0].toUpperCase() + top[0].slice(1)}, ${top[1]} and ${top[2]}.`, fit: 86 + Math.round((t.warmth + t.playfulness + t.nerdiness) % 12) };
 }
 const FACE_WORDS = new Set(['smiling', 'laughing', 'looking surprised', 'frowning', 'yawning', 'winking at her', 'nodding', 'shaking his head', 'looking away from the screen', 'back at the screen after being away']);
+// her temperament colours her voice a little: quick and bright when playful, slower and softer when shy or patient, lower when sure of herself
+function voiceMod() { const t = (db.sheet && db.sheet.traits) || {}, v = k => ((+t[k] || 50) - 50), c = x => +Math.max(0.86, Math.min(1.15, x)).toFixed(3); return { rate: c(1 + v('playfulness') / 500 - v('patience') / 700 - v('shyness') / 600), pitch: c(1 + v('shyness') / 500 + v('playfulness') / 700 - v('confidence') / 600) }; }
 const SHOW_ME = /show me (where|around|the (room|place|view|bar|class|library|store)|your (room|surroundings|view)|what'?s (around|behind))|let me see (where|around|the (room|place|view)|behind)|(turn|flip|move|pan|point) (the |your )?(camera|phone)|look around|what'?s behind you|where are you (right now|really)\??.*(show|see)|prove (it|you'?re)/i;
 async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
@@ -694,14 +726,16 @@ async function handle(req, res) {
       if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
-      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
       // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"
       // and opens their first conversation herself.
       if (url.pathname === '/api/intro' && req.method === 'POST') {
         const { answers } = await readBody(req); if (db.intro !== 'todo') return json(res, 409, { error: 'already met' });
         const t = { ...TRAITS_DEFAULT }; (Array.isArray(answers) ? answers : []).slice(0, MATCH.length).forEach((a, i) => { const d = MATCH[i][a | 0] || {}; for (const k in d) t[k] = Math.max(5, Math.min(95, (t[k] || 50) + d[k])); });
-        db.sheet.traits = t; save(); return json(res, 200, { traits: t, overview: matchBlurb(t) });
+        const hob = MATCH_HOBBY[answers && answers[4] | 0] || MATCH_HOBBY[0], base = structuredClone(SHEET_DEFAULT);   // what she is into, and a line of her story to go with it
+        db.sheet.likes = [...hob.likes, ...base.likes.filter(l => !hob.likes.includes(l))].slice(0, 9); db.sheet.backstory = base.backstory + ' ' + hob.story; db.sheet.look = ['', 'crimson', 'royal'][answers && answers[5] | 0] || '';
+        db.sheet.traits = t; save(); return json(res, 200, { traits: t, overview: { ...matchBlurb(t), tags: ['goth', ...hob.tags, 'college student'] } });
       }
       if (url.pathname === '/api/intro/start' && req.method === 'POST') {
         if (db.intro !== 'todo') return json(res, 409, { error: 'already met' }); if (busy) return json(res, 409, { error: 'busy' }); busy = true;
@@ -725,6 +759,15 @@ async function handle(req, res) {
           if (!text || /^[\s.\u2026*_-]*$/.test(text) || /^\W*(nothing( to add)?|no follow[- ]?up|n\/a)\W*$/i.test(text)) { db.log.pop(); save(); return json(res, 200, { text: '' }); }
           db.log.push({ who: 'her', text, at: Date.now(), more: true }); save(); return json(res, 200, { text }); }
         catch (e) { db.log.pop(); return json(res, 200, { text: '', error: e.message }); } finally { busy = false; }
+      }
+
+      // making and dropping plans: { place, at (ms), title } or { remove: id }
+      if (url.pathname === '/api/plan' && req.method === 'POST') {
+        const b = await readBody(req); db.dates = db.dates || [];
+        if (b.remove) db.dates = db.dates.filter(d => d.id !== b.remove);
+        else { const at = +b.at, place = String(b.place || ''); if (!(at > Date.now() - 600000 && at < Date.now() + 30 * 86400000) || !(place === 'dorm' || place === 'house' || customMap(place))) return json(res, 400, { error: 'Pick a place and a time in the next month.' }); if (db.dates.length >= 12) return json(res, 400, { error: 'That is a lot of plans. Drop one first.' });
+          const d = { id: Math.random().toString(36).slice(2, 9), at, place, title: String(b.title || '').replace(/[<>]/g, '').trim().slice(0, 60) || 'Hanging out' }; db.dates.push(d); db.log.push({ who: 'sys', text: `Plan made: ${d.title} at ${placeLabel(place)}, ${whenText(at)}.`, at: Date.now() }); cur().touches.push({ kind: 'planned', at: Date.now() }); }
+        save(); return json(res, 200, { dates: datesView() });
       }
 
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
@@ -801,7 +844,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
         if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
-        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES, memories: memoryView(), feeling: db.feeling && Date.now() - db.feeling.at < 72 * 3600000 ? db.feeling.text : '', hasWord: !!db.word });
+        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES, memories: memoryView(), week: WEEK.map((d, i) => ({ day: DAYS[i], a: d[0], b: d[1], today: i === dayNow() })), dates: datesView(), places: [{ id: 'dorm', name: 'Her dorm' }, { id: 'house', name: 'Your house' }, ...devData().maps.custom.map(m => ({ id: m.id, name: m.name }))], feeling: db.feeling && Date.now() - db.feeling.at < 72 * 3600000 ? db.feeling.text : '', hasWord: !!db.word });
       }
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
@@ -953,7 +996,9 @@ async function handle(req, res) {
           else if (wantsPic(msg)) { const pz = posed(msg, devData().cues); if (close * 100 >= rule('picAskMin') && (pz || Math.random() < 0.55 + 0.45 * close)) { pic = pz ? { ...selfie('dorm', kind, close), pose: 'plain', face: 'happy', ...(pz.gest ? { gest: pz.gest } : { clip: pz.clip, t: 0 }), ...(pz.cam ? { cam: pz.cam } : {}), desc: `a picture of her ${pz.label}, in her dorm room` } : (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
-        const pre = [takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', faceNow ? `she can see him on his camera: he is ${faceNow}` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
+        const lastSeen = db.log.filter(e => !e.hidden && e.who !== 'sys').slice(-2, -1)[0], gapMin = lastSeen ? (Date.now() - lastSeen.at) / 60000 : 999, clockNow = new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'long', hour: 'numeric', minute: '2-digit' });
+        const timePre = gapMin > 20 || /\b(time|clock|late|early|morning|afternoon|evening|tonight|night|midnight|noon|o'?clock|today|day is it|a\.?m\.?|p\.?m\.?|bed|sleep|awake|up so)\b/i.test(msg) ? `the clock says ${clockNow}` : '';   // the time, right next to his words, when it matters: after a gap, or when the hour comes up
+        const pre = [timePre, takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', faceNow ? `she can see him on his camera: he is ${faceNow}` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest

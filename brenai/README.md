@@ -158,3 +158,10 @@ She is told the actual time with every reply ("Right now it is 3:44 PM on Wednes
 
 ## Her arms while seated
 `ARMS` in `public/avatar-vrm.js`: where her free arms rest (hands in her lap, hands folded, one hand in her lap and the other at her side). She changes between them every minute or so. A held thing (`OVER`) goes over the top at full weight, also while you talk: the phone is held in front of her chest with the screen tipped to her face. `WIZRA_DBG.live` exposes the pose tables for tuning from the console.
+
+## Time next to his words, her voice, match extras, her week and plans
+- When there has been a gap of twenty minutes or the hour comes up in his message, the clock time rides in front of his words ("the clock says Wednesday 3:44 PM"), not only in the setup text. `/api/state` returns `tz`.
+- `voiceMod()`: her temperament shifts her speaking rate and pitch a little (0.86 to 1.15), applied to the device voice and the PC voice's speed.
+- The match has six questions: the fifth sets what she is into (likes, a line of backstory, the tags on the match card), the sixth her colours (`sheet.look`: an uploaded outfit whose name contains that word is worn when no level outfit applies).
+- `WEEK` in `server.mjs` is her usual week: she is told it, and the Character menu shows it. It does not yet decide when she is really out.
+- Plans: `POST /api/plan { place, at, title }` or `{ remove }`, kept in `db.dates`. She is told about plans in the next three days. From ten minutes before, `placeView().due` shows a card to go (her dorm and your house open as an invitation). Keeping a plan adds a memory and three points on your path.

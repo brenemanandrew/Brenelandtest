@@ -20,6 +20,14 @@
       { art: ['🍕', '🛋️', '😂'], bg: 'linear-gradient(160deg,#a85a1c,#f2c14e)', t: 'Someone to hang out with', d: 'Good company, easy laughs' },
       { art: ['🚀', '💪', '📈'], bg: 'linear-gradient(160deg,#1c3a6b,#3fb0d1)', t: 'Someone who pushes me', d: 'Honest, keeps me sharp' },
       { art: ['🌌', '🤝', '💭'], bg: 'linear-gradient(160deg,#3a2466,#b06ad1)', t: 'Someone who gets me', d: 'Listens, remembers, understands' } ] },
+    { q: 'What should she be into?', a: [
+      { art: ['🐉', '🎲', '🗺️'], bg: 'linear-gradient(160deg,#3b2a6b,#4f9ad1)', t: 'Tabletop and fantasy', d: 'Campaigns, minis, maps on every wall' },
+      { art: ['🎬', '🦇', '🎧'], bg: 'linear-gradient(160deg,#1b1420,#7a1024)', t: 'Horror and music', d: 'Midnight movies, dark playlists' },
+      { art: ['🎨', '🧵', '📷'], bg: 'linear-gradient(160deg,#6b2a55,#f08a4b)', t: 'Art and thrifting', d: 'Sketchbooks, odd finds, film photos' } ] },
+    { q: 'Pick her colours', a: [
+      { art: ['🖤', '🕸️', '⛓️'], bg: 'linear-gradient(160deg,#16141c,#4a4458)', t: 'Classic black', d: 'Black and grey plaid' },
+      { art: ['❤️', '🥀', '🩸'], bg: 'linear-gradient(160deg,#3a0a12,#c22838)', t: 'Crimson', d: 'Black with red tartan' },
+      { art: ['💜', '🔮', '🌙'], bg: 'linear-gradient(160deg,#2a1450,#8e54d6)', t: 'Royal purple', d: 'Deep purple on purple' } ] },
   ];
   const css = `
   #intro { position:fixed; inset:0; z-index:60; display:grid; place-items:center; background:radial-gradient(120% 90% at 50% 20%,#2a2350,#0c0a18 70%); font-family:"Fredoka",system-ui,sans-serif; color:#eae6ff; overflow:hidden; }
@@ -69,7 +77,7 @@
 
     // 1. the account is made
     const go = el('button', { className: 'go', textContent: 'Find my match' });
-    show(el('h2', { textContent: `Welcome, ${name}` }), el('p', { textContent: 'Your account is set up. Answer four quick questions and we will find the companion who fits you best.' }), go); await click(go);
+    show(el('h2', { textContent: `Welcome, ${name}` }), el('p', { textContent: 'Your account is set up. Answer six quick questions and we will find the companion who fits you best.' }), go); await click(go);
 
     for (;;) {
       // 2. the questions: three picture cards each
