@@ -511,8 +511,9 @@ export async function create(url, opts = {}) {
     return hit ? { tag: hit.object.userData.tag, x: hit.point.x, z: hit.point.z } : null;
   }
   function direct(hit) { // returns what happened, in the words used for the silent note to her (or '' if nothing did)
-    const t = hit.tag; if (inCall) return '';
+    const t = hit.tag; if (inCall || focusWant > 0) return '';
     if (fp.on) { // you are in the room: the floor is where you walk, the seat is where you sit, the TV is yours to switch on
+      if (fp.locked) return '';
       if (t === 'floor') { standUp(); fp.goal = [hit.x, hit.z]; return ''; }
       const seat = places.seat[here]; if (seat && t === seat.tag && (here === 'house' || rt.act !== 'up')) { fp.goal = null; fp.sit = seat; fp.x = seat.at[0]; fp.z = seat.at[1]; snd('sit'); return here === 'house' ? 'yousit' : 'yousitbed'; }
       if (t === 'tv') { places.tv.on = !places.tv.on; snd('tv'); return places.tv.on ? 'tvon' : 'tvoff'; }
@@ -658,6 +659,7 @@ export async function create(url, opts = {}) {
   window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp); window.addEventListener('blur', keysOff);
   function walkYou(dt) {
     if (window.WIZRA_YOU) { fp.x = hip.x + window.WIZRA_YOU[0]; fp.z = hip.z + window.WIZRA_YOU[1]; } // test hook: stand you somewhere, measured from her seat
+    if (fp.locked) { fp.keys.clear(); fp.goal = null; }                            // the heart game holds you still
     const K = fp.keys, f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), sd = (K.has('d') ? 1 : 0) - (K.has('a') ? 1 : 0);
     fp.yaw -= ((K.has('arrowright') ? 1 : 0) - (K.has('arrowleft') ? 1 : 0)) * dt * 1.9;
     let mx = 0, mz = 0; const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw);
@@ -685,6 +687,34 @@ export async function create(url, opts = {}) {
     aim.lerpVectors(near, far, e); aim.y += 0.32 * e * up; aim.x += rt.x * 0.55 * e * up; aim.z += (rt.z - far.z) * 0.4 * e * up;
     camera.position.set(aim.x + dist * Math.sin(camYaw) * Math.cos(lift), aim.y + dist * Math.sin(lift), aim.z + dist * Math.cos(camYaw) * Math.cos(lift));
     camera.lookAt(aim);
+  }
+  // ---- the heart game's camera. While it is on you cannot move or look: the view goes straight in front of her, then drifts
+  // slowly and cuts to a new angle with every heart (her face, a shoulder, her hand...), a little closer each time, until the
+  // last one puts it right up against her heart. hc.b blends between the ordinary view and this one at the start and the end.
+  const HSHOT = [{ yaw: 0, up: 0.04, at: 'face' }, { yaw: 0.55, up: 0.1, at: 'face' }, { yaw: -0.5, up: 0.08, at: 'shoulder' }, { yaw: 0.3, up: 0.3, at: 'face' }, { yaw: -0.35, up: 0.32, at: 'hand' }, { yaw: 0.6, up: 0.16, at: 'shoulder' },
+    { yaw: -0.3, up: 0.1, at: 'face' }, { yaw: 0.4, up: 0.12, at: 'heart' }, { yaw: -0.45, up: 0.2, at: 'face' }, { yaw: 0.2, up: 0.1, at: 'heart' }, { yaw: 0.06, up: 0.06, at: 'heart' }];
+  // her heart itself: a soft glowing heart over her chest that brightens and beats faster as the view closes in
+  const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), gr = g.createRadialGradient(64, 60, 4, 64, 60, 62); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,120,180,.95)'); gr.addColorStop(1, 'rgba(255,60,150,0)'); g.fillStyle = gr;
+    g.beginPath(); g.moveTo(64, 112); g.bezierCurveTo(-8, 62, 20, 2, 64, 36); g.bezierCurveTo(108, 2, 136, 62, 64, 112); g.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+  const heartGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0, depthTest: false, blending: THREE.AdditiveBlending })); heartGlow.renderOrder = 30; heartGlow.visible = false; scene.add(heartGlow);
+  const hc = { b: 0, shot: -1, since: 0, fov: 0, q: new THREE.Quaternion(), pos: new THREE.Vector3(), at: new THREE.Vector3(), tgt: new THREE.Vector3(), keepPos: new THREE.Vector3(), keepQ: new THREE.Quaternion() };
+  function heartCamera(dt, t) {
+    const on = focusWant > 0 && !inCall && chestNode; hc.b += ((on ? 1 : 0) - hc.b) * Math.min(1, dt * (on ? 3 : 4)); fp.locked = on;
+    if (hc.b < 0.004) { if (hc.fov) { camera.fov = hc.fov; hc.fov = 0; camera.updateProjectionMatrix(); } hc.shot = -1; heartGlow.visible = false; return; }
+    if (!hc.fov) hc.fov = camera.fov;
+    const n = Math.max(0, Math.min(10, Math.round(focusWant * 10))), shotN = on ? n : Math.max(0, hc.shot), shot = HSHOT[shotN], p = shotN / 10;
+    if (shotN !== hc.shot) { hc.shot = shotN; hc.since = t; }                                          // a pop: cut to the next angle
+    chestNode.getWorldPosition(heartAt); const yw = vrm.scene.rotation.y, lx = Math.cos(yw), lz = -Math.sin(yw); heartAt.x += 0.04 * lx; heartAt.z += 0.04 * lz; heartAt.y += 0.07;
+    if (shot.at === 'face') { head.getWorldPosition(hc.tgt); hc.tgt.y += 0.06; } else if (shot.at === 'hand') palmR.getWorldPosition(hc.tgt); else if (shot.at === 'shoulder') { hc.tgt.copy(heartAt); hc.tgt.x += 0.1 * lx; hc.tgt.z += 0.1 * lz; hc.tgt.y += 0.1; } else hc.tgt.copy(heartAt);
+    hc.tgt.lerp(heartAt, p * p * 0.85);                                                                // every shot leans a little more toward her heart
+    const age = (t - hc.since) / 1000, dist = (1.45 - 1.03 * Math.pow(p, 1.15)) * (1 - 0.035 * Math.min(age, 4)), wide = 0.35 + 0.65 * dist / 1.45;   // slow push in; angles narrow as it closes
+    const a = yw + shot.yaw * wide + 0.07 * age * (shotN % 2 ? 1 : -1) * wide, elev = shot.up * wide + 0.015 * age;
+    hc.pos.set(hc.tgt.x + Math.sin(a) * Math.cos(elev) * dist, hc.tgt.y + Math.sin(elev) * dist, hc.tgt.z + Math.cos(a) * Math.cos(elev) * dist);
+    const e = hc.b * hc.b * (3 - 2 * hc.b); hc.keepPos.copy(camera.position); hc.keepQ.copy(camera.quaternion);
+    camera.position.copy(hc.pos); camera.lookAt(hc.tgt);
+    if (e < 0.995) { hc.q.copy(camera.quaternion); camera.position.lerpVectors(hc.keepPos, hc.pos, e); camera.quaternion.slerpQuaternions(hc.keepQ, hc.q, e); }   // easing in from (or back out to) the ordinary view
+    camera.fov = hc.fov + (32 - hc.fov) * e; camera.updateProjectionMatrix();
+    const beat = 1 + 0.12 * Math.abs(Math.sin(t / 1000 * (3 + 5 * p))); heartGlow.visible = true; heartGlow.position.copy(heartAt).addScaledVector(hc.pos.clone().sub(heartAt).normalize(), 0.09); heartGlow.scale.setScalar((0.07 + 0.1 * p) * beat); heartGlow.material.opacity = e * Math.min(1, 0.15 + p * 1.1);
   }
   placeCamera(1);
   const chestNode = B('upperChest') || B('chest') || B('spine');
@@ -753,9 +783,9 @@ export async function create(url, opts = {}) {
     walkTo, holdClip, where: () => [rt.k > 0.5 ? rt.x : 0, rt.k > 0.5 ? rt.z : hip.z], clips: () => Object.keys(CLIPS), gestures: () => Object.keys(GESTURE).filter(n => n !== 'test'),
     // what the Studio needs to draw the rooms without her model: floor height, each room's walls and the built-in furniture's footprints
     layout: () => ({ floorY, hipZ: hip.z, bounds: { dorm: places.bounds.dorm, house: places.bounds.house }, solid: places.baseSolid, anchors: { seat: [0, hip.z], stand: STAND_AT, shelf: AT_SHELF, counter: AT_COUNTER, door: DOOR, bed: places.bed.side } }),
-    look(dx, dy) { if (!fp.on) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
+    look(dx, dy) { if (!fp.on || fp.locked) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
-    zoom(d) { if (inCall || !document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
+    zoom(d) { if (focusWant > 0) return true; if (inCall || !document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
     locate(e) { // screen -> puppet space, measured from her eye line
       const c = project(eye.x, eye.y, eye.z), up = project(eye.x, eye.y + 0.1, eye.z), k = (c.y - up.y) / 0.1 || 1;
       if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
@@ -776,10 +806,7 @@ export async function create(url, opts = {}) {
       if (em) { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised']) if (has(n)) em.setValue(n, mix(n, w[n])); if (has('blink')) em.setValue('blink', mix('blink', blink)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh); }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
-      if (focusNow > 0.003 && !fp.on && !inCall && chestNode) { // the heart game: each pop brings the view closer to her heart
-        const e = focusNow * focusNow * (3 - 2 * focusNow); chestNode.getWorldPosition(heartAt); heartAt.x += 0.04 * Math.cos(vrm.scene.rotation.y); heartAt.y += 0.03;
-        heartCam.copy(camera.position).sub(heartAt).normalize().multiplyScalar(0.3).add(heartAt); camera.position.lerp(heartCam, e); head.getWorldPosition(tmpB); tmpB.y += 0.04; camera.lookAt(tmpB.lerp(heartAt, 0.25 + 0.75 * e));
-      }
+      heartCamera(s.dt, s.t);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking

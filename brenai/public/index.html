@@ -601,7 +601,7 @@ const heartGame = (() => {
   function start() {
     if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, wasBig: document.body.classList.contains('big') });
     if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
-    vig().classList.remove('bad'); vig().classList.add('on'); $('heartHud').classList.add('on'); avatar.routine('sit'); avatar.flash('surprised', 900); setTimeout(pop, 30);
+    vig().classList.remove('bad'); vig().classList.add('on'); $('heartHud').classList.add('on'); avatar.routine('sit'); avatar.flash('surprised', 900); avatar.focus(0.02); hud(); setTimeout(() => { if (g.on) pop(); }, 900);   // the view swings round in front of her first
   }
   function pop() {
     g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.squirm(g.n >= 7); avatar.focus(g.n / 10);

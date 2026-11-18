@@ -237,7 +237,7 @@ function drawMaps() {
   }
   const cat = $('catalog'); cat.textContent = ''; const groups = {};
   for (const k in CATALOG) (groups[CATALOG[k].group] = groups[CATALOG[k].group] || []).push(k);
-  for (const gname in groups) { const grid = el('div', { className: 'cat' }); for (const k of groups[gname]) { const b = el('button', {}, el('i', {}), CATALOG[k].name); b.firstChild.style.background = CATALOG[k].color; b.onclick = () => { const bb = boundsOf(mapSel), n = itemsOf(mapSel).length, it = fresh(k, +((bb.x0 + bb.x1) / 2 + 0.5 + (n % 4) * 0.5).toFixed(2), +((bb.z0 + bb.z1) / 2 + 0.9 + (Math.floor(n / 4) % 3) * 0.5).toFixed(2));   // each new thing lands a little further along itemsOf(mapSel).push(it); rebuildItem(it); select(it); }; grid.append(b); } cat.append(el('h3', { textContent: gname }), grid); }
+  for (const gname in groups) { const grid = el('div', { className: 'cat' }); for (const k of groups[gname]) { const b = el('button', {}, el('i', {}), CATALOG[k].name); b.firstChild.style.background = CATALOG[k].color; b.onclick = () => { const bb = boundsOf(mapSel), n = itemsOf(mapSel).length, it = fresh(k, +((bb.x0 + bb.x1) / 2 + 0.5 + (n % 4) * 0.5).toFixed(2), +((bb.z0 + bb.z1) / 2 + 0.9 + (Math.floor(n / 4) % 3) * 0.5).toFixed(2)); itemsOf(mapSel).push(it); rebuildItem(it); select(it); }; grid.append(b); } cat.append(el('h3', { textContent: gname }), grid); }
   drawRoom(); drawSel();
 }
 function drawSel() {
