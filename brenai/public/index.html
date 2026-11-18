@@ -369,6 +369,12 @@
   .msg.her .act { color:#b81f74; border-color:#b81f74; background:rgba(184,31,116,.06); } .msg.me .act { color:#5a35c2; border-color:#5a35c2; background:rgba(90,53,194,.06); }
   .line.sys { color:rgba(58,38,92,.68); font-size:13.5px; } .line.err { color:#b3261e; } #log .typing { color:#7a6a99; }
   #log .pic { box-shadow:0 0 0 2px #fff, 0 2px 6px rgba(20,8,50,.3); }
+  /* she is calling you: the phone shakes hard and throws off little action lines */
+  #callBtn.incoming { animation:ringHard .5s linear infinite !important; background:linear-gradient(135deg,#ffd166,#ff6fa5) !important; }
+  @keyframes ringHard { 0%,100% { transform:rotate(0) scale(1.08); } 15% { transform:rotate(-20deg) scale(1.12); } 30% { transform:rotate(18deg) scale(1.12); } 45% { transform:rotate(-16deg) scale(1.1); } 60% { transform:rotate(14deg) scale(1.1); } 80% { transform:rotate(-6deg) scale(1.08); } }
+  #callBtn .rays { display:none; } #callBtn.incoming .rays { display:block; position:absolute; inset:-55%; border-radius:50%; pointer-events:none; background:repeating-conic-gradient(#fff 0 7deg, transparent 7deg 36deg);
+    -webkit-mask:radial-gradient(circle, transparent 56%, #000 58%, #000 80%, transparent 82%); mask:radial-gradient(circle, transparent 56%, #000 58%, #000 80%, transparent 82%); animation:rays .5s steps(2) infinite; }
+  @keyframes rays { 0% { transform:scale(.82) rotate(0); opacity:1; } 100% { transform:scale(1.12) rotate(18deg); opacity:.55; } }
 </style>
 </head>
 <body>
@@ -536,6 +542,13 @@ function setPresence(a, g, instant) {
   if (away && !was) avatar.presence(instant ? 'gone' : 'leave');
   avatar.setState(glow ? glow.kind : '');
 }
+// She is out and calling YOU: the phone on her sign shakes with little lines popping off it, and rings, until you pick up or it stops.
+let ringing = false, ringLoop = 0, ringStop = 0;
+function setRinging(on, answered) {
+  if (on === ringing) return; ringing = on; const b = $('callBtn'); b.classList.toggle('incoming', on); clearInterval(ringLoop); clearTimeout(ringStop);
+  if (on) { if (!b.querySelector('.rays')) b.append(el('span', { className: 'rays' })); WizraSound.fx('phone'); ringLoop = setInterval(() => WizraSound.fx('phone'), 2300); ringStop = setTimeout(() => setRinging(false), 48000); }
+  else if (!answered && away) addSys('Missed call from Wizra.');
+}
 // something she said she has later: shown quietly beside her until it happens
 function showPlan(p) {
   plan = p || null; const note = $('awayNote'); note.hidden = !!away || !plan; note.classList.toggle('plan', !away && !!plan);
@@ -562,7 +575,7 @@ setInterval(async () => { // keep time with the server: is she due back, has the
   if (document.hidden || $('login').style.display === 'grid') return;
   try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
     if (phoneCall.on) return;
-    if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } setPlace(d); }
+    if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } setPlace(d); setRinging(!!(d.away && d.away.ringing)); }
   } catch {}
 }, 15000);
 
@@ -923,14 +936,15 @@ function ringTone(on) { // a soft two-tone ring while it connects
 }
 const callStatus = t => { $('callStatus').textContent = t; };
 const speechDone = () => new Promise(ok => { let n = 0; const t = setInterval(() => { if ((++n > 4 && !speaker.busy()) || n > 500) { clearInterval(t); ok(); } }, 120); });
-async function startCall() {
+async function startCall(e) {
   if (!away || phoneCall.on || sendBtn.disabled) return;
-  phoneCall.on = true; phoneCall.busy = true; document.body.classList.remove('big'); document.body.classList.add('calling', 'ringing'); $('phone').classList.remove('ended'); callStatus('Calling...');
+  const incoming = ringing; setRinging(false, true);
+  phoneCall.on = true; phoneCall.busy = true; document.body.classList.remove('big'); document.body.classList.add('calling', 'ringing'); $('phone').classList.remove('ended'); callStatus(incoming ? 'Connecting...' : 'Calling...');
   // for the call: her voice on, your mic on, whatever the usual settings are (put back afterwards)
   phoneCall.saved = { speak: speaker.on, mic: voice.on }; speaker.on = true; $('callMic').classList.remove('off'); $('callType').hidden = voice.supported;
-  ringTone(true);
+  if (!incoming) ringTone(true);
   let d = null;
-  try { const [r] = await Promise.all([api('/api/call/start', {}), new Promise(ok => setTimeout(ok, 2600 + Math.random() * 2500))]); d = await r.json(); if (!r.ok) d = { error: d.error || 'failed' }; } catch (e) { d = { error: e.message }; }
+  try { const [r] = await Promise.all([api('/api/call/start', { incoming }), new Promise(ok => setTimeout(ok, incoming ? 500 : 2600 + Math.random() * 2500))]); d = await r.json(); if (!r.ok) d = { error: d.error || 'failed' }; } catch (e) { d = { error: e.message }; }
   ringTone(false);
   if (!phoneCall.on) return;                                   // you hung up while it rang
   if (!d || d.error || !d.answered) { callStatus(d && d.error ? 'Could not connect' : 'No answer'); if (d && d.text) { addSys('You called Wizra. No answer.'); addLine('her', d.text); } return endCall(null, 1700); }

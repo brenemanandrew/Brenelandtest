@@ -152,6 +152,7 @@
     connect(t) { tone(fxBus, 'sine', 660, t, 0.1, 0.12, { decay: true }); tone(fxBus, 'sine', 990, t + 0.1, 0.18, 0.12, { decay: true }); },
     hangup(t) { for (let i = 0; i < 3; i++) tone(fxBus, 'sine', 480, t + i * 0.28, 0.16, 0.12, {}); },
     dial(t) { tone(fxBus, 'sine', 941, t, 0.11, 0.07, {}); tone(fxBus, 'sine', 1336, t, 0.11, 0.07, {}); },
+    phone(t) { for (const at of [0, 0.42]) for (let i = 0; i < 7; i++) tone(fxBus, 'sine', i % 2 ? 1568 : 1319, t + at + i * 0.045, 0.05, 0.16, { a: 0.004, r: 0.01 }); },   // your phone ringing: she is calling
     ring(t) { for (const f of [440, 480]) tone(fxBus, 'sine', f, t, 1.8, 0.06, { a: 0.03, r: 0.05 }); },   // the ringing you hear while you wait
   };
   const EMOTE = { '✨': 'sparkle', '💗': 'heart', '💢': 'anger', '❓': 'ask', '💦': 'sweat' };
@@ -177,8 +178,8 @@
   // the phone: the page marks a call on <body>; the sounds follow it
   function watchCall() {
     const c = document.body.classList, calling = c.contains('calling'), ringing = calling && c.contains('ringing');
-    if (ringing && !ringTimer) { fx('dial'); ringTimer = setInterval(() => fx('ring'), 4000); setTimeout(() => { if (ringTimer) fx('ring'); }, 500); }
-    if (!ringing && ringTimer) { clearInterval(ringTimer); ringTimer = 0; if (calling) fx('connect'); }
+    if (ringing && !ringTimer) { fx('dial'); ringTimer = 1; }                    // (the page plays the ringing itself while it connects)
+    if (!ringing && ringTimer) { ringTimer = 0; if (calling) fx('connect'); }
     if (onCall && !calling) fx('hangup');
     onCall = calling;
   }

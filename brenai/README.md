@@ -73,3 +73,8 @@ Fonts are hosted in `public/fonts` (SIL Open Font License): Fredoka for the inte
 - Around you: cars passing at your house; birds, far traffic and now and then her roommate through the wall at her dorm.
 - Effects: typing (yours and hers), a sound per emoji that pops over her, footsteps, sitting, TV, lamp, door, pouring, phone dial, ringing, connect and hang up. The 3D view asks for them with a `wizra-sound` window event.
 - Volume for music and effects is under her settings, Voice. Music drops while she is speaking and stops on a call. Sound starts after the first tap or key press (browser rule).
+
+## She calls you
+- While she is out she may video call you: decided when she leaves (`leaveNow`), about 2% at no rapport up to 18% at 100 (a bit more on the romance path), never when she is somewhere she is hiding, and only on outings of 20 minutes or more. At most one per outing.
+- The phone on her "out" sign shakes with action lines and rings for about 50 seconds (`ringNow`, `ringing` in `/api/away`). Tap it to pick up; otherwise it is logged as a missed call and she knows when she is back.
+- Test switch: `CALL_TEST_RING=1` makes her call a few seconds after leaving.

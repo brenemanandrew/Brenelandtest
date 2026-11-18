@@ -383,7 +383,13 @@ function planDue() {
   return '';
 }
 const awayView = () => { if (db.call && Date.now() - db.call.since > 25 * 60000) db.call = null; return awayView0(); }; // (a call left open is dropped)
-const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || clock(db.away.until), due: Date.now() >= db.away.until && !db.call } : null; // (back = when she said; the real time is hers to keep)
+const RING_FOR = 50000;
+function ringNow() { // is she calling him right now? Once the ringing runs out unanswered it is a missed call.
+  const a = db.away, now = Date.now(); if (!a || !a.callAt || a.rang || db.call || now < a.callAt) return false;
+  if (now > a.callAt + RING_FOR || now >= a.until) { a.rang = 'missed'; db.log.push({ who: 'sys', text: 'Missed call from Wizra.', at: now }); save(); return false; }
+  return true;
+}
+const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || clock(db.away.until), due: Date.now() >= db.away.until && !db.call, ringing: ringNow() } : null; // (back = when she said; the real time is hers to keep)
 const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
 // ---- visiting: once the relationship score reaches VISIT_AT they can be in the same room. db.place is '' (apart, the usual),
 // 'dorm' (he is at her dorm) or 'house' (she is at his house). The page shows it in first person.
@@ -409,6 +415,10 @@ function leaveNow(leave, since = Date.now()) {
   // she is not a train: a few minutes early to half an hour late, later still when she is somewhere she should not be
   const drift = a.minutes < 12 ? 0 : (Math.random() * (a.out.lying ? 50 : 32) - (a.out.lying ? 0 : 6)) * 60000;
   a.until = (said || now + leave.minutes * 60000 / AWAY_SPEED) + drift / AWAY_SPEED; a.said = said ? clock(said) : clock(now + leave.minutes * 60000 / AWAY_SPEED);
+  // now and then she is the one who calls, part way through being out: rare, and likelier the closer they are
+  const close = (db.sheet.rapport | 0) / 100, chance = (0.02 + 0.16 * close * close) * (db.sheet.path === 'romance' ? 1.4 : 1);
+  if (process.env.CALL_TEST_RING) a.callAt = now + 4000;
+  else if (!a.out.lying && a.minutes >= 20 && Math.random() < chance) a.callAt = now + (a.until - now) * (0.25 + 0.5 * Math.random());
   db.away = a;
   db.plan = null;
   db.log.push({ who: 'sys', text: `Wizra left for ${where}. Back around ${a.said}.`, at: now });
@@ -422,7 +432,7 @@ async function comeBack(onDelta) {
   db.glow = out.kind ? { ...out, where: a.where, until: now + 60 * 60000 / AWAY_SPEED } : null;
   db.log.push({ who: 'sys', text: 'Wizra is back.', at: now });
   const how = out.lying ? 'tries to slip back in quietly from' : 'comes back in from';
-  const pre = `looks up as she ${how} ${a.where}${missed ? '; the messages above were sent while she was out and she is only seeing them now' : ''}`;
+  const pre = `looks up as she ${how} ${a.where}${missed ? '; the messages above were sent while she was out and she is only seeing them now' : ''}${a.rang === 'missed' ? '; she tried to video call him while she was out and he did not pick up' : ''}`;
   db.log.push({ who: 'me', text: '', at: now, pre, hidden: true });
   console.log(`[away] back from ${a.where}${out.kind ? ', ' + out.kind + (out.lying ? ' (cover story)' : '') : ''}`);
   try {
@@ -610,16 +620,18 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/call/start' && req.method === 'POST') {
         if (!db.away) return json(res, 409, { error: 'She is right here.' });
         if (busy) return json(res, 409, { error: 'busy' });
+        const hers = !!(await readBody(req)).incoming && ringNow();                 // he is picking up a call she made
         busy = true;
         try {
-          if (!(process.env.CALL_TEST_ANSWER ? process.env.CALL_TEST_ANSWER === 'yes' : picksUp(db.away))) { // no answer; she texts back instead
+          if (hers) db.away.rang = 'answered';
+          else if (!(process.env.CALL_TEST_ANSWER ? process.env.CALL_TEST_ANSWER === 'yes' : picksUp(db.away))) { // no answer; she texts back instead
             const pre = 'tries to video call her; she lets it ring out and sends a short text back instead';
             db.log.push({ who: 'sys', text: 'You called Wizra. No answer.', at: Date.now() }, { who: 'me', text: '', at: Date.now(), pre, hidden: true });
             let text = ''; try { text = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text, at: Date.now() }); } catch { db.log.pop(); }
             save(); return json(res, 200, { answered: false, text });
           }
           db.call = { since: Date.now() };
-          const pre = 'video calls her; she picks up';
+          const pre = hers ? 'picks up: she is the one video calling him, out of the blue, from wherever she is. She says why she called' : 'video calls her; she picks up';
           db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true });
           let text; try { text = await reply(`*${pre}*`, () => {}); } catch (e) { db.log.pop(); db.call = null; throw e; }
           db.log.push({ who: 'her', text, at: Date.now(), hidden: true });
