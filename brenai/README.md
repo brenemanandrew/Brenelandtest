@@ -111,3 +111,9 @@ Everyone who plays has their own game. After the site password the page asks for
 - "Switch player" sits at the bottom of the settings menu. Eight wrong PINs from one address locks PIN entry for ten minutes.
 - The save from before PINs (`brenai.json`) could be claimed once with a PIN; it is then renamed `brenai.claimed.json`.
 - A PIN is not a strong password: anyone with the site password could guess a 4 digit PIN over a few days. It keeps saves apart, it does not guard secrets.
+
+## Modelled props and the four made rooms
+`public/props.js` holds 38 modelled props for the Studio's map editor (groups: Hangout, Study, Game night, Romantic, Camping). They are built in code from rounded, turned and swept shapes with an inked silhouette; several glow, flicker or move (fires, candles, string lights, lanterns, the movie screen, the record player) and carry their own warm light.
+- A room made in the Studio can now be outdoors (`open`, with a day, sunset or night sky), can hide her usual dorm furniture (`bare`) and can have mood lighting (`dim`). In a bare room she still sits at the same spot and walks to the same shelf and counter spots, so put a seat and props there.
+- Four rooms were built with them and saved in the Studio: the game night den, the study nook, the campsite under the stars, the fireside room. They are ordinary Studio rooms and can be edited or deleted there.
+- She does not sit on the new seats by herself (bean bags, camp chair): her sitting spot is still the one seat every room has.

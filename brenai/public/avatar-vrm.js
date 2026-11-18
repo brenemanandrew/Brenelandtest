@@ -26,7 +26,7 @@ export async function create(url, opts = {}) {
   const scene = new THREE.Scene();
   const sun = new THREE.DirectionalLight(0xffffff, Math.PI), amb = new THREE.AmbientLight(0xffffff, 0.4); sun.position.set(0.6, 1, 1.2); scene.add(sun, amb);
   // the room follows the clock on the device you are watching from: bright by day, warm in the evening, dim and blue at night
-  let night = 0;
+  let night = 0, mood = 0;   // mood: how dark the place itself is (a camp at night), whatever the clock says
   let stageK = null;   // the heart game's plain pink stage: null when the room is showing, else 0..1 for how deep the pink has gone
   function daylight() {
     const h = new Date().getHours() + new Date().getMinutes() / 60;
@@ -34,11 +34,12 @@ export async function create(url, opts = {}) {
     const eve = Math.max(0, 1 - Math.abs(h - 19) / 2.5);
     sun.intensity = Math.PI * (0.62 + 0.38 * day); sun.color.setRGB(1 - 0.12 * night + 0.02 * eve, 1 - 0.14 * night - 0.08 * eve, 1 - 0.02 * night - 0.2 * eve);
     amb.intensity = 0.26 + 0.2 * day;
+    if (mood) { sun.intensity = Math.PI * (0.62 + 0.38 * day) * (1 - 0.72 * mood); sun.color.setRGB(1 - 0.35 * mood, 1 - 0.25 * mood, 1); amb.intensity = (0.26 + 0.2 * day) * (1 - 0.3 * mood); }
     if (stageK !== null) return;
     el.style.background = `radial-gradient(circle at 50% 35%, hsl(${272 - 20 * night} ${45 - 10 * night}% ${54 - 26 * night}%), hsl(264 46% ${32 - 14 * night}%) 55%, hsl(258 48% ${20 - 9 * night}%) 100%)`;
   }
   daylight(); const dayTimer = setInterval(daylight, 60000);
-  const camera = new THREE.PerspectiveCamera(26, 1, 0.05, 20);
+  const camera = new THREE.PerspectiveCamera(26, 1, 0.05, 70);
 
   const loader = new GLTFLoader(); loader.register(p => new VRMLoaderPlugin(p));
   const gltf = await loader.loadAsync(url);
@@ -656,7 +657,7 @@ export async function create(url, opts = {}) {
   let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0;
   const mugDorm = REST_AT.mug[0].clone();
   function setPlace(name) {
-    here = places.groups[name] ? name : 'dorm'; for (const k in places.groups) places.groups[k].visible = k === here; room.visible = here !== 'house';   // (her own furniture is in every room but your house)
+    here = places.groups[name] ? name : 'dorm'; for (const k in places.groups) places.groups[k].visible = k === here; room.visible = here !== 'house' && !places.bare[here]; lampLight.visible = room.visible || here === 'house'; mood = places.dark[here] || 0; daylight();   // (her own furniture is in every room but your house)
     pickable = tagged.filter(o => !o.userData.place || o.userData.place === here);
     REST_AT.mug[0].copy(here === 'house' ? places.mugAt : mugDorm); lampLight.position.copy(here === 'house' ? places.lampAt : shade.position);
   }
@@ -883,7 +884,7 @@ export async function create(url, opts = {}) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
-      placeProps(); lampTick(s.dt); places.tick(night, s.t);
+      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night);
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();
       const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;

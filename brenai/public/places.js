@@ -163,9 +163,10 @@ export function buildPlaces(THREE, A) {
   // and colours, plus whatever was placed in it.
   const maps = A.maps || {}, groups = { dorm, house }, names = { dorm: 'her dorm', house: 'your house' }, bounds = { dorm: D, house: Hh }, spawn = { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] };
   const baseSolid = { dorm: solid.dorm.map(r => [...r]), house: solid.house.map(r => [...r]) };
+  const alive = {}, bare = {}, dark = {};   // alive: what moves in each room (flames, lights); bare: rooms without her dorm furniture
   function addItems(group, name, items) {
     const g = new THREE.Group(); g.position.y = floorY;
-    for (const it of items || []) { try { g.add(buildItem(THREE, toon, outline, it)); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
+    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
     group.add(g);
   }
   addItems(dorm, 'dorm', (maps.dorm || {}).items); addItems(house, 'house', (maps.house || {}).items);
@@ -173,11 +174,28 @@ export function buildPlaces(THREE, A) {
     if (!m || !m.id || groups[m.id]) continue;
     const g = new THREE.Group(); g.visible = false; into = g; place = m.id; TAG = '';
     const B = { x0: -2.05 - (+m.left || 0), x1: 3.1 + (+m.right || 0), z0: D.z0, z1: hip.z + 3.05 + (+m.front || 0), h: Math.max(2.3, +m.height || 2.6) }, out = world(m.outside === 'yard' ? 'yard' : 'campus');
+    bare[m.id] = !!m.bare; dark[m.id] = m.open ? (m.sky === 'night' ? 1 : m.sky === 'dusk' ? 0.5 : 0) : Math.max(0, Math.min(1, +m.dim || 0));
+    if (m.open) { // outdoors: ground to the horizon, a sky, no walls
+      const cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
+      TAG = 'floor'; reg(flat(B.x1 - B.x0, B.z1 - B.z0, cx, floorY - 0.006, cz, toon(m.floor || '#4f8a55'), true)); TAG = '';
+      const far = new THREE.Mesh(new THREE.CircleGeometry(30, 48), toon(m.floor || '#4f8a55')); far.rotation.x = -Math.PI / 2; far.position.set(cx, floorY - 0.012, cz); g.add(far);
+      const SKY = { night: ['#070b24', '#1b2452', '#3a3f7a'], dusk: ['#2a2f6e', '#c76a8a', '#ffb27a'], day: ['#3f8fe0', '#8cc8ff', '#e6f6ff'] }[m.sky] || ['#3f8fe0', '#8cc8ff', '#e6f6ff'];
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(32, 32, 16), new THREE.MeshBasicMaterial({ side: THREE.BackSide, fog: false, map: paint(64, 512, (c, W, H) => {
+        const gr = c.createLinearGradient(0, 0, 0, H * 0.52); gr.addColorStop(0, SKY[0]); gr.addColorStop(0.6, SKY[1]); gr.addColorStop(1, SKY[2]); c.fillStyle = gr; c.fillRect(0, 0, W, H); c.fillStyle = SKY[2]; c.fillRect(0, H * 0.52, W, H); }) })); sky.position.set(cx, floorY, cz); g.add(sky);
+      if (m.sky === 'night' || m.sky === 'dusk') {
+        const n = m.sky === 'night' ? 420 : 90, pos = new Float32Array(n * 3); for (let k = 0; k < n; k++) { const a = (k * 2.399963) % (Math.PI * 2), e = 0.12 + 1.35 * ((k * 0.6180339) % 1), r = 30; pos[k * 3] = cx + r * Math.cos(e) * Math.cos(a); pos[k * 3 + 1] = floorY + r * Math.sin(e); pos[k * 3 + 2] = cz + r * Math.cos(e) * Math.sin(a); }
+        const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3)); const stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: '#ffffff', size: 2.2, sizeAttenuation: false, transparent: true })); g.add(stars);
+        const moon = new THREE.Mesh(new THREE.CircleGeometry(1.5, 32), new THREE.MeshBasicMaterial({ color: '#fff6d8' })); moon.position.set(cx - 9, floorY + 13, B.z0 - 22); moon.lookAt(cx, floorY + 1.5, cz); g.add(moon);
+        const halo = new THREE.Mesh(new THREE.CircleGeometry(2.6, 32), new THREE.MeshBasicMaterial({ color: '#fff6d8', transparent: true, opacity: 0.16 })); halo.position.copy(moon.position); halo.position.z -= 0.1; halo.quaternion.copy(moon.quaternion); g.add(halo);
+        (alive[m.id] = alive[m.id] || []).push(t => { stars.material.opacity = 0.8 + 0.2 * Math.sin(t / 900); });
+      }
+    } else {
     TAG = 'floor'; reg(flat(B.x1 - B.x0, B.z1 - B.z0, (B.x0 + B.x1) / 2, floorY - 0.006, (B.z0 + B.z1) / 2, toon(m.floor || '#3a2f52'), true));
     TAG = ''; flat(B.x1 - B.x0, B.z1 - B.z0, (B.x0 + B.x1) / 2, floorY + B.h, (B.z0 + B.z1) / 2, toon('#f2eef6'), false);
     const wc = m.wall || '#6d5a8f';
     wall('N', B.z0, B.x0, B.x1, B.h, wc, m.windows === false ? [] : [{ at: 0.1, w: 1.15, y0: 1.05, y1: 2.05 }], out);
     wall('W', B.x0, B.z0, B.z1, B.h, wc, m.windows === false ? [] : [{ at: (B.z0 + B.z1) / 2, w: 1.4, y0: 0.95, y1: 2.05 }], out); wall('E', B.x1, B.z0, B.z1, B.h, wc); wall('S', B.z1, B.x0, B.x1, B.h, wc);
+    }
     groups[m.id] = g; names[m.id] = m.name || 'a new place'; bounds[m.id] = B; spawn[m.id] = [2.2, hip.z + 1.1];
     solid[m.id] = [solid.dorm[0], solid.dorm[1], solid.dorm[2], solid.dorm[3], solid.dorm[5]].map(r => [...r]); blocks[m.id] = blocks.dorm.slice(0, 4).map(r => [...r]);
     addItems(g, m.id, m.items);
@@ -185,7 +203,8 @@ export function buildPlaces(THREE, A) {
   return {
     groups, names, baseSolid, floorY,
     dorm, house, toon, outline, eyeH, solid,
-    bounds, blocks, spawn,
+    bounds, blocks, spawn, bare, dark,
+    live(name, t, night) { for (const f of alive[name] || []) f(t, night); },   // what moves in the room on screen
     seat: { dorm: { tag: 'bed', at: [bedX + 0.62, bedZ + 0.2], out: [bedX + 0.95, bedZ + 0.2], h: floorY + 1.12 }, house: { tag: 'chair', at: [-0.78, hip.z + 0.22], out: [-2.6, hip.z + 0.5], h: seatTop + 0.66 } },
     bed: { side: [bedX + 0.8, bedZ - 0.1], at: [bedX, bedZ - 0.1], top: floorY + 0.58 },
     mugAt: new THREE.Vector3(-0.55, tableTop + 0.045, tableZ + 0.16), lampAt: new THREE.Vector3(-2.15, floorY + 1.62, backZ + 0.05),

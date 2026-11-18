@@ -2,6 +2,7 @@
 // A placed thing: { id, kind, x, z, y (lift off the floor), rot (radians, about up), sx, sy, sz (scale), color, solid }
 // CATALOG[kind] = { name, group, size [w, h, d] in metres at scale 1, parts: [[shape, w, h, d, x, y, z, colour], ...] }
 // A part's colour is a fixed colour, or 'c' for the thing's own colour, 'c2' for a darker shade of it.
+import { PROPS, kit } from './props.js';
 const P = (name, group, size, parts, color = '#8a5a34') => ({ name, group, size, parts, color });
 export const CATALOG = {
   // plain shapes
@@ -40,12 +41,14 @@ export const CATALOG = {
   candle: P('Candle', 'Decor', [0.1, 0.25, 0.1], [['cyl', 0.04, 0.18, 0.04, 0, 0.09, 0, 'c'], ['glow', 0.02, 0.06, 0.005, 0, 0.21, 0, '#ffd98a']], '#f3ead8'),
   arcade: P('Arcade cabinet', 'Decor', [0.7, 1.8, 0.75], [['box', 0.7, 1.8, 0.7, 0, 0.9, -0.02, 'c'], ['box', 0.56, 0.44, 0.04, 0, 1.3, 0.34, '#7dff9a'], ['box', 0.7, 0.1, 0.3, 0, 0.92, 0.42, 'c2'], ['box', 0.7, 0.24, 0.06, 0, 1.68, 0.34, '#ffd166']], '#2a2350'),
 };
+Object.assign(CATALOG, PROPS);   // the modelled props (props.js) sit in the same catalogue
 export const shade = (hex, k = 0.72) => { const n = parseInt(hex.slice(1), 16); return '#' + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * k).toString(16).padStart(2, '0')).join(''); };
-export const fresh = (kind, x = 0, z = 0) => ({ id: Math.random().toString(36).slice(2, 9), kind, x, z, y: 0, rot: 0, sx: 1, sy: 1, sz: 1, color: CATALOG[kind].color, solid: !['rug', 'roundrug', 'picture', 'cushion', 'candle', 'bookstack'].includes(kind) });
+export const fresh = (kind, x = 0, z = 0) => ({ id: Math.random().toString(36).slice(2, 9), kind, x, z, y: 0, rot: 0, sx: 1, sy: 1, sz: 1, color: CATALOG[kind].color, solid: !CATALOG[kind].flat && !['rug', 'roundrug', 'picture', 'cushion', 'candle', 'bookstack'].includes(kind) });
 // One placed thing as a THREE group standing on y = 0 (the caller puts the group at floor height). toon(colour) makes a material.
 export function buildItem(THREE, toon, outline, item) {
   const def = CATALOG[item.kind] || CATALOG.box, g = new THREE.Group(), col = item.color || def.color;
-  for (const [shape, w, h, d, x, y, z, c] of def.parts) {
+  if (def.make) { const K = kit(THREE, toon, outline, col, g); def.make(K); if (K.ticks.length) g.userData.tick = (t, night) => { for (const f of K.ticks) f(t, night); }; }
+  for (const [shape, w, h, d, x, y, z, c] of def.parts || []) {
     const colour = c === 'c' ? col : c === 'c2' ? shade(col) : c;
     const geo = shape === 'box' ? new THREE.BoxGeometry(w, h, d) : shape === 'cyl' ? new THREE.CylinderGeometry(w, d, h, 20) : shape === 'ball' ? new THREE.SphereGeometry(w, 16, 12) : shape === 'cone' ? new THREE.ConeGeometry(w, h, 20) : new THREE.CylinderGeometry(w, d, h, 18, 1, true);
     const m = new THREE.Mesh(geo, shape === 'glow' ? new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide }) : toon(colour)); m.position.set(x, y, z);
