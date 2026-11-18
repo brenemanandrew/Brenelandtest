@@ -263,6 +263,16 @@
 
   /* the wheel's close button: a cartoon sticker right by the wheel, not off in the corner */
   #ringWrap { position:relative; width:344px; max-width:100%; margin:0 auto; }
+  /* a settings page is open: the wheel folds into one row of icons along the top, and the page gets the rest of the screen */
+  #wheel.open.bar { display:flex; flex-direction:column; overflow:hidden; }
+  #wheel.bar #ringWrap { width:100%; max-width:560px; flex:none; }
+  #wheel.bar #ring { width:auto; height:auto; margin:0; padding:14px 62px 6px 8px; display:flex; gap:0; overflow-x:auto; scrollbar-width:none; } #wheel.bar #ring::-webkit-scrollbar { display:none; }
+  #wheel.bar #ring .hub { display:none; }
+  #wheel.bar #ring .seg { position:static; margin:0; flex:none; width:64px; font-size:10px; gap:3px; opacity:.72; } #wheel.bar #ring .seg small { display:none; } #wheel.bar #ring .seg b { font-weight:600; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+  #wheel.bar #ring .seg .ic { width:40px; height:40px; box-shadow:none; } #wheel.bar #ring .seg .ic svg { width:22px; height:22px; }
+  #wheel.bar #ring .seg.cur { opacity:1; } #wheel.bar #ring .seg.cur .ic { box-shadow:0 0 0 3px #fff, 0 4px 12px hsl(var(--hue) 80% 50% / .6); }
+  #wheel.bar #closeWheel { top:8px; right:8px; }
+  #wheel.bar #panel { flex:1; min-height:0; overflow-y:auto; width:calc(100% - 16px); margin:4px auto 8px; } #wheel.bar #switchPlayer { display:none !important; }
   #closeWheel { position:absolute; top:26px; right:-4px; left:auto; z-index:17; width:46px; height:46px; padding:9px; border-radius:50%; color:#fff; font-size:0; cursor:pointer;
     background:radial-gradient(circle at 35% 30%, #ff8f8f, #f03e3e 60%, #d42a2a); border:3px solid #fff; box-shadow:0 4px 0 #8a1c1c, 0 8px 14px rgba(0,0,0,.4); transform:rotate(6deg); transition:transform .1s, box-shadow .1s; }
   #closeWheel svg { width:100%; height:100%; display:block; filter:drop-shadow(0 1.5px 0 rgba(120,20,20,.7)); }
@@ -1250,11 +1260,11 @@ function drawRing() {
   const hub = el('div', { className: 'hub', onclick: closeWheel }); WizraAvatar.mount(hub); ring.append(hub);
   SEGS.forEach((g, i) => {
     const a = -Math.PI / 2 + i * 2 * Math.PI / SEGS.length;
-    const b = el('div', { className: 'seg' + (g.toggle ? (settings[g.toggle] ? ' on' : ' off') : '') });
+    const b = el('div', { className: 'seg' + (g.toggle ? (settings[g.toggle] ? ' on' : ' off') : '') + (g.k === cur && $('wheel').classList.contains('bar') ? ' cur' : '') }); b.dataset.k = g.k;
     b.style.left = (172 + 134 * Math.cos(a)) + 'px'; b.style.top = (164 + 134 * Math.sin(a)) + 'px'; b.style.setProperty('--hue', (300 + i * 40) % 360);
     const ic = el('span', { className: 'ic' }); ic.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ICON[g.k] + '</svg>';
     b.append(ic, el('b', { textContent: g.name }), el('small', { textContent: g.sub() }));
-    b.onclick = () => g.toggle ? saveSettings({ settings: { [g.toggle]: !settings[g.toggle] } }) : openPanel(g.k);
+    b.onclick = () => g.toggle ? saveSettings({ settings: { [g.toggle]: !settings[g.toggle] } }) : (g.k === cur && $('wheel').classList.contains('bar')) ? backToWheel() : openPanel(g.k);
     ring.append(b);
   });
 }
@@ -1296,8 +1306,9 @@ function listEditor(title, key, secret) {
 }
 let cur = null;
 // every panel gets a coloured header with its icon, matching its bubble on the wheel
+function backToWheel() { cur = ''; $('panel').classList.remove('show'); $('wheel').classList.remove('bar'); drawRing(); $('wheel').scrollTop = 0; }   // tap the open page's icon again: the full wheel comes back
 function openPanel(k) {
-  buildPanel(k);
+  buildPanel(k); $('wheel').classList.add('bar'); for (const b of $('ring').querySelectorAll('.seg')) { b.classList.toggle('cur', b.dataset.k === k); if (b.dataset.k === k) b.scrollIntoView({ block: 'nearest', inline: 'center' }); } $('panel').scrollTop = 0;
   const p = $('panel'), i = SEGS.findIndex(g => g.k === k), h3 = p.querySelector('h3');
   p.style.setProperty('--hue', i >= 0 ? (300 + i * 40) % 360 : 318);
   if (h3) { const ic = el('span', { className: 'ic' }); ic.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (ICON[k] || '<path d="M7 11V6a2 2 0 0 1 4 0v5M11 10V5a2 2 0 0 1 4 0v6M15 11V8a2 2 0 0 1 4 0v7a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-3-5a1.8 1.800 0 0 1 3-2l1 1"/>') + '</svg>'; h3.prepend(ic); }
@@ -1438,7 +1449,7 @@ function buildPanel(k) {
 }
 async function openWheel() {
   const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || '';
-  drawRing(); $('panel').classList.remove('show'); $('wheel').classList.add('open');
+  $('wheel').classList.remove('bar'); drawRing(); $('panel').classList.remove('show'); $('wheel').classList.add('open');
 }
 function closeWheel() { $('wheel').classList.remove('open'); }
 $('closeWheel').onclick = closeWheel;
