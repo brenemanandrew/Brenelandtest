@@ -721,14 +721,15 @@ export async function create(url, opts = {}) {
     const beat = 1 + 0.12 * Math.abs(Math.sin(t / 1000 * (3 + 5 * p))); heartGlow.visible = true; heartGlow.position.copy(heartAt).addScaledVector(hc.pos.clone().sub(heartAt).normalize(), 0.09); heartGlow.scale.setScalar((0.07 + 0.1 * p) * beat); heartGlow.material.opacity = e * Math.min(1, 0.15 + p * 1.1);
   }
   // ---- the bonus round after a win: time stands still (her pose and hair freeze) and the view cuts to another part of her every 3 s.
-  let frozen = false, frozeAt = 0; const BSHOT = [{ at: 'face', yaw: 0.15, up: 0.08, d: 0.8 }, { at: 'heart', yaw: -0.2, up: 0.12, d: 0.62 }, { at: 'hand', yaw: -0.3, up: 0.35, d: 0.6 }, { at: 'shoulder', yaw: 0.5, up: 0.16, d: 0.75 }];
+  let frozen = false, frozeAt = 0; const bz = { mode: 'cut', shot: 0, yaw: 0, pitch: 0.12, dist: 1.15 }; const BSHOT = [{ at: 'face', yaw: 0.15, up: 0.08, d: 0.8 }, { at: 'heart', yaw: -0.2, up: 0.12, d: 0.62 }, { at: 'hand', yaw: -0.3, up: 0.35, d: 0.6 }, { at: 'shoulder', yaw: 0.5, up: 0.16, d: 0.75 }];
   const spot = (name, out) => { // a place on her, in the world
     chestNode.getWorldPosition(heartAt); const yw = vrm.scene.rotation.y, lx = Math.cos(yw), lz = -Math.sin(yw); heartAt.x += 0.04 * lx; heartAt.z += 0.04 * lz; heartAt.y += 0.07;
     if (name === 'face') { head.getWorldPosition(out); out.y += 0.06; } else if (name === 'hand') palmR.getWorldPosition(out); else if (name === 'handL') palmL.getWorldPosition(out); else if (name === 'shoulder' || name === 'shoulderR') { out.copy(heartAt); const sd = name === 'shoulder' ? 0.1 : -0.18; out.x += sd * lx; out.z += sd * lz; out.y += 0.1; } else out.copy(heartAt);
     return out; };
   function bonusCamera(t) {
-    const i = Math.floor((t - frozeAt) / 3000) % BSHOT.length, sh = BSHOT[i], age = ((t - frozeAt) % 3000) / 1000, yw = vrm.scene.rotation.y, a = yw + sh.yaw + 0.05 * age, elev = sh.up + 0.01 * age, d = sh.d * (1 - 0.03 * age);
-    spot(sh.at, hc.tgt); if (sh.at !== 'heart') hc.tgt.lerp(heartAt, 0.25);                              // keep her heart in the picture
+    const yw = vrm.scene.rotation.y; let a, elev, d;
+    if (bz.mode === 'orbit') { spot('heart', hc.tgt); hc.tgt.y += 0.1; a = yw + bz.yaw; elev = bz.pitch; d = bz.dist; }               // yours to turn: round her upper body, at whatever distance you like
+    else { const sh = BSHOT[bz.shot % BSHOT.length], age = Math.min(6, (t - frozeAt) / 1000); a = yw + sh.yaw + 0.04 * age; elev = sh.up + 0.008 * age; d = sh.d * (1 - 0.02 * age); spot(sh.at, hc.tgt); if (sh.at !== 'heart') hc.tgt.lerp(heartAt, 0.25); }   // a held shot, drifting a little; the next tap cuts
     camera.position.set(hc.tgt.x + Math.sin(a) * Math.cos(elev) * d, hc.tgt.y + Math.sin(elev) * d, hc.tgt.z + Math.cos(a) * Math.cos(elev) * d); camera.lookAt(hc.tgt);
     spot('heart', hc.at); heartGlow.visible = true; heartGlow.position.copy(hc.at).addScaledVector(hc.pos.copy(camera.position).sub(hc.at).normalize(), 0.09); heartGlow.scale.setScalar(0.13 * (1 + 0.14 * Math.abs(Math.sin(t / 110)))); heartGlow.material.opacity = 1;
   }
@@ -816,7 +817,12 @@ export async function create(url, opts = {}) {
       if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
       return { x: 100 + (e.clientX - c.x) / k / UNIT, y: 100 + (e.clientY - c.y) / k / UNIT };
     },
-    bonus(on) { frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; if (!on) heartGlow.visible = false; }, bonusHit,
+    bonus(on) { // true: time stops and the view holds a shot; 'orbit': the pose stays and you turn the view yourself; false: back to normal
+      if (on === 'orbit') { const sh = BSHOT[bz.shot % BSHOT.length]; Object.assign(bz, { mode: 'orbit', yaw: sh.yaw, pitch: 0.14, dist: 1.1 }); return; }
+      frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; Object.assign(bz, { mode: 'cut', shot: 0 }); if (!on) heartGlow.visible = false; },
+    bonusShot() { bz.shot++; frozeAt = performance.now(); },
+    bonusOrbit(dx, dy, dz) { bz.yaw -= dx * 0.008; bz.pitch = Math.max(-0.05, Math.min(1.25, bz.pitch + dy * 0.006)); bz.dist = Math.max(0.5, Math.min(2.8, bz.dist * (1 + dz))); },
+    bonusHit,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
