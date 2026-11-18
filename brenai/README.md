@@ -165,3 +165,8 @@ She is told the actual time with every reply ("Right now it is 3:44 PM on Wednes
 - The match has six questions: the fifth sets what she is into (likes, a line of backstory, the tags on the match card), the sixth her colours (`sheet.look`: an uploaded outfit whose name contains that word is worn when no level outfit applies).
 - `WEEK` in `server.mjs` is her usual week: she is told it, and the Character menu shows it. It does not yet decide when she is really out.
 - Plans: `POST /api/plan { place, at, title }` or `{ remove }`, kept in `db.dates`. She is told about plans in the next three days. From ten minutes before, `placeView().due` shows a card to go (her dorm and your house open as an invitation). Keeping a plan adds a memory and three points on your path.
+
+## Things to do in a room, coins, gifts and decor
+- On a visit the target button lists up to four things to do that depend on what is in the room (`ROOM_DO` in `index.html`: a d20 roll at the battle map table, flash cards at the whiteboard, the telescope, marshmallows at the fire...). Each is sent as an action with its lean, like the other moments.
+- Coins (`db.coins`): 1 per reply of hers, 5 for a kept plan, 10 for a heart game win. `SHOP` and `SPOTS` in `server.mjs`: a gift goes to the next free spot in her dorm (this player's game only), decor to the next spot in the player's house; `POST /api/shop { buy: 'gift' | 'decor', id }`. `extrasView()` gives the page these items, which it lays over the shared maps (`mapsNow()`).
+- After a visit to your house she sometimes leaves something of hers there (up to three things).

@@ -545,6 +545,24 @@ function placeNote() {
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
   return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
 }
+// ---- coins, gifts and your own decor ----
+// Coins come from time together (a reply of hers, a kept plan, the heart game). A gift lands in HER room in this player's game;
+// decor lands in YOUR house. Each takes the next free spot of its list. db.gifts / db.decor = [{ kind, at }]
+const SHOP = {
+  gift: [['roses', 'A vase of roses', 25], ['candles', 'Candles', 20], ['bookpile', 'A tower of books', 20], ['dice', 'Giant dice', 30], ['lavalamp', 'A lava lamp', 30], ['cushions', 'A pile of cushions', 25], ['balloons', 'Heart balloons', 35], ['beanbag', 'A bean bag', 60], ['guitar', 'A guitar', 80], ['recordplayer', 'A record player', 90]],
+  decor: [['bookstack', 'A stack of books', 10], ['plant', 'A plant', 20], ['picture', 'A picture', 20], ['pouf', 'A floor cushion', 30], ['lamp', 'A floor lamp', 30], ['roundrug', 'A round rug', 30], ['stringlights', 'String lights', 40], ['beanbag', 'A bean bag', 60], ['guitar', 'A guitar', 80], ['arcade', 'An arcade cabinet', 150], ['fireplace', 'A fireplace', 200]],
+};
+const SPOTS = { gift: [[2.65, 2.55, -0.8], [1.9, 1.45, -0.5], [-1.6, 0.15, 0.6], [2.7, -1.2, -0.4], [1.65, 2.95, 3.14], [2.3, 0.0, -1.2], [-0.45, 1.35, 0.3], [2.75, 1.5, -1.57]],
+  decor: [[1.5, 2.0, -0.6], [2.3, 1.0, -1.2], [-3.3, 0.6, 1.2], [-0.4, 2.7, 0.2], [1.1, 3.7, 3.14], [-3.1, 2.1, 1.4], [0.9, 0.9, 0], [2.6, 2.9, -2.2]] };
+const WALL = { picture: 1.4, stringlights: 1.95 };   // these hang: against the back wall, at this height
+const earn = n => { db.coins = Math.max(0, (db.coins | 0) + n); };
+const shopView = () => ({ coins: db.coins | 0, gift: SHOP.gift.map(([id, name, price]) => ({ id, name, price, have: (db.gifts || []).filter(g => g.kind === id).length })), decor: SHOP.decor.map(([id, name, price]) => ({ id, name, price, have: (db.decor || []).filter(g => g.kind === id).length })), room: { gift: SPOTS.gift.length - (db.gifts || []).length, decor: SPOTS.decor.length - (db.decor || []).length } });
+// what this player's own things add to the rooms (the page lays them over the shared maps)
+function extrasView() {
+  const lay = (list, spots, wallZ) => (list || []).slice(0, spots.length).map((g, i) => { const [x, z, rot] = spots[i], hang = WALL[g.kind]; return { id: 'x' + i + g.kind, kind: g.kind, x: hang ? Math.max(-1.6, Math.min(2.4, x)) : x, z: hang ? wallZ : z, y: hang || 0, rot: hang ? 0 : rot, sx: 1, sy: 1, sz: 1, solid: false }; });
+  const left = (db.left || []).map((g, i) => ({ id: 'l' + i, kind: g.kind, x: [-1.7, 0.7, -2.7][i], z: [1.35, 1.55, 1.2][i], y: 0, rot: i * 0.7, sx: 1, sy: 1, sz: 1, solid: false }));
+  return { dorm: lay(db.gifts, SPOTS.gift, -1.5), house: [...lay(db.decor, SPOTS.decor, -1.55), ...left], v: (db.gifts || []).length + ':' + (db.decor || []).length + ':' + (db.left || []).length };
+}
 // ---- her week, and plans the two of you make ----
 // Her usual week (what she will say she has on, and what the player can see and plan around). Index 0 is Sunday.
 const WEEK = [
@@ -567,7 +585,7 @@ function dateDue() { const now = Date.now(), d = (db.dates || []).find(d => !d.d
 // the memory book: firsts and milestones, each kept once ({ key, at, text })
 function remember(key, text) { db.memories = db.memories || []; if (db.memories.some(m => m.key === key)) return; db.memories.push({ key, at: Date.now(), text }); if (db.memories.length > 200) db.memories.shift(); }
 const memoryView = () => ({ moments: (db.memories || []).slice().sort((a, b) => a.at - b.at), pics: db.log.filter(e => e.pic && !e.hidden).slice(-24).map(e => ({ at: e.at, pic: e.pic })), since: (db.log[0] || {}).at || 0 });
-function setPlace(place) { db.place = place || ''; db.invite = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
+function setPlace(place) { db.place = place || ''; db.invite = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; earn(5); remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
   if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
 // ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
 // things the player says that she reacts to on the spot (a pose and an emoji), before her words come: edited in the Studio
@@ -726,7 +744,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
-      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), extras: extrasView(), coins: db.coins | 0, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
       // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"
       // and opens their first conversation herself.
@@ -768,6 +786,15 @@ async function handle(req, res) {
         else { const at = +b.at, place = String(b.place || ''); if (!(at > Date.now() - 600000 && at < Date.now() + 30 * 86400000) || !(place === 'dorm' || place === 'house' || customMap(place))) return json(res, 400, { error: 'Pick a place and a time in the next month.' }); if (db.dates.length >= 12) return json(res, 400, { error: 'That is a lot of plans. Drop one first.' });
           const d = { id: Math.random().toString(36).slice(2, 9), at, place, title: String(b.title || '').replace(/[<>]/g, '').trim().slice(0, 60) || 'Hanging out' }; db.dates.push(d); db.log.push({ who: 'sys', text: `Plan made: ${d.title} at ${placeLabel(place)}, ${whenText(at)}.`, at: Date.now() }); cur().touches.push({ kind: 'planned', at: Date.now() }); }
         save(); return json(res, 200, { dates: datesView() });
+      }
+
+      if (url.pathname === '/api/shop' && req.method === 'POST') {
+        const { buy, id } = await readBody(req), row = (SHOP[buy] || []).find(r => r[0] === id), key = buy === 'gift' ? 'gifts' : 'decor'; if (!row) return json(res, 400, { error: 'No such thing in the shop.' });
+        db[key] = db[key] || []; if (db[key].length >= SPOTS[buy].length) return json(res, 400, { error: buy === 'gift' ? 'Her room is full of your gifts already.' : 'Your house has no room left for more.' });
+        if ((db.coins | 0) < row[2]) return json(res, 400, { error: `That costs ${row[2]} coins; you have ${db.coins | 0}.` });
+        earn(-row[2]); db[key].push({ kind: id, at: Date.now() });
+        if (buy === 'gift') { db.giftNote = `gives her a present: ${row[1].toLowerCase()}. It is hers now and has a place in her room`; remember('gift:' + id, `You gave her ${row[1].toLowerCase()}.`); addBond(db.sheet.path || 'friend', 4); db.log.push({ who: 'sys', text: `You gave Wizra ${row[1].toLowerCase()}.`, at: Date.now() }); }
+        save(); return json(res, 200, { shop: shopView(), extras: extrasView() });
       }
 
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
@@ -829,6 +856,7 @@ async function handle(req, res) {
         const { place, decline } = await readBody(req), now = Date.now();
         if (decline) { db.invite = null; save(); return json(res, 200, placeView()); }
         if (!place) {
+          if (db.place === 'house' && (db.left || []).length < 3 && Math.random() < 0.35) { const k = ['bookstack', 'cushion', 'dice'][(db.left || []).length]; db.left = [...(db.left || []), { kind: k, at: now }]; db.log.push({ who: 'sys', text: `Wizra left ${k === 'bookstack' ? 'a couple of her books' : k === 'cushion' ? 'her favourite cushion' : 'a set of her dice'} at your place.`, at: now }); remember('left:' + k, 'She started leaving her things at your place.'); }
           if (db.place) { db.log.push({ who: 'sys', text: db.place === 'house' ? 'Wizra headed home.' : 'You headed home.', at: now }); cur().touches.push({ kind: db.place === 'house' ? 'homeHouse' : 'homeDorm', at: now }); setPlace(''); save(); }
           return json(res, 200, placeView());
         }
@@ -844,7 +872,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
         if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
-        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES, memories: memoryView(), week: WEEK.map((d, i) => ({ day: DAYS[i], a: d[0], b: d[1], today: i === dayNow() })), dates: datesView(), places: [{ id: 'dorm', name: 'Her dorm' }, { id: 'house', name: 'Your house' }, ...devData().maps.custom.map(m => ({ id: m.id, name: m.name }))], feeling: db.feeling && Date.now() - db.feeling.at < 72 * 3600000 ? db.feeling.text : '', hasWord: !!db.word });
+        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES, memories: memoryView(), shop: shopView(), week: WEEK.map((d, i) => ({ day: DAYS[i], a: d[0], b: d[1], today: i === dayNow() })), dates: datesView(), places: [{ id: 'dorm', name: 'Her dorm' }, { id: 'house', name: 'Your house' }, ...devData().maps.custom.map(m => ({ id: m.id, name: m.name }))], feeling: db.feeling && Date.now() - db.feeling.at < 72 * 3600000 ? db.feeling.text : '', hasWord: !!db.word });
       }
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
@@ -926,7 +954,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/hearts' && req.method === 'POST') {
         const { result, bonus } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < rule('heartCooldown') * 1000) return json(res, 429, { error: 'too soon', ...placeView() });
         db.heartsAt = now; fixBond();
-        if (result === 'win') { addBond('romance', rule('heartWin') + Math.max(0, Math.min(rule('bonusTaps') * Math.max(rule('bonusHeart'), rule('bonusFace'), rule('bonusOther')), Math.round(+bonus || 0)))); cur().touches.push({ kind: 'heartwin', at: now }); }
+        if (result === 'win') { earn(10); addBond('romance', rule('heartWin') + Math.max(0, Math.min(rule('bonusTaps') * Math.max(rule('bonusHeart'), rule('bonusFace'), rule('bonusOther')), Math.round(+bonus || 0)))); cur().touches.push({ kind: 'heartwin', at: now }); }
         else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - rule('heartLose')); fixBond(); cur().touches.push({ kind: 'heartlose', at: now }); }
         save(); return json(res, 200, placeView());
       }
@@ -998,7 +1026,8 @@ async function handle(req, res) {
         }
         const lastSeen = db.log.filter(e => !e.hidden && e.who !== 'sys').slice(-2, -1)[0], gapMin = lastSeen ? (Date.now() - lastSeen.at) / 60000 : 999, clockNow = new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'long', hour: 'numeric', minute: '2-digit' });
         const timePre = gapMin > 20 || /\b(time|clock|late|early|morning|afternoon|evening|tonight|night|midnight|noon|o'?clock|today|day is it|a\.?m\.?|p\.?m\.?|bed|sleep|awake|up so)\b/i.test(msg) ? `the clock says ${clockNow}` : '';   // the time, right next to his words, when it matters: after a gap, or when the hour comes up
-        const pre = [timePre, takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', faceNow ? `she can see him on his camera: he is ${faceNow}` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
+        const giftPre = db.giftNote || ''; db.giftNote = '';
+        const pre = [timePre, giftPre, takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', faceNow ? `she can see him on his camera: he is ${faceNow}` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest
@@ -1009,7 +1038,7 @@ async function handle(req, res) {
             const done = spokenLines(heard.replace(/[^.!?]*$/, '')); if (done[0] && (done.length > 1 || done[0].length >= 55)) { early = true; voiced(done[0]).catch(() => {}); } // (a short first sentence waits: it will be joined to the next)
           });
           if (wantVoice) prewarm(full);
-          db.log.push({ who: 'her', text: full, at: Date.now(), ...(pic ? { pic } : {}) });
+          earn(1); db.log.push({ who: 'her', text: full, at: Date.now(), ...(pic ? { pic } : {}) });
           db.sinceLearn++;
           if (db.place && BOND.includes(lean)) addBond(lean, rule('momentPts'));                       // one of the moments he chose while they are together
           if (ask) db.log.push({ who: 'sys', text: ask === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: Date.now() });

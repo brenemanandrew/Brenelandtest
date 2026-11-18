@@ -741,7 +741,7 @@ async function load() {
   await loadDev();
   let zone = ''; try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
   const r = await api('/api/state' + (zone ? '?tz=' + encodeURIComponent(zone) : '')); const s = await r.json();
-  myName = s.name || 'You'; if (s.voiceMod) voiceMod = s.voiceMod; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
+  myName = s.name || 'You'; if (s.extras) myExtras = s.extras; if (s.voiceMod) voiceMod = s.voiceMod; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
   if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
@@ -878,8 +878,17 @@ const MOMENTS = {
   friend: ['challenges her to a round of cards', 'shows her a dumb meme on his phone', 'suggests ordering pizza and putting a horror movie on', 'asks how her D&D campaign is going', 'roasts her dice superstitions', 'holds out a fist for a bump', 'dares her to do her worst villain voice', 'starts a debate about the best horror movie ever made'],
   mentor: ['asks how her thesis research is going', 'offers to look over her paper with her', 'gives her some honest advice about life after graduation', 'asks what she wants to be doing in five years', 'tells her she handled that well, and why', 'walks her through how he would approach the problem', 'asks what she is stuck on this week', 'tells her about a mistake he made at her age'],
 };
+// things to do together that depend on what is in the room: [what you do (as an action), which way it leans]
+const ROOM_DO = { gametable: [() => 'rolls a d20 at the battle map table and it comes up ' + (1 + Math.random() * 20 | 0), 'friend'], dice: [() => 'rolls the giant d20 across the floor and it lands on ' + (1 + Math.random() * 20 | 0), 'friend'], whiteboard: ['quizzes her from the whiteboard, flash-card style', 'mentor'], laptop: ['sits down to study next to her for a while', 'mentor'], bookpile: ['pulls a book off the pile and asks her to explain it to him', 'mentor'],
+  telescope: ['looks through the telescope and asks her to show him a constellation', 'romance'], campfire: ['roasts a marshmallow over the fire and offers her the first one', 'friend'], fireplace: ['sits down by the fire close beside her', 'romance'], dinner: ['pulls out her chair at the candlelit table for two', 'romance'], projector: ['puts a movie on the screen and settles in beside her', 'friend'], tv: ['puts a movie on and settles in beside her', 'friend'],
+  picnic: ['shares the snacks on the picnic blanket with her', 'friend'], recordplayer: ['puts a record on and asks her to dance', 'romance'], guitar: ['picks up the guitar and plays her something, badly', 'friend'], tent: ['sits with her in the doorway of the tent, looking out', 'romance'], arcade: ['challenges her to a round on the arcade cabinet', 'friend'], coffeecart: ['makes her a coffee from the cart, the way she likes it', 'mentor'],
+  blanketfort: ['crawls into the blanket fort with her', 'romance'], chest: ['opens the treasure chest and hands her the best loot', 'friend'], pizza: ['splits the last slice of pizza with her', 'friend'], snacks: ['passes her the snacks', 'friend'], beanbag: ['flops onto the bean bag next to hers', 'friend'], stringlights: ['switches the string lights on and the big light off', 'romance'], candles: ['lights the candles', 'romance'], roses: ['hands her one of the roses', 'romance'] };
+const ROOM_BUILTIN = { dorm: ['bookpile', 'stringlights'], house: ['tv', 'snacks'] };
+function roomDoList() { const pl = visitInfo.place, m = (dev.maps && dev.maps.custom || []).find(x => x.id === pl), items = m ? m.items : ((dev.maps || {})[pl] || {}).items || [], kinds = [...new Set([...(ROOM_BUILTIN[pl] || []), ...items.map(i => i.kind)])].filter(k => ROOM_DO[k]); return kinds.sort(() => Math.random() - 0.5).slice(0, 4).map(k => { const [t, lean] = ROOM_DO[k]; return [typeof t === 'function' ? t() : t, lean]; }); }
 function drawMoments() {
   const box = $('fpMoments'); box.textContent = '';
+  { const b = el('button', { title: 'Things to do here', textContent: '\ud83c\udfaf' }); b.onclick = e => { e.stopPropagation(); const c = $('fpChoices'); if (!c.hidden && c.dataset.k === 'room') { c.hidden = true; return; } const list = roomDoList(); c.dataset.k = 'room'; c.textContent = ''; c.hidden = false; if (!list.length) c.append(el('button', { textContent: 'Nothing special to do here yet. Add things to this room in the Studio.', disabled: true }));
+      for (const [text, lean] of list) { const o = el('button', { textContent: text[0].toUpperCase() + text.slice(1).replace(/\bhe\b/g, 'you').replace(/\bhim\b/g, 'you').replace(/\bhis\b/g, 'your') }); o.onclick = () => { c.hidden = true; WizraSound.moment(lean); send('*' + text + '*', '', lean); }; c.append(o); } }; box.append(b); }
   for (const k in PATHS) { const b = el('button', { title: PATHS[k][1], className: visitInfo.path === k ? 'lead' : '' }, PATHS[k][0], el('small', { textContent: (visitInfo.bond || {})[k] || 0 })); b.onclick = e => { e.stopPropagation(); showChoices(k); }; box.append(b); }
 }
 function showChoices(k) {
@@ -984,14 +993,16 @@ sendBtn.onclick = () => send();
 
 // Action buttons: things you do; she reacts. (Later these can also drive the avatar directly.)
 // Which picture she uses: the cartoon, or the uploaded 3D model. Swaps live; the cartoon stays up until the model is ready.
-let avatarShown = 'puppet', avatarNote = '';
+let avatarShown = 'puppet', avatarNote = '', myExtras = { dorm: [], house: [], v: '' };
+// the rooms as this player has them: the shared maps plus their own gifts (in her dorm) and decor (in their house)
+const mapsNow = () => { const m = dev.maps || {}; return { ...m, dorm: { ...(m.dorm || {}), items: [...((m.dorm || {}).items || []), ...(myExtras.dorm || [])] }, house: { ...(m.house || {}), items: [...((m.house || {}).items || []), ...(myExtras.house || [])] } }; };
 async function applyAvatar() {
   const fit = visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
-  const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + (fit ? fit.key : settings.avatarV) : 'puppet';
+  const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + (fit ? fit.key : settings.avatarV) + ':' + (myExtras.v || '') : 'puppet';   // (your own gifts and decor are part of the rooms, so a new one rebuilds them)
   if (want === avatarShown) return; avatarShown = want; avatarNote = '';
   if (want === 'puppet') return avatar.setRenderer(null);
   try {
-    const m = await import('./avatar-vrm.js'); const r = await m.create(fit ? fit.url : '/api/avatar?v=' + settings.avatarV, { maps: dev.maps });
+    const m = await import('./avatar-vrm.js'); const r = await m.create(fit ? fit.url : '/api/avatar?v=' + settings.avatarV, { maps: mapsNow() });
     if (avatarShown === want) avatar.setRenderer(r); else r.dispose();
   } catch (e) { console.error(e); if (avatarShown === want) { avatarShown = 'puppet'; avatarNote = 'The 3D model could not be shown on this device (' + e.message + '). Showing the cartoon.'; avatar.setRenderer(null); } }
 }
@@ -1290,7 +1301,7 @@ $('callMic').onclick = () => { const on = !voice.on; voice.set({ on }); $('callM
 $('callType').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { callSay(e.target.value.trim()); e.target.value = ''; } });
 
 // ---------- the wheel ----------
-let sheet = null, notes = '', memories = { moments: [], pics: [] }, feelingNow = '', weekInfo = { week: [], dates: [], places: [] };
+let sheet = null, notes = '', memories = { moments: [], pics: [] }, feelingNow = '', weekInfo = { week: [], dates: [], places: [] }, shopInfo = { coins: 0, gift: [], decor: [], room: {} };
 const MOODS = ['auto', 'happy', 'playful', 'chill', 'focused', 'excited', 'tired', 'grumpy', 'sad', 'anxious'];
 const LABEL = v => v < 20 ? 'very low' : v < 40 ? 'low' : v < 60 ? 'middle' : v < 80 ? 'high' : 'very high';
 async function saveSettings(patch) {
@@ -1430,6 +1441,12 @@ function buildPanel(k) {
       fold('likes', '💜', 'Likes', sheet.likes.length, listEditor('', 'likes')), fold('dislikes', '🚫', 'Dislikes', sheet.dislikes.length, listEditor('', 'dislikes')));
     const nt = el('textarea', { rows: 8, value: notes });
     const saveN = el('button', { className: 'small', textContent: 'Save notes' }); saveN.onclick = () => api('/api/settings', { notes: nt.value }).then(() => { notes = nt.value; saveN.textContent = 'Saved'; });
+    { // the shop: gifts for her room, things for your own house, paid for with coins from time together
+      const S = shopInfo, row = (kind, it) => { const b = el('button', { className: 'small', textContent: it.price + ' \ud83e\ude99' }); b.disabled = S.coins < it.price || (S.room[kind] || 0) <= 0; if (b.disabled) b.style.opacity = '.45';
+        b.onclick = async () => { const r = await api('/api/shop', { buy: kind, id: it.id }), o = await r.json(); if (!r.ok) return alert(o.error || 'That did not work.'); shopInfo = o.shop; myExtras = o.extras; WizraSound.fx('sparkle'); buildPanel('sheet'); applyAvatar(); };
+        return el('div', { className: 'memline' }, el('span', { textContent: it.name + (it.have ? '  (have ' + it.have + ')' : ''), style: 'flex:1' }), b); };
+      p.append(fold('shop', '\ud83c\udf81', 'Gifts and decor', S.coins + ' coins', el('div', { className: 'note', textContent: 'You earn a coin each time she answers you, 5 for keeping a plan and 10 for winning the heart game. A gift goes into her room; decor goes into your house.' }),
+        el('label', { textContent: 'Gifts for her' + (S.room.gift > 0 ? '' : ' (her room is full)') }), ...S.gift.map(it => row('gift', it)), el('label', { textContent: 'For your house' + (S.room.decor > 0 ? '' : ' (no room left)') }), ...S.decor.map(it => row('decor', it)))); }
     { // her week, and the plans you two have made
       const W = weekInfo, sel = el('select', {}, ...W.places.map(x => el('option', { value: x.id, textContent: x.name }))), dayS = el('select', {}, ...[0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(Date.now() + i * 86400000); return el('option', { value: i, textContent: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'long' }) }); }));
       const tm = el('input', { type: 'time', value: '19:00' }), ti = el('input', { type: 'text', placeholder: 'What for? e.g. D&D night, study session, stargazing', maxLength: 60 }), add = el('button', { className: 'small', textContent: 'Make the plan' });
@@ -1527,7 +1544,7 @@ function buildPanel(k) {
   }
 }
 async function openWheel() {
-  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || ''; memories = d.memories || { moments: [], pics: [] }; feelingNow = d.feeling || ''; weekInfo = { week: d.week || [], dates: d.dates || [], places: d.places || [] };
+  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || ''; memories = d.memories || { moments: [], pics: [] }; feelingNow = d.feeling || ''; weekInfo = { week: d.week || [], dates: d.dates || [], places: d.places || [] }; shopInfo = d.shop || { coins: 0, gift: [], decor: [], room: {} };
   $('wheel').classList.remove('bar'); drawRing(); $('panel').classList.remove('show'); $('wheel').classList.add('open');
 }
 function closeWheel() { $('wheel').classList.remove('open'); }
