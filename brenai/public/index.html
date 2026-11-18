@@ -272,7 +272,8 @@
   #wheel.bar #ring .seg .ic { width:40px; height:40px; box-shadow:none; } #wheel.bar #ring .seg .ic svg { width:22px; height:22px; }
   #wheel.bar #ring .seg.cur { opacity:1; } #wheel.bar #ring .seg.cur .ic { box-shadow:0 0 0 3px #fff, 0 4px 12px hsl(var(--hue) 80% 50% / .6); }
   #wheel.bar #closeWheel { top:8px; right:8px; }
-  #wheel.bar #panel { flex:1; min-height:0; overflow-y:auto; width:calc(100% - 16px); margin:4px auto 8px; } #wheel.bar #switchPlayer { display:none !important; }
+  #wheel.bar #panel { flex:1; min-height:0; overflow-y:auto; width:calc(100% - 16px); margin:4px auto 8px; } #wheel.bar #switchPlayer, #wheel.bar #setWord { display:none !important; }
+  .memline { display:flex; gap:10px; align-items:baseline; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.14); font-size:14px; } .memline time { flex:none; width:74px; font-size:12px; opacity:.7; } .mempics { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; } .mempics .chatpic { width:100%; margin:0; border-width:2px; border-radius:10px; }
   #closeWheel { position:absolute; top:26px; right:-4px; left:auto; z-index:17; width:46px; height:46px; padding:9px; border-radius:50%; color:#fff; font-size:0; cursor:pointer;
     background:radial-gradient(circle at 35% 30%, #ff8f8f, #f03e3e 60%, #d42a2a); border:3px solid #fff; box-shadow:0 4px 0 #8a1c1c, 0 8px 14px rgba(0,0,0,.4); transform:rotate(6deg); transition:transform .1s, box-shadow .1s; }
   #closeWheel svg { width:100%; height:100%; display:block; filter:drop-shadow(0 1.5px 0 rgba(120,20,20,.7)); }
@@ -474,7 +475,7 @@
 <div id="login">
   <form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form>
   <form id="pinForm" hidden><div id="pinTitle">Your PIN</div><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="4 to 8 digits">
-    <input id="pinName" type="text" maxlength="24" placeholder="What should she call you?" hidden><button id="pinGo">Enter</button><button type="button" id="pinNew" class="quiet">I am new here</button><div id="pinMsg"></div></form>
+    <input id="pinName" type="text" maxlength="24" placeholder="What should she call you?" hidden><input id="pinWord" type="text" maxlength="40" autocomplete="off" placeholder="Recovery word" hidden><button id="pinGo">Enter</button><button type="button" id="pinNew" class="quiet">I am new here</button><button type="button" id="pinLost" class="quiet">I forgot my PIN</button><div id="pinMsg"></div></form>
 </div>
 
 <script src="sound.js"></script>
@@ -1007,16 +1008,22 @@ $('bigBtn').onclick = () => { const big = document.body.classList.toggle('big');
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
-{ const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('panel').insertAdjacentElement('afterend', sw); }
+{ const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('panel').insertAdjacentElement('afterend', sw);
+  const rw = el('button', { id: 'setWord', textContent: 'Set a recovery word (in case you forget your PIN)' }); rw.style.cssText = sw.style.cssText; rw.onclick = async () => { const w = prompt('Pick a recovery word or phrase. With it and your name you can set a new PIN if you forget yours.'); if (!w) return; const r = await api('/api/pin/word', { word: w }), d = await r.json().catch(() => ({})); alert(r.ok ? 'Saved. Keep it somewhere safe.' : (d.error || 'That did not work.')); }; sw.insertAdjacentElement('afterend', rw); }
 // Two doors: the site password, then your own PIN. The PIN picks your save; everyone's game is their own.
 function showLogin(pin) { $('login').style.display = 'grid'; $('loginForm').hidden = !!pin; $('pinForm').hidden = !pin; if (pin) $('pin').focus(); }
-let pinNew = false;
-$('pinNew').onclick = () => { pinNew = !pinNew; $('pinName').hidden = !pinNew; $('pinTitle').textContent = pinNew ? 'Pick a PIN for your own game' : 'Your PIN'; $('pinGo').textContent = pinNew ? 'Start' : 'Enter'; $('pinNew').textContent = pinNew ? 'I already have a PIN' : 'I am new here'; $('pinMsg').textContent = pinNew ? 'Remember it: it is the only way back to your game.' : ''; };
+let pinMode = 'in';   // in: enter your PIN; new: make a game; lost: a new PIN with your name and recovery word
+function pinShow(mode) {
+  pinMode = mode; $('pinName').hidden = mode === 'in'; $('pinWord').hidden = mode === 'in'; $('pinName').placeholder = mode === 'lost' ? 'The name she calls you' : 'What should she call you?'; $('pinWord').placeholder = mode === 'new' ? 'Recovery word (optional, in case you forget the PIN)' : 'Your recovery word'; $('pin').placeholder = mode === 'lost' ? 'A new PIN, 4 to 8 digits' : '4 to 8 digits';
+  $('pinTitle').textContent = mode === 'new' ? 'Pick a PIN for your own game' : mode === 'lost' ? 'Get back into your game' : 'Your PIN'; $('pinGo').textContent = mode === 'new' ? 'Start' : mode === 'lost' ? 'Set my new PIN' : 'Enter';
+  $('pinNew').textContent = mode === 'new' ? 'I already have a PIN' : 'I am new here'; $('pinLost').textContent = mode === 'lost' ? 'Back' : 'I forgot my PIN'; $('pinMsg').textContent = mode === 'new' ? 'Remember your PIN: it is the way back to your game.' : mode === 'lost' ? 'This works if you set a recovery word in the settings.' : '';
+}
+$('pinNew').onclick = () => pinShow(pinMode === 'new' ? 'in' : 'new'); $('pinLost').onclick = () => pinShow(pinMode === 'lost' ? 'in' : 'lost');
 $('pinForm').onsubmit = async e => {
-  e.preventDefault();
-  const r = await fetch('/api/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: $('pin').value, create: pinNew, name: $('pinName').value }) }), d = await r.json().catch(() => ({}));
-  if (r.ok) return location.reload();
-  $('pin').value = ''; $('pinMsg').textContent = r.status === 404 ? 'No game with that PIN. New here? Press "I am new here".' : (d.error || 'That did not work.');
+  e.preventDefault(); const post = (url, body) => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const r = pinMode === 'lost' ? await post('/api/pin/recover', { name: $('pinName').value, word: $('pinWord').value, pin: $('pin').value }) : await post('/api/pin', { pin: $('pin').value, create: pinMode === 'new', name: $('pinName').value }), d = await r.json().catch(() => ({}));
+  if (r.ok) { if (pinMode === 'new' && $('pinWord').value.trim().length >= 3) await post('/api/pin/word', { word: $('pinWord').value }).catch(() => {}); return location.reload(); }
+  $('pin').value = ''; $('pinMsg').textContent = r.status === 404 && pinMode === 'in' ? 'No game with that PIN. New here? Press "I am new here".' : (d.error || 'That did not work.');
 };
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
@@ -1222,7 +1229,7 @@ $('callMic').onclick = () => { const on = !voice.on; voice.set({ on }); $('callM
 $('callType').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { callSay(e.target.value.trim()); e.target.value = ''; } });
 
 // ---------- the wheel ----------
-let sheet = null, notes = '';
+let sheet = null, notes = '', memories = { moments: [], pics: [] }, feelingNow = '';
 const MOODS = ['auto', 'happy', 'playful', 'chill', 'focused', 'excited', 'tired', 'grumpy', 'sad', 'anxious'];
 const LABEL = v => v < 20 ? 'very low' : v < 40 ? 'low' : v < 60 ? 'middle' : v < 80 ? 'high' : 'very high';
 async function saveSettings(patch) {
@@ -1281,7 +1288,7 @@ const PATHS = { romance: ['\uD83D\uDC97', 'Romance', 'Something more than friend
 // a section that stays shut until tapped: icon, title and a hint of what is inside. It remembers being open.
 const openFolds = new Set();
 function fold(key, icon, title, hint, ...kids) {
-  const d = el('details', { className: 'fold', open: openFolds.has(key) }), body = el('div', { className: 'fbody' }); body.append(...kids);
+  const d = el('details', { className: 'fold', open: openFolds.has(key) }), body = el('div', { className: 'fbody' }); body.append(...kids.filter(k => k != null));
   d.append(el('summary', {}, el('i', { textContent: icon }), el('b', { textContent: title }), el('span', { className: typeof hint === 'number' ? 'cnt' : 'pv', textContent: String(hint) })), body);
   d.ontoggle = () => { d.open ? openFolds.add(key) : openFolds.delete(key); };
   return d;
@@ -1362,6 +1369,9 @@ function buildPanel(k) {
       fold('likes', '💜', 'Likes', sheet.likes.length, listEditor('', 'likes')), fold('dislikes', '🚫', 'Dislikes', sheet.dislikes.length, listEditor('', 'dislikes')));
     const nt = el('textarea', { rows: 8, value: notes });
     const saveN = el('button', { className: 'small', textContent: 'Save notes' }); saveN.onclick = () => api('/api/settings', { notes: nt.value }).then(() => { notes = nt.value; saveN.textContent = 'Saved'; });
+    { const day = t => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' }), M = memories, pics = el('div', { className: 'mempics' }, ...M.pics.slice().reverse().map(x => { const im = picEl(x.pic); im.title = day(x.at); return im; }));
+      p.append(fold('mem', '📔', 'Memory book', M.moments.length + M.pics.length ? `${M.moments.length} moments, ${M.pics.length} pictures` : 'nothing yet', feelingNow ? el('div', { className: 'note', textContent: 'Right now she is: ' + feelingNow }) : null,
+        ...(M.moments.length ? M.moments.map(m => el('div', { className: 'memline' }, el('time', { textContent: day(m.at) }), el('span', { textContent: m.text }))) : [el('div', { className: 'note', textContent: 'Firsts land here as they happen: first visit, first call, first picture, each level.' })]), M.pics.length ? pics : null)); }
     p.append(fold('notes', '📝', 'Her notes about you', notes ? notes.split(/\s+/).length + ' words' : 'empty', el('div', { className: 'note', textContent: 'She rewrites these every few messages. Edit or clear them if she picked up something wrong.' }), nt, el('div', { className: 'row' }, saveN)));
   } else if (k === 'avatar') {
     const is3d = settings.avatarKind === 'vrm';
@@ -1448,7 +1458,7 @@ function buildPanel(k) {
   }
 }
 async function openWheel() {
-  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || '';
+  const r = await api('/api/settings'); const d = await r.json(); settings = d.settings; sheet = d.sheet; notes = d.notes || ''; memories = d.memories || { moments: [], pics: [] }; feelingNow = d.feeling || '';
   $('wheel').classList.remove('bar'); drawRing(); $('panel').classList.remove('show'); $('wheel').classList.add('open');
 }
 function closeWheel() { $('wheel').classList.remove('open'); }

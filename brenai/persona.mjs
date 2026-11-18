@@ -117,6 +117,7 @@ Reply with one JSON object only, no other text:
   "rapport_delta": integer from -8 to 8, how these exchanges moved her feelings toward him (kind, funny, interested = up; rude, dismissive = down; neutral = 0),
   "revealed": [indexes of secret likes she clearly admitted to in the chat],
   "bond_lean": "romance", "friend", "mentor" or "": which way ${user} himself leaned in these exchanges (romance = flirting, compliments on her looks, affection, asking her out; friend = joking around, games, shared hobbies, easy company; mentor = advice, teaching, helping with her studies or plans, encouragement). Empty if it is not clear,
+  "feeling": "one short phrase for how Wizra is left feeling toward ${user} after these exchanges and why, in her terms (e.g. 'still a bit stung that he laughed at her painting', 'happy, he remembered her exam', 'curious about his trip'). Empty string if nothing stands out.",
   "new_hidden_like": "a new small secret like that grew naturally out of a positive moment in this chat, or empty string" ,
   "cuss_level": her cuss level after this chat; raise by at most 1 only if growth is allowed, rapport is 60+ and ${user} cusses comfortably himself; otherwise keep it
 }`;

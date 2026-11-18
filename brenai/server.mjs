@@ -173,6 +173,7 @@ function save() {
 // The save from before there were players: the game-wide parts move to shared.json at once; the rest waits to be claimed with a PIN.
 const legacy = (() => { try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); } catch { return null; } })();
 if (legacy && !fs.existsSync(SHARED)) { for (const k of SHARED_KEYS) if (legacy[k] !== undefined) shared[k] = legacy[k]; const a = {}; for (const k of AVATAR_KEYS) if (legacy.settings && legacy.settings[k] !== undefined) a[k] = legacy.settings[k]; shared.avatar = a; write(SHARED, shared); }
+const wordKey = (name, word) => crypto.createHash('sha256').update('brenai-word:' + String(name || '').trim().toLowerCase() + '|' + String(word || '').trim().toLowerCase()).digest('hex').slice(0, 32);
 const isOwner = () => !shared.owner || shared.owner === cur().id;
 const legacyOpen = () => !!legacy && fs.existsSync(STORE);
 
@@ -195,6 +196,7 @@ function systemBlocks() {
   if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
   const blocks = [{ type: 'text', text: db.persona ? db.persona.replaceAll('{user}', USER_NAME) : PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') + (db.sheet.path === 'romance' && ROM_STAGE[db.sheet.romLevel] ? '\n- Where the two of you are: ' + ROM_STAGE[db.sheet.romLevel] : '') }];
   if (db.intro === 'first') blocks.push({ type: 'text', text: `IMPORTANT, right now: this is your very first conversation with ${USER_NAME}. A matching service just paired the two of you (you signed up to be someone's research buddy and company in the evenings; he picked you from your profile a minute ago). You have never spoken before and you know nothing about him except his name. Introduce yourself the way you really would, in your own voice and temperament, find out who he is and what he is into, and let him get to know you a little at a time. Do not act like you already know him.` });
+  if (db.feeling && Date.now() - db.feeling.at < 72 * 3600000) { const h = Math.round((Date.now() - db.feeling.at) / 3600000); blocks.push({ type: 'text', text: `How you were left feeling about ${USER_NAME} ${h < 1 ? 'a little while ago' : h < 24 ? `about ${h} hour${h === 1 ? '' : 's'} ago` : `${Math.round(h / 24)} day${h < 36 ? '' : 's'} ago`}: ${db.feeling.text}. You still carry that: let it colour how you are with him now (warmer, cooler, teasing, careful, whatever fits), without announcing it, and let it change as the conversation goes.` }); }
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -376,6 +378,7 @@ async function learn() {
   const d = Math.max(-8, Math.min(8, Math.round(Number(out.rapport_delta) || 0)));
   sh.rapport = Math.max(0, Math.min(100, sh.rapport + d));
   for (const i of Array.isArray(out.revealed) ? out.revealed : []) if (sh.hiddenLikes[i]) sh.hiddenLikes[i].revealed = true;
+  if (typeof out.feeling === 'string') db.feeling = out.feeling.trim() ? { text: out.feeling.trim().slice(0, 160), at: Date.now() } : null;   // what she carries into the next conversation
   const nl = typeof out.new_hidden_like === 'string' ? out.new_hidden_like.trim() : '';
   if (nl && d > 0 && sh.hiddenLikes.length < 30 && !sh.hiddenLikes.some(h => h.text.toLowerCase() === nl.toLowerCase())) sh.hiddenLikes.push({ text: nl.slice(0, 200), revealed: false, grown: true });
   if (BOND.includes(out.bond_lean)) addBond(out.bond_lean, db.place ? 2 : 1);
@@ -404,7 +407,7 @@ function addBond(kind, n) {
   fixBond(); const sh = db.sheet;
   if (kind !== 'romance') { sh.bond[kind] = Math.min(100, sh.bond[kind] + n); return fixBond(); }
   sh.bond.romance += n;
-  while (sh.romLevel < ROM_MAX && sh.bond.romance >= romNeed(sh.romLevel)) { sh.bond.romance -= romNeed(sh.romLevel); sh.romLevel++; db.log.push({ who: 'sys', text: `Romance reached level ${sh.romLevel}.`, at: Date.now() }); console.log(`[bond] romance level ${sh.romLevel}`); }
+  while (sh.romLevel < ROM_MAX && sh.bond.romance >= romNeed(sh.romLevel)) { sh.bond.romance -= romNeed(sh.romLevel); sh.romLevel++; remember('rom:' + sh.romLevel, `Romance reached level ${sh.romLevel}.`); db.log.push({ who: 'sys', text: `Romance reached level ${sh.romLevel}.`, at: Date.now() }); console.log(`[bond] romance level ${sh.romLevel}`); }
   fixBond();
 }
 const bondView = () => { fixBond(); return { bond: db.sheet.bond, path: db.sheet.path, pathLock: db.sheet.pathLock || '', level: db.sheet.romLevel, need: romNeed(db.sheet.romLevel), levelMax: ROM_MAX }; };
@@ -487,7 +490,7 @@ async function awayPic() {
     const pre = `is not with her; she is out and sends him a picture from where she is: ${spec.desc}. She writes one short line to go with it${due.slip ? `. She has not thought about the fact that what is behind her shows she is not at ${a.where}` : ''}`;
     db.log.push({ who: 'me', text: '', at: now, pre, hidden: true });
     const text = await reply(`*${pre}*`, () => {});
-    db.log.push({ who: 'her', text, at: Date.now(), pic: spec, auto: true }); console.log(`[pic] sent while out (${spec.pose}, ${spec.scene}${due.slip ? ', slip' : ''})`);
+    remember('pic', 'The first picture she sent you.'); db.log.push({ who: 'her', text, at: Date.now(), pic: spec, auto: true }); console.log(`[pic] sent while out (${spec.pose}, ${spec.scene}${due.slip ? ', slip' : ''})`);
   } catch (e) { db.log.pop(); console.error('[pic]', e.message); } finally { busy = false; save(); }
 }
 const tailView = () => { for (let i = db.log.length - 1; i >= 0 && i > db.log.length - 12; i--) if (db.log[i].auto) { const { at, text, pic } = db.log[i]; return { at, text, pic }; } return null; };
@@ -532,7 +535,10 @@ function placeNote() {
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
   return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
 }
-function setPlace(place) { db.place = place || ''; db.invite = null; }
+// the memory book: firsts and milestones, each kept once ({ key, at, text })
+function remember(key, text) { db.memories = db.memories || []; if (db.memories.some(m => m.key === key)) return; db.memories.push({ key, at: Date.now(), text }); if (db.memories.length > 200) db.memories.shift(); }
+const memoryView = () => ({ moments: (db.memories || []).slice().sort((a, b) => a.at - b.at), pics: db.log.filter(e => e.pic && !e.hidden).slice(-24).map(e => ({ at: e.at, pic: e.pic })), since: (db.log[0] || {}).at || 0 });
+function setPlace(place) { db.place = place || ''; db.invite = null; if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
 // ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
 const devData = () => { const d = db.dev || (db.dev = {}); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
 const customMap = id => devData().maps.custom.find(m => m.id === id);
@@ -641,10 +647,27 @@ async function handle(req, res) {
         res.writeHead(200, { 'set-cookie': `brenai_u=${u.id}.${sign(u.id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`, 'content-type': 'application/json' });
         return res.end(JSON.stringify({ ok: true, name: u.data.name || '' }));
       }
+      // a forgotten PIN: your name and the recovery word you set move your save to a new PIN
+      if (url.pathname === '/api/pin/recover' && req.method === 'POST') {
+        const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || ''), now = Date.now(), fails = (pinFails.get(ip) || []).filter(t => now - t < 600000);
+        if (fails.length >= 8) return json(res, 429, { error: 'Too many tries. Try again in a few minutes.' });
+        const { name, word, pin } = await readBody(req); if (!/^\d{4,8}$/.test(String(pin || ''))) return json(res, 400, { error: 'A PIN is 4 to 8 digits.' });
+        const old = (shared.words || {})[wordKey(name, word)], nid = pinId(String(pin)); let u = old && playerOf(old);
+        if (!u) { fails.push(now); pinFails.set(ip, fails); return json(res, 404, { error: 'That name and recovery word do not match a game.' }); }
+        if (nid !== old) { if (playerOf(nid)) return json(res, 409, { error: 'Pick a different PIN.' }); const file = path.join(USERS, nid + '.json'); try { fs.renameSync(u.file, file); } catch (e) { return json(res, 500, { error: 'Could not move the save.' }); }
+          players.delete(old); u.id = nid; u.file = file; players.set(nid, u); shared.words[wordKey(name, word)] = nid; if (shared.owner === old) shared.owner = nid; als.run(u, save); console.log('[players] a PIN was reset with a recovery word'); }
+        res.writeHead(200, { 'set-cookie': `brenai_u=${u.id}.${sign(u.id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`, 'content-type': 'application/json' });
+        return res.end('{"ok":true}');
+      }
       if (url.pathname === '/api/pin/out' && req.method === 'POST') { res.writeHead(200, { 'set-cookie': 'brenai_u=; Path=/; Max-Age=0', 'content-type': 'application/json' }); return res.end('{"ok":true}'); }
       if (!als.getStore()) { const u = playerFrom(req); if (!u) return json(res, 401, { error: 'pin', canClaim: legacyOpen() }); wearModel(u); return als.run(u, () => handle(req, res)); }   // from here on, `db` is this player's save
 
       // the Studio and everything else that changes the game for everybody belongs to one player, the owner
+      if (url.pathname === '/api/pin/word' && req.method === 'POST') { // set (or change) the recovery word for this save
+        const { word } = await readBody(req), w = String(word || '').trim(); if (w.length < 3 || w.length > 40) return json(res, 400, { error: 'Use a word or phrase of 3 to 40 characters.' });
+        shared.words = shared.words || {}; const k = wordKey(USER_NAME, w); if (shared.words[k] && shared.words[k] !== cur().id) return json(res, 409, { error: 'Pick a different word.' });
+        for (const key in shared.words) if (shared.words[key] === cur().id) delete shared.words[key]; shared.words[k] = cur().id; db.word = true; save(); return json(res, 200, { ok: true });
+      }
       if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
@@ -658,7 +681,7 @@ async function handle(req, res) {
       }
       if (url.pathname === '/api/intro/start' && req.method === 'POST') {
         if (db.intro !== 'todo') return json(res, 409, { error: 'already met' }); if (busy) return json(res, 409, { error: 'busy' }); busy = true;
-        db.intro = 'first'; db.away = null; const pre = `${USER_NAME} has just picked you on the matching service and the chat has opened for the first time. You speak first: say hi and introduce yourself`; let text = '';
+        db.intro = 'first'; db.away = null; remember('met', 'The day you were matched with Wizra.'); const pre = `${USER_NAME} has just picked you on the matching service and the chat has opened for the first time. You speak first: say hi and introduce yourself`; let text = '';
         try { db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true }); text = await reply(`*${pre}*`, () => {}); }
         catch (e) { console.error('[intro]', e.message); db.log.pop(); text = `hey. so, I'm Wizra. guess the matching thing picked us. ...hi, ${USER_NAME}.`; }   // her PC is off: a plain hello, so the first minute still works
         finally { busy = false; }
@@ -739,7 +762,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
         if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
-        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES });
+        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES, memories: memoryView(), feeling: db.feeling && Date.now() - db.feeling.at < 72 * 3600000 ? db.feeling.text : '', hasWord: !!db.word });
       }
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
@@ -925,6 +948,7 @@ async function handle(req, res) {
         const hers = !!(await readBody(req)).incoming && ringNow();                 // he is picking up a call she made
         busy = true;
         try {
+          remember(hers ? 'call:hers' : 'call:yours', hers ? 'The first time she called you.' : 'The first time you called her.');
           if (hers) db.away.rang = 'answered';
           else if (!(process.env.CALL_TEST_ANSWER ? process.env.CALL_TEST_ANSWER === 'yes' : picksUp(db.away))) { // no answer; she texts back instead
             const pre = 'tries to video call her; she lets it ring out and sends a short text back instead';

@@ -128,3 +128,8 @@ A player made with "I am new here" gets `public/intro.js` before the game: a com
 - One player owns the game (`shared.owner`, set when the original save was claimed, or once with `POST /api/owner`). Only the owner can save in the Studio, upload models, outfits, clips or the picture pack, or change game rules and her core character. Everyone else gets a 403 and the Studio shows a notice.
 - `PERCH` in `public/mapkit.js` lists what she can settle on. On her own (rarely) or when her reply says so ("*flops onto the bean bag*"), she walks to it and sits or lies there for a minute or two, then comes back to her seat. Test hook: `WIZRA_PERCH = n`.
 - `WISHLIST.md` is the agreed list of what comes next.
+
+## Feeling, memory book, PIN recovery
+- `db.feeling` ({ text, at }): the note keeper (`LEARN_PROMPT`) writes how she was left feeling; `systemBlocks()` hands it back to her for 72 hours.
+- `db.memories` via `remember(key, text)`: one entry per first. `GET /api/settings` returns `memories` ({ moments, pics }) for the Memory book fold in the Character menu.
+- `POST /api/pin/word { word }` sets a recovery word for the current save (`shared.words`, hashed with the name). `POST /api/pin/recover { name, word, pin }` moves the save to a new PIN.

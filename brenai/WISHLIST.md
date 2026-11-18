@@ -6,9 +6,11 @@ Agreed with Andrew on 2026-11-18: build all of these, except the parked one.
 - 13. The Studio and everything shared (rooms, events, layout, outfits, her model, game rules, her core character) can only be changed by the owner of the game.
 - 1. She uses the furniture placed in a room: she walks over and sits on a bean bag, camp chair, log, chair, sofa or stool, or lies on a bed, sleeping bag, picnic blanket or blanket fort (first version).
 
+- 5. Her mood carries over: her note keeper records how she was left feeling, and she starts the next conversation with it (for up to three days).
+- 3. Memory book (Character menu): firsts with dates (matched, first visit to each place, first call, first picture, each level) and the pictures she sent.
+- 14. PIN recovery: set a recovery word (at sign up or in the settings); name plus word sets a new PIN.
+
 ## To do, in this order
-- 5. Her mood carries over from how the last conversation ended.
-- 3. Memory book: pictures she sent, firsts (first visit, first call, each level up), dates.
 - 2. Date and hangout plans on a small calendar; the right room opens at that time.
 - 4. Things to do together in each room (dice at the game table, flash cards, constellations, marshmallows) that feed the friend, mentor or romance score.
 - 6. The match questions also pick her look, hobbies and backstory.
@@ -18,7 +20,6 @@ Agreed with Andrew on 2026-11-18: build all of these, except the parked one.
 - 10. Phone notifications when she texts or calls while you are away.
 - 11. Her schedule (class, work, sleep) visible to the player.
 - 12. Her voice shifts with the temperament the player picked.
-- 14. PIN recovery word.
 
 ## Parked (keep, do not build yet)
 - 15. Two players at once: a queue with a "she is busy with someone else" notice, since the PC model answers one person at a time.
