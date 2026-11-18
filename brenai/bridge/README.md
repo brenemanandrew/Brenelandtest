@@ -37,3 +37,10 @@ Already have the model loaded and the server running? Just: `node wizra-bridge.m
 - https://brenai.fly.dev/api/brain says `"online": true` when the bridge is connected.
 - "token was refused": the PC and Fly secrets don't match. "Bionic did not answer": load the model / start its server.
 - Privacy: the bridge never prints or saves what you say. The chat log lives only on the Brenai Fly volume.
+
+## The "Start her brain" button
+On a Windows PC the Brenai login screen shows whether her brain is online, and when it is not, a "Start her brain on this PC" button. A web page cannot run a command by itself, so set the button up once on this PC (PowerShell):
+```
+irm https://brenai.fly.dev/bridge/install-start-button.ps1 | iex
+```
+That registers the link type `brenai-brain://`, which opens a PowerShell window running `start-wizra.ps1` from `C:\Users\<you>\Brenai` (and refreshes the bridge files there). The browser asks once whether the site may open it. Remove it with `Remove-Item -Recurse HKCU:\Software\Classes\brenai-brain`.
