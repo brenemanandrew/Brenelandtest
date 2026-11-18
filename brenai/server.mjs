@@ -17,6 +17,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
 import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates } from './pics.mjs';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
@@ -49,7 +50,7 @@ const PICS = path.join(DATA_DIR, 'pics');             // the pictures she has se
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
 const PASSWORD = process.env.APP_PASSWORD || ''; // empty = no login (local only)
-const USER_NAME = process.env.USER_NAME || 'Andrew';
+Object.defineProperty(globalThis, 'USER_NAME', { get: () => cur().data.name || process.env.USER_NAME || 'Andrew' });   // each player's own name, wherever the code says USER_NAME
 const COMPACT_AT = Number(process.env.COMPACT_AT || 600000); // tokens of history before old turns get summarized
 const LEARN_EVERY = Number(process.env.LEARN_EVERY || 6); // user messages between profile updates
 
@@ -146,20 +147,40 @@ const toks = s => Math.ceil(String(s).length / 3.6);
 
 // ---------- store ----------
 fs.mkdirSync(DATA_DIR, { recursive: true });
-let db = { history: [], log: [], profile: '', sinceLearn: 0 };
-try { db = { ...db, ...JSON.parse(fs.readFileSync(STORE, 'utf8')) }; } catch {}
-db.settings = { ...SETTINGS_DEFAULT, ...(db.settings || {}) };
-db.sheet = { ...structuredClone(SHEET_DEFAULT), ...(db.sheet || {}) };
-db.call = null; // a call does not survive a restart
-function save() {
-  const tmp = STORE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(db));
-  fs.renameSync(tmp, STORE);
+// ---------- saves ----------
+// Every player has their own save (DATA_DIR/users/<id>.json), chosen by their PIN: their chat, her feelings about them, the
+// scores, where she is. What belongs to the game itself is shared by everyone (DATA_DIR/shared.json): the Studio's work, the
+// outfits, the rules, her core character text and which model she uses.
+// The code below just says `db`: which player's save that is depends on whose request is being handled (AsyncLocalStorage).
+const USERS = path.join(DATA_DIR, 'users'), SHARED = path.join(DATA_DIR, 'shared.json'), SHARED_KEYS = new Set(['dev', 'outfits', 'rules', 'persona']);
+const freshSave = raw => { const d = { history: [], log: [], profile: '', sinceLearn: 0, ...raw }; d.settings = { ...SETTINGS_DEFAULT, ...(d.settings || {}) }; d.sheet = { ...structuredClone(SHEET_DEFAULT), ...(d.sheet || {}) }; d.call = null; return d; };   // (a call does not survive a restart)
+let shared = {}; try { shared = JSON.parse(fs.readFileSync(SHARED, 'utf8')); } catch {}
+const players = new Map(), nobody = { id: '', file: '', data: freshSave({}), touches: [] }, als = new AsyncLocalStorage(), cur = () => als.getStore() || nobody;
+const pinId = pin => crypto.createHash('sha256').update('brenai-pin:' + pin).digest('hex').slice(0, 24);
+function playerOf(id, create) {
+  if (players.has(id)) return players.get(id); const file = path.join(USERS, id + '.json'); let raw = null; try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+  if (!raw && !create) return null; const u = { id, file, data: freshSave(raw || create), touches: [] }; if (shared.avatar) wearModel(u); players.set(id, u); return u;
 }
+const db = new Proxy({}, { get: (_, k) => SHARED_KEYS.has(k) ? shared[k] : cur().data[k], set: (_, k, v) => { if (SHARED_KEYS.has(k)) shared[k] = v; else cur().data[k] = v; return true; }, deleteProperty: (_, k) => { if (SHARED_KEYS.has(k)) delete shared[k]; else delete cur().data[k]; return true; } });
+const AVATAR_KEYS = ['avatarKind', 'avatarV', 'avatarName'];
+const wearModel = u => { for (const k of AVATAR_KEYS) { if ((shared.avatar || {})[k] === undefined) delete u.data.settings[k]; else u.data.settings[k] = shared.avatar[k]; } };   // every save shows the game's one model
+const write = (file, obj) => { fs.writeFileSync(file + '.tmp', JSON.stringify(obj)); fs.renameSync(file + '.tmp', file); };
+function save() {
+  const u = cur(); if (u.file) { const a = {}; for (const k of AVATAR_KEYS) if (u.data.settings[k] !== undefined) a[k] = u.data.settings[k]; if (JSON.stringify(a) !== JSON.stringify(shared.avatar || {})) shared.avatar = a;   // her model is the game's, not one player's
+    fs.mkdirSync(USERS, { recursive: true }); write(u.file, u.data); }
+  write(SHARED, shared);
+}
+// The save from before there were players: the game-wide parts move to shared.json at once; the rest waits to be claimed with a PIN.
+const legacy = (() => { try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); } catch { return null; } })();
+if (legacy && !fs.existsSync(SHARED)) { for (const k of SHARED_KEYS) if (legacy[k] !== undefined) shared[k] = legacy[k]; const a = {}; for (const k of AVATAR_KEYS) if (legacy.settings && legacy.settings[k] !== undefined) a[k] = legacy.settings[k]; shared.avatar = a; write(SHARED, shared); }
+const legacyOpen = () => !!legacy && fs.existsSync(STORE);
 
 // ---------- auth (one shared password, signed cookie) ----------
 const SECRET = process.env.SESSION_SECRET || crypto.createHash('sha256').update('brenai:' + PASSWORD).digest('hex');
 const token = () => crypto.createHmac('sha256', SECRET).update('ok').digest('hex');
+const sign = id => crypto.createHmac('sha256', SECRET).update('player:' + id).digest('hex').slice(0, 32);
+function playerFrom(req) { const m = /(?:^|;\s*)brenai_u=([a-f0-9]{24})\.([a-f0-9]{32})/.exec(req.headers.cookie || ''); return m && m[2] === sign(m[1]) ? playerOf(m[1]) : null; }
+const pinFails = new Map();   // wrong PINs per address, so nobody can walk through all of them
 function authed(req) {
   if (!PASSWORD) return true;
   const m = /(?:^|;\s*)brenai=([a-f0-9]+)/.exec(req.headers.cookie || '');
@@ -207,13 +228,13 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
   heartwin: ['kept stroking her hair until she melted: squirming, blushing, happy tears in her eyes, and then a rush of warmth she cannot explain away', ''], heartlose: ['kept fussing with her hair clumsily until she got annoyed and ducked away', ''],
   petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
-let touches = [];
+// (each player's own list: cur().touches)
 function takeTouches() {
-  const fresh = touches.filter(t => Date.now() - t.at < 15 * 60000); touches = [];
+  const fresh = cur().touches.filter(t => Date.now() - t.at < 15 * 60000); cur().touches = [];
   const n = {}; for (const t of fresh) n[t.kind] = (n[t.kind] || 0) + 1;
   return Object.keys(n).map(k => (TOUCH[k][n[k] > 1 ? 1 : 0] || TOUCH[k][0]).replace('%n', n[k])).join(', ');
 }
-// a log entry as the model sees it: the silent touches ride in front of his words as an action
+// a log entry as the model sees it: the silent cur().touches ride in front of his words as an action
 const withPre = e => (e.pre ? `*${e.pre}* ` : '') + picNote(e.pic) + e.text;
 
 async function replyLocal(userText, onDelta) {
@@ -561,7 +582,7 @@ function readBody(req) {
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
 let busy = false;
-const server = http.createServer(async (req, res) => {
+async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
@@ -578,6 +599,22 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, { error: 'login' });
+      // which player: a PIN opens your own save. A new PIN makes a new one (only when asked to: a typo should not).
+      if (url.pathname === '/api/pin' && req.method === 'POST') {
+        const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || ''), now = Date.now(), fails = (pinFails.get(ip) || []).filter(t => now - t < 600000);
+        if (fails.length >= 8) return json(res, 429, { error: 'Too many wrong PINs. Try again in a few minutes.' });
+        const { pin, create, name, claim } = await readBody(req); if (!/^\d{4,8}$/.test(String(pin || ''))) return json(res, 400, { error: 'A PIN is 4 to 8 digits.' });
+        const id = pinId(String(pin)); let u = playerOf(id);
+        if (!u && claim && legacyOpen()) { // the save from before PINs: whoever claims it first with a PIN owns it from then on
+          const mine = { ...legacy }; for (const k of SHARED_KEYS) delete mine[k]; u = playerOf(id, mine); als.run(u, save); fs.renameSync(STORE, STORE.replace(/\.json$/, '.claimed.json')); console.log('[players] the original save was claimed');
+        }
+        if (!u && create) { const nm = String(name || '').replace(/[^\p{L}\p{N} '._-]/gu, '').trim().slice(0, 24); if (!nm) return json(res, 400, { error: 'What should she call you?' }); u = playerOf(id, { name: nm }); als.run(u, save); console.log('[players] new player'); }
+        if (!u) { fails.push(now); pinFails.set(ip, fails); return json(res, 404, { error: 'No save with that PIN.', canClaim: legacyOpen() }); }
+        res.writeHead(200, { 'set-cookie': `brenai_u=${u.id}.${sign(u.id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`, 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ok: true, name: u.data.name || '' }));
+      }
+      if (url.pathname === '/api/pin/out' && req.method === 'POST') { res.writeHead(200, { 'set-cookie': 'brenai_u=; Path=/; Max-Age=0', 'content-type': 'application/json' }); return res.end('{"ok":true}'); }
+      if (!als.getStore()) { const u = playerFrom(req); if (!u) return json(res, 401, { error: 'pin', canClaim: legacyOpen() }); wearModel(u); return als.run(u, () => handle(req, res)); }   // from here on, `db` is this player's save
 
       if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
@@ -640,7 +677,7 @@ const server = http.createServer(async (req, res) => {
         const { place, decline } = await readBody(req), now = Date.now();
         if (decline) { db.invite = null; save(); return json(res, 200, placeView()); }
         if (!place) {
-          if (db.place) { db.log.push({ who: 'sys', text: db.place === 'house' ? 'Wizra headed home.' : 'You headed home.', at: now }); touches.push({ kind: db.place === 'house' ? 'homeHouse' : 'homeDorm', at: now }); setPlace(''); save(); }
+          if (db.place) { db.log.push({ who: 'sys', text: db.place === 'house' ? 'Wizra headed home.' : 'You headed home.', at: now }); cur().touches.push({ kind: db.place === 'house' ? 'homeHouse' : 'homeDorm', at: now }); setPlace(''); save(); }
           return json(res, 200, placeView());
         }
         if (customMap(place)) { // a place made in the Studio: you just go there together
@@ -648,7 +685,7 @@ const server = http.createServer(async (req, res) => {
           setPlace(place); db.log.push({ who: 'sys', text: `You two went to ${customMap(place).name}.`, at: now }); save(); return json(res, 200, placeView());
         }
         if (place !== inviteNow()) return json(res, 409, { error: 'There is no invitation open right now.', ...placeView() });
-        setPlace(place); db.log.push({ who: 'sys', text: place === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: now }); touches.push({ kind: place === 'dorm' ? 'cameDorm' : 'cameHouse', at: now }); save();
+        setPlace(place); db.log.push({ who: 'sys', text: place === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: now }); cur().touches.push({ kind: place === 'dorm' ? 'cameDorm' : 'cameHouse', at: now }); save();
         return json(res, 200, placeView());
       }
 
@@ -716,7 +753,7 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/touch' && req.method === 'POST') {
         const { kind } = await readBody(req);
-        if (TOUCH[kind] && touches.length < 40) touches.push({ kind, at: Date.now() });
+        if (TOUCH[kind] && cur().touches.length < 40) cur().touches.push({ kind, at: Date.now() });
         return json(res, 200, { ok: true });
       }
 
@@ -736,8 +773,8 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname === '/api/hearts' && req.method === 'POST') {
         const { result, bonus } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < rule('heartCooldown') * 1000) return json(res, 429, { error: 'too soon', ...placeView() });
         db.heartsAt = now; fixBond();
-        if (result === 'win') { addBond('romance', rule('heartWin') + Math.max(0, Math.min(rule('bonusTaps') * Math.max(rule('bonusHeart'), rule('bonusFace'), rule('bonusOther')), Math.round(+bonus || 0)))); touches.push({ kind: 'heartwin', at: now }); }
-        else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - rule('heartLose')); fixBond(); touches.push({ kind: 'heartlose', at: now }); }
+        if (result === 'win') { addBond('romance', rule('heartWin') + Math.max(0, Math.min(rule('bonusTaps') * Math.max(rule('bonusHeart'), rule('bonusFace'), rule('bonusOther')), Math.round(+bonus || 0)))); cur().touches.push({ kind: 'heartwin', at: now }); }
+        else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - rule('heartLose')); fixBond(); cur().touches.push({ kind: 'heartlose', at: now }); }
         save(); return json(res, 200, placeView());
       }
       // a scripted event at work: note that it fired, put a line she says in the log, or have her react in her own words
@@ -762,10 +799,10 @@ const server = http.createServer(async (req, res) => {
         const { to, rapport } = await readBody(req), t = Number(to);
         if (!Number.isFinite(t) || t < Date.now() - 7 * 86400000 || t > Date.now()) return json(res, 400, { error: 'to must be a time in the last week (ms)' });
         if (busy) return json(res, 409, { error: 'busy' });
-        save(); const backup = STORE.replace(/\.json$/, `.before-rewind-${Date.now()}.json`); try { fs.copyFileSync(STORE, backup); } catch (e) { return json(res, 500, { error: 'could not back up: ' + e.message }); }
+        save(); const backup = cur().file.replace(/\.json$/, `.before-rewind-${Date.now()}.json`); try { fs.copyFileSync(cur().file, backup); } catch (e) { return json(res, 500, { error: 'could not back up: ' + e.message }); }
         const before = db.log.length, gone = db.log.filter(e => e.at >= t), turns = gone.filter(e => e.who === 'her').length;
         db.log = db.log.filter(e => e.at < t); db.history = db.history.slice(0, Math.max(0, db.history.length - turns * 2));
-        db.away = null; db.glow = null; db.plan = null; db.call = null; db.place = ''; db.invite = null; db.sinceLearn = 0; touches = [];
+        db.away = null; db.glow = null; db.plan = null; db.call = null; db.place = ''; db.invite = null; db.sinceLearn = 0; cur().touches = [];
         if (Number.isFinite(+rapport)) db.sheet.rapport = Math.max(0, Math.min(100, Math.round(+rapport)));
         save();
         return json(res, 200, { ok: true, removed: before - db.log.length, kept: db.log.length, backup: path.basename(backup), ...placeView() });
@@ -937,7 +974,8 @@ const server = http.createServer(async (req, res) => {
     console.error('[http]', e.message);
     if (!res.headersSent) json(res, 500, { error: e.message }); else res.end();
   }
-});
+}
+const server = http.createServer(handle);
 const wss = new WebSocketServer({ noServer: true, maxPayload: 24 << 20 });
 server.on('upgrade', (req, sock, head) => {
   if (new URL(req.url, 'http://x').pathname !== '/brain') return sock.destroy();

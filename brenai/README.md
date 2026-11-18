@@ -102,3 +102,12 @@ Stroke her hair: a heart pops up. Pop it and nine more follow, faster and bounci
 - Romance has levels 0 to 3 (`sheet.romLevel`). The romance score fills to what the next level costs (rules `lvl1` 100, `lvl2` 500, `lvl3` 700), the level goes up and the score restarts from the leftover; level 3 fills to `lvlCap` 1000. A level outweighs any score when deciding what you two are, and her prompt gets a line for the stage you are at.
 - Outfits are whole models, one per level and kind of moment: `POST /api/outfit/slot?level=&situation=` (a .vrm), stored in `DATA_DIR/outfits`, listed and configured through `/api/outfits`. `outfitNow()` picks by where she is and the clock (School, Going Out, Nightly, Weekend, Daily); an empty slot falls back to a lower level, then Daily, then her base model. The game loads whatever `outfit` says in `/api/state` and `/api/away` and swaps when it changes.
 - Assign them in the Studio: Character and rules, Outfits.
+
+## Players and PINs
+Everyone who plays has their own game. After the site password the page asks for a PIN (4 to 8 digits):
+- An existing PIN opens that player's save. "I am new here" makes a new one (pick a PIN, say what she should call you).
+- Per player (`/data/users/<id>.json`, the id is a hash of the PIN): the chat, her notes, the scores, levels, where she is, settings.
+- Shared by everyone (`/data/shared.json`): the Studio's work (layout, events, maps), outfits, game rules, her core character text and her model.
+- "Switch player" sits under "New chat" in the settings. Eight wrong PINs from one address locks PIN entry for ten minutes.
+- The save from before PINs (`brenai.json`) could be claimed once with a PIN; it is then renamed `brenai.claimed.json`.
+- A PIN is not a strong password: anyone with the site password could guess a 4 digit PIN over a few days. It keeps saves apart, it does not guard secrets.

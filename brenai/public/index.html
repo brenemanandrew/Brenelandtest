@@ -99,7 +99,7 @@
   #closeWheel { position:fixed; top:10px; right:14px; font-size:26px; background:none; border:0; color:var(--text); z-index:16; }
   #newChat { display:block; margin:0 auto 14px; padding:8px 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; font-size:14px; }
   #login { position:fixed; inset:0; background:var(--bg); display:none; place-items:center; z-index:20; }
-  #login form { display:grid; gap:10px; width:260px; }
+  #login form { display:grid; gap:10px; width:260px; } #login form[hidden], #login input[hidden] { display:none; } #login button.quiet { background:rgba(255,255,255,.12) !important; font-weight:500 !important; } #pinMsg { font-size:13px; min-height:18px; opacity:.85; text-align:center; }
   #login input, #login button { padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; }
 
   /* ================= theme: twilight (2026-11-17). Warmer and brighter than the first near-black look. ================= */
@@ -464,7 +464,11 @@
   </div>
 </div>
 <div id="wheel"><div id="ringWrap"><button id="closeWheel" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"><path d="M6.500 6.500l11 11M17.500 6.500l-11 11"/></svg></button><div id="ring"></div></div><div id="panel"></div><button id="newChat">New conversation</button></div>
-<div id="login"><form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form></div>
+<div id="login">
+  <form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form>
+  <form id="pinForm" hidden><div id="pinTitle">Your PIN</div><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="4 to 8 digits">
+    <input id="pinName" type="text" maxlength="24" placeholder="What should she call you?" hidden><button id="pinGo">Enter</button><button type="button" id="pinNew" class="quiet">I am new here</button><div id="pinMsg"></div></form>
+</div>
 
 <script src="sound.js"></script>
 <script src="avatar.js"></script>
@@ -578,7 +582,7 @@ for (const w of ['her', 'me']) for (const ev of ['scroll', 'pointerdown']) $(w +
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {});
-  if (r.status === 401) { $('login').style.display = 'grid'; throw new Error('login'); }
+  if (r.status === 401) { const e = await r.clone().json().catch(() => ({})); showLogin(e.error === 'pin'); throw new Error('login'); }
   return r;
 }
 
@@ -988,11 +992,22 @@ $('bigBtn').onclick = () => { const big = document.body.classList.toggle('big');
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
+{ const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('newChat').insertAdjacentElement('afterend', sw); }
 $('newChat').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); closeWheel(); load(); } };
+// Two doors: the site password, then your own PIN. The PIN picks your save; everyone's game is their own.
+function showLogin(pin) { $('login').style.display = 'grid'; $('loginForm').hidden = !!pin; $('pinForm').hidden = !pin; if (pin) $('pin').focus(); }
+let pinNew = false;
+$('pinNew').onclick = () => { pinNew = !pinNew; $('pinName').hidden = !pinNew; $('pinTitle').textContent = pinNew ? 'Pick a PIN for your own game' : 'Your PIN'; $('pinGo').textContent = pinNew ? 'Start' : 'Enter'; $('pinNew').textContent = pinNew ? 'I already have a PIN' : 'I am new here'; $('pinMsg').textContent = pinNew ? 'Remember it: it is the only way back to your game.' : ''; };
+$('pinForm').onsubmit = async e => {
+  e.preventDefault();
+  const r = await fetch('/api/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: $('pin').value, create: pinNew, name: $('pinName').value }) }), d = await r.json().catch(() => ({}));
+  if (r.ok) return location.reload();
+  $('pin').value = ''; $('pinMsg').textContent = r.status === 404 ? 'No game with that PIN. New here? Press "I am new here".' : (d.error || 'That did not work.');
+};
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
   const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
-  if (r.ok) { $('login').style.display = 'none'; load(); voice.start(); } else $('pw').value = '';
+  if (r.ok) { $('login').style.display = 'none'; load().then(() => voice.start()).catch(() => {}); } else $('pw').value = '';
 };
 // ---------- voice input (talk to text) ----------
 // The browser's own speech recognition (Chrome, Edge, Safari; not Firefox). On by default; remembered per device.
