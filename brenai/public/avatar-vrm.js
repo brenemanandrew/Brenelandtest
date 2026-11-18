@@ -70,6 +70,10 @@ export async function create(url) {
     crossed: { leftUpperLeg: [-1.36, 0.1, -0.1], leftLowerLeg: [0.62, 0, 0], rightUpperLeg: [-1.5, -0.12, 0.16], rightLowerLeg: [0.6, 0, 0], leftFoot: [0.2, 0.25, 0], rightFoot: [0.2, -0.25, 0] },
     floor: { _z: 0.17, hips: [-0.1, 0, 0], spine: [0.06, 0, 0], leftUpperLeg: [-1.36, 0, 0.06], rightUpperLeg: [-1.36, 0, -0.06], leftLowerLeg: [1.42, 0, 0], rightLowerLeg: [1.42, 0, 0], leftFoot: [0.02, 0, 0], rightFoot: [0.02, 0, 0] },
   };
+  // whole-body ways of sitting taken from recorded poses (feet up on the seat): _clip is the pose, _y/_z nudge her onto the cushion
+  const SEATED = window.WIZRA_SEATED || { curl: { _clip: 'female_sitting_pose', _y: 0.02, _z: 0.07 }, hair: { _clip: 'female_sitting_pose_1', _y: 0.02, _z: 0.07 }, knee: { _clip: 'female_sitting_pose_2', _y: 0.02, _z: 0.07 } };
+  if (!window.WIZRA_LEGS) Object.assign(LEGS, SEATED);
+  const ARM = /Arm|Hand|Shoulder|Thumb|Index|Middle|Ring|Little/;
   const FINGER = /Proximal|Intermediate|Distal/;
   const KEYS = [...new Set([...Object.keys(POSE), ...Object.keys(STAND), ...Object.values(OVER).flatMap(o => Object.keys(o))])];
   const standOf = n => STAND[n] || (FINGER.test(n) ? POSE[n] : [0, 0, 0]), situpOf = n => SITUP[n] || POSE[n] || [0, 0, 0];
@@ -232,7 +236,7 @@ export async function create(url) {
   const stride = c => (c.hips ? Math.abs(c.hips[c.hips.length - 1] - c.hips[2]) * hipY0 : 0) || 1.3;   // metres one loop of a walking clip covers, at her size
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
   const rt = { act: 'sit', until: 0, nextAt: performance.now() + 15000 + Math.random() * 15000, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
-    legs: 'up', lg: { crossed: 0, floor: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
+    legs: 'up', lg: { crossed: 0, floor: 0, curl: 0, hair: 0, knee: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
   const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), stay = sec => ({ wait: sec, idle: true }), run = fn => ({ run: fn });
   // ---- finding her way: a grid of the room with the furniture (and you) blocked out, so she walks round things, not through them ----
   const CELL = 0.1, PAD = 0.17, navs = {};
@@ -286,13 +290,14 @@ export async function create(url) {
   }
   const ERRAND = {
     pace: () => plan(CLIPS.texting_and_walking ? 'pacing around the room, texting' : 'up and pacing around the room', [run(() => { if (CLIPS.texting_and_walking) rt.carry = 'phone'; }), go(R_BACK), go(L_BACK), go(R_BACK), run(() => { if (rt.carry === 'phone') rt.carry = null; })]),
-    liedown: () => { if (here === 'dorm' && CLIPS.female_laying_pose) plan('lying on her bed', [go(places.bed.side), { lie: 45 + Math.random() * 60 }]); },
+    liedown: () => { if (here === 'dorm' && CLIPS.female_laying_pose) { rt.liePose = CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose'; plan('lying on her bed', [go(places.bed.side), { lie: 45 + Math.random() * 60 }]); } },
     fetchbook: () => plan('getting a book from the shelf', [go(AT_SHELF), face(Math.PI), wait(1.3), run(() => { rt.carry = 'book'; rt.bookHome = 'table'; }), wait(0.5)], Math.random() < 0.75 ? 'read' : ''),
     returnbook: () => plan('putting her book back on the shelf', [run(() => { rt.carry = 'book'; }), wait(0.6), go(AT_SHELF), face(Math.PI), wait(1.2), run(() => { rt.carry = null; rt.bookHome = 'shelf'; }), wait(0.5)]),
     fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), wait(2.2)], 'sip'),
   };
   function startActivity(name) {
     const now = performance.now(); if (rt.act === 'gone' || rt.leaving) return;   // not here, or on her way out
+    if (SEATED[name]) { if (CLIPS[SEATED[name]._clip]) { rt.legs = name; rt.legsAt = now + 60000 + Math.random() * 60000; } return; }
     if (name === 'feetup' || name === 'crosslegs' || name === 'feetdown') { rt.legs = name === 'feetup' ? 'up' : name === 'crosslegs' ? 'crossed' : 'floor'; rt.legsAt = now + 60000 + Math.random() * 60000; return; }
     if (name === 'sit') { if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.after = ''; } else if (rt.act !== 'sitdown') rt.act = 'sit'; rt.nextAt = now + 20000 + Math.random() * 25000; return; }
     if (name === 'read' && rt.bookHome === 'shelf') name = 'fetchbook';             // nothing to read until she gets a book
@@ -365,10 +370,11 @@ export async function create(url) {
       if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
     }
     // how her legs are resting: she changes it now and then, and it only applies while she is properly sat
-    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !window.WIZRA_STILL) { const r = Math.random(); rt.legs = r < 0.4 ? 'up' : r < 0.75 ? 'crossed' : 'floor'; rt.legsAt = now + 50000 + Math.random() * 90000; }
-    let scoot = 0;
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', ...Object.keys(SEATED).filter(n => CLIPS[SEATED[n]._clip])]; rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 50000 + Math.random() * 90000; }
+    let scoot = 0, perch = 0; const seatClips = [];
     for (const name in LEGS) {
       rt.lg[name] += ((rt.legs === name ? 1 : 0) - rt.lg[name]) * Math.min(1, dt * 2.2); const v = rt.lg[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
+      if (LEGS[name]._clip) { if (!CLIPS[LEGS[name]._clip]) continue; seatClips.push([LEGS[name]._clip, wgt]); perch += (floorY + LEGS[name]._y) * wgt; scoot += (hip.z + LEGS[name]._z) * wgt; continue; } // a recorded pose, feet up on the seat
       if (LEGS[name]._z) scoot += LEGS[name]._z * wgt;                              // sitting forward on the seat
       for (const n in LEGS[name]) { if (n[0] === '_') continue; const q = LEGS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; }
     }
@@ -404,14 +410,15 @@ export async function create(url) {
     // recorded motion over the top, once she is on her feet: standing idle, talking with her hands, walking
     rt.talkW += ((s.talking && k > 0.9 && !moving ? 1 : 0) - rt.talkW) * Math.min(1, dt * 3);
     rt.lie += Math.sign(rt.lieWant - rt.lie) * Math.min(Math.abs(rt.lieWant - rt.lie), dt * 0.55); const lie = ease(rt.lie);
+    const busyArms = Math.min(1, Math.max(rt.ov.read, rt.ov.phone, rt.ov.sip) * 1.5); for (const [c, wgt] of seatClips) playClip(c, wgt, 0, n => ARM.test(n) ? busyArms : 0);
     if (k > 0.02) {
       const holdArm = n => WALK_ARM[n] ? Math.min(1, rt.hold * 2) : 0;
       playClip('idle', k * (1 - rt.leg) * (1 - lie), now / 1000, holdArm); playClip('talking', k * rt.talkW * (1 - rt.leg) * (1 - lie), now / 1000, holdArm);
       if (walkClip) { if (moving) rt.walkT += (rt.walkSp || 0.6) * dt / stride(CLIPS[walkClip]) * CLIPS[walkClip].dur; playClip(walkClip, k * rt.leg, rt.walkT, walkClip === 'walking' ? holdArm : null); }
-      if (lie > 0.003) playClip('female_laying_pose', lie, 0);
+      if (lie > 0.003) playClip(rt.liePose || 'female_laying_pose', lie, 0);
     }
     const bob = walkClip ? 0 : 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, bed = places.bed, turn = Math.atan2(Math.sin(-Math.PI / 2 - rt.yaw), Math.cos(-Math.PI / 2 - rt.yaw));
-    vrm.scene.position.set(rt.x * k + (bed.at[0] - rt.x) * lie, floorY * k + bob + (bed.top - floorY) * lie, (ka - k) * 0.05 + rt.z * k + scoot + (bed.at[1] - rt.z) * lie);
+    vrm.scene.position.set(rt.x * k + (bed.at[0] - rt.x) * lie, floorY * k + bob + perch + (bed.top - floorY) * lie, (ka - k) * 0.05 + rt.z * k + scoot + (bed.at[1] - rt.z) * lie);
     vrm.scene.rotation.y = (rt.yaw + turn * lie) * k;
     rt.zoom = 0.3 * k;
   }
