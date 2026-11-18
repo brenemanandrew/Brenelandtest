@@ -658,6 +658,46 @@ export async function create(url) {
   const target = new THREE.Object3D(); scene.add(target); if (vrm.lookAt) vrm.lookAt.target = target;
 
   const em = vrm.expressionManager, has = n => em && em.getExpression(n);
+  // ---- a picture she sends: one posed frame of her, somewhere, drawn off to the side of the live view and handed back as an image.
+  // It is drawn at the top of a frame and the normal frame is drawn straight over it, so the live view never shows it.
+  let snapReq = null;
+  const snapshot = spec => new Promise(done => { snapReq = { spec, done }; });
+  function takeSnap(spec) {
+    if (inCall) return '';
+    const keep = { vis: vrm.scene.visible, fov: camera.fov, room: room.visible, dorm: places.dorm.visible, house: places.house.visible, sun: sun.intensity, sunC: sun.color.clone(), amb: amb.intensity, bg: el.style.background };
+    const props = [book, phone, mug], propVis = props.map(o => o.visible);
+    renderer.setSize(480, 600, false); camera.aspect = 0.8;
+    // pose: standing naturally, then whatever her hand is doing
+    for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'leftShoulder', 'rightShoulder', 'spine', 'hips']) set(n, 0, 0, 0);
+    const home = spec.scene === 'dorm', LIE = { bed: 'female_laying_pose_1', bed2: 'female_laying_pose' }, SIT = { knees: ['female_sitting_pose', 0], knee: ['female_sitting_pose_2', 0], hair: ['female_sitting_pose_1', 0], kick: ['sitting_kicking_legs', 0.5] };
+    clipHip = 0; const lying = home && CLIPS[LIE[spec.pose]] ? LIE[spec.pose] : '', sitting = home && SIT[spec.pose] && CLIPS[SIT[spec.pose][0]] ? SIT[spec.pose] : null;   // the recorded poses: on her bed
+    if (lying) playClip(lying, 1, 0); else if (sitting) playClip(sitting[0], 1, sitting[1]); else playClip('idle', 1, 2);
+    const SIGN_OF = { peace: 'peace', heart: 'fingerheart', fox: 'fox' };
+    if (SIGN_OF[spec.pose]) { const tg = sign(SIGN_OF[spec.pose], 6, {}); for (const n in tg) if (n[0] !== '_' && n !== 'spine') set(n, ...tg[n]); set('head', 0, 0, -0.16); }
+    else if (spec.pose === 'wave') { set('rightUpperArm', 0, 0, -0.7); set('rightLowerArm', 0, 0, -1.1); set('head', 0, 0, 0.1); }
+    else if (!lying && !sitting) set('head', 0.04, 0, spec.pose === 'full' ? 0 : 0.08);
+    if (hipsNode) hipsNode.position.y = hipY0 + clipHip;
+    const want = EXPR[spec.face] || EXPR.happy; if (em) for (const n of NAMES) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.3, want[n] || 0) : n === 'aa' || n === 'oh' ? 0 : n === 'happy' ? 0 : n === 'relaxed' ? Math.max(want.relaxed || 0, want.happy ? 0.55 : 0) : (want[n] || 0));   // a closed-mouth smile for the camera
+    // where: her own room as it is, or a painted backdrop of wherever she is
+    const inDorm = spec.scene === 'dorm' || !BACKDROP[spec.scene]; vrm.scene.visible = true;
+    room.visible = places.dorm.visible = inDorm; places.house.visible = false; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
+    if (inDorm) { if (lying) { vrm.scene.position.set(places.bed.at[0], places.bed.top, places.bed.at[1]); vrm.scene.rotation.y = -Math.PI / 2; } else if (sitting) { vrm.scene.position.set(places.bed.at[0] + 0.32, places.bed.top - 0.4, places.bed.at[1] + 0.35); vrm.scene.rotation.y = Math.PI / 2 - 0.25; } else { vrm.scene.position.set(1.0, floorY, hip.z + 1.25); vrm.scene.rotation.y = 0.5; } }
+    else { vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; const c = bdCanvas.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.clearRect(0, 0, 384, 704); const l = BACKDROP[spec.scene](c, 384, 704); bdTex.needsUpdate = true; sun.intensity = Math.PI * 0.9; sun.color.setRGB(l[0], l[1], l[2]); amb.intensity = 0.35; el.style.background = '#000'; }
+    if (vrm.springBoneManager) vrm.springBoneManager.reset(); vrm.update(0); vrm.scene.updateMatrixWorld(true);
+    head.getWorldPosition(tmpA); const yw = vrm.scene.rotation.y, fx = Math.sin(yw), fz = Math.cos(yw), full = spec.pose === 'full';
+    camera.fov = 40; camera.updateProjectionMatrix();
+    if (lying) { camera.position.set(places.bed.at[0] + 0.75, places.bed.top + 1.75, places.bed.at[1] - 1.35); camera.lookAt(places.bed.at[0], places.bed.top + 0.12, places.bed.at[1] - 0.05); }   // from up by her pillow
+    else if (sitting) { camera.position.set(tmpA.x + fx * 1.9 + fz * 1.0, tmpA.y + 0.7, tmpA.z + fz * 1.9 - fx * 1.0); camera.lookAt(tmpA.x, tmpA.y - 0.3, tmpA.z); }                // from a little above and to one side
+    else if (full) { camera.position.set(tmpA.x + fx * 3.0 + fz * 0.25, tmpA.y - 0.45, tmpA.z + fz * 3.0 - fx * 0.25); camera.lookAt(tmpA.x, tmpA.y - 0.72, tmpA.z); }
+    else { const side = SIGN_OF[spec.pose] || spec.pose === 'wave' ? -0.13 : 0; camera.position.set(tmpA.x + fx * 0.8 + fz * (0.1 + side), tmpA.y + 0.2, tmpA.z + fz * 0.8 - fx * (0.1 + side)); camera.lookAt(tmpA.x + fz * side, tmpA.y + 0.04, tmpA.z - fx * side); }   // her face, from arm's length and a little above
+    if (!inDorm) { backdrop.position.set(tmpA.x, tmpA.y - (full ? 0.6 : 0.3), tmpA.z - 1.05); backdrop.scale.set(full ? 2.4 : 1, full ? 1.5 : 1, 1); }
+    renderer.render(scene, camera);
+    let url = ''; try { url = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
+    // and put everything back for the live view (the pose and camera are rebuilt every frame anyway)
+    backdrop.visible = false; backdrop.scale.set(1, 1, 1); room.visible = keep.room; places.dorm.visible = keep.dorm; places.house.visible = keep.house; props.forEach((o, i) => { o.visible = propVis[i]; });
+    vrm.scene.visible = keep.vis; camera.fov = keep.fov; camera.updateProjectionMatrix(); sun.intensity = keep.sun; sun.color.copy(keep.sunC); amb.intensity = keep.amb; el.style.background = keep.bg; clipHip = 0; if (vrm.springBoneManager) vrm.springBoneManager.reset();
+    return url;
+  }
   const w = {}; for (const n of NAMES) w[n] = 0;
   let size = '', thumbCb = null;
   const v3 = new THREE.Vector3();
@@ -683,7 +723,9 @@ export async function create(url) {
       if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
       return { x: 100 + (e.clientX - c.x) / k / UNIT, y: 100 + (e.clientY - c.y) / k / UNIT };
     },
+    snapshot,
     draw(s) {
+      if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
       const W = el.clientWidth, H = el.clientHeight, key = W + 'x' + H;
       if (key !== size && W && H) { size = key; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
       routine(s);                               // where she is and what she is holding

@@ -78,3 +78,9 @@ Fonts are hosted in `public/fonts` (SIL Open Font License): Fredoka for the inte
 - While she is out she may video call you: decided when she leaves (`leaveNow`), about 2% at no rapport up to 18% at 100 (a bit more on the romance path), never when she is somewhere she is hiding, and only on outings of 20 minutes or more. At most one per outing.
 - The phone on her "out" sign shakes with action lines and rings for about 50 seconds (`ringNow`, `ringing` in `/api/away`). Tap it to pick up; otherwise it is logged as a missed call and she knows when she is back.
 - Test switch: `CALL_TEST_RING=1` makes her call a few seconds after leaving.
+
+## Pictures she sends
+- `pics.mjs` decides what a picture is (a spec: pose, place, face, or a "thing" she likes); the page draws it and posts the image back to `POST /api/pic/<id>` so it is the same picture from then on (`GET /api/pic/<id>`, stored in `DATA_DIR/pics`).
+- A selfie is one posed frame of her 3D model (`snapshot` in avatar-vrm.js): standing poses and hand signs anywhere, plus the recorded sitting and lying poses on her bed when she is home. The place behind her is where she REALLY is, so a picture can give away a cover story (`slip`).
+- When: if you ask for one (she may say no below 25 rapport), on a whim with a reply (`chatChance`), and up to twice while she is out (`awayChance`, scheduled in `leaveNow`, sent when the page checks `/api/away`). All get likelier with rapport, more so on the romance path.
+- Test switches: `PIC_TEST=1` (one picture a few seconds after she leaves), `PIC_TEST_CHAT=1` (a picture with every reply).

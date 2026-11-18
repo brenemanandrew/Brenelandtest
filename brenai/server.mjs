@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
+import { wantsPic, selfie, thing, chatChance, awayChance, picNote } from './pics.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,8 @@ const PORT = Number(process.env.PORT || 8080);
 const DATA_DIR = process.env.DATA_DIR || path.join(here, 'data');
 const STORE = path.join(DATA_DIR, 'brenai.json');
 const AVATAR = path.join(DATA_DIR, 'avatar.vrm');
-const ANIMS = path.join(DATA_DIR, 'anims.json');   // her motion clips (made from licensed animation files, so kept on the volume, not in the repo)
+const ANIMS = path.join(DATA_DIR, 'anims.json');
+const PICS = path.join(DATA_DIR, 'pics');             // the pictures she has sent, once a page has drawn them   // her motion clips (made from licensed animation files, so kept on the volume, not in the repo)
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
 const PASSWORD = process.env.APP_PASSWORD || ''; // empty = no login (local only)
@@ -190,7 +192,7 @@ function takeTouches() {
   return Object.keys(n).map(k => (TOUCH[k][n[k] > 1 ? 1 : 0] || TOUCH[k][0]).replace('%n', n[k])).join(', ');
 }
 // a log entry as the model sees it: the silent touches ride in front of his words as an action
-const withPre = e => (e.pre ? `*${e.pre}* ` : '') + e.text;
+const withPre = e => (e.pre ? `*${e.pre}* ` : '') + picNote(e.pic) + e.text;
 
 async function replyLocal(userText, onDelta) {
   const setup = setupText();
@@ -383,6 +385,20 @@ function planDue() {
   return '';
 }
 const awayView = () => { if (db.call && Date.now() - db.call.since > 25 * 60000) db.call = null; return awayView0(); }; // (a call left open is dropped)
+// A picture she sends on her own while she is out: due ones go out when the page next checks in (she writes the line herself).
+async function awayPic() {
+  const a = db.away, now = Date.now(); if (!a || !a.pics || !a.pics.length || busy || db.call || now < a.pics[0].at) return;
+  const due = a.pics.shift(); if (now > due.at + 20 * 60000 || now >= a.until || (!brain.ws && !client)) { save(); return; }
+  busy = true;
+  try {
+    const spec = selfie(sceneFor(a), (a.out || {}).kind || '', (db.sheet.rapport | 0) / 100);
+    const pre = `is not with her; she is out and sends him a picture from where she is: ${spec.desc}. She writes one short line to go with it${due.slip ? `. She has not thought about the fact that what is behind her shows she is not at ${a.where}` : ''}`;
+    db.log.push({ who: 'me', text: '', at: now, pre, hidden: true });
+    const text = await reply(`*${pre}*`, () => {});
+    db.log.push({ who: 'her', text, at: Date.now(), pic: spec, auto: true }); console.log(`[pic] sent while out (${spec.pose}, ${spec.scene}${due.slip ? ', slip' : ''})`);
+  } catch (e) { db.log.pop(); console.error('[pic]', e.message); } finally { busy = false; save(); }
+}
+const tailView = () => { for (let i = db.log.length - 1; i >= 0 && i > db.log.length - 12; i--) if (db.log[i].auto) { const { at, text, pic } = db.log[i]; return { at, text, pic }; } return null; };
 const RING_FOR = 50000;
 function ringNow() { // is she calling him right now? Once the ringing runs out unanswered it is a missed call.
   const a = db.away, now = Date.now(); if (!a || !a.callAt || a.rang || db.call || now < a.callAt) return false;
@@ -417,6 +433,14 @@ function leaveNow(leave, since = Date.now()) {
   a.until = (said || now + leave.minutes * 60000 / AWAY_SPEED) + drift / AWAY_SPEED; a.said = said ? clock(said) : clock(now + leave.minutes * 60000 / AWAY_SPEED);
   // now and then she is the one who calls, part way through being out: rare, and likelier the closer they are
   const close = (db.sheet.rapport | 0) / 100, chance = (0.02 + 0.16 * close * close) * (db.sheet.path === 'romance' ? 1.4 : 1);
+  // and now and then a picture from wherever she is. If she is somewhere she should not be, most of the time she sends
+  // nothing; when she does, she has not thought about what is behind her (slip), and the picture gives her away.
+  a.pics = [];
+  for (let i = 0; i < 2; i++) if (process.env.PIC_TEST ? i === 0 : a.minutes >= 15 && Math.random() < awayChance(close, db.sheet.path === 'romance') / (i + 1)) {
+    if (a.out.lying && !process.env.PIC_TEST && Math.random() > 0.4) continue;
+    a.pics.push({ at: process.env.PIC_TEST ? now + 4000 : now + (a.until - now) * (0.15 + 0.7 * Math.random()), slip: !!a.out.lying });
+  }
+  a.pics.sort((x, y) => x.at - y.at);
   if (process.env.CALL_TEST_RING) a.callAt = now + 4000;
   else if (!a.out.lying && a.minutes >= 20 && Math.random() < chance) a.callAt = now + (a.until - now) * (0.25 + 0.5 * Math.random());
   db.away = a;
@@ -444,7 +468,7 @@ async function comeBack(onDelta) {
 
 // ---------- http ----------
 // changes whenever a new version is deployed: pages left open use it to reload themselves
-const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js', 'public/sound.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js', 'public/sound.js', 'pics.mjs'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
 const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -477,7 +501,20 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
-      if (url.pathname === '/api/away') return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), ...placeView() }); }
+
+      // a picture she sent: the first page to show it draws it and hands it back here, so it stays the same picture from then on
+      if (url.pathname.startsWith('/api/pic/')) {
+        const pid = url.pathname.slice(9), file = path.join(PICS, pid + '.webp'); if (!/^[a-z0-9]{6,20}$/.test(pid)) return json(res, 400, { error: 'bad id' });
+        if (req.method === 'GET') { if (!fs.existsSync(file)) return json(res, 404, { error: 'not drawn yet' }); res.writeHead(200, { 'content-type': 'image/webp', 'cache-control': 'private, max-age=31536000, immutable' }); return fs.createReadStream(file).pipe(res); }
+        if (req.method === 'POST') {
+          if (!db.log.some(e => e.pic && e.pic.id === pid)) return json(res, 404, { error: 'no such picture' });
+          const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 900000) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+          const m = /^data:image\/(webp|png|jpeg);base64,([A-Za-z0-9+/=]+)$/.exec(Buffer.concat(parts).toString('utf8')); if (!m) return json(res, 400, { error: 'not an image' });
+          fs.mkdirSync(PICS, { recursive: true }); if (!fs.existsSync(file)) fs.writeFileSync(file, Buffer.from(m[2], 'base64'));
+          return json(res, 200, { ok: true });
+        }
+      }
 
       // taking up her invitation (place = what she offered), turning it down, or going home (place = '')
       if (url.pathname === '/api/visit' && req.method === 'POST') {
@@ -600,7 +637,14 @@ const server = http.createServer(async (req, res) => {
             : (yes ? 'asks to come over to her dorm; she says yes, and he has just arrived and walked into her room' : 'asks to come over to her dorm; she is not up for company right now and says so');
           if (yes) setPlace(ask); else { ask = ''; db.invite = null; }
         }
-        const pre = [takeTouches(), askPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
+        // a picture with this reply: because he asked, or now and then on her own (more often the closer they are)
+        let pic = null, picPre = '';
+        if (!db.place && !askPre) {
+          const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
+          if (wantsPic(msg)) { if (close >= 0.25 && Math.random() < 0.55 + 0.45 * close) { pic = selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance')) { pic = Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
+        }
+        const pre = [takeTouches(), askPre, picPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest
@@ -611,14 +655,14 @@ const server = http.createServer(async (req, res) => {
             const done = spokenLines(heard.replace(/[^.!?]*$/, '')); if (done[0] && (done.length > 1 || done[0].length >= 55)) { early = true; voiced(done[0]).catch(() => {}); } // (a short first sentence waits: it will be joined to the next)
           });
           if (wantVoice) prewarm(full);
-          db.log.push({ who: 'her', text: full, at: Date.now() });
+          db.log.push({ who: 'her', text: full, at: Date.now(), ...(pic ? { pic } : {}) });
           db.sinceLearn++;
           if (db.place && BOND.includes(lean)) addBond(lean, 2);                       // one of the moments he chose while they are together
           if (ask) db.log.push({ who: 'sys', text: ask === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: Date.now() });
           notePlan(full); const leave = detectLeave(full); if (leave) leaveNow(leave);
           else if (!db.place && !askPre && canVisit()) { const inv = detectInvite(full); if (inv) db.invite = { place: inv, at: Date.now() }; }
           save();
-          send({ t: 'done', text: full, away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+          send({ t: 'done', text: full, pic, away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
           if (db.sinceLearn >= LEARN_EVERY) { db.sinceLearn = 0; learn().catch(e => console.error('[learn]', e.message)); }
         } catch (e) {
           console.error('[chat]', e.status || '', e.message);

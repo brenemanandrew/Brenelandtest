@@ -296,6 +296,8 @@
       setState(kind) { state = STATE[kind] ? kind : ''; if (R.glow) R.glow(state); },
       // her routine (3D model only): what she is busy with right now, in words, and a way to start something
       activity() { return R.activity ? R.activity() : ''; },
+      // a posed picture of her (3D model only): resolves to an image URL, or '' if it cannot be drawn
+      snapshot(spec) { return R.snapshot ? R.snapshot(spec) : Promise.resolve(''); },
       // visiting in person (3D model only): 'dorm' or 'house' puts you in the room in first person, '' takes you home
       visit(name) { if (R.visit) R.visit(name || ''); return !!R.visit; }, canVisit() { return !!R.visit; },
       routine(name) { if (R.doActivity) R.doActivity(name); },

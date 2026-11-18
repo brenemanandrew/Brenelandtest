@@ -2,7 +2,7 @@ FROM node:22-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.mjs persona.mjs away.mjs ./
+COPY server.mjs persona.mjs away.mjs pics.mjs ./
 COPY public ./public
 # the PC bridge files, downloadable from https://brenai.fly.dev/bridge/ (no secrets in them)
 COPY bridge ./public/bridge
