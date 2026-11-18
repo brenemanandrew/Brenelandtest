@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
-import { wantsPic, selfie, thing, chatChance, awayChance, picNote } from './pics.mjs';
+import { wantsPic, selfie, thing, chatChance, awayChance, picNote, fromPack } from './pics.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +25,9 @@ const DATA_DIR = process.env.DATA_DIR || path.join(here, 'data');
 const STORE = path.join(DATA_DIR, 'brenai.json');
 const AVATAR = path.join(DATA_DIR, 'avatar.vrm');
 const ANIMS = path.join(DATA_DIR, 'anims.json');
+const PACK = path.join(DATA_DIR, 'pack');             // the ready-made picture pack (tools/picpack): manifest.json + images
+let pack = []; const loadPack = () => { try { pack = JSON.parse(fs.readFileSync(path.join(PACK, 'manifest.json'), 'utf8')); } catch { pack = []; } }; loadPack();
+const sent = () => (db.sentPics || []), noteSent = spec => { if (spec && spec.file) db.sentPics = [...sent(), spec.file].slice(-45); return spec; };
 const PICS = path.join(DATA_DIR, 'pics');             // the pictures she has sent, once a page has drawn them   // her motion clips (made from licensed animation files, so kept on the volume, not in the repo)
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
@@ -391,7 +394,7 @@ async function awayPic() {
   const due = a.pics.shift(); if (now > due.at + 20 * 60000 || now >= a.until || (!brain.ws && !client)) { save(); return; }
   busy = true;
   try {
-    const spec = selfie(sceneFor(a), (a.out || {}).kind || '', (db.sheet.rapport | 0) / 100);
+    const close = (db.sheet.rapport | 0) / 100, spec = noteSent(fromPack(pack, { home: false, scene: sceneFor(a), close, path: db.sheet.path, slip: due.slip, recent: sent() })) || selfie(sceneFor(a), (a.out || {}).kind || '', close);
     const pre = `is not with her; she is out and sends him a picture from where she is: ${spec.desc}. She writes one short line to go with it${due.slip ? `. She has not thought about the fact that what is behind her shows she is not at ${a.where}` : ''}`;
     db.log.push({ who: 'me', text: '', at: now, pre, hidden: true });
     const text = await reply(`*${pre}*`, () => {});
@@ -503,6 +506,19 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), ...placeView() }); }
 
+      // the picture pack: GET one image; POST the whole pack at once { manifest: [...], files: { name: base64 } }
+      if (url.pathname.startsWith('/api/pack')) {
+        if (req.method === 'GET') { const f = url.pathname.slice(10); if (!/^[a-z0-9_]+\.webp$/.test(f) || !fs.existsSync(path.join(PACK, f))) return json(res, 404, { error: 'no such picture' }); res.writeHead(200, { 'content-type': 'image/webp', 'cache-control': 'private, max-age=86400' }); return fs.createReadStream(path.join(PACK, f)).pipe(res); }
+        if (req.method === 'POST') {
+          const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 40e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+          let d; try { d = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
+          if (!Array.isArray(d.manifest) || !d.files) return json(res, 400, { error: 'manifest and files needed' });
+          fs.rmSync(PACK, { recursive: true, force: true }); fs.mkdirSync(PACK, { recursive: true }); let n = 0;
+          for (const f in d.files) if (/^[a-z0-9_]+\.webp$/.test(f)) { fs.writeFileSync(path.join(PACK, f), Buffer.from(d.files[f], 'base64')); n++; }
+          fs.writeFileSync(path.join(PACK, 'manifest.json'), JSON.stringify(d.manifest.filter(m => d.files[m.file]))); loadPack();
+          return json(res, 200, { ok: true, pictures: n, listed: pack.length });
+        }
+      }
       // a picture she sent: the first page to show it draws it and hands it back here, so it stays the same picture from then on
       if (url.pathname.startsWith('/api/pic/')) {
         const pid = url.pathname.slice(9), file = path.join(PICS, pid + '.webp'); if (!/^[a-z0-9]{6,20}$/.test(pid)) return json(res, 400, { error: 'bad id' });
@@ -641,8 +657,8 @@ const server = http.createServer(async (req, res) => {
         let pic = null, picPre = '';
         if (!db.place && !askPre) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
-          if (wantsPic(msg)) { if (close >= 0.25 && Math.random() < 0.55 + 0.45 * close) { pic = selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
-          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance')) { pic = Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
+          if (wantsPic(msg)) { if (close >= 0.25 && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && noteSent(fromPack(pack, { home: true, close, path: db.sheet.path, recent: sent(), ask: true }))) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance')) { pic = (!kind && Math.random() < 0.85 && noteSent(fromPack(pack, { home: true, close, path: db.sheet.path, recent: sent() }))) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
         const pre = [takeTouches(), askPre, picPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });

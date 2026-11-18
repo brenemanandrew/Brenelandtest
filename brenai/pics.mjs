@@ -24,4 +24,19 @@ export function thing(likes) {
 // how often: rare with a stranger, fairly regular once they are close (and a bit more if it is romance)
 export const chatChance = (close, romance) => (0.008 + 0.06 * close * close) * (romance ? 1.6 : 1);
 export const awayChance = (close, romance) => (0.1 + 0.3 * close * close) * (romance ? 1.3 : 1);
+// ---- the picture pack: ready-made pictures on the server (see tools/picpack). Each has a theme, where it can be sent from,
+// the scene it was taken in (selfies out), a minimum rapport and maybe the relationship path it belongs to.
+// ctx: { home, scene, close 0..1, path, slip, recent: [files], ask }  ->  a spec, or null if nothing fits
+export function fromPack(pack, ctx) {
+  if (!pack || !pack.length) return null;
+  const ok = pack.filter(p => (p.min || 0) <= ctx.close * 100 && (!p.path || p.path === ctx.path) && !(ctx.recent || []).includes(p.file)
+    && (ctx.home ? p.where !== 'out' : p.where === 'out' ? p.scene === ctx.scene : p.where === 'any')
+    && (!ctx.slip || (p.where === 'out' && p.scene === ctx.scene))            // a picture that gives her away has to show where she really is
+    && (!ctx.ask || p.theme === 'selfie' || p.theme === 'cute' || (p.theme === 'relationship' && /selfie|picture of her/.test(p.desc))));
+  if (!ok.length) return null;
+  // her own pick: what she is, to him, pulls the choice (the pictures made for that path come up most)
+  const weight = p => (p.theme === 'relationship' ? 3 : p.theme === 'selfie' || p.theme === 'cute' ? 1.3 + ctx.close : 1) * (ctx.home || p.where === 'out' ? 1 : 0.8);
+  let r = Math.random() * ok.reduce((a, p) => a + weight(p), 0); const p = ok.find(p => (r -= weight(p)) < 0) || ok[0];
+  return { id: id(), kind: 'pack', file: p.file, theme: p.theme, desc: p.desc };
+}
 export const picNote = p => p ? `*sends a picture: ${p.desc}* ` : '';

@@ -517,7 +517,7 @@ async function drawPic(spec) { // -> an image URL ('' if it cannot be drawn on t
   const c = el('canvas', { width: 480, height: 600 }); (THING[spec.what] || THING.dice)(c.getContext('2d'), 480, 600); return c.toDataURL('image/webp', 0.88);
 }
 function picEl(spec) {
-  const img = el('img', { className: 'chatpic', alt: 'A picture from Wizra', src: '/api/pic/' + spec.id }); let tried = false;
+  const img = el('img', { className: 'chatpic', alt: 'A picture from Wizra', src: spec.kind === 'pack' ? '/api/pack/' + spec.file : '/api/pic/' + spec.id }); let tried = spec.kind === 'pack';
   img.onerror = async () => { if (tried) return; tried = true; img.removeAttribute('src'); img.classList.add('wait');
     const url = await drawPic(spec).catch(() => ''); if (!url) { img.alt = 'A picture she sent (it needs her 3D model to show)'; return; }
     img.src = url; img.classList.remove('wait'); fetch('/api/pic/' + spec.id, { method: 'POST', body: url }).catch(() => {}); };
