@@ -949,8 +949,9 @@ async function send(quick, visit, lean) {
   sendBtn.disabled = true; speaker.stop(typeof quick === 'string' ? 'a button or an event sent a message for you' : 'you sent a message'); if (!away) { avatar.setThinking(true); userDid(text); }
   addLine('me', text); bubble('me', text); WizraSound.fx('send');
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
+  const cue = away ? null : cueFor(text); if (cue) { if (cue.gesture) avatar.gesture(cue.gesture, cue.hold || 3.5); if (cue.emote) avatar.emote(cue.emote, 2000); }   // something you said that she reacts to on the spot (the Studio's Reactions)
   try {
-    const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
+    const r = await api('/api/chat', { text, ...(cue ? { cue: cue.label } : {}), doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     await readReply(r, body); armFollow();
   } catch (e) {
@@ -1026,6 +1027,7 @@ let noticedAt = 0;
 $('bigBtn').onclick = () => { const big = document.body.classList.toggle('big'); if (big && Date.now() - noticedAt > 90000 && !avatar.activity()) { noticedAt = Date.now(); setTimeout(() => { avatar.react('wave'); }, 500); } };
 // Things you do to her in the chat (typed or from the action buttons) also land on the avatar straight away.
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
+function cueFor(text) { const t = ' ' + String(text).toLowerCase().replace(/[^a-z0-9!?' ]+/g, ' ').replace(/'/g, '') + ' '; for (const c of dev.cues || []) for (const w of String(c.words).toLowerCase().replace(/'/g, '').split(',')) { const k = w.trim(); if (k && t.includes(/^[a-z0-9]/.test(k) ? ' ' + k : k)) return c; } return null; }
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
 { const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('panel').insertAdjacentElement('afterend', sw);

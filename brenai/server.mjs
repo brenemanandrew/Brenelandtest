@@ -541,7 +541,23 @@ function remember(key, text) { db.memories = db.memories || []; if (db.memories.
 const memoryView = () => ({ moments: (db.memories || []).slice().sort((a, b) => a.at - b.at), pics: db.log.filter(e => e.pic && !e.hidden).slice(-24).map(e => ({ at: e.at, pic: e.pic })), since: (db.log[0] || {}).at || 0 });
 function setPlace(place) { db.place = place || ''; db.invite = null; if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
 // ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
-const devData = () => { const d = db.dev || (db.dev = {}); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
+// things the player says that she reacts to on the spot (a pose and an emoji), before her words come: edited in the Studio
+const CUES_DEFAULT = [
+  { label: 'yelps and flinches', words: 'spider, a bug, snake, a mouse, behind you, watch out, look out, boo!', gesture: 'eep', emote: '\ud83d\ude31' },
+  { label: 'throws her hands up', words: 'reach for the sky, hands up, stick em up, freeze!', gesture: 'handsup', emote: '\ud83d\ude4c' },
+  { label: 'cheers', words: 'we did it, you did it, good job, well done, proud of you, congrats, congratulations', gesture: 'cheer', emote: '\ud83c\udf89' },
+  { label: 'claps', words: 'round of applause, bravo, encore, clap for', gesture: 'clap', emote: '\ud83d\udc4f' },
+  { label: 'rolls her eyes', words: 'dad joke, pun intended, knock knock', gesture: 'eyeroll', emote: '\ud83d\ude44' },
+  { label: 'throws a peace sign', words: 'say cheese, peace out, smile for', gesture: 'peace', emote: '\u270c\ufe0f' },
+  { label: 'high-fives the air', words: 'high five, up top', gesture: 'wave', emote: '\u270b' },
+  { label: 'dances in place', words: 'dance for me, lets dance, dance party, this is my jam', gesture: 'dance', emote: '\ud83d\udc83' },
+  { label: 'thinks it over', words: 'riddle me this, what do you think, pop quiz, guess what', gesture: 'think', emote: '\ud83e\udd14' },
+  { label: 'takes a bow', words: 'take a bow, your majesty, my lady', gesture: 'bow', emote: '\ud83d\ude4f' },
+  { label: 'yawns', words: 'bedtime, getting late, so sleepy, time for bed', gesture: 'yawn', emote: '\ud83e\udd71' },
+  { label: 'makes a little heart', words: 'love you, i adore you, you are the best, youre the best', gesture: 'fingerheart', emote: '\ud83d\udc96' },
+];
+const cleanCues = list => list.slice(0, 80).map(c => ({ label: String(c.label || '').slice(0, 60), words: String(c.words || '').slice(0, 200), gesture: String(c.gesture || '').replace(/[^a-z]/gi, '').slice(0, 20), emote: String(c.emote || '').slice(0, 8), hold: Math.max(1, Math.min(12, +c.hold || 3.5)) })).filter(c => c.words.trim() && (c.gesture || c.emote));
+const devData = () => { const d = db.dev || (db.dev = {}); if (!Array.isArray(d.cues)) d.cues = cleanCues(CUES_DEFAULT); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
 const customMap = id => devData().maps.custom.find(m => m.id === id);
 function leaveNow(leave, since = Date.now()) {
   if (db.place) setPlace('');                                                       // wherever she is going, the visit is over
@@ -850,11 +866,12 @@ async function handle(req, res) {
         if (req.method === 'POST') {
           const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 3e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
           let b; try { b = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
+          if (Array.isArray(b.cues)) d.cues = cleanCues(b.cues); if (b.cues === 'default') d.cues = cleanCues(CUES_DEFAULT);
           if (b.ui && typeof b.ui === 'object') d.ui = b.ui; if (Array.isArray(b.events)) d.events = b.events.slice(0, 200); if (b.maps && typeof b.maps === 'object') { d.maps = b.maps; devData(); } if (b.layout && typeof b.layout === 'object') d.layout = b.layout;
           if (b.run) d.run = { id: String(b.run), at: Date.now() };                      // "run this event now" from the Studio
           d.v = Date.now(); save();
         }
-        return json(res, 200, { ui: d.ui, events: d.events, maps: d.maps, layout: d.layout || null, fired: d.fired, run: d.run || null, v: d.v || 0 });
+        return json(res, 200, { cues: d.cues, ui: d.ui, events: d.events, maps: d.maps, layout: d.layout || null, fired: d.fired, run: d.run || null, v: d.v || 0 });
       }
       // the heart game (rub her head, pop the hearts): ten pops is +10 romance, three misses is -1. Once a minute at most.
       if (url.pathname === '/api/hearts' && req.method === 'POST') {
@@ -900,7 +917,7 @@ async function handle(req, res) {
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text, doing, voice: wantVoice, visit, lean } = await readBody(req);
+        const { text, doing, voice: wantVoice, visit, lean, cue } = await readBody(req); const cued = String(cue || '').replace(/[^a-z '-]/gi, '').trim().slice(0, 60);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
@@ -930,7 +947,7 @@ async function handle(req, res) {
           else if (wantsPic(msg)) { if (close * 100 >= rule('picAskMin') && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
-        const pre = [takeTouches(), askPre, picPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
+        const pre = [takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest

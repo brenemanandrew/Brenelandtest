@@ -185,11 +185,13 @@ export async function create(url, opts = {}) {
     hips: () => ({ leftUpperArm: [0.25, 0, -0.85], rightUpperArm: [0.25, 0, 0.85], leftLowerArm: [0, -1.5, 0], rightLowerArm: [0, 1.5, 0], leftHand: [0, 0, -0.5], rightHand: [0, 0, 0.5], _head: [0, 0, 0.08] }),
     cheer: t => ({ leftUpperArm: [0, 0, 1.1 + 0.1 * sin(t * 9)], rightUpperArm: [0, 0, -1.1 - 0.1 * sin(t * 9)], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], _hipY: 0.012 * abs(sin(t * 9)), _head: [-0.1, 0, 0], _face: { happy: 1 } }),
     pout: () => ({ leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _eyes: [2.2, -0.6], _head: [0.1, 0.3, -0.1], _face: { sad: 0.45, angry: 0.25, ou: 0.5 } }),
+    handsup: t => ({ leftUpperArm: [0, 0, 1.38], rightUpperArm: [0, 0, -1.38], leftLowerArm: [0, -0.2, 0], rightLowerArm: [0, 0.2, 0], leftHand: [0, 0, 0.2], rightHand: [0, 0, -0.2], spine: plus('spine', -0.06), _head: [-0.05, 0, 0], _face: { surprised: 0.8 } }),
+    eep: t => { const j = Math.exp(-t * 1.6); return { leftUpperArm: [-0.4, -0.35, -1.2], rightUpperArm: [-0.4, 0.35, 1.2], leftLowerArm: [0, -2.2, 0], rightLowerArm: [0, 2.2, 0], leftShoulder: [0, 0, 0.3], rightShoulder: [0, 0, -0.3], spine: plus('spine', -0.12 - 0.08 * j), _hipY: 0.03 * j * abs(sin(t * 14)), _head: [-0.08, 0.25 * sin(t * 6) * j, 0.06], _eyes: [1.5 * sin(t * 5), 0], _face: { surprised: 1 } }; },
     test: () => window.WIZRA_GEST || {},                                           // test hook: try a pose from the console
     jolt: t => ({ spine: plus('spine', -0.14 * Math.exp(-t * 2.5)), leftShoulder: [0, 0, 0.25 * Math.exp(-t * 2.5)], rightShoulder: [0, 0, -0.25 * Math.exp(-t * 2.5)], _head: [-0.12 * Math.exp(-t * 2.5), 0, 0] }),
   };
   const REST = n => CUR[n] || [0, 0, 0];
-  const WIDE = { peace: 0.24, oksign: 0.24, fox: 0.24, fingerheart: 0.24, crossed: 0.24, flipoff: 0.24, fingerwave: 0.24, wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, clap: 0.2, facepalm: 0.15, think: 0.15, crossarms: 0.15, hips: 0.2, cheer: 0.34, handsup: 0.3, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
+  const WIDE = { peace: 0.24, oksign: 0.24, fox: 0.24, fingerheart: 0.24, crossed: 0.24, flipoff: 0.24, fingerwave: 0.24, wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, clap: 0.2, handsup: 0.34, eep: 0.2, facepalm: 0.15, think: 0.15, crossarms: 0.15, hips: 0.2, cheer: 0.34, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
   let touchedBones = [], gestureZoom = 0;
   const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0, eyes: [0, 0] };
   const hipsNode = B('hips'), hipY0 = hipsNode ? hipsNode.position.y : 0;
