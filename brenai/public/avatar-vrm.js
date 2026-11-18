@@ -516,7 +516,7 @@ export async function create(url) {
       const held = Math.max(rt.ov[name] * 1.6, rt.carryW[key] || 0), wgt = Math.min(1, held), e = wgt * wgt * (3 - 2 * wgt), reading = name === 'read' && rt.ov.read > (rt.carryW.book || 0);
       if (ATTACH[name] && handN && handRaw) { // held properly: fixed in the hand, turning with it
         handN.getWorldQuaternion(tmpQ2); handRaw.getWorldPosition(tmpA); tmpA.add(tmpB.set(...ATTACH[name][0]).applyQuaternion(tmpQ2)); tmpQ2.multiply(ATTACH[name][1]);
-        if (name === 'sip') tmpQ2.setFromEuler(tmpE.set(-0.6 * Math.min(1, rt.ov.sip), vrm.scene.rotation.y, 0, 'YXZ'));   // a cup stays upright whatever her wrist does, and tips toward her when she drinks
+        if (name === 'sip') { const yw = vrm.scene.rotation.y; tmpQ2.setFromEuler(tmpE.set(0.6 * Math.min(1, rt.ov.sip), yw + Math.PI, 0, 'YXZ')); tmpA.x += 0.05 * Math.cos(yw); tmpA.z -= 0.05 * Math.sin(yw); }   // a cup stays upright whatever her wrist does, and tips toward her when she drinks
         o.position.lerpVectors(rp, tmpA, e); tmpQ.setFromEuler(rr); o.quaternion.copy(tmpQ).slerp(tmpQ2, e); continue;
       }
       palmR.getWorldPosition(tmpA); if (reading) { palmL.getWorldPosition(tmpB); tmpA.add(tmpB).multiplyScalar(0.5); }
