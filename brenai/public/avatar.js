@@ -199,22 +199,27 @@
       if (!fingers.has(e.pointerId)) return; fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (fingers.size === 2 && R.zoom) { const d = spread(); if (pinch > 0) R.zoom((pinch - d) / Math.max(120, stage.clientWidth) * 1.6); pinch = d; }
     });
-    stage.addEventListener('pointerdown', e => { if (multi) return; const p = at(e); down = { ...p, sx: p.x, t: now(), path: 0, pet: 0 }; try { stage.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
+    const onHerAt = p => Math.abs(p.x - 100) < 58 && p.y > 28 && p.y < 330;
+    stage.addEventListener('pointerdown', e => { if (multi) return; const p = at(e), inRoom = !!(R.fp && R.fp()); down = { ...p, sx: p.x, t: now(), path: 0, pet: 0, look: inRoom && !onHerAt(p), cx: e.clientX, cy: e.clientY, px: 0 };
+      if (inRoom && document.activeElement && document.activeElement.blur) document.activeElement.blur();   // so the keys walk you instead of typing
+      try { stage.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
     stage.addEventListener('pointermove', e => {
       const p = at(e); pointerLook = { x: (p.x - 100) / 30, y: (p.y - 100) / 34 }; pointerLookUntil = now() + 1500;
       if (!down || multi) return;
+      if (down.look) { const mx = e.clientX - down.cx, my = e.clientY - down.cy; down.cx = e.clientX; down.cy = e.clientY; down.px += Math.hypot(mx, my); if (down.px > 6) R.look(mx, my); return; } // visiting: dragging turns your head
       const d = Math.hypot(p.x - down.x, p.y - down.y); down.path += d;
       if (p.y < 92 && now() - down.t > 250) { down.pet += d; if (down.pet > 30) react('pet'); }
       down.x = p.x; down.y = p.y;
     });
     const up = e => {
       if (!down || multi) { down = null; return; } const p = at(e), d = down, ms = now() - d.t, dx = p.x - d.sx; down = null;
+      const point = () => { const hit = R.pick(e); if (hit) { const what = R.direct(hit); if (what) { show('surprised', 500); doGesture('nod', 1.2); if (opts.onTouch) opts.onTouch(what); } } };
+      if (d.look) { if (d.px <= 8 && R.pick) point(); return; }
       if (Math.abs(dx) > 55 && ms < 380) return touched('swat', Math.sign(dx));
       if (d.pet > 60) return touched('petEnd');
       if (d.path > 25) return;
       // a tap that is not on her: it may be on something in her room, and then she goes and deals with it
-      const onHer = Math.abs(p.x - 100) < 58 && p.y > 28 && p.y < 330;
-      if (!onHer && R.pick) { const hit = R.pick(e); if (hit) { const what = R.direct(hit); if (what) { show('surprised', 500); doGesture('nod', 1.2); if (opts.onTouch) opts.onTouch(what); } } return; }
+      if (!onHerAt(p) && R.pick) { point(); return; }
       const t = now(); taps.push(t); while (taps.length && t - taps[0] > 2500) taps.shift();
       if (taps.length >= 4) { taps.length = 0; return touched('spam'); }
       if (Math.hypot(p.x - 100, p.y - 108) < 9) return touched('boop');
@@ -284,6 +289,8 @@
       setState(kind) { state = STATE[kind] ? kind : ''; if (R.glow) R.glow(state); },
       // her routine (3D model only): what she is busy with right now, in words, and a way to start something
       activity() { return R.activity ? R.activity() : ''; },
+      // visiting in person (3D model only): 'dorm' or 'house' puts you in the room in first person, '' takes you home
+      visit(name) { if (R.visit) R.visit(name || ''); return !!R.visit; }, canVisit() { return !!R.visit; },
       routine(name) { if (R.doActivity) R.doActivity(name); },
       // swap the picture live; null goes back to the cartoon
       setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); askThumb(); if (R.glow) R.glow(state); if (opts.onRenderer) opts.onRenderer(); },

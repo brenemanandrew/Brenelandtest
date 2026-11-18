@@ -317,6 +317,24 @@
   #panel .actrow button { width:38px; height:38px; padding:0; border-radius:50%; border:0; background:rgba(255,255,255,.14); box-shadow:none; }
   #newChat { font-family:"Fredoka",sans-serif; font-weight:700; border:2px solid rgba(255,255,255,.5); padding:10px 20px; margin-top:16px; box-shadow:0 4px 0 rgba(0,0,0,.25); cursor:pointer; }
   #ring .seg b { font-family:"Fredoka",sans-serif; font-weight:700; font-size:13px; } #ring .seg small { font-family:"Patrick Hand",sans-serif; font-size:13.5px; }
+  /* getting together: the visit button and its little menu, her invitation, and the first-person view once you are there */
+  #visitBtn { position:absolute; left:-8px; top:-8px; width:32px; height:32px; border-radius:50%; border:0; background:#fff; color:#6a3aa8; font-size:16px; line-height:1; padding:0; cursor:pointer; z-index:4; box-shadow:0 3px 10px rgba(0,0,0,.3); }
+  body.calling #visitBtn, body.big #visitBtn, body.fp #visitBtn, body.fp #bigBtn, body.fp #outSign { display:none; }
+  #visitMenu, #inviteCard { position:fixed; left:12px; top:calc(var(--av) + 22px); z-index:14; max-width:min(320px, calc(100vw - 24px)); padding:12px 14px; border-radius:18px; background:#fff; color:#3a2a5c; box-shadow:0 10px 30px rgba(0,0,0,.45); font-family:"Patrick Hand", "Fredoka", sans-serif; font-size:17px; line-height:1.25; }
+  #visitMenu[hidden], #inviteCard[hidden], #fpBar { display:none; }
+  #visitMenu b, #inviteCard b { display:block; font-family:"Bangers", "Fredoka", sans-serif; font-weight:400; font-size:20px; letter-spacing:.04em; color:#6a3aa8; margin-bottom:4px; }
+  #visitMenu button, #inviteCard button, #fpBar button { font:inherit; font-family:"Fredoka", sans-serif; font-size:14px; font-weight:600; border:0; border-radius:999px; padding:8px 14px; margin:8px 6px 0 0; cursor:pointer; background:var(--grad, linear-gradient(135deg,#a855f7,#ec4899)); color:#fff; box-shadow:0 3px 8px rgba(0,0,0,.25); }
+  #inviteCard button.no, #fpBar button.quiet { background:#ece6f7; color:#5a4a7c; }
+  #visitMenu .meter { height:10px; border-radius:6px; background:#ece6f7; overflow:hidden; margin-top:8px; } #visitMenu .meter i { display:block; height:100%; background:linear-gradient(90deg,#a855f7,#ec4899); }
+  body.fp #stageWrap { position:fixed; left:0; top:0; transform:none; width:100vw; height:100dvh; z-index:1; }
+  body.fp #stage { border:0; border-radius:0; box-shadow:none; cursor:grab; }
+  body.fp #brainBtn { right:12px; top:12px; bottom:auto; left:auto; }
+  body.fp #fpBar { display:flex; align-items:center; position:fixed; left:10px; top:10px; z-index:6; }
+  body.fp #fpBar button { margin:0 6px 0 0; white-space:nowrap; padding:7px 12px; } #fpHint { position:fixed; left:50%; bottom:calc(var(--band, 72px) + 86px); transform:translateX(-50%); width:max-content; max-width:92vw; text-align:center; padding:6px 14px; border-radius:999px; background:rgba(20,10,45,.6); color:#fff; font-family:"Patrick Hand", "Fredoka", sans-serif; font-size:16px; transition:opacity 1s; pointer-events:none; }
+  body.fp #herSide { top:44px; }
+  body.fp #herSide { z-index:2; pointer-events:none; } body.fp #bottom { pointer-events:none; } body.fp #meBox { pointer-events:auto; } body.fp #bar { position:relative; z-index:3; }
+  body.fp #logHead, body.fp:not(.fplog) #logWrap { visibility:hidden; } body.fp.fplog #logWrap { z-index:2; }
+  body.fp #inviteCard, body.fp #visitMenu { display:none; }
 </style>
 </head>
 <body>
@@ -331,6 +349,7 @@
         <div class="board"><b>WIZRA IS OUT</b><span>Back by <i id="outBack">soon</i></span></div>
         <button id="callBtn" title="Video call her"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button>
       </div>
+      <button id="visitBtn" title="Get together">&#127968;</button>
       <button id="bigBtn" title="Expand / shrink">&#10530;</button>
       <button id="brainBtn" title="Her settings">&#129504;</button>
     </div></div>
@@ -360,6 +379,9 @@
   </div>
 </div>
 <div id="stageBack"></div>
+<div id="visitMenu" hidden></div>
+<div id="inviteCard" hidden></div>
+<div id="fpBar"><button id="fpLeave">Head home</button><button id="fpLog" class="quiet">Chat log</button><span id="fpHint"></span></div>
 <!-- the video call: a phone on the screen with her on it. Nothing is written during a call; you talk, she answers out loud. -->
 <div id="call">
   <div id="phone">
@@ -379,7 +401,7 @@
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 // Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
-const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); }, onThumb: url => setHerThumb(url), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
+const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); }, onThumb: url => setHerThumb(url), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -461,7 +483,7 @@ async function load() {
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
   for (const e of s.log) e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text);
-  setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); if (s.depart === 'say') depart();
+  setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); setPlace(s); if (s.depart === 'say') depart();
 }
 function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
@@ -504,9 +526,48 @@ setInterval(async () => { // keep time with the server: is she due back, has the
   if (document.hidden || $('login').style.display === 'grid') return;
   try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
     if (phoneCall.on) return;
-    if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } }
+    if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } setPlace(d); }
   } catch {}
 }, 15000);
+
+// ---------- getting together ----------
+// At 100 relationship points you can invite her over to your house or go to her dorm (and she can ask you). The server
+// keeps where you both are; here the avatar's stage becomes the whole screen and you look through your own eyes.
+let visitInfo = { place: '', canVisit: false, rapport: 0, visitAt: 100, invite: '' }, shownPlace = '', hintTimer = 0;
+function syncPlace(arriving) {
+  const want = visitInfo.place && avatar.canVisit() && !away ? visitInfo.place : '';
+  if (want === shownPlace) return; shownPlace = want;
+  document.body.classList.toggle('fp', !!want); document.body.classList.remove('fplog', 'big'); $('visitMenu').hidden = true;
+  avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return');
+  if (want) { const h = $('fpHint'); h.textContent = 'Drag to look. Tap the floor to walk. Tap ' + (want === 'house' ? 'the couch to sit, the TV to switch it on.' : 'her bed to sit.'); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => { h.style.opacity = 0; }, 9000); }
+}
+function setPlace(d, arriving) {
+  if (!d || d.place === undefined) return;
+  const was = visitInfo.place; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 100, invite: d.invite || '' };
+  if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
+  showInvite();
+}
+function showInvite() {
+  const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite; c.hidden = !inv; if (!inv || c.dataset.for === inv) { if (!inv) c.dataset.for = ''; return; }
+  c.dataset.for = inv; c.textContent = '';
+  const yes = el('button', { textContent: inv === 'dorm' ? 'Go over' : 'Sure, come over' }), no = el('button', { className: 'no', textContent: 'Not now' });
+  c.append(el('b', { textContent: inv === 'dorm' ? 'She invited you over' : 'She wants to come over' }), inv === 'dorm' ? 'Wizra is asking you over to her dorm room.' : 'Wizra is asking to come hang out at your place.', el('div', {}, yes, no));
+  yes.onclick = async () => { try { const r = await api('/api/visit', { place: inv }); const d = await r.json(); if (r.ok) addSys(inv === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.'); setPlace(d, true); } catch {} };
+  no.onclick = async () => { c.hidden = true; try { const r = await api('/api/visit', { decline: true }); setPlace(await r.json()); } catch {} };
+}
+$('visitBtn').onclick = e => {
+  e.stopPropagation(); const m = $('visitMenu'); if (!m.hidden) { m.hidden = true; return; }
+  m.textContent = ''; m.hidden = false; const v = visitInfo;
+  if (!avatar.canVisit()) return m.append(el('b', { textContent: 'Get together' }), 'This needs her 3D model. Add it under her settings, Avatar.');
+  if (away) return m.append(el('b', { textContent: 'Get together' }), 'She is out right now.');
+  if (!v.canVisit) { const bar = el('div', { className: 'meter' }, el('i', {})); bar.firstChild.style.width = Math.min(100, v.rapport / v.visitAt * 100) + '%'; return m.append(el('b', { textContent: 'Not yet' }), `Hanging out in person opens up at ${v.visitAt} relationship points. You two are at ${v.rapport}.`, bar); }
+  const a = el('button', { textContent: 'Invite her over' }), b = el('button', { textContent: 'Go to her dorm' });
+  a.onclick = () => { m.hidden = true; send('Want to come over to my place?', 'house'); }; b.onclick = () => { m.hidden = true; send('Can I come over to yours?', 'dorm'); };
+  m.append(el('b', { textContent: 'Get together' }), 'Ask her. She may say no if she is not up for it.', el('div', {}, a, b));
+};
+document.addEventListener('click', e => { if (!$('visitMenu').hidden && !$('visitMenu').contains(e.target)) $('visitMenu').hidden = true; });
+$('fpLog').onclick = () => { document.body.classList.toggle('fplog'); log.scrollTop = log.scrollHeight; };
+$('fpLeave').onclick = async () => { const was = visitInfo.place; try { const r = await api('/api/visit', { place: '' }); const d = await r.json(); if (was) addSys(was === 'dorm' ? 'You headed home.' : 'Wizra headed home.'); setPlace(d); } catch {} };
 
 // Her reply is decided first, then typed out: nothing is rearranged after it appears. Speech starts with the typing.
 function typeOut(body, text) {
@@ -552,11 +613,12 @@ async function readReply(r, body, beforeType) {
       await typeOut(body, full); clearInterval(flap);
       if (ev.away && !ev.returned) { await new Promise(ok => setTimeout(ok, 1400)); addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); plan = null; setPresence(ev.away, null, false); }
       else if (ev.glow !== undefined && !ev.returned) { glow = ev.glow; avatar.setState(glow ? glow.kind : ''); }
+      if (ev.place !== undefined) { if (ev.place && ev.place !== visitInfo.place) addSys(ev.place === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.'); setPlace(ev, true); }
     }
   }
 }
 
-async function send(quick) {
+async function send(quick, visit) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
@@ -565,7 +627,7 @@ async function send(quick) {
   addLine('me', text); bubble('me', text);
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   try {
-    const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc' });
+    const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     await readReply(r, body);
   } catch (e) {

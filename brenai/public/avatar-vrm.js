@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { buildPlaces, cel } from './places.js';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
 const EXPR = {
@@ -129,10 +130,11 @@ export async function create(url) {
   // furniture, built to fit wherever her hips and heels ended up
   const wp = n => { const v = new THREE.Vector3(); const bone = B(n); if (bone) bone.getWorldPosition(v); return v; };
   const hip = wp('hips'), feet = wp('leftFoot').add(wp('rightFoot')).multiplyScalar(0.5);
-  const floorY = hip.y - 0.5, mat = c => new THREE.MeshLambertMaterial({ color: c });
+  const floorY = hip.y - 0.5, kit = cel(THREE), mat = kit.toon;
+  const room = new THREE.Group(); scene.add(room); // the furniture she has always had: it is her dorm room's
   let TAG = 'chair'; const tagged = []; // everything you can tap to send her to
-  const tag = (m, t = TAG) => { m.traverse(o => { if (o.isMesh) { o.userData.tag = t; tagged.push(o); } }); return m; };
-  const box = (w, h, d, x, y, z, c, rx = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.rotation.x = rx; scene.add(m); return tag(m); };
+  const tag = (m, t = TAG, where = 'dorm') => { m.traverse(o => { if (o.isMesh) { o.userData.tag = t; o.userData.place = where; tagged.push(o); } }); return m; };
+  const box = (w, h, d, x, y, z, c, rx = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.rotation.x = rx; if (Math.max(w, h, d) > 0.24) kit.outline(m); room.add(m); return tag(m); };
   const seatTop = hip.y - 0.1;
   box(0.74, seatTop - floorY - 0.12, 0.72, 0, (seatTop - 0.12 + floorY) / 2, hip.z + 0.06, '#3a2148');           // chair body
   box(0.6, 0.14, 0.62, 0, seatTop - 0.07, hip.z + 0.1, '#5b3570');                                               // seat cushion
@@ -141,10 +143,9 @@ export async function create(url) {
   const tableTop = feet.y - 0.1, tableZ = feet.z + 0.1; TAG = 'table';
   box(0.8, 0.05, 0.5, 0, tableTop - 0.025, tableZ, '#3b2a1c');                                            // table top
   for (const [x, z] of [[-0.35, -0.2], [0.35, -0.2], [-0.35, 0.2], [0.35, 0.2]]) box(0.05, tableTop - floorY - 0.05, 0.05, x, (tableTop - 0.05 + floorY) / 2, tableZ + z, '#2a1d14');
-  const rug = new THREE.Mesh(new THREE.CircleGeometry(1.25, 40), mat('#251a30')); rug.rotation.x = -Math.PI / 2; rug.position.set(0, floorY, (hip.z + feet.z) / 2); scene.add(rug); tag(rug, 'floor');
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(1.25, 40), mat('#251a30')); rug.rotation.x = -Math.PI / 2; rug.position.set(0, floorY, (hip.z + feet.z) / 2); room.add(rug); tag(rug, 'floor');
 
   // ---- the rest of her room: a floor, a bookshelf to the left and a little counter with a kettle to the right ----
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(3.4, 48), mat('#2b2038')); floor.rotation.x = -Math.PI / 2; floor.position.set(0, floorY - 0.004, hip.z); scene.add(floor); tag(floor, 'floor');
   const backZ = hip.z - 1.25;                                    // the line the shelf and counter stand on
   const SHELF = { x: -1.3, z: backZ }, COUNTER = { x: 1.45, z: backZ + 0.05 }; TAG = 'shelf';
   box(0.9, 1.7, 0.04, SHELF.x, floorY + 0.85, SHELF.z - 0.13, '#33241a');                                         // shelf back
@@ -154,13 +155,13 @@ export async function create(url) {
   for (let row = 0; row < 4; row++) { let x = SHELF.x - 0.4, n = 0; while (x < SHELF.x + 0.36) { const wd = 0.03 + ((row * 7 + n * 5) % 4) * 0.009, ht = 0.25 + ((row * 3 + n * 11) % 5) * 0.022; if (!(row === 2 && n === 4)) box(wd, ht, 0.2, x + wd / 2, floorY + 0.07 + row * 0.41 + ht / 2, SHELF.z, SPINES[(row * 3 + n) % SPINES.length]); x += wd + 0.006; n++; } }
   TAG = 'counter';
   box(0.7, 0.9, 0.45, COUNTER.x, floorY + 0.45, COUNTER.z, '#3a2148'); box(0.76, 0.04, 0.5, COUNTER.x, floorY + 0.92, COUNTER.z, '#d9cfe6'); // counter + top
-  const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.19, 20), mat('#c9ccd6')); kettle.position.set(COUNTER.x + 0.15, floorY + 1.035, COUNTER.z); scene.add(kettle); tag(kettle, 'counter');
-  const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 16), mat('#6b3a2a')); jar.position.set(COUNTER.x - 0.2, floorY + 1.01, COUNTER.z - 0.05); scene.add(jar);
+  const kettle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.085, 0.19, 20), mat('#c9ccd6')); kettle.position.set(COUNTER.x + 0.15, floorY + 1.035, COUNTER.z); room.add(kettle); tag(kettle, 'counter');
+  const jar = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 16), mat('#6b3a2a')); jar.position.set(COUNTER.x - 0.2, floorY + 1.01, COUNTER.z - 0.05); room.add(jar);
 
   // the door she leaves and comes back by, out to the right
   const DOOR = [2.75, hip.z + 0.55];
   TAG = 'door'; box(0.08, 2.05, 1.0, 3.05, floorY + 1.02, DOOR[1], '#3b2a1c'); box(0.1, 2.15, 0.08, 3.04, floorY + 1.07, DOOR[1] - 0.54, '#2a1d14'); box(0.1, 2.15, 0.08, 3.04, floorY + 1.07, DOOR[1] + 0.54, '#2a1d14');
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), mat('#d9b25a')); knob.position.set(2.99, floorY + 1.0, DOOR[1] + 0.36); scene.add(knob);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 12, 10), mat('#d9b25a')); knob.position.set(2.99, floorY + 1.0, DOOR[1] + 0.36); room.add(knob);
   // flushed cheeks: two soft discs on her face, shown when she blushes (or has been drinking)
   const rawHead = vrm.humanoid.getRawBoneNode('head');
   const blushMat = new THREE.MeshBasicMaterial({ color: '#ff5f8f', transparent: true, opacity: 0, depthTest: false });
@@ -171,9 +172,12 @@ export async function create(url) {
 
   // a floor lamp behind the chair that comes on as it gets dark
   TAG = 'lamp'; box(0.035, 1.5, 0.035, 0.75, floorY + 0.75, backZ + 0.1, '#1c1626'); box(0.3, 0.03, 0.3, 0.75, floorY + 0.015, backZ + 0.1, '#1c1626');
-  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 0.26, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#ffd9a0', side: THREE.DoubleSide })); shade.position.set(0.75, floorY + 1.58, backZ + 0.1); scene.add(shade); tag(shade, 'lamp');
+  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 0.26, 20, 1, true), new THREE.MeshBasicMaterial({ color: '#ffd9a0', side: THREE.DoubleSide })); shade.position.set(0.75, floorY + 1.58, backZ + 0.1); room.add(shade); tag(shade, 'lamp');
   const lampLight = new THREE.PointLight('#ffc27a', 0, 5, 1.6); lampLight.position.copy(shade.position); scene.add(lampLight);
   let lampOn = null; // null = follows the hour; true/false once you have tapped it
+  // the walls, windows and the rest of her dorm, and your house (see places.js)
+  const places = buildPlaces(THREE, { cel: kit, floorY, hip, feet, seatTop, tableTop, tableZ, backZ, SHELF, COUNTER, DOOR, tagged });
+  scene.add(places.dorm, places.house);
 
   // ---- props: they rest on the furniture and go to her hands when she uses them ----
   const group = (...kids) => { const g = new THREE.Group(); g.add(...kids); scene.add(g); return g; };
@@ -183,7 +187,7 @@ export async function create(url) {
   const phone = group(slab(0.068, 0.138, 0.009, '#15121c'), screen);
   const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.032, 0.09, 20), mat('#f0e8f8')), handle = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.007, 8, 16), mat('#f0e8f8')); handle.position.x = 0.045;
   const mug = group(cup, handle);
-  tag(book, 'book'); tag(phone, 'phone'); tag(mug, 'mug');
+  tag(book, 'book', ''); tag(phone, 'phone', ''); tag(mug, 'mug', '');
   const REST_AT = { // where each prop sits when she is not holding it: [position, rotation]
     book: [new THREE.Vector3(0.24, tableTop + 0.012, feet.z - 0.08), new THREE.Euler(-Math.PI / 2, 0, 0.4)],
     bookShelf: [new THREE.Vector3(SHELF.x - 0.19, floorY + 0.07 + 2 * 0.41 + 0.1, SHELF.z + 0.02), new THREE.Euler(0, Math.PI / 2, 0)], // its gap on the shelf
@@ -254,7 +258,7 @@ export async function create(url) {
   function routine(s) {
     if (rt.act === 'call') return callFrame(s);
     if (rt.act === 'gone') return;                                               // the chair is empty
-    const now = performance.now(), dt = s.dt, attending = (s.talking || s.faceName === 'thinking') && !rt.leaving;
+    const now = performance.now(), dt = s.dt, attending = (s.talking || s.faceName === 'thinking') && !rt.leaving; rt.attending = attending;
     // on her own schedule
     if (rt.act === 'sit' && !attending && now > rt.nextAt && !window.WIZRA_STILL) {
       const r = Math.random(), onTable = rt.bookHome === 'table';
@@ -319,17 +323,23 @@ export async function create(url) {
     vrm.scene.rotation.y = rt.yaw * k;
     rt.zoom = 0.3 * k;
   }
-  function lampTick(dt) { const want = (lampOn === null ? night > 0.45 : lampOn) ? 1 : 0; lampLight.intensity += (want * 2.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 2.4, 0.36 + 0.49 * lampLight.intensity / 2.4, 0.32 + 0.31 * lampLight.intensity / 2.4); }
+  function lampTick(dt) { const want = (lampOn === null ? night > 0.45 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
   // ---- tap to direct: you tap a thing in her room, she goes and deals with it ----
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pick(e) {
     const r = renderer.domElement.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    ray.setFromCamera(ndc, camera); const hit = ray.intersectObjects(tagged, false)[0];
+    ray.setFromCamera(ndc, camera); const hit = ray.intersectObjects(pickable, false)[0];
     return hit ? { tag: hit.object.userData.tag, x: hit.point.x, z: hit.point.z } : null;
   }
   function direct(hit) { // returns what happened, in the words used for the silent note to her (or '' if nothing did)
-    const t = hit.tag; if (inCall) return ''; if (rt.act === 'gone' || rt.leaving) return t === 'lamp' ? (lampOn = !(lampLight.intensity > 1), '') : '';
-    if (t === 'lamp') { lampOn = !(lampLight.intensity > 1); return ''; }
+    const t = hit.tag; if (inCall) return '';
+    if (fp.on) { // you are in the room: the floor is where you walk, the seat is where you sit, the TV is yours to switch on
+      if (t === 'floor') { standUp(); fp.goal = [hit.x, hit.z]; return ''; }
+      const seat = places.seat[here]; if (t === seat.tag && (here === 'house' || rt.act !== 'up')) { fp.goal = null; fp.sit = seat; fp.x = seat.at[0]; fp.z = seat.at[1]; return here === 'house' ? 'yousit' : 'yousitbed'; }
+      if (t === 'tv') { places.tv.on = !places.tv.on; return places.tv.on ? 'tvon' : 'tvoff'; }
+    }
+    if (rt.act === 'gone' || rt.leaving) return t === 'lamp' ? (lampOn = !(lampLight.intensity > 0.7), '') : '';
+    if (t === 'lamp') { lampOn = !(lampLight.intensity > 0.7); return ''; }
     if (t === 'shelf') { const had = rt.bookHome === 'table'; startActivity(had ? 'returnbook' : 'fetchbook'); return 'pointshelf'; }
     if (t === 'counter') { startActivity('fetchdrink'); return 'pointcounter'; }
     if (t === 'chair') { if (rt.act !== 'up') return ''; startActivity('sit'); return 'pointchair'; }
@@ -397,7 +407,7 @@ export async function create(url) {
   const callLight = [1, 1, 1, 0]; let roomObjs = null, inCall = false;
   function call(on, sceneName) {
     if (!roomObjs) roomObjs = scene.children.filter(o => o !== vrm.scene && o !== backdrop && o !== target && !o.isLight);
-    inCall = !!on; for (const o of roomObjs) o.visible = !on; backdrop.visible = !!on; lampLight.visible = !on;
+    inCall = !!on; for (const o of roomObjs) o.visible = !on; if (!on) setPlace(here); backdrop.visible = !!on; lampLight.visible = !on;
     if (on) {
       const c = bdCanvas.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.clearRect(0, 0, 384, 704);
       const l = (BACKDROP[sceneName] || BACKDROP.street)(c, 384, 704); callLight.splice(0, 4, ...l); bdTex.needsUpdate = true;
@@ -426,8 +436,56 @@ export async function create(url) {
   const near = new THREE.Vector3(0, eye.y - 0.035, eye.z), far = new THREE.Vector3(0, (eye.y + floorY) / 2 + 0.05, (hip.z + feet.z) / 2);
   let zoomWant = Number(localStorage.getItem('brenai.zoom')) || 0, zoom = 0, camYaw = 0;
   const aim = new THREE.Vector3();
+  // ---- visiting: you are in the room with her and see it through your own eyes. Drag to look, tap the floor (or WASD) to walk. ----
+  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 };
+  let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0;
+  const mugDorm = REST_AT.mug[0].clone();
+  function setPlace(name) {
+    here = name === 'house' ? 'house' : 'dorm'; room.visible = places.dorm.visible = here === 'dorm'; places.house.visible = here === 'house';
+    pickable = tagged.filter(o => !o.userData.place || o.userData.place === here);
+    REST_AT.mug[0].copy(here === 'house' ? places.mugAt : mugDorm); lampLight.position.copy(here === 'house' ? places.lampAt : shade.position);
+  }
+  setPlace('dorm');
+  const seatHer = () => { if (rt.act === 'gone') return; if (rt.leaving) return vanish(); vanish(); rt.act = 'sit'; rt.nextAt = performance.now() + 15000; vrm.scene.visible = true; if (vrm.springBoneManager) vrm.springBoneManager.reset(); };
+  function visit(name) { // 'dorm' or 'house' = you are there in person; '' = back to seeing her from afar, in her own room
+    if (inCall) return;
+    if (!name) { const was = here; fp.on = false; fp.keys.clear(); places.tv.on = false; setPlace('dorm'); if (was !== 'dorm') seatHer(); camera.fov = 26; camera.updateProjectionMatrix(); return; }
+    if ((name === 'house') !== (here === 'house')) { setPlace(name); seatHer(); }
+    const [x, z] = places.spawn[here];
+    Object.assign(fp, { on: true, x, z, cx: x, cz: z, ch: places.eyeH, goal: null, sit: null, pitch: -0.06, yaw: Math.atan2(-x, hip.z + 0.3 - z) });
+    camera.fov = 62; camera.updateProjectionMatrix();
+  }
+  const standUp = () => { if (fp.sit) { fp.x = fp.sit.out[0]; fp.z = fp.sit.out[1]; fp.sit = null; } };
+  const free = (x, z) => {
+    const b = places.bounds[here], m = 0.3; if (x < b.x0 + m || x > b.x1 - m || z < b.z0 + m || z > b.z1 - m) return false;
+    for (const [x0, x1, z0, z1] of places.blocks[here]) if (x > x0 - 0.14 && x < x1 + 0.14 && z > z0 - 0.14 && z < z1 + 0.14) return false;
+    return !(vrm.scene.visible && rt.k > 0.5 && Math.hypot(x - rt.x, z - rt.z) < 0.5);   // not through her either
+  };
+  const MOVE = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
+  const typing = () => /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '');
+  const keyDown = e => { if (!fp.on || typing() || e.ctrlKey || e.metaKey || e.altKey) return; const k = e.key.toLowerCase(); if (MOVE.has(k)) { fp.keys.add(k); e.preventDefault(); } };
+  const keyUp = e => fp.keys.delete(String(e.key).toLowerCase()), keysOff = () => fp.keys.clear();
+  window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp); window.addEventListener('blur', keysOff);
+  function walkYou(dt) {
+    const K = fp.keys, f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), sd = (K.has('d') ? 1 : 0) - (K.has('a') ? 1 : 0);
+    fp.yaw -= ((K.has('arrowright') ? 1 : 0) - (K.has('arrowleft') ? 1 : 0)) * dt * 1.9;
+    let mx = 0, mz = 0; const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw);
+    if (f || sd) { fp.goal = null; standUp(); mx = fx * f - fz * sd; mz = fz * f + fx * sd; }
+    else if (fp.goal) { const dx = fp.goal[0] - fp.x, dz = fp.goal[1] - fp.z, d = Math.hypot(dx, dz); if (d < 0.08) fp.goal = null; else { mx = dx / d; mz = dz / d; } }
+    const len = Math.hypot(mx, mz);
+    if (len > 0.01) {
+      const st = 1.45 * dt / len, nx = fp.x + mx * st, nz = fp.z + mz * st;
+      if (free(nx, nz)) { fp.x = nx; fp.z = nz; } else if (free(nx, fp.z) && Math.abs(mx) > 0.2 * len) fp.x = nx; else if (free(fp.x, nz) && Math.abs(mz) > 0.2 * len) fp.z = nz; else fp.goal = null;
+      fp.bob += dt * 9;
+    }
+    const k = Math.min(1, dt * (fp.sit ? 4 : 10)); fp.cx += (fp.x - fp.cx) * k; fp.cz += (fp.z - fp.cz) * k;
+    fp.ch += ((fp.sit ? fp.sit.h : places.eyeH) - fp.ch) * Math.min(1, dt * 4);
+    const cp = Math.cos(fp.pitch); camera.position.set(fp.cx, fp.ch + (len > 0.01 ? 0.012 * Math.sin(fp.bob) : 0), fp.cz);
+    aim.set(fp.cx + Math.sin(fp.yaw) * cp, camera.position.y + Math.sin(fp.pitch), fp.cz + Math.cos(fp.yaw) * cp); camera.lookAt(aim);
+  }
   function placeCamera(dt) {
     if (inCall) return;                                                          // the call frames her itself
+    if (fp.on) return walkYou(dt);
     const want = Math.max(document.body.classList.contains('big') ? zoomWant : 0, gestureZoom, rt.zoom);
     zoom += (want - zoom) * Math.min(1, dt * 6);
     const e = zoom * zoom * (3 - 2 * zoom); camYaw = 0.95 * Math.min(1, e * 2.4); const up = rt.k || 0; // on her feet: pull back, lift and follow her so she stays in view
@@ -443,7 +501,7 @@ export async function create(url) {
   const w = {}; for (const n of NAMES) w[n] = 0;
   let size = '', thumbCb = null;
   const v3 = new THREE.Vector3();
-  const project = (x, y, z) => { const r = renderer.domElement.getBoundingClientRect(); v3.set(x, y, z).project(camera); return { x: r.left + (v3.x + 1) / 2 * r.width, y: r.top + (1 - v3.y) / 2 * r.height }; };
+  const project = (x, y, z) => { const r = renderer.domElement.getBoundingClientRect(); v3.set(x, y, z).project(camera); return { x: r.left + (v3.x + 1) / 2 * r.width, y: r.top + (1 - v3.y) / 2 * r.height, behind: v3.z > 1 }; };
   const UNIT = 0.0027; // metres per puppet-space unit (her face is about 80 units tall there)
 
   return {
@@ -455,10 +513,14 @@ export async function create(url) {
     doActivity(name) { startActivity(name); },
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,
+    // visiting (see visit above): where you are, whether you are seeing through your own eyes, and turning your head
+    visit, place: () => here, fp: () => fp.on,
+    look(dx, dy) { if (!fp.on) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
     zoom(d) { if (inCall || !document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
     locate(e) { // screen -> puppet space, measured from her eye line
       const c = project(eye.x, eye.y, eye.z), up = project(eye.x, eye.y + 0.1, eye.z), k = (c.y - up.y) / 0.1 || 1;
+      if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
       return { x: 100 + (e.clientX - c.x) / k / UNIT, y: 100 + (e.clientY - c.y) / k / UNIT };
     },
     draw(s) {
@@ -475,9 +537,15 @@ export async function create(url) {
       placeCamera(s.dt);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
-      if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; }
-      const facing = rt.stand > 0.5 ? 0 : camYaw * 0.55; // seated she turns her head to you; on her feet her whole body does
-      const roll = -s.rot * Math.PI / 180 * 1.6, yaw = s.tx * 0.045 + (rt.gazeProp ? 0 : s.look.x * 0.045 + facing) + rt.head[1], pitch = s.ty * 0.03 + (rt.gazeProp ? 0 : s.look.y * 0.03) + (1 - s.sq) * 1.5 + rt.head[0];
+      const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking
+      if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else if (watching) target.position.copy(places.tv.at); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; }
+      let facing = rt.stand > 0.5 ? 0 : camYaw * 0.55, tip = 0; // seated she turns her head to you; on her feet her whole body does
+      if (fp.on) { // you could be anywhere in the room: she turns as far as a neck goes, and looks up if you are standing over her
+        const dx = camera.position.x - eye.x, dz = camera.position.z - eye.z, off = Math.atan2(dx, dz) - vrm.scene.rotation.y, a = Math.atan2(Math.sin(off), Math.cos(off));
+        const wantY = watching ? 0 : Math.max(-1.05, Math.min(1.05, a)) * (rt.stand > 0.5 ? 0.3 : 0.62), wantP = watching ? 0 : Math.max(-0.3, Math.min(0.3, -Math.atan2(camera.position.y - eye.y, Math.hypot(dx, dz)) * 0.5));
+        faceYaw += (wantY - faceYaw) * Math.min(1, s.dt * 4); facePitch += (wantP - facePitch) * Math.min(1, s.dt * 4); facing = faceYaw; tip = facePitch;
+      }
+      const roll = -s.rot * Math.PI / 180 * 1.6, yaw = s.tx * 0.045 + (rt.gazeProp ? 0 : s.look.x * 0.045 + facing) + rt.head[1], pitch = s.ty * 0.03 + (rt.gazeProp ? 0 : s.look.y * 0.03 + tip) + (1 - s.sq) * 1.5 + rt.head[0];
       const drift = rt.glow === 'tipsy' ? 0.07 * Math.sin(s.t / 900) : rt.glow === 'high' ? 0.05 * Math.sin(s.t / 2100) : 0; // a slow loll of the head
       if (head) head.rotation.set(base.head[0] + pitch * 0.6 + gx.head[0] + body[1] + (rt.glow === 'high' ? 0.03 * Math.sin(s.t / 1700) : 0), yaw * 0.6 + gx.head[1] + body[2], roll * 0.6 + gx.head[2] + body[3] + drift);
       if (neck) neck.rotation.set(CUR.neck[0] + pitch * 0.4, yaw * 0.4, roll * 0.4);
@@ -486,15 +554,15 @@ export async function create(url) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY;
       vrm.update(s.dt); // spring bones: hair and clothes swing with the head
-      placeProps(); lampTick(s.dt);
+      placeProps(); lampTick(s.dt); places.tick(night, s.t);
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();
       const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;
       // the close camera stays on her face wherever she goes
       head.getWorldPosition(tmpA); tmpA.y += eyeUp; eye.lerp(tmpA, Math.min(1, s.dt * 8)); near.set(eye.x, eye.y - 0.035, eye.z);
       renderer.render(scene, camera);
-      if (thumbCb && zoom < 0.03 && rt.act === 'sit' && rt.stand < 0.01 && !rt.glow && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
+      if (thumbCb && !fp.on && zoom < 0.03 && rt.act === 'sit' && rt.stand < 0.01 && !rt.glow && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
     },
-    dispose() { clearInterval(dayTimer); el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
+    dispose() { clearInterval(dayTimer); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', keysOff); el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
   };
 }

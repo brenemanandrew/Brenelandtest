@@ -135,3 +135,12 @@ export function callNote(a, user) {
 }
 export const HANGUP = /\b(talk to (you|ya) (later|soon|tomorrow|tonight)|see (you|ya) (later|soon|tonight|in a bit|when i'?m back)|i('?ve| have)? ?(gotta|got to|have to|need to|should) (go|run|get back|hang up)|bye+\b|good ?night|hanging up|later[.!]?\s*$)/i;
 export const COMING = /\b(on my way|heading (back|home|over)( now)?|coming (back|home|over)( now)?|i'?ll (come|head) (back|home|over)( now)?|be (right )?there( soon| in)?|leaving now|omw)\b/i;
+
+// ---- visiting. Her spoken words only: she invites him over to her dorm ('dorm'), or asks to come to his place ('house'). ----
+export function detectInvite(text) {
+  const said = String(text).replace(/\*[^*]*\*/g, ' ');
+  if (/\b(can'?t|cannot|don'?t|not|never|no way|won'?t)\b[^.!?]{0,30}\b(come|swing|stop|drop|head) (on )?(over|by)\b/i.test(said)) return '';
+  if (/\b(can|could|should|may|mind if|want me to|how about|what if) i (just )?(come|came|head|swing|stop|drop) (over|by)\b|\bi('ll| will| could| can| should| wanna| want to) (just )?(come|head|swing|stop|drop) (over|by)\b|\b(hang|chill) (out )?at (your|ur) (place|house)\b|\bcome (over )?to (your|ur) (place|house)\b/i.test(said)) return 'house';
+  if (/\b(come|swing|stop|drop|head) (on )?(over|by)\b|\b(hang|chill) (out )?(at|in) my (dorm|room|place)\b|\bcome (over )?to my (dorm|room|place)\b/i.test(said)) return 'dorm';
+  return '';
+}

@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
-import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING } from './away.mjs';
+import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -146,7 +146,7 @@ function authed(req) {
 // ---------- the model call ----------
 function systemBlocks() {
   // Stable first so the cache holds; this only changes when settings, the sheet or the notes change.
-  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') }];
+  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') }];
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -178,12 +178,14 @@ function setupText() {
 const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the bookshelf'], pointcounter: ['points her to the kettle', 'points her to the kettle'], pointchair: ['pats her chair for her to sit back down', 'pats her chair for her to sit back down'],
   pointfloor: ['beckons her over', 'beckons her over'], pointbook: ['taps her book', 'taps her book'], pointphone: ['taps her phone', 'taps her phone'], pointmug: ['taps her mug', 'taps her mug'],
   poke: ['pokes her cheek', 'pokes her cheek %n times'], boop: ['boops her nose', 'boops her nose %n times'], pat: ['pats her on the head', 'pats her on the head %n times'],
+  yousit: ['sits down on the couch next to her', 'sits down on the couch next to her'], yousitbed: ['sits down on the edge of her bed', 'sits down on the edge of her bed'], tvon: ['turns the TV on', 'turns the TV on'], tvoff: ['turns the TV off', 'turns the TV off'],
+  cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
   petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
 let touches = [];
 function takeTouches() {
   const fresh = touches.filter(t => Date.now() - t.at < 15 * 60000); touches = [];
   const n = {}; for (const t of fresh) n[t.kind] = (n[t.kind] || 0) + 1;
-  return Object.keys(n).map(k => TOUCH[k][n[k] > 1 ? 1 : 0].replace('%n', n[k])).join(', ');
+  return Object.keys(n).map(k => (TOUCH[k][n[k] > 1 ? 1 : 0] || TOUCH[k][0]).replace('%n', n[k])).join(', ');
 }
 // a log entry as the model sees it: the silent touches ride in front of his words as an action
 const withPre = e => (e.pre ? `*${e.pre}* ` : '') + e.text;
@@ -365,7 +367,20 @@ function planDue() {
 const awayView = () => { if (db.call && Date.now() - db.call.since > 25 * 60000) db.call = null; return awayView0(); }; // (a call left open is dropped)
 const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || clock(db.away.until), due: Date.now() >= db.away.until && !db.call } : null; // (back = when she said; the real time is hers to keep)
 const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
+// ---- visiting: once the relationship score reaches 100 they can be in the same room. db.place is '' (apart, the usual),
+// 'dorm' (he is at her dorm) or 'house' (she is at his house). The page shows it in first person.
+const VISIT_AT = 100;
+const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= VISIT_AT;
+const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
+const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: VISIT_AT, invite: inviteNow() });
+function placeNote() {
+  if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
+  if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
+  return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
+}
+function setPlace(place) { db.place = place || ''; db.invite = null; }
 function leaveNow(leave, since = Date.now()) {
+  if (db.place) setPlace('');                                                       // wherever she is going, the visit is over
   const now = since, p = db.plan || {};
   // back when she said she would be, if she said; otherwise however long that kind of outing takes
   const said = p.backAt && p.backAt > now + 5 * 60000 && p.backAt < now + 16 * 3600000 ? p.backAt : 0;
@@ -401,7 +416,7 @@ async function comeBack(onDelta) {
 
 // ---------- http ----------
 // changes whenever a new version is deployed: pages left open use it to reload themselves
-const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
 const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -432,9 +447,22 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) {
       if (!authed(req)) return json(res, 401, { error: 'login' });
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
+      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
-      if (url.pathname === '/api/away') return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView() });
+      if (url.pathname === '/api/away') return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+
+      // taking up her invitation (place = what she offered), turning it down, or going home (place = '')
+      if (url.pathname === '/api/visit' && req.method === 'POST') {
+        const { place, decline } = await readBody(req), now = Date.now();
+        if (decline) { db.invite = null; save(); return json(res, 200, placeView()); }
+        if (!place) {
+          if (db.place) { db.log.push({ who: 'sys', text: db.place === 'dorm' ? 'You headed home.' : 'Wizra headed home.', at: now }); touches.push({ kind: db.place === 'dorm' ? 'homeDorm' : 'homeHouse', at: now }); setPlace(''); save(); }
+          return json(res, 200, placeView());
+        }
+        if (place !== inviteNow()) return json(res, 409, { error: 'There is no invitation open right now.', ...placeView() });
+        setPlace(place); db.log.push({ who: 'sys', text: place === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: now }); touches.push({ kind: place === 'dorm' ? 'cameDorm' : 'cameHouse', at: now }); save();
+        return json(res, 200, placeView());
+      }
 
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
@@ -490,12 +518,12 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/reset' && req.method === 'POST') {
-        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; db.plan = null; db.call = null; save();
+        db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; db.plan = null; db.call = null; db.place = ''; db.invite = null; save();
         return json(res, 200, { ok: true });
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text, doing, voice: wantVoice } = await readBody(req);
+        const { text, doing, voice: wantVoice, visit } = await readBody(req);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
@@ -508,7 +536,15 @@ const server = http.createServer(async (req, res) => {
           send({ t: 'away', away: awayView() }); return res.end();
         }
         const seen = String(doing || '').replace(/[^a-z ]/gi, '').trim().slice(0, 60);
-        const pre = [takeTouches(), seen ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
+        // he asks to get together (the page's visit button): she has made up her mind before she answers, like a call
+        let ask = (visit === 'house' || visit === 'dorm') && !db.place && canVisit() ? visit : '', askPre = '';
+        if (ask) {
+          const g = currentGlow(), yes = process.env.VISIT_TEST_ANSWER ? process.env.VISIT_TEST_ANSWER === 'yes' : !(g && ['upset', 'groggy'].includes(g.kind)) && Math.random() < 0.9;
+          askPre = ask === 'house' ? (yes ? 'invites her over to his house; she says yes, comes over, and has just walked in his front door' : 'invites her over to his house; she is not up for it right now and says so')
+            : (yes ? 'asks to come over to her dorm; she says yes, and he has just arrived and walked into her room' : 'asks to come over to her dorm; she is not up for company right now and says so');
+          if (yes) setPlace(ask); else { ask = ''; db.invite = null; }
+        }
+        const pre = [takeTouches(), askPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest
@@ -521,13 +557,15 @@ const server = http.createServer(async (req, res) => {
           if (wantVoice) prewarm(full);
           db.log.push({ who: 'her', text: full, at: Date.now() });
           db.sinceLearn++;
+          if (ask) db.log.push({ who: 'sys', text: ask === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: Date.now() });
           notePlan(full); const leave = detectLeave(full); if (leave) leaveNow(leave);
+          else if (!db.place && !askPre && canVisit()) { const inv = detectInvite(full); if (inv) db.invite = { place: inv, at: Date.now() }; }
           save();
-          send({ t: 'done', text: full, away: awayView(), glow: glowView(), plan: planView() });
+          send({ t: 'done', text: full, away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
           if (db.sinceLearn >= LEARN_EVERY) { db.sinceLearn = 0; learn().catch(e => console.error('[learn]', e.message)); }
         } catch (e) {
           console.error('[chat]', e.status || '', e.message);
-          db.log.pop(); save();
+          db.log.pop(); if (ask) setPlace(''); save();
           send({ t: 'error', error: e instanceof Anthropic.APIError ? `API error ${e.status ?? ''}: ${e.message}` : e.message });
         } finally {
           busy = false;
