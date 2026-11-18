@@ -36,6 +36,20 @@ export function requested(text, pack, ctx) {
   if (hit.length) { const p = pick(hit); return { id: id(), kind: 'pack', file: p.file, theme: p.theme, desc: p.desc }; }
   return { none: bare.slice(0, 40) };
 }
+// He asked for a picture of her doing something ("a selfie with your hands up", "a pic of you doing a tree pose"): which pose?
+// -> { gest | clip, cam, label } or null. The Studio's Reactions count too: their phrases name poses the same way.
+const POSED = [[/hands? (up|in the air)|reach(ing)? for the sky|arms up/i, 'handsup', 'full', 'with her hands up'], [/peace sign|\bpeace\b|v sign/i, 'peace', '', 'throwing a peace sign'], [/finger heart|little heart|heart (sign|hands?)/i, 'fingerheart', '', 'making a little finger heart'], [/\bfox\b/i, 'fox', '', 'making a fox sign'],
+  [/wav(e|ing)/i, 'wave', 'half', 'waving'], [/arms? (crossed|folded)|cross(ing|ed)? (your|her) arms/i, 'crossarms', 'half', 'with her arms crossed'], [/hands? on (your|her) hips?|sass/i, 'hips', 'half', 'with her hands on her hips'], [/think(ing)?|ponder|chin/i, 'think', 'half', 'thinking, hand on her chin'],
+  [/face ?palm/i, 'facepalm', 'half', 'facepalming'], [/pout|sulk|grumpy/i, 'pout', '', 'pouting'], [/cheer|celebrat|excited|victory/i, 'cheer', 'full', 'cheering with her arms up'], [/clap/i, 'clap', 'half', 'clapping'], [/shrug/i, 'shrug', 'half', 'shrugging'], [/yawn|sleepy|tired/i, 'yawn', 'half', 'mid yawn'],
+  [/stretch/i, 'stretch', 'full', 'stretching'], [/eye ?roll|rolling (your|her) eyes/i, 'eyeroll', '', 'rolling her eyes'], [/scared|spooked|eep|startled|spider/i, 'eep', 'half', 'looking startled'], [/laugh|giggl/i, 'laugh', '', 'laughing'], [/flip(ping)? (me )?off|middle finger/i, 'flipoff', '', 'flipping him off'], [/\bok(ay)? sign/i, 'oksign', '', 'making an OK sign'], [/bow/i, 'bow', 'half', 'taking a bow']];
+const POSED_CLIP = [[/tree pose/i, 'yoga_tree', 'in a tree pose'], [/warrior/i, 'yoga_warrior', 'in a warrior pose'], [/yoga|meditat|lotus|kneel/i, 'yoga_sit', 'kneeling in a yoga pose, palms together'], [/side (bend|stretch)|crescent/i, 'yoga_moon', 'in a standing side bend']];
+export function posed(text, cues) {
+  const t = String(text).replace(/\*[^*]*\*/g, ' ');
+  const c = POSED_CLIP.find(([re]) => re.test(t)); if (c) return { clip: c[1], cam: 'full', label: c[2] };
+  const g = POSED.find(([re]) => re.test(t)); if (g) return { gest: g[1], cam: g[2], label: g[3] };
+  const low = ' ' + t.toLowerCase().replace(/[^a-z0-9!? ]+/g, ' ') + ' '; for (const q of cues || []) if (q.gesture && String(q.words).toLowerCase().split(',').some(w => w.trim() && low.includes(' ' + w.trim().replace(/[^a-z0-9!? ]+/g, ' ')))) return { gest: q.gesture, cam: 'half', label: q.label || 'striking a pose' };
+  return null;
+}
 // how often: rare with a stranger, fairly regular once they are close (and a bit more if it is romance)
 export const chatChance = (close, romance) => (0.008 + 0.06 * close * close) * (romance ? 1.6 : 1);
 export const awayChance = (close, romance) => (0.1 + 0.3 * close * close) * (romance ? 1.3 : 1);

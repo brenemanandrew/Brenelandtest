@@ -227,7 +227,7 @@ export async function create(url, opts = {}) {
       yoga_tree: pose(1, { rightUpperLeg: [-1.0, -1.35, 0], leftUpperLeg: [0, 0, 0] }, { ...UP, rightLowerLeg: [2.3, 0, 0], rightFoot: [0.5, 0, 0], leftLowerLeg: [0, 0, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0, 0, 0] }),
       yoga_warrior: pose(0.76, { leftUpperLeg: [-1.1, 1.5, 0], rightUpperLeg: [0, -0.3, -0.72] }, { leftLowerLeg: [1.1, 0, 0], leftFoot: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightFoot: [0, 0, 0.72], leftUpperArm: [0, 0, 0], rightUpperArm: [0, 0, 0], leftLowerArm: [0, 0, 0], rightLowerArm: [0, 0, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0, 1.1, 0] }),
       yoga_moon: pose(1, { leftUpperLeg: [0, 0, 0], rightUpperLeg: [0, 0, 0] }, { ...UP, leftLowerLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], spine: [0, 0, 0.22], chest: [0, 0, 0.2], head: [0, 0, 0.12] }),
-      yoga_sit: pose(0.17, { leftUpperLeg: [-1.4, 1.05, 0], rightUpperLeg: [-1.4, -1.05, 0] }, { leftLowerLeg: [2.45, 0, 0], rightLowerLeg: [2.45, 0, 0], leftFoot: [0.4, 0, 0], rightFoot: [0.4, 0, 0], leftUpperArm: [-0.35, 0, -1.0], rightUpperArm: [-0.35, 0, 1.0], leftLowerArm: [0, -0.45, 0], rightLowerArm: [0, 0.45, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.06, 0, 0] }),
+      yoga_sit: pose(0.13, { leftUpperLeg: [-1.45, 0.08, 0], rightUpperLeg: [-1.45, -0.08, 0] }, { leftLowerLeg: [2.6, 0, 0], rightLowerLeg: [2.6, 0, 0], leftFoot: [0.6, 0, 0], rightFoot: [0.6, 0, 0], leftUpperArm: [-0.32, -0.3, -1.15], rightUpperArm: [-0.32, 0.3, 1.15], leftLowerArm: [0, -1.85, 0], rightLowerArm: [0, 1.85, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.08, 0, 0] }),   // kneeling, sitting back on her heels, palms together
     }); }
   const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(); let clipHip = 0;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
@@ -835,8 +835,10 @@ export async function create(url, opts = {}) {
     if (SIGN_OF[spec.pose]) { const tg = sign(SIGN_OF[spec.pose], 6, {}); for (const n in tg) if (n[0] !== '_' && n !== 'spine') set(n, ...tg[n]); set('head', 0, 0, -0.16); }
     else if (spec.pose === 'wave') { set('rightUpperArm', 0, 0, -0.7); set('rightLowerArm', 0, 0, -1.1); set('head', 0, 0, 0.1); }
     else if (!lying && !sitting) set('head', 0.04, 0, spec.pose === 'full' ? 0 : 0.08);
+    let gFace = null; if (spec.gest && GESTURE[spec.gest]) { // a pose she was asked for: any of her gestures, frozen a moment in
+      const tg = GESTURE[spec.gest](1.1); for (const n in tg) { if (n === '_head') set('head', ...tg[n]); else if (n === '_face') gFace = tg[n]; else if (n[0] !== '_' && n !== 'spine' && n !== 'hips') set(n, ...tg[n]); } }
     if (hipsNode) hipsNode.position.y = hipY0 + clipHip;
-    const want = EXPR[spec.face] || EXPR.happy; if (em) for (const n of NAMES) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.3, want[n] || 0) : n === 'aa' || n === 'oh' ? 0 : (want[n] || 0)); if (em && spec.faceW) for (const n in spec.faceW) if (has(n)) em.setValue(n, spec.faceW[n]);   // a closed-mouth smile for the camera
+    const want = EXPR[spec.face] || EXPR.happy; if (em) for (const n of NAMES) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.3, want[n] || 0) : n === 'aa' || n === 'oh' ? 0 : (want[n] || 0)); if (em && spec.faceW) for (const n in spec.faceW) if (has(n)) em.setValue(n, spec.faceW[n]); if (em && gFace) for (const n in gFace) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.5, gFace[n]) : gFace[n]);   // a closed-mouth smile for the camera
     // where: her own room as it is, or a painted backdrop of wherever she is
     const custom = spec.scene === 'custom' && window.WIZRA_BG, inDorm = !custom && (spec.scene === 'dorm' || !BACKDROP[spec.scene]); vrm.scene.visible = true;
     for (const k in places.groups) places.groups[k].visible = inDorm && k === 'dorm'; room.visible = inDorm; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
@@ -848,7 +850,7 @@ export async function create(url, opts = {}) {
     if (lying) { camera.position.set(places.bed.at[0] + 0.75, places.bed.top + 1.75, places.bed.at[1] - 1.35); camera.lookAt(places.bed.at[0], places.bed.top + 0.12, places.bed.at[1] - 0.05); }   // from up by her pillow
     else if (sitting) { camera.position.set(tmpA.x + fx * 1.9 + fz * 1.0, tmpA.y + 0.7, tmpA.z + fz * 1.9 - fx * 1.0); camera.lookAt(tmpA.x, tmpA.y - 0.3, tmpA.z); }                // from a little above and to one side
     else if (half) { camera.position.set(tmpA.x + fx * 1.55 + fz * 0.15, tmpA.y + 0.05, tmpA.z + fz * 1.55 - fx * 0.15); camera.lookAt(tmpA.x, tmpA.y - 0.3, tmpA.z); }                    // waist up
-    else if (full) { camera.position.set(tmpA.x + fx * 3.0 + fz * 0.25, tmpA.y - 0.45, tmpA.z + fz * 3.0 - fx * 0.25); camera.lookAt(tmpA.x, tmpA.y - 0.72, tmpA.z); }
+    else if (full) { camera.position.set(tmpA.x + fx * 3.0 + fz * 0.25, Math.max(floorY + 0.75, tmpA.y - 0.45), tmpA.z + fz * 3.0 - fx * 0.25); camera.lookAt(tmpA.x, Math.max(floorY + 0.35, tmpA.y - 0.72), tmpA.z); }
     else { const side = SIGN_OF[spec.pose] || spec.pose === 'wave' ? -0.13 : 0; camera.position.set(tmpA.x + fx * 0.8 + fz * (0.1 + side), tmpA.y + 0.2, tmpA.z + fz * 0.8 - fx * (0.1 + side)); camera.lookAt(tmpA.x + fz * side, tmpA.y + 0.04, tmpA.z - fx * side); }   // her face, from arm's length and a little above
     if (!inDorm) { backdrop.position.set(tmpA.x, tmpA.y - (full ? 0.6 : half ? 0.35 : 0.3), tmpA.z - 1.05); backdrop.scale.set(full ? 2.4 : half ? 1.6 : 1.5, full ? 1.5 : half ? 1.15 : 1.2, 1); }
     blushMat.opacity = (spec.blush || 0) * 0.5;

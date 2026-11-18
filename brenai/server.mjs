@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
-import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, requested } from './pics.mjs';
+import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, requested, posed } from './pics.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
@@ -944,7 +944,7 @@ async function handle(req, res) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
           const what = wantsPic(msg) ? requested(msg, pack, { home: true, close }) : null;   // a picture OF something: her room, her dice, the view...
           if (what && what !== 'self') { if (what.none) picPre = `asks for a picture of ${what.none}; she has nothing like that in front of her to photograph right now and says so in her own way (no picture is sent)`; else if (close * 100 >= rule('picAskMin')) { pic = what; picPre = `asks for ${what.desc.replace(/^a picture of /, 'a picture of ')}; she takes it and sends it: ${what.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending pictures yet and says so in her own way'; }
-          else if (wantsPic(msg)) { if (close * 100 >= rule('picAskMin') && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          else if (wantsPic(msg)) { const pz = posed(msg, devData().cues); if (close * 100 >= rule('picAskMin') && (pz || Math.random() < 0.55 + 0.45 * close)) { pic = pz ? { ...selfie('dorm', kind, close), pose: 'plain', face: 'happy', ...(pz.gest ? { gest: pz.gest } : { clip: pz.clip, t: 0 }), ...(pz.cam ? { cam: pz.cam } : {}), desc: `a picture of her ${pz.label}, in her dorm room` } : (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
         const pre = [takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');

@@ -146,3 +146,6 @@ A player made with "I am new here" gets `public/intro.js` before the game: a com
 
 ## Reactions (things you say that she reacts to at once)
 `dev.cues` (shared, edited in the Studio under Character and rules, Reactions; starter set `CUES_DEFAULT` in `server.mjs`): each is `{ label, words, gesture, emote, hold }`. When a message you send contains one of the comma-separated phrases, the page plays the pose and pops the emoji immediately (`cueFor` in `index.html`), and the chat request carries the label so her instructions say she just did it. New poses for this: `eep` (flinch) and `handsup`.
+
+## Posed photos
+Ask for a picture of her doing something ("a selfie with your hands up", "a pic of you in a tree pose"): `posed(text, cues)` in `pics.mjs` finds the pose (its own list, then the Studio's Reactions phrases), and the selfie spec carries `gest` (any gesture, frozen) or `clip` (a yoga pose) plus a camera (`half`, `full`). `takeSnap` applies it. The seated yoga pose is a kneeling one (palms together).
