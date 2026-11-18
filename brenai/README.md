@@ -179,3 +179,8 @@ She is told the actual time with every reply ("Right now it is 3:44 PM on Wednes
 - One shadow-casting key light (soft shadow map, 1024 on phones, 2048 otherwise): solid things and she cast, floors and walls catch (`shadeUp` in `avatar-vrm.js`). A cool rim light from behind, and a light only lightning uses.
 - CSS over the picture (`#stage` in `index.html`): richer colour on the canvas, a warm light leak, a vignette; `data-weather` on `#stage` swaps in a mood per weather.
 - `places.js` weather: rain streaks and round snowflakes fall in boxes just outside the window walls (all around in an outdoor place); a storm adds slanted fast rain and a double-flicker of lightning (`places.flash`). Set by the player's real weather, or `brenaiDev.avatar.weather('rainy' | 'snowy' | 'stormy' | 'cloudy' | 'foggy' | '')` from the console.
+
+## Light beams, storms and power cuts
+- Every outside window (north and west walls) has a light shaft slanting to the floor, a bright window-shaped patch where it lands and dust in the beam (`beams` in `places.js`): warm by day, faint and blue as moonlight, dimmed by cloud, gone in rain, and blazing for an instant in lightning.
+- `gloom` in `avatar-vrm.js` takes light out for weather (storm 0.7, rain 0.3, power cut 0.93). In a flash the key light jumps behind the windows, so shadows are thrown toward the viewer; thunder plays.
+- In a storm, indoors, a lightning strike has a one in five chance of cutting the power for 45 to 115 seconds: `places.setPower(false)` darkens everything in `ELECTRIC` (lamps, string lights, screens; candles, fires and battery things stay lit), her lamp and the TV go off, she flinches, the chat notes it, and she is told (`powerout` / `powerback` touches). `brenaiDev.avatar.power(false)` forces one.

@@ -28,7 +28,10 @@ export function buildPlaces(THREE, A) {
   const paint = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
 
   // ---- the world outside the windows: a painted panorama a few metres beyond each one ----
-  const worldMats = [];
+  const worldMats = [], beams = [];
+  const beamTex = paint(8, 128, (c, W, H) => { const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,.12)'); c.fillStyle = g; c.fillRect(0, 0, W, H); });
+  const paneTex = paint(64, 64, (c, W) => { c.fillStyle = '#fff'; c.fillRect(0, 0, W, W); c.fillStyle = '#000'; c.fillRect(W / 2 - 2, 0, 4, W); c.fillRect(0, W / 2 - 2, W, 4); c.strokeStyle = '#000'; c.lineWidth = 6; c.strokeRect(0, 0, W, W); });
+  const dotTex = paint(16, 16, (c, W) => { const g = c.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, W); });
   function world(kind) {
     const tex = paint(1024, 512, (c, W, H) => {
       const sky = c.createLinearGradient(0, 0, 0, H * 0.7); sky.addColorStop(0, '#6fb7ff'); sky.addColorStop(1, '#d8f0ff'); c.fillStyle = sky; c.fillRect(0, 0, W, H);
@@ -67,6 +70,18 @@ export function buildPlaces(THREE, A) {
       bar(h.w + 0.14, 0.08, h.at, h.y1 + 0.02); bar(h.w + 0.2, 0.1, h.at, h.y0 - 0.03); bar(h.y1 - h.y0, 0.08, a - 0.02, (h.y0 + h.y1) / 2, true); bar(h.y1 - h.y0, 0.08, b + 0.02, (h.y0 + h.y1) / 2, true);
       bar(h.w, 0.04, h.at, (h.y0 + h.y1) / 2); bar(h.y1 - h.y0, 0.04, h.at, (h.y0 + h.y1) / 2, true);
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(h.w, h.y1 - h.y0), new THREE.MeshBasicMaterial({ color: '#cfeaff', transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false })); glass.position.set(alongX ? h.at : fixed, floorY + (h.y0 + h.y1) / 2, alongX ? fixed : h.at); glass.rotation.y = ry; into.add(glass);
+      if (worldMat && (face === 'N' || face === 'W')) { // light through the window: a shaft slanting down into the room, a bright patch where it lands, dust in the beam
+        const d = face === 'N' ? [0.3, -0.8, 1] : [1, -0.8, 0.3], P = [[a, h.y0], [b, h.y0], [b, h.y1], [a, h.y1]].map(([c, y]) => new THREE.Vector3(alongX ? c : fixed, floorY + y, alongX ? fixed : c)), Q = P.map(v => { const k = (v.y - floorY - 0.012) / 0.8; return new THREE.Vector3(v.x + d[0] * k, floorY + 0.012, v.z + d[2] * k); });
+        const pos = [], uv = [], quad = (A, B, C, D, ua, ub) => { for (const [v, u, w] of [[A, ua, 0], [B, ub, 0], [C, ub, 1], [A, ua, 0], [C, ub, 1], [D, ua, 1]]) { pos.push(v.x, v.y, v.z); uv.push(u, w); } };
+        for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(P[i], P[j], Q[j], Q[i], i / 4, (i + 1) / 4); }
+        const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        const shaft = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ map: beamTex, color: '#fff0c8', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); shaft.renderOrder = 3; into.add(shaft);
+        const fg = new THREE.BufferGeometry(); fg.setAttribute('position', new THREE.Float32BufferAttribute([Q[0], Q[1], Q[2], Q[0], Q[2], Q[3]].flatMap(v => [v.x, v.y, v.z]), 3)); fg.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
+        const patch = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ map: paneTex, color: '#fff0c8', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); patch.renderOrder = 2; into.add(patch);
+        const mp = []; for (let i = 0; i < 46; i++) { const u = Math.random(), v = Math.random(), w = 0.08 + 0.85 * Math.random(), top = P[3].clone().lerp(P[2], u), bot = P[0].clone().lerp(P[1], u), p0 = bot.lerp(top, v), q0 = Q[0].clone().lerp(Q[1], u).lerp(Q[3].clone().lerp(Q[2], u), v), pt = p0.lerp(q0, w); mp.push(pt.x, pt.y, pt.z); }
+        const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3)); const motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: '#fff6dc', size: 0.022, map: dotTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); motes.renderOrder = 4; into.add(motes);
+        beams.push({ shaft: shaft.material, patch: patch.material, motes: motes.material, pts: motes, group: into });
+      }
       if (worldMat) { const w = new THREE.Mesh(new THREE.PlaneGeometry(13, 6), worldMat); w.position.set(alongX ? h.at : fixed + out[0], floorY + 2.4, alongX ? fixed + out[1] : h.at); w.rotation.y = ry; into.add(w); }
     }
     piece(u, to, 0, height);
@@ -163,10 +178,11 @@ export function buildPlaces(THREE, A) {
   // and colours, plus whatever was placed in it.
   const maps = A.maps || {}, groups = { dorm, house }, names = { dorm: 'her dorm', house: 'your house' }, bounds = { dorm: D, house: Hh }, spawn = { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] };
   const baseSolid = { dorm: solid.dorm.map(r => [...r]), house: solid.house.map(r => [...r]) };
+  const ELECTRIC = new Set(['stringlights', 'lanterns', 'desklamp', 'lavalamp', 'projector', 'recordplayer', 'arcade', 'tv', 'lamp', 'coffeecart']), electric = {}, outdoor = {}; let powerOn = true;   // what goes dark when the power is out (candles, fires and anything on batteries stay lit)
   const alive = {}, bare = {}, dark = {}, perches = {};   // perches: the placed things she can go and sit or lie on   // alive: what moves in each room (flames, lights); bare: rooms without her dorm furniture
   function addItems(group, name, items) {
     const g = new THREE.Group(); g.position.y = floorY;
-    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); const pc = perchOf(it); if (pc && Math.hypot(it.x, it.z - hip.z) > 0.5) (perches[name] = perches[name] || []).push(pc); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
+    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); if (ELECTRIC.has(it.kind)) { (electric[name] = electric[name] || []).push(b); if (b.userData.tick) { const run = alive[name].pop(); alive[name].push((t, n) => { if (powerOn) run(t, n); }); } } const pc = perchOf(it); if (pc && Math.hypot(it.x, it.z - hip.z) > 0.5) (perches[name] = perches[name] || []).push(pc); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
     group.add(g);
   }
   addItems(dorm, 'dorm', (maps.dorm || {}).items); addItems(house, 'house', (maps.house || {}).items);
@@ -174,7 +190,7 @@ export function buildPlaces(THREE, A) {
     if (!m || !m.id || groups[m.id]) continue;
     const g = new THREE.Group(); g.visible = false; into = g; place = m.id; TAG = '';
     const B = { x0: -2.05 - (+m.left || 0), x1: 3.1 + (+m.right || 0), z0: D.z0, z1: hip.z + 3.05 + (+m.front || 0), h: Math.max(2.3, +m.height || 2.6) }, out = world(m.outside === 'yard' ? 'yard' : 'campus');
-    bare[m.id] = !!m.bare; dark[m.id] = m.open ? (m.sky === 'night' ? 1 : m.sky === 'dusk' ? 0.5 : 0) : Math.max(0, Math.min(1, +m.dim || 0));
+    outdoor[m.id] = !!m.open; bare[m.id] = !!m.bare; dark[m.id] = m.open ? (m.sky === 'night' ? 1 : m.sky === 'dusk' ? 0.5 : 0) : Math.max(0, Math.min(1, +m.dim || 0));
     if (m.open) { // outdoors: ground to the horizon, a sky, no walls
       const cx = (B.x0 + B.x1) / 2, cz = (B.z0 + B.z1) / 2;
       TAG = 'floor'; reg(flat(B.x1 - B.x0, B.z1 - B.z0, cx, floorY - 0.006, cz, toon(m.floor || '#4f8a55'), true)); TAG = '';
@@ -216,7 +232,9 @@ export function buildPlaces(THREE, A) {
         rain.visible = kind === 'rainy' || kind === 'stormy'; snow.visible = kind === 'snowy'; } }; }
   let flashAt = -1e9, nextFlash = 0;
   return {
-    sky: '', flash: 0,
+    sky: '', flash: 0, outdoor, get power() { return powerOn; },
+    setPower(on) { powerOn = !!on; if (!on) this.tv.on = false;
+      for (const n in electric) for (const g of electric[n]) g.traverse(o => { if (o.isPointLight) o.visible = powerOn; else if (o.isMesh && o.material && o.material.isMeshBasicMaterial && !o.material.map && o.material.side !== THREE.BackSide) { if (!powerOn) { if (!o.userData.lit) o.userData.lit = o.material.color.clone(); o.material.color.set('#17131f'); } else if (o.userData.lit) o.material.color.copy(o.userData.lit); } }); },
     groups, names, baseSolid, floorY,
     dorm, house, toon, outline, eyeH, solid,
     bounds, blocks, spawn, bare, dark, perches,
@@ -229,6 +247,9 @@ export function buildPlaces(THREE, A) {
       const W = { cloudy: [0.78, 0.8, 0.84], rainy: [0.58, 0.62, 0.7], stormy: [0.42, 0.44, 0.55], foggy: [0.86, 0.86, 0.88], snowy: [0.92, 0.94, 1] }[this.sky] || [1, 1, 1];   // the player's real weather greys or brightens what is outside
       if (this.sky === 'stormy') { if (t > nextFlash) { flashAt = t; nextFlash = t + 3500 + Math.random() * 9000; } const d = t - flashAt; this.flash = d < 90 ? 1 : d < 160 ? 0.25 : d < 260 ? 0.8 : d < 700 ? 0.8 * (1 - (d - 260) / 440) : 0; } else this.flash = 0;   // lightning: a double flicker
       for (const n in fx) if (groups[n].visible) fx[n].step(this.sky, t);
+      // the light through the windows: warm shafts by day (less under cloud, none in rain), a pale moonbeam on a clear night, and all of it blazing for an instant in lightning
+      { const clear = { '': 1, cloudy: 0.4, foggy: 0.55, snowy: 0.5, rainy: 0.12, stormy: 0 }[this.sky] ?? 1, day = (1 - night) * clear, moon = night * 0.3 * Math.max(clear, 0.2) * (this.sky === 'stormy' ? 0 : 1), a = 0.26 * day + 0.1 * moon + 0.55 * this.flash, cold = this.flash > 0 || night > 0.6;
+        for (const b of beams) { b.shaft.opacity = a; b.patch.opacity = Math.min(0.9, a * 2.4); b.motes.opacity = Math.min(1, (day + moon * 0.6) * (0.55 + 0.35 * Math.sin(t / 900))); const col = cold ? '#bcd0ff' : '#fff0c8'; b.shaft.color.set(col); b.patch.color.set(col); b.pts.position.y = 0.02 * Math.sin(t / 2300); } }
       const F = 1 + 1.4 * this.flash, k = (1 - 0.72 * night) * F; for (const m of worldMats) m.color.setRGB(k * W[0], (k * (1 - 0.05 * night) + 0.03 * night) * W[1], Math.min(1.6, (k + 0.12 * night) * W[2]));
       if (this.tv.on) this.tv.screen.material.color.setHSL((t / 9000) % 1, 0.55, 0.5 + 0.12 * Math.sin(t / 170)); else this.tv.screen.material.color.set('#101018');
     },

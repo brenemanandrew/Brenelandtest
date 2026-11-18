@@ -33,7 +33,7 @@ export async function create(url, opts = {}) {
   // who throws a shadow and who catches one: flat panels (floors, walls, the view outside) only catch; solid things do both; glowing things neither
   const shadeUp = root => root.traverse(o => { if (!o.isMesh || !o.material || o.material.isMeshBasicMaterial || o.material.transparent) return; const flatGeo = o.geometry && (o.geometry.type === 'PlaneGeometry' || o.geometry.type === 'CircleGeometry'); o.receiveShadow = true; o.castShadow = !flatGeo; });
   // the room follows the clock on the device you are watching from: bright by day, warm in the evening, dim and blue at night
-  let night = 0, mood = 0;   // mood: how dark the place itself is (a camp at night), whatever the clock says
+  let night = 0, mood = 0, gloom = 0;   // gloom: how much the weather (and a power cut) takes out of the light   // mood: how dark the place itself is (a camp at night), whatever the clock says
   let stageK = null;   // the heart game's plain pink stage: null when the room is showing, else 0..1 for how deep the pink has gone
   function daylight() {
     const h = new Date().getHours() + new Date().getMinutes() / 60;
@@ -41,7 +41,8 @@ export async function create(url, opts = {}) {
     const eve = Math.max(0, 1 - Math.abs(h - 19) / 2.5);
     sun.intensity = Math.PI * (0.62 + 0.38 * day); sun.color.setRGB(1 - 0.12 * night + 0.02 * eve, 1 - 0.14 * night - 0.08 * eve, 1 - 0.02 * night - 0.2 * eve);
     amb.intensity = 0.26 + 0.2 * day;
-    if (mood) { sun.intensity = Math.PI * (0.62 + 0.38 * day) * (1 - 0.72 * mood); sun.color.setRGB(1 - 0.35 * mood, 1 - 0.25 * mood, 1); amb.intensity = (0.26 + 0.2 * day) * (1 - 0.3 * mood); }
+    if (gloom) { sun.intensity *= 1 - 0.85 * gloom; amb.intensity *= 1 - 0.62 * gloom; sun.color.setRGB(sun.color.r * (1 - 0.3 * gloom), sun.color.g * (1 - 0.2 * gloom), sun.color.b); }
+    if (mood) { sun.intensity = Math.PI * (0.62 + 0.38 * day) * (1 - 0.72 * mood) * (1 - 0.6 * gloom); sun.color.setRGB(1 - 0.35 * mood, 1 - 0.25 * mood, 1); amb.intensity = (0.26 + 0.2 * day) * (1 - 0.3 * mood); }
     if (stageK !== null) return;
     el.style.background = `radial-gradient(circle at 50% 35%, hsl(${272 - 20 * night} ${45 - 10 * night}% ${54 - 26 * night}%), hsl(264 46% ${32 - 14 * night}%) 55%, hsl(258 48% ${20 - 9 * night}%) 100%)`;
   }
@@ -576,7 +577,19 @@ export async function create(url, opts = {}) {
     vrm.scene.rotation.y = (rt.yaw + turn * lie) * k + sideways;
     rt.zoom = 0.3 * k;
   }
-  function lampTick(dt) { const want = (lampOn === null ? night > 0.45 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
+  // ---- a storm is dark, and now and then it takes the power: every lamp and screen dies and only lightning, candles and fires are left
+  const storm = { until: 0, next: 0, was: 0, flashing: false };
+  const regloom = () => { gloom = !places.power ? 0.93 : ({ stormy: 0.7, rainy: 0.3, cloudy: 0.14, foggy: 0.12, snowy: 0.05 }[places.sky] || 0); daylight(); };
+  function power(on, ms) { on = !!on; if (on === places.power) return; places.setPower(on); if (!on) { storm.until = performance.now() + (ms || 45000 + Math.random() * 70000); lampLight.intensity = 0; } else storm.next = performance.now() + 60000 + Math.random() * 120000;
+    (el.closest('#stage') || el).dataset.power = on ? '' : 'out'; regloom(); snd(on ? 'powerup' : 'powerdown'); window.dispatchEvent(new CustomEvent('wizra-power', { detail: on })); }
+  function stormTick(now) {
+    const fl = places.flash; if (fl >= 1 && storm.was < 1) { snd('thunder'); if (places.power && !inCall && !places.outdoor[here] && now > storm.next && Math.random() < 0.2) power(false); } storm.was = fl;
+    if (!places.power && now > storm.until) power(true);
+    if (fl > 0 && !inCall) { storm.flashing = true; sun.position.set(-3.5, 6, -7); sun.intensity = 0.4 + fl * 5.5; sun.color.set('#cfdcff'); }   // lightning: for an instant the light comes from the windows and throws long shadows at you
+    else if (storm.flashing) { storm.flashing = false; sun.position.set(0.6, 1, 1.2).multiplyScalar(9); daylight(); }
+    bolt.intensity = fl * 1.1;
+  }
+  function lampTick(dt) { const want = places.power && (lampOn === null ? night > 0.45 || gloom > 0.5 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
   // ---- tap to direct: you tap a thing in her room, she goes and deals with it ----
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pick(e) {
@@ -889,7 +902,7 @@ export async function create(url, opts = {}) {
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
     activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
-    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, weather(kind) { places.sky = kind || ''; (el.closest('#stage') || el).dataset.weather = kind || ''; },
+    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, weather(kind) { places.sky = kind || ''; (el.closest('#stage') || el).dataset.weather = kind || ''; if (kind !== 'stormy' && !places.power) power(true); regloom(); }, power,
     doActivity(name) { rt.self = false; startActivity(name); },   // asked for (by you, or by what she wrote): not a whim to drop when you speak
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,
@@ -949,7 +962,7 @@ export async function create(url, opts = {}) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
-      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); bolt.intensity = places.flash * 1.5;
+      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now());
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();
       const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;

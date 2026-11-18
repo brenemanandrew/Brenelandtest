@@ -24,6 +24,7 @@
   #stage::after { background:radial-gradient(ellipse at 50% 46%, transparent 52%, rgba(22,8,48,.42) 100%); transition:background 1.5s; }
   #stage[data-weather=rainy]::before { background:linear-gradient(180deg, rgba(120,160,230,.20), rgba(60,90,170,.14)); } #stage[data-weather=rainy]::after { background:radial-gradient(ellipse at 50% 46%, transparent 44%, rgba(12,18,48,.55) 100%); }
   #stage[data-weather=stormy]::before { background:linear-gradient(180deg, rgba(90,110,200,.26), rgba(40,40,120,.22)); } #stage[data-weather=stormy]::after { background:radial-gradient(ellipse at 50% 46%, transparent 38%, rgba(8,8,36,.66) 100%); }
+  #stage[data-power=out]::before { background:linear-gradient(180deg, rgba(40,50,140,.30), rgba(10,10,60,.34)) !important; } #stage[data-power=out]::after { background:radial-gradient(ellipse at 50% 46%, transparent 22%, rgba(2,2,20,.82) 100%) !important; } #stage[data-power=out] canvas { filter:saturate(.75) contrast(1.15) brightness(.92); }
   #stage[data-weather=snowy]::before { background:linear-gradient(180deg, rgba(225,238,255,.26), rgba(190,210,255,.12)); } #stage[data-weather=cloudy]::before, #stage[data-weather=foggy]::before { background:linear-gradient(180deg, rgba(200,205,225,.18), rgba(150,155,190,.12)); }
   #bigBtn { position:absolute; left:-8px; bottom:-8px; width:30px; height:30px; border-radius:50%; border:2px solid var(--line); background:var(--panel); color:var(--dim); font-size:15px; line-height:1; padding:0; cursor:pointer; z-index:2; }
   #stage > * { width:100%; height:100%; display:block; object-fit:cover; }
@@ -1095,6 +1096,9 @@ $('stageBack').onclick = () => document.body.classList.remove('big');
   const wb = el('button', { id: 'weatherBtn', textContent: localStorage.getItem('brenai.weather') ? 'Local weather is on (tap to turn off)' : 'Use the weather where I am' }); wb.style.cssText = sw.style.cssText; nb.insertAdjacentElement('afterend', wb);
   wb.onclick = () => { if (localStorage.getItem('brenai.weather')) { localStorage.removeItem('brenai.weather'); weatherNow = ''; wb.textContent = 'Use the weather where I am'; avatar.weather && avatar.weather(''); return; }
     if (!confirm('This asks your device for its location and sends it, rounded to about 10 km, to the free weather service open-meteo.com to get the current weather. Nothing else is sent. OK?')) return; localStorage.setItem('brenai.weather', '1'); wb.textContent = 'Local weather is on (tap to turn off)'; weatherTick(); }; }
+// the power going out in a storm (the renderer decides when): she jumps, the chat says so, and she is told
+window.addEventListener('wizra-power', e => { const on = !!e.detail; if (away || SANDBOX) return; addSys(on ? 'The power is back.' : 'The power just went out.'); fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: on ? 'powerback' : 'powerout' }) }).catch(() => {});
+  if (!on) setTimeout(() => { avatar.gesture('eep', 3.2); avatar.emote('\u2757', 1800); }, 350); else setTimeout(() => { avatar.gesture('sigh', 2.4); }, 600); });
 // the weather where you are (only if you turned it on): she is told it, and the sky outside her windows follows it
 let weatherNow = '';
 function weatherTick() { if (!localStorage.getItem('brenai.weather') || !navigator.geolocation) return;

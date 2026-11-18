@@ -144,6 +144,8 @@
     step(t) { hit(fxBus, t, 0.07, 0.7, { type: 'lowpass', f: rnd(260, 380) }); }, step2(t) { hit(fxBus, t, 0.06, 0.35, { type: 'lowpass', f: rnd(500, 700) }); hit(fxBus, t, 0.015, 0.03, { f: 2500 }); },   // you, and her boots
     sit(t) { hit(fxBus, t, 0.22, 1.2, { type: 'lowpass', f: 200 }); hit(fxBus, t + 0.05, 0.3, 0.05, { type: 'bandpass', f: 1200 }); },
     tv(t) { hit(fxBus, t, 0.012, 0.25, { f: 2000 }); hit(fxBus, t + 0.02, 0.22, 0.07, { type: 'bandpass', f: 3000, fTo: 6000 }); tone(fxBus, 'sine', 9000, t + 0.02, 0.3, 0.012, { decay: true }); },
+    thunder(t) { hit(fxBus, t, 0.06, 0.8, { type: 'lowpass', f: 2600 }); hit(fxBus, t + 0.06, 2.8, 1.4, { type: 'lowpass', f: 190, fTo: 55 }); hit(fxBus, t + 0.9, 1.6, 0.6, { type: 'lowpass', f: 120 }); },   // a crack, then the long roll
+    powerdown(t) { tone(fxBus, 'sawtooth', 220, t, 0.7, 0.1, { to: 40, lp: 700, decay: true }); hit(fxBus, t, 0.02, 0.3, { f: 1200 }); }, powerup(t) { tone(fxBus, 'sine', 90, t, 0.5, 0.08, { to: 240 }); hit(fxBus, t + 0.45, 0.02, 0.25, { f: 1800 }); },
     click(t) { hit(fxBus, t, 0.014, 0.25, { f: 1500 }); tone(fxBus, 'sine', 1300, t, 0.02, 0.06, { decay: true }); },
     door(t) { tone(fxBus, 'sawtooth', 240, t, 0.35, 0.03, { to: 330, lp: 1200, vib: true }); tone(fxBus, 'sine', 100, t + 0.4, 0.28, 0.45, { to: 52, decay: true }); hit(fxBus, t + 0.4, 0.06, 0.6, { type: 'lowpass', f: 1200 }); },
     pour(t) { hit(fxBus, t, 1.6, 0.3, { type: 'bandpass', f: 900, fTo: 2600, q: 2, a: 0.2 }); },
