@@ -335,6 +335,33 @@
   body.fp #herSide { z-index:2; pointer-events:none; } body.fp #bottom { pointer-events:none; } body.fp #meBox { pointer-events:auto; } body.fp #bar { position:relative; z-index:3; }
   body.fp #logHead, body.fp:not(.fplog) #logWrap { visibility:hidden; } body.fp.fplog #logWrap { z-index:2; }
   body.fp #inviteCard, body.fp #visitMenu { display:none; }
+  /* her Character menu: a card up top, the rest folded away */
+  #panel .idcard { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:20px; background:linear-gradient(120deg, hsl(var(--hue) 70% 46% / .55), hsl(calc(var(--hue) + 50) 70% 42% / .45)); box-shadow:inset 0 0 0 2px rgba(255,255,255,.18); }
+  #panel .idcard img { width:76px; height:76px; border-radius:50%; object-fit:cover; border:3px solid #fff; box-shadow:0 4px 0 rgba(0,0,0,.25); flex:none; background:#2a1b4d; }
+  #panel .idcard b { display:block; font-family:"Bangers","Fredoka",sans-serif; font-weight:400; font-size:28px; letter-spacing:.05em; line-height:1; } #panel .idcard span { display:block; font-family:"Patrick Hand","Fredoka",sans-serif; font-size:17px; line-height:1.25; }
+  #panel .heart { margin-top:12px; padding:12px 14px 16px; border-radius:20px; background:rgba(255,255,255,.07); }
+  #panel .heart .hl { display:flex; align-items:baseline; gap:10px; } #panel .heart .hl b { font-family:"Bangers","Fredoka",sans-serif; font-weight:400; font-size:26px; color:#ff8fc0; } #panel .heart .hl span { flex:1; font-family:"Patrick Hand",sans-serif; font-size:15px; color:rgba(255,255,255,.75); }
+  #panel button.ghost { border:0; background:rgba(255,255,255,.14); color:#fff; border-radius:999px; padding:4px 12px; font:inherit; font-size:12px; cursor:pointer; }
+  #panel .hbar { position:relative; height:16px; margin-top:8px; border-radius:999px; background:rgba(0,0,0,.35); } #panel .hbar i { display:block; height:100%; border-radius:999px; background:linear-gradient(90deg,#a855f7,#ff8fc0); }
+  #panel .hbar em { position:absolute; top:-7px; width:30px; height:30px; margin-left:-15px; border-radius:50%; display:grid; place-items:center; font-style:normal; font-size:15px; background:#3a2a66; box-shadow:0 0 0 2px rgba(255,255,255,.35); filter:grayscale(1); opacity:.75; } #panel .hbar em.got { filter:none; opacity:1; background:#fff; }
+  #panel .heart input[type=range] { width:100%; margin-top:16px; } #panel .heart input[hidden] { display:none; }
+  #panel details.fold { margin-top:10px; border-radius:18px; background:rgba(255,255,255,.07); } #panel details.fold[open] { background:rgba(255,255,255,.11); }
+  #panel .fold summary { list-style:none; display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer; } #panel .fold summary::-webkit-details-marker { display:none; }
+  #panel .fold summary::after { content:"\203A"; margin-left:auto; font-size:24px; line-height:1; opacity:.7; transition:transform .15s; } #panel .fold[open] summary::after { transform:rotate(90deg); }
+  #panel .fold summary i { font-style:normal; font-size:24px; flex:none; } #panel .fold summary b { font-family:"Fredoka",sans-serif; font-weight:600; font-size:16px; flex:none; }
+  #panel .fold .pv { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:"Patrick Hand",sans-serif; font-size:15px; color:rgba(255,255,255,.6); } #panel .fold[open] .pv { visibility:hidden; }
+  #panel .fold .cnt { padding:1px 10px; border-radius:999px; background:rgba(255,255,255,.18); font-size:13px; font-weight:700; }
+  #panel .fbody { padding:0 14px 14px; } #panel .fbody label { margin-left:0; margin-right:0; } #panel .fbody > .note:first-child { margin-top:0; } #panel .fbody .chips { margin-top:8px; }
+  #panel .tri { display:flex; gap:10px; margin:12px 0 4px; } #panel .tri > div { flex:1; text-align:center; padding:8px 4px; border-radius:16px; background:rgba(0,0,0,.22); } #panel .tri > div.on { background:var(--grad); box-shadow:0 3px 0 rgba(0,0,0,.28); }
+  #panel .tri span { display:flex; align-items:flex-end; justify-content:center; height:46px; } #panel .tri span i { width:18px; border-radius:6px 6px 2px 2px; background:#fff; opacity:.85; } #panel .tri b { display:block; font-size:22px; } #panel .tri small { font-size:12px; font-weight:600; }
+  /* together in person: three kinds of moment down the left edge, and what each one offers */
+  #fpMoments { display:none; } body.fp #fpMoments { display:flex; flex-direction:column; gap:10px; position:fixed; left:10px; top:34%; z-index:6; }
+  #fpMoments button { width:48px; height:48px; border-radius:50%; border:0; background:#fff; font-size:22px; line-height:1; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); position:relative; } #fpMoments button.lead { box-shadow:0 0 0 3px #ff8fc0, 0 4px 0 rgba(0,0,0,.3); }
+  #fpMoments button small { position:absolute; right:-6px; bottom:-4px; min-width:20px; padding:1px 5px; border-radius:999px; background:#3a2a66; color:#fff; font:700 11px "Fredoka",sans-serif; }
+  #fpChoices { position:fixed; left:68px; top:34%; z-index:7; display:flex; flex-direction:column; gap:8px; max-width:min(300px, calc(100vw - 84px)); } #fpChoices[hidden] { display:none; }
+  #fpChoices button { text-align:left; border:0; border-radius:16px; padding:10px 14px; background:#fff; color:#3a2a5c; font-family:"Patrick Hand","Fredoka",sans-serif; font-size:17px; line-height:1.2; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); }
+  #bondPop { position:fixed; left:50%; top:22%; z-index:8; transform:translateX(-50%); font-family:"Bangers","Fredoka",sans-serif; font-size:34px; color:#fff; text-shadow:0 3px 0 #a8327a, 0 0 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; } #bondPop.go { animation:bondPop 1.8s ease-out; }
+  @keyframes bondPop { 0% { opacity:0; transform:translate(-50%, 20px) scale(.7); } 15% { opacity:1; transform:translate(-50%, 0) scale(1.1); } 100% { opacity:0; transform:translate(-50%, -50px) scale(1); } }
 </style>
 </head>
 <body>
@@ -381,6 +408,7 @@
 <div id="stageBack"></div>
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
+<div id="fpMoments"></div><div id="fpChoices" hidden></div><div id="bondPop"></div>
 <div id="fpBar"><button id="fpLeave">Head home</button><button id="fpLog" class="quiet">Chat log</button><span id="fpHint"></span></div>
 <!-- the video call: a phone on the screen with her on it. Nothing is written during a call; you talk, she answers out loud. -->
 <div id="call">
@@ -533,17 +561,20 @@ setInterval(async () => { // keep time with the server: is she due back, has the
 // ---------- getting together ----------
 // At 100 relationship points you can invite her over to your house or go to her dorm (and she can ask you). The server
 // keeps where you both are; here the avatar's stage becomes the whole screen and you look through your own eyes.
-let visitInfo = { place: '', canVisit: false, rapport: 0, visitAt: 100, invite: '' }, shownPlace = '', hintTimer = 0;
+let visitInfo = { place: '', canVisit: false, rapport: 0, visitAt: 90, invite: '', bond: {}, path: '' }, shownPlace = '', hintTimer = 0, seeingOut = false;
 function syncPlace(arriving) {
   const want = visitInfo.place && avatar.canVisit() && !away ? visitInfo.place : '';
-  if (want === shownPlace) return; shownPlace = want;
+  if (want === shownPlace || seeingOut) return; shownPlace = want; $('fpChoices').hidden = true;
   document.body.classList.toggle('fp', !!want); document.body.classList.remove('fplog', 'big'); $('visitMenu').hidden = true;
   avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return');
   if (want) { const h = $('fpHint'); h.textContent = 'Drag to look. Tap the floor to walk. Tap ' + (want === 'house' ? 'the couch to sit, the TV to switch it on.' : 'her bed to sit.'); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => { h.style.opacity = 0; }, 9000); }
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 100, invite: d.invite || '' };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '' };
+  if (sheet) { sheet.bond = visitInfo.bond; sheet.path = visitInfo.path; sheet.rapport = d.rapport; }
+  for (const k in PATHS) if (was && old[k] !== undefined && visitInfo.bond[k] > old[k]) { const pop = $('bondPop'); pop.textContent = '+' + (visitInfo.bond[k] - old[k]) + ' ' + PATHS[k][0]; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
+  drawMoments();
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
   showInvite();
 }
@@ -567,7 +598,31 @@ $('visitBtn').onclick = e => {
 };
 document.addEventListener('click', e => { if (!$('visitMenu').hidden && !$('visitMenu').contains(e.target)) $('visitMenu').hidden = true; });
 $('fpLog').onclick = () => { document.body.classList.toggle('fplog'); log.scrollTop = log.scrollHeight; };
-$('fpLeave').onclick = async () => { const was = visitInfo.place; try { const r = await api('/api/visit', { place: '' }); const d = await r.json(); if (was) addSys(was === 'dorm' ? 'You headed home.' : 'Wizra headed home.'); setPlace(d); } catch {} };
+$('fpLeave').onclick = async () => {
+  const was = visitInfo.place; if (seeingOut) return;
+  try {
+    const r = await api('/api/visit', { place: '' }); const d = await r.json(); if (was) addSys(was === 'dorm' ? 'You headed home.' : 'Wizra headed home.');
+    if (was === 'house' && shownPlace === 'house' && !away) { // see her out: she walks to your door before the view goes back to her room
+      seeingOut = true; avatar.presence('leave'); const t0 = Date.now(); while (avatar.activity() !== 'out' && Date.now() - t0 < 20000) await new Promise(ok => setTimeout(ok, 300));
+      seeingOut = false; setPlace(d); if (!away) avatar.presence('return');
+    } else setPlace(d);
+  } catch { seeingOut = false; }
+};
+// the dating-sim part: while you are together, three kinds of moment. What you pick (and how you talk) decides what you become.
+const MOMENTS = {
+  romance: ['sits a little closer to her', 'tells her she looks really good tonight', 'holds her gaze a moment longer than usual and smiles', 'offers her his hoodie', 'asks if she would want to go on an actual date sometime', 'tucks a strand of hair behind her ear', 'tells her he likes having her around', 'reaches over and takes her hand'],
+  friend: ['challenges her to a round of cards', 'shows her a dumb meme on his phone', 'suggests ordering pizza and putting a horror movie on', 'asks how her D&D campaign is going', 'roasts her dice superstitions', 'holds out a fist for a bump', 'dares her to do her worst villain voice', 'starts a debate about the best horror movie ever made'],
+  mentor: ['asks how her thesis research is going', 'offers to look over her paper with her', 'gives her some honest advice about life after graduation', 'asks what she wants to be doing in five years', 'tells her she handled that well, and why', 'walks her through how he would approach the problem', 'asks what she is stuck on this week', 'tells her about a mistake he made at her age'],
+};
+function drawMoments() {
+  const box = $('fpMoments'); box.textContent = '';
+  for (const k in PATHS) { const b = el('button', { title: PATHS[k][1], className: visitInfo.path === k ? 'lead' : '' }, PATHS[k][0], el('small', { textContent: (visitInfo.bond || {})[k] || 0 })); b.onclick = e => { e.stopPropagation(); showChoices(k); }; box.append(b); }
+}
+function showChoices(k) {
+  const c = $('fpChoices'); if (!c.hidden && c.dataset.k === k) { c.hidden = true; return; } c.dataset.k = k; c.textContent = ''; c.hidden = false;
+  for (const text of [...MOMENTS[k]].sort(() => Math.random() - 0.5).slice(0, 3)) { const b = el('button', { textContent: text[0].toUpperCase() + text.slice(1).replace(/\bher\b/g, 'her').replace(/\bhe\b/g, 'you').replace(/\bhis\b/g, 'your') }); b.onclick = () => { c.hidden = true; send('*' + text + '*', '', k); }; c.append(b); }
+}
+document.addEventListener('click', e => { if (!$('fpChoices').hidden && !$('fpChoices').contains(e.target)) $('fpChoices').hidden = true; });
 
 // Her reply is decided first, then typed out: nothing is rearranged after it appears. Speech starts with the typing.
 function typeOut(body, text) {
@@ -618,7 +673,7 @@ async function readReply(r, body, beforeType) {
   }
 }
 
-async function send(quick, visit) {
+async function send(quick, visit, lean) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
@@ -627,7 +682,7 @@ async function send(quick, visit) {
   addLine('me', text); bubble('me', text);
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   try {
-    const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}) });
+    const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     await readReply(r, body);
   } catch (e) {
@@ -959,8 +1014,18 @@ function slider(title, key, lo, hi, note) {
   if (note) out.append(el('div', { className: 'note', textContent: note }));
   return out;
 }
+// what the two of you are: [icon, short name, how it reads on her card]
+const PATHS = { romance: ['\uD83D\uDC97', 'Romance', 'Something more than friends'], friend: ['\uD83C\uDFB2', 'Friends', 'Close friends'], mentor: ['\uD83C\uDF93', 'Mentor', 'You are her mentor'] };
+// a section that stays shut until tapped: icon, title and a hint of what is inside. It remembers being open.
+const openFolds = new Set();
+function fold(key, icon, title, hint, ...kids) {
+  const d = el('details', { className: 'fold', open: openFolds.has(key) }), body = el('div', { className: 'fbody' }); body.append(...kids);
+  d.append(el('summary', {}, el('i', { textContent: icon }), el('b', { textContent: title }), el('span', { className: typeof hint === 'number' ? 'cnt' : 'pv', textContent: String(hint) })), body);
+  d.ontoggle = () => { d.open ? openFolds.add(key) : openFolds.delete(key); };
+  return d;
+}
 function listEditor(title, key, secret) {
-  const box = el('div'); box.append(el('label', { textContent: title }));
+  const box = el('div'); if (title) box.append(el('label', { textContent: title }));
   const chips = el('div', { className: 'chips' });
   const items = sheet[key];
   items.forEach((it, i) => {
@@ -1004,21 +1069,36 @@ function buildPanel(k) {
     p.append(slider('Temperature', 'temperature', 'predictable', 'wild', 'Real sampling temperature on your PC model (0.3 to 1.2, middle is 0.75), plus a matching hint in her instructions. Lower if she rambles or gets odd.'));
   } else if (k === 'sheet') {
     p.append(el('h3', { textContent: 'Character' }));
-    const bd = el('input', { type: 'text', value: sheet.birthday });
-    const bs = el('textarea', { rows: 6, value: sheet.backstory });
-    const saveTxt = el('button', { className: 'small', textContent: 'Save birthday + backstory' });
-    saveTxt.onclick = () => saveSettings({ sheet: { birthday: bd.value, backstory: bs.value } }).then(() => openPanel('sheet'));
-    const rp = el('input', { type: 'range', min: 0, max: 100, value: sheet.rapport }); rp.onchange = () => saveSettings({ sheet: { rapport: +rp.value } }).then(() => openPanel('sheet'));
-    const cl = el('input', { type: 'range', min: 0, max: 3, step: 1, value: sheet.cussLevel }); cl.onchange = () => saveSettings({ sheet: { cussLevel: +cl.value } }).then(() => openPanel('sheet'));
+    const again = () => openPanel('sheet'), v = visitInfo, bond = sheet.bond || {}, path = sheet.path || '';
+    // her card: picture, name, birthday and what you two are
+    const born = new Date(String(sheet.birthday).split('(')[0]), now = new Date(), age = isNaN(born) ? '' : now.getFullYear() - born.getFullYear() - (now < new Date(now.getFullYear(), born.getMonth(), born.getDate()) ? 1 : 0);
+    const pic = el('img', { src: herThumb || 'me.svg', alt: 'Wizra' }); pic.dataset.her = '1';
+    p.append(el('div', { className: 'idcard' }, pic, el('div', {}, el('b', { textContent: 'Wizra' }), el('span', { textContent: '🎂 ' + (isNaN(born) ? sheet.birthday : born.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' · ' + age) }), el('span', { textContent: PATHS[path] ? PATHS[path][0] + ' ' + PATHS[path][2] : '✨ Still finding out what you two are' }))));
+    // rapport: a heart meter with the two things it unlocks marked on it
+    const fill = el('i', {}); fill.style.width = sheet.rapport + '%';
+    const tick = (at, text) => { const t = el('em', { textContent: text }); t.style.left = at + '%'; if (sheet.rapport >= at) t.className = 'got'; return t; };
+    const rp = el('input', { type: 'range', min: 0, max: 100, value: sheet.rapport }); rp.hidden = true; rp.onchange = () => saveSettings({ sheet: { rapport: +rp.value } }).then(again);
+    const adj = el('button', { className: 'ghost', textContent: 'adjust' }); adj.onclick = () => { rp.hidden = !rp.hidden; };
+    p.append(el('div', { className: 'heart' }, el('div', { className: 'hl' }, el('b', { textContent: '♥ ' + sheet.rapport }), el('span', { textContent: 'Rapport. Moves on its own as you talk.' }), adj), el('div', { className: 'hbar' }, fill, tick(60, '🗣'), tick(v.visitAt || 90, '🏠')), rp));
+    // what you are to each other: follows how you treat her, or pin it
+    const tri = el('div', { className: 'tri' });
+    for (const key of ['romance', 'friend', 'mentor']) { const [ico, name] = PATHS[key], bar = el('i', {}); bar.style.height = Math.min(100, (bond[key] || 0) * 2.5 + 4) + '%'; tri.append(el('div', { className: path === key ? 'on' : '' }, el('span', {}, bar), el('b', { textContent: ico }), el('small', { textContent: name + ' ' + (bond[key] || 0) }))); }
+    const lock = el('div', { className: 'chips' });
+    for (const [key, name] of [['', 'Let it follow how I treat her'], ['romance', 'Romance'], ['friend', 'Friends'], ['mentor', 'Mentor']]) { const c = el('span', { className: 'chip' + ((sheet.pathLock || '') === key ? ' sel' : ''), textContent: name }); c.onclick = () => saveSettings({ sheet: { pathLock: key } }).then(again); lock.append(c); }
+    p.append(fold('bond', '💞', 'You and her', PATHS[path] ? PATHS[path][1] : 'not settled yet', el('div', { className: 'note', textContent: 'Flirt, hang out or guide her, mostly when you are at each other\'s places, and this fills in by itself.' }), tri, lock));
+    // cussing: four faces
+    const cuss = el('div', { className: 'chips' });
+    [['😇', 'never'], ['🙊', 'mild'], ['😏', 'casual'], ['🤬', 'free']].forEach(([ico, name], n) => { const c = el('span', { className: 'chip big' + (sheet.cussLevel === n ? ' sel' : '') }, el('i', { textContent: ico }), name); c.onclick = () => saveSettings({ sheet: { cussLevel: n } }).then(again); cuss.append(c); });
     const dev = el('input', { type: 'checkbox', checked: settings.cussDevelop }); dev.onchange = () => saveSettings({ settings: { cussDevelop: dev.checked } });
-    p.append(el('label', { textContent: 'Birthday' }), bd, el('label', { textContent: 'Backstory' }), bs, el('div', { className: 'row' }, saveTxt),
-      listEditor('Likes', 'likes'), listEditor('Dislikes', 'dislikes'),
-      el('label', { textContent: 'Rapport: ' + sheet.rapport + '/100 (moves on its own as you talk)' }), rp,
-      el('label', { textContent: 'Cussing: ' + ['never', 'mild', 'casual', 'free'][sheet.cussLevel] }), cl,
-      el('label', {}, dev, ' Let her pick up cussing over time (only once rapport is 60+ and you cuss yourself)'));
+    p.append(fold('cuss', '💬', 'Cussing', ['never', 'mild', 'casual', 'free'][sheet.cussLevel], cuss, el('label', {}, dev, ' Let her pick it up over time (rapport 60+ and you cuss yourself)')));
+    // the long reads, tucked away
+    const bd = el('input', { type: 'text', value: sheet.birthday }), bs = el('textarea', { rows: 7, value: sheet.backstory });
+    const saveTxt = el('button', { className: 'small', textContent: 'Save' }); saveTxt.onclick = () => saveSettings({ sheet: { birthday: bd.value, backstory: bs.value } }).then(again);
+    p.append(fold('story', '📖', 'Backstory', sheet.backstory, el('label', { textContent: 'Birthday' }), bd, el('label', { textContent: 'Backstory' }), bs, el('div', { className: 'row' }, saveTxt)),
+      fold('likes', '💜', 'Likes', sheet.likes.length, listEditor('', 'likes')), fold('dislikes', '🚫', 'Dislikes', sheet.dislikes.length, listEditor('', 'dislikes')));
     const nt = el('textarea', { rows: 8, value: notes });
     const saveN = el('button', { className: 'small', textContent: 'Save notes' }); saveN.onclick = () => api('/api/settings', { notes: nt.value }).then(() => { notes = nt.value; saveN.textContent = 'Saved'; });
-    p.append(el('label', { textContent: 'Her private notes about you (she rewrites these every few messages; edit or clear them if she picked up something wrong)' }), nt, el('div', { className: 'row' }, saveN));
+    p.append(fold('notes', '📝', 'Her notes about you', notes ? notes.split(/\s+/).length + ' words' : 'empty', el('div', { className: 'note', textContent: 'She rewrites these every few messages. Edit or clear them if she picked up something wrong.' }), nt, el('div', { className: 'row' }, saveN)));
   } else if (k === 'avatar') {
     const is3d = settings.avatarKind === 'vrm';
     p.append(el('h3', { textContent: 'Avatar' }), el('div', { className: 'note', textContent: 'Now showing: ' + (is3d ? '3D model' + (settings.avatarName ? ' (' + settings.avatarName + ')' : '') : 'the cartoon') + (avatarNote ? '. ' + avatarNote : '') }));

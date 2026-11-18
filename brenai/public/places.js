@@ -117,11 +117,11 @@ export function buildPlaces(THREE, A) {
   wall('E', Hh.x1, Hh.z0, Hh.z1, Hh.h, '#eed6b4', [], null, '#ffffff'); wall('S', Hh.z1, Hh.x0, Hh.x1, Hh.h, '#f1dfc2', [], null, '#ffffff');
   // the couch: she sits at its right-hand end (the same seat her armchair has in the dorm), with room beside her
   TAG = 'chair'; const cw = 2.5, cx = -0.88, baseH = seatTop - floorY - 0.12;
-  box(cw, baseH, 0.78, cx, floorY + baseH / 2, hip.z + 0.06, '#3f6f8f'); box(cw, 0.95, 0.18, cx, seatTop + 0.3, hip.z - 0.37, '#4a82a6', -0.28);
-  for (let i = 0; i < 3; i++) box(0.74, 0.15, 0.64, 0.02 - i * 0.78, seatTop - 0.07, hip.z + 0.1, '#5a9cc4');
-  box(0.14, 0.32, 0.76, 0.42, seatTop + 0.08, hip.z + 0.05, '#4a82a6'); box(0.14, 0.32, 0.76, cx - cw / 2 + 0.02, seatTop + 0.08, hip.z + 0.05, '#4a82a6');
+  box(cw, baseH, 0.66, cx, floorY + baseH / 2, hip.z - 0.02, '#3f6f8f'); box(cw, 0.95, 0.18, cx, seatTop + 0.3, hip.z - 0.37, '#4a82a6', -0.28);
+  for (let i = 0; i < 3; i++) box(0.74, 0.15, 0.56, 0.02 - i * 0.78, seatTop - 0.07, hip.z + 0.03, '#5a9cc4');
+  box(0.14, 0.32, 0.66, 0.42, seatTop + 0.08, hip.z - 0.02, '#4a82a6'); box(0.14, 0.32, 0.66, cx - cw / 2 + 0.02, seatTop + 0.08, hip.z - 0.02, '#4a82a6');
   TAG = ''; box(0.4, 0.4, 0.14, -1.6, seatTop + 0.22, hip.z - 0.2, '#ffd166', -0.3); box(0.36, 0.36, 0.14, -0.9, seatTop + 0.2, hip.z - 0.2, '#ff8fc0', -0.3);                              // cushions
-  TAG = 'table'; box(1.5, 0.06, 0.6, -0.45, tableTop - 0.03, tableZ + 0.04, '#8a5a34'); for (const [dx, dz] of [[-0.68, -0.24], [0.68, -0.24], [-0.68, 0.24], [0.68, 0.24]]) box(0.06, tableTop - floorY - 0.06, 0.06, -0.45 + dx, (tableTop - 0.06 + floorY) / 2, tableZ + 0.04 + dz, '#6b4326');
+  TAG = 'table'; box(1.5, 0.06, 0.5, -0.45, tableTop - 0.03, tableZ + 0.07, '#8a5a34'); for (const [dx, dz] of [[-0.68, -0.19], [0.68, -0.19], [-0.68, 0.19], [0.68, 0.19]]) box(0.06, tableTop - floorY - 0.06, 0.06, -0.45 + dx, (tableTop - 0.06 + floorY) / 2, tableZ + 0.07 + dz, '#6b4326');
   TAG = 'floor'; reg(flat(3.4, 2.5, -0.6, floorY + 0.004, hip.z + 1.0, toon('#d9534f'), true)); reg(flat(3.0, 2.1, -0.6, floorY + 0.008, hip.z + 1.0, toon('#f6e7c8'), true));                    // rug
   // TV on its stand, against the front wall, facing the couch
   const tvZ = Hh.z1 - 0.32, tvX = -0.7; TAG = 'tv';
@@ -152,9 +152,9 @@ export function buildPlaces(THREE, A) {
   // what she cannot walk through: the real footprints of the furniture [x0, x1, z0, z1] (her path finder pads them)
   const pot = (x, z, r) => [x - r, x + r, z - r, z + r];
   const solid = {
-    dorm: [[-0.44, 0.44, hip.z - 0.5, hip.z + 0.42], [-0.4, 0.4, tableZ - 0.25, tableZ + 0.25], [SHELF.x - 0.47, SHELF.x + 0.47, D.z0, SHELF.z + 0.15], [COUNTER.x - 0.38, COUNTER.x + 0.38, D.z0, COUNTER.z + 0.25], [COUNTER.x + 0.5, COUNTER.x + 1.0, D.z0, COUNTER.z + 0.27],
+    dorm: [[-0.44, 0.44, hip.z - 0.5, hip.z + 0.3], [-0.4, 0.4, tableZ - 0.18, tableZ + 0.22], [SHELF.x - 0.47, SHELF.x + 0.47, D.z0, SHELF.z + 0.15], [COUNTER.x - 0.38, COUNTER.x + 0.38, D.z0, COUNTER.z + 0.25], [COUNTER.x + 0.5, COUNTER.x + 1.0, D.z0, COUNTER.z + 0.27],
       pot(0.75, backZ + 0.1, 0.04), [D.x0, bedX + 0.5, bedZ - 1.04, bedZ + 1.0], [deskX - 0.65, deskX + 0.65, deskZ - 0.3, D.z1], [deskX - 0.33, deskX + 0.13, deskZ - 0.87, deskZ - 0.4]],
-    house: [[cx - cw / 2 - 0.05, 0.49, hip.z - 0.5, hip.z + 0.45], [-1.2, 0.3, tableZ - 0.26, tableZ + 0.34], [SHELF.x - 0.47, SHELF.x + 0.47, Hh.z0, SHELF.z + 0.15], [kx0, Hh.x1, Hh.z0, COUNTER.z + 0.28], [Hh.x1 - 0.77, Hh.x1, hip.z - 0.75, hip.z - 0.09],
+    house: [[cx - cw / 2 - 0.05, 0.49, hip.z - 0.5, hip.z + 0.31], [-1.2, 0.3, tableZ - 0.18, tableZ + 0.32], [SHELF.x - 0.47, SHELF.x + 0.47, Hh.z0, SHELF.z + 0.15], [kx0, Hh.x1, Hh.z0, COUNTER.z + 0.28], [Hh.x1 - 0.77, Hh.x1, hip.z - 0.75, hip.z - 0.09],
       [tvX - 0.85, tvX + 0.85, tvZ - 0.21, Hh.z1], [dx - 1.1, dx + 1.1, dz - 0.62, dz + 0.62], pot(Hh.x0 + 0.4, Hh.z0 + 0.45, 0.3), pot(2.55, hip.z + 3.9, 0.24), pot(-2.3, tvZ - 0.05, 0.2), pot(-2.15, backZ + 0.05, 0.04)],
   };
   return {

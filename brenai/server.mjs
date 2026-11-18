@@ -146,6 +146,7 @@ function authed(req) {
 // ---------- the model call ----------
 function systemBlocks() {
   // Stable first so the cache holds; this only changes when settings, the sheet or the notes change.
+  fixBond();
   const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') }];
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
@@ -316,11 +317,24 @@ async function learn() {
   for (const i of Array.isArray(out.revealed) ? out.revealed : []) if (sh.hiddenLikes[i]) sh.hiddenLikes[i].revealed = true;
   const nl = typeof out.new_hidden_like === 'string' ? out.new_hidden_like.trim() : '';
   if (nl && d > 0 && sh.hiddenLikes.length < 30 && !sh.hiddenLikes.some(h => h.text.toLowerCase() === nl.toLowerCase())) sh.hiddenLikes.push({ text: nl.slice(0, 200), revealed: false, grown: true });
+  if (BOND.includes(out.bond_lean)) addBond(out.bond_lean, db.place ? 2 : 1);
   const c = Math.round(Number(out.cuss_level));
   if (db.settings.cussDevelop && Number.isFinite(c) && c === sh.cussLevel + 1 && sh.rapport >= 60) sh.cussLevel = c;
   save();
   console.log(`[learn] rapport ${sh.rapport} (${d >= 0 ? '+' : ''}${d}) cuss ${sh.cussLevel}${nl ? ' new secret like' : ''}`);
 }
+
+// ---- what they are to each other: romance, friends or mentor. Nobody picks it from a menu; it follows how he treats her.
+// Each lean adds points (more when they are together in person). The clear leader becomes sheet.path, which her prompt uses.
+// sheet.pathLock (set from her Character menu) pins it by hand; '' lets it follow the points again.
+const BOND = ['romance', 'friend', 'mentor'];
+function fixBond() {
+  const sh = db.sheet; if (!sh.bond || typeof sh.bond !== 'object') sh.bond = {}; for (const k of BOND) sh.bond[k] = Math.max(0, Math.min(100, Math.round(+sh.bond[k] || 0)));
+  const order = [...BOND].sort((a, b) => sh.bond[b] - sh.bond[a]), top = order[0];
+  sh.path = BOND.includes(sh.pathLock) ? sh.pathLock : (sh.bond[top] >= 5 && sh.bond[top] - sh.bond[order[1]] >= 2 ? top : '');
+}
+function addBond(kind, n) { fixBond(); db.sheet.bond[kind] = Math.min(100, db.sheet.bond[kind] + n); fixBond(); }
+const bondView = () => { fixBond(); return { bond: db.sheet.bond, path: db.sheet.path, pathLock: db.sheet.pathLock || '' }; };
 
 // Only known fields, sane types; the sheet is fully editable from the wheel.
 function applySettings(body) {
@@ -339,6 +353,9 @@ function applySettings(body) {
   for (const k of ['likes', 'dislikes']) if (Array.isArray(h[k])) H[k] = h[k].map(String).map(x => x.trim()).filter(Boolean).slice(0, 60);
   if (Array.isArray(h.hiddenLikes)) H.hiddenLikes = h.hiddenLikes.filter(x => x && String(x.text || '').trim()).slice(0, 60).map(x => ({ text: String(x.text).trim().slice(0, 200), revealed: !!x.revealed, ...(x.grown ? { grown: true } : {}) }));
   if (Number.isFinite(+h.rapport)) H.rapport = Math.max(0, Math.min(100, Math.round(+h.rapport)));
+  if (h.pathLock === '' || BOND.includes(h.pathLock)) H.pathLock = h.pathLock;
+  if (h.bond && typeof h.bond === 'object') { fixBond(); for (const k of BOND) if (Number.isFinite(+h.bond[k])) H.bond[k] = +h.bond[k]; }
+  fixBond();
   if (Number.isFinite(+h.cussLevel)) H.cussLevel = Math.max(0, Math.min(3, Math.round(+h.cussLevel)));
   save();
 }
@@ -372,7 +389,7 @@ const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, unt
 const VISIT_AT = 90;
 const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= VISIT_AT;
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
-const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: VISIT_AT, invite: inviteNow() });
+const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: VISIT_AT, invite: inviteNow(), ...bondView() });
 function placeNote() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
@@ -523,7 +540,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text, doing, voice: wantVoice, visit } = await readBody(req);
+        const { text, doing, voice: wantVoice, visit, lean } = await readBody(req);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
@@ -557,6 +574,7 @@ const server = http.createServer(async (req, res) => {
           if (wantVoice) prewarm(full);
           db.log.push({ who: 'her', text: full, at: Date.now() });
           db.sinceLearn++;
+          if (db.place && BOND.includes(lean)) addBond(lean, 2);                       // one of the moments he chose while they are together
           if (ask) db.log.push({ who: 'sys', text: ask === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: Date.now() });
           notePlan(full); const leave = detectLeave(full); if (leave) leaveNow(leave);
           else if (!db.place && !askPre && canVisit()) { const inv = detectInvite(full); if (inv) db.invite = { place: inv, at: Date.now() }; }

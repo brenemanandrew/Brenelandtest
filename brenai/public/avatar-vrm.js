@@ -141,13 +141,13 @@ export async function create(url) {
   const tag = (m, t = TAG, where = 'dorm') => { m.traverse(o => { if (o.isMesh) { o.userData.tag = t; o.userData.place = where; tagged.push(o); } }); return m; };
   const box = (w, h, d, x, y, z, c, rx = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.rotation.x = rx; if (Math.max(w, h, d) > 0.24) kit.outline(m); room.add(m); return tag(m); };
   const seatTop = hip.y - 0.1;
-  box(0.74, seatTop - floorY - 0.12, 0.72, 0, (seatTop - 0.12 + floorY) / 2, hip.z + 0.06, '#3a2148');           // chair body
-  box(0.6, 0.14, 0.62, 0, seatTop - 0.07, hip.z + 0.1, '#5b3570');                                               // seat cushion
+  box(0.74, seatTop - floorY - 0.12, 0.62, 0, (seatTop - 0.12 + floorY) / 2, hip.z - 0.01, '#3a2148');           // chair body
+  box(0.6, 0.14, 0.54, 0, seatTop - 0.07, hip.z + 0.03, '#5b3570');                                               // seat cushion
   box(0.74, 0.95, 0.16, 0, seatTop + 0.3, hip.z - 0.36, '#4a2a5c', -0.28);                                       // back, tilted
-  box(0.13, 0.3, 0.7, -0.38, seatTop + 0.08, hip.z + 0.05, '#4a2a5c'); box(0.13, 0.3, 0.7, 0.38, seatTop + 0.08, hip.z + 0.05, '#4a2a5c'); // arms
+  box(0.13, 0.3, 0.62, -0.38, seatTop + 0.08, hip.z - 0.01, '#4a2a5c'); box(0.13, 0.3, 0.62, 0.38, seatTop + 0.08, hip.z - 0.01, '#4a2a5c'); // arms
   const tableTop = feet.y - (window.WIZRA_TABLE || 0.1), tableZ = feet.z + 0.03; TAG = 'table';
-  box(0.8, 0.05, 0.5, 0, tableTop - 0.025, tableZ, '#3b2a1c');                                            // table top
-  for (const [x, z] of [[-0.35, -0.2], [0.35, -0.2], [-0.35, 0.2], [0.35, 0.2]]) box(0.05, tableTop - floorY - 0.05, 0.05, x, (tableTop - 0.05 + floorY) / 2, tableZ + z, '#2a1d14');
+  box(0.8, 0.05, 0.4, 0, tableTop - 0.025, tableZ + 0.02, '#3b2a1c');                                            // table top
+  for (const [x, z] of [[-0.35, -0.13], [0.35, -0.13], [-0.35, 0.17], [0.35, 0.17]]) box(0.05, tableTop - floorY - 0.05, 0.05, x, (tableTop - 0.05 + floorY) / 2, tableZ + z, '#2a1d14');
   const rug = new THREE.Mesh(new THREE.CircleGeometry(1.25, 40), mat('#251a30')); rug.rotation.x = -Math.PI / 2; rug.position.set(0, floorY, (hip.z + feet.z) / 2); room.add(rug); tag(rug, 'floor');
 
   // ---- the rest of her room: a floor, a bookshelf to the left and a little counter with a kettle to the right ----
@@ -197,7 +197,7 @@ export async function create(url) {
     book: [new THREE.Vector3(0.24, tableTop + 0.012, feet.z - 0.08), new THREE.Euler(-Math.PI / 2, 0, 0.4)],
     bookShelf: [new THREE.Vector3(SHELF.x - 0.19, floorY + 0.07 + 2 * 0.41 + 0.1, SHELF.z + 0.02), new THREE.Euler(0, Math.PI / 2, 0)], // its gap on the shelf
     phone: [new THREE.Vector3(-0.26, tableTop + 0.006, feet.z - 0.1), new THREE.Euler(-Math.PI / 2, 0, -0.3)],
-    mug: [new THREE.Vector3(-0.38, seatTop + 0.275, hip.z + 0.22), new THREE.Euler(0, 0.6, 0)],
+    mug: [new THREE.Vector3(-0.38, seatTop + 0.275, hip.z + 0.16), new THREE.Euler(0, 0.6, 0)],
   };
   const PROP = { read: book, phone, sip: mug }, PROP_KEY = { read: 'book', phone: 'phone', sip: 'mug' };
   const raw = n => vrm.humanoid.getRawBoneNode(n);
@@ -207,7 +207,7 @@ export async function create(url) {
   // ---- her routine: what she is busy with when left alone, and the errands she can run ----
   // Seated she reads, checks her phone or sips. On her feet she follows a plan: a list of steps (go somewhere, turn, wait
   // with her hand out, do something), then walks back and sits down, optionally starting something once seated.
-  const standZ = Math.max(hip.z + 0.4, Math.min(hip.z + 0.55, (hip.z + 0.42 + tableZ - 0.25) / 2)), STAND_AT = [0, standZ];                                               // she stands up in front of the chair, between it and the table
+  const standZ = Math.max(hip.z + 0.38, (hip.z + 0.3 + tableZ - 0.18) / 2), STAND_AT = [0, standZ]; window.WIZRA_DBG = { feet: feet.z - hip.z, stand: standZ - hip.z, table: tableZ - hip.z };                                               // she stands up in front of the chair, between it and the table
   const EXIT = [0.95, standZ];                                                // then steps out to the side past the armrest
   const R_BACK = [0.95, hip.z - 0.72], L_BACK = [-0.78, hip.z - 0.72];             // round the back of the chair
   const AT_SHELF = [SHELF.x + 0.12, SHELF.z + 0.5], AT_COUNTER = [COUNTER.x - 0.05, COUNTER.z + 0.52];
@@ -523,6 +523,7 @@ export async function create(url) {
   const keyUp = e => fp.keys.delete(String(e.key).toLowerCase()), keysOff = () => fp.keys.clear();
   window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp); window.addEventListener('blur', keysOff);
   function walkYou(dt) {
+    if (window.WIZRA_YOU) { fp.x = hip.x + window.WIZRA_YOU[0]; fp.z = hip.z + window.WIZRA_YOU[1]; } // test hook: stand you somewhere, measured from her seat
     const K = fp.keys, f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), sd = (K.has('d') ? 1 : 0) - (K.has('a') ? 1 : 0);
     fp.yaw -= ((K.has('arrowright') ? 1 : 0) - (K.has('arrowleft') ? 1 : 0)) * dt * 1.9;
     let mx = 0, mz = 0; const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw);

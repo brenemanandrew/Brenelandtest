@@ -55,3 +55,9 @@ Fonts are hosted in `public/fonts` (SIL Open Font License): Fredoka for the inte
 - Server: `db.place` ('' / 'dorm' / 'house'), `POST /api/visit`, `visit` on `/api/chat`, a place note in her prompt. Test switches: `VISIT_TEST=1` (skip the points gate), `VISIT_TEST_ANSWER=yes|no`.
 - Needs her 3D model; with the cartoon avatar the button just says so.
 
+
+## What you two become (romance, friends, mentor)
+- Nobody picks it from a menu. Each lean adds points to `sheet.bond`: the learning step reads which way you leaned in recent talk (worth double while you are together in person), and the three round buttons down the left edge during a visit offer three "moments" each (flirt, hang out, guide), worth 2 points.
+- Once one is clearly ahead (5+ points and 2 clear of the next) it becomes `sheet.path` and a line in her prompt (`BOND_LINE` in persona.mjs) sets how she relates to you. Her Character menu shows the three scores and can pin a path by hand.
+- Her Character menu is a card (picture, birthday, heart meter with the cussing and visit marks) with everything else folded away.
+- Test hooks in the 3D view: `WIZRA_CAM` (fixed camera), `WIZRA_YOU` (where you stand), `WIZRA_LEGS`, `WIZRA_TABLE`.
