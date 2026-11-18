@@ -160,7 +160,7 @@
     let voice = null, state = ''; let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
     function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + (STATE[state] ? 5000 + Math.random() * 7000 : 9000 + Math.random() * 14000); if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
-    function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; }
+    function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; if (opts.onEmote) opts.onEmote(ch); }
     function kick(rot = 0, tx = 0, ty = 0, sq = 0) { sp.rot.v += rot; sp.tx.v += tx; sp.ty.v += ty; sp.sq.v += sq; }
     // Her reserve: touches add up. irk rises with pokes and swats, fond with pats and pets; both fade over a few minutes.
     // Enough of either changes her resting face and how she takes the next touch.

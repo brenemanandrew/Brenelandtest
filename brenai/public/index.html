@@ -424,12 +424,13 @@
 <div id="wheel"><div id="ringWrap"><button id="closeWheel" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"><path d="M6.500 6.500l11 11M17.500 6.500l-11 11"/></svg></button><div id="ring"></div></div><div id="panel"></div><button id="newChat">New conversation</button></div>
 <div id="login"><form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form></div>
 
+<script src="sound.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 // Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
-const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); }, onThumb: url => setHerThumb(url), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
+const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); }, onThumb: url => setHerThumb(url), onEmote: ch => WizraSound.emote(ch), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -566,7 +567,7 @@ function syncPlace(arriving) {
   const want = visitInfo.place && avatar.canVisit() && !away ? visitInfo.place : '';
   if (want === shownPlace || seeingOut) return; shownPlace = want; $('fpChoices').hidden = true;
   document.body.classList.toggle('fp', !!want); document.body.classList.remove('fplog', 'big'); $('visitMenu').hidden = true;
-  avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return');
+  avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return'); WizraSound.scene(want || 'chat');
   if (want) { const h = $('fpHint'); h.textContent = 'Drag to look. Tap the floor to walk. Tap ' + (want === 'house' ? 'the couch to sit, the TV to switch it on.' : 'her bed to sit.'); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => { h.style.opacity = 0; }, 9000); }
 }
 function setPlace(d, arriving) {
@@ -574,7 +575,7 @@ function setPlace(d, arriving) {
   const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '' };
   if (sheet) { sheet.bond = visitInfo.bond; sheet.path = visitInfo.path; sheet.rapport = d.rapport; }
   for (const k in PATHS) if (was && old[k] !== undefined && visitInfo.bond[k] > old[k]) { const pop = $('bondPop'); pop.textContent = '+' + (visitInfo.bond[k] - old[k]) + ' ' + PATHS[k][0]; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
-  drawMoments();
+  drawMoments(); WizraSound.path(visitInfo.path);
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
   showInvite();
 }
@@ -620,7 +621,7 @@ function drawMoments() {
 }
 function showChoices(k) {
   const c = $('fpChoices'); if (!c.hidden && c.dataset.k === k) { c.hidden = true; return; } c.dataset.k = k; c.textContent = ''; c.hidden = false;
-  for (const text of [...MOMENTS[k]].sort(() => Math.random() - 0.5).slice(0, 3)) { const b = el('button', { textContent: text[0].toUpperCase() + text.slice(1).replace(/\bher\b/g, 'her').replace(/\bhe\b/g, 'you').replace(/\bhis\b/g, 'your') }); b.onclick = () => { c.hidden = true; send('*' + text + '*', '', k); }; c.append(b); }
+  for (const text of [...MOMENTS[k]].sort(() => Math.random() - 0.5).slice(0, 3)) { const b = el('button', { textContent: text[0].toUpperCase() + text.slice(1).replace(/\bher\b/g, 'her').replace(/\bhe\b/g, 'you').replace(/\bhis\b/g, 'your') }); b.onclick = () => { c.hidden = true; WizraSound.moment(k); send('*' + text + '*', '', k); }; c.append(b); }
 }
 document.addEventListener('click', e => { if (!$('fpChoices').hidden && !$('fpChoices').contains(e.target)) $('fpChoices').hidden = true; });
 
@@ -634,7 +635,7 @@ function typeOut(body, text) {
       if (si >= segs.length) { bubble('her', text); log.scrollTop = log.scrollHeight; return done(); }
       const seg = segs[si];
       if (!el) { el = document.createElement('div'); el.className = seg.cls; body.appendChild(el); }
-      ci = Math.min(seg.t.length, ci + per); el.textContent = seg.t.slice(0, ci);
+      ci = Math.min(seg.t.length, ci + per); el.textContent = seg.t.slice(0, ci); WizraSound.fx('type');
       if (seg.cls === 'say') { const b = $('herBubble'); b.textContent = (said + ' ' + el.textContent).trim(); $('herWrap').classList.add('show'); b.scrollTop = b.scrollHeight; clearTimeout(timers.her); }
       if (ci >= seg.t.length) { if (seg.cls === 'say') said = (said + ' ' + seg.t).trim(); si++; ci = 0; el = null; }
       log.scrollTop = log.scrollHeight;
@@ -679,7 +680,7 @@ async function send(quick, visit, lean) {
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
   sendBtn.disabled = true; speaker.stop(); if (!away) { avatar.setThinking(true); userDid(text); }
-  addLine('me', text); bubble('me', text);
+  addLine('me', text); bubble('me', text); WizraSound.fx('send');
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   try {
     const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
@@ -695,7 +696,8 @@ async function send(quick, visit, lean) {
 }
 
 function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, innerHeight * 0.3) + 'px'; }
-input.addEventListener('input', autosize);
+input.addEventListener('input', autosize); input.addEventListener('input', () => WizraSound.fx('type'));
+WizraSound.duckWhen(() => speaker.busy());
 input.addEventListener('keydown', e => voice.typed(e));
 input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
 sendBtn.onclick = () => send();
@@ -1175,6 +1177,9 @@ function buildPanel(k) {
       el('label', {}, hp, ' I am on headphones (keep listening while she talks; talking over her cuts her off)'),
       el('label', { textContent: 'Try her voice' }), el('div', { className: 'row' }, sample, test),
       el('div', { className: 'note', textContent: 'Sending a message or tapping the mic button stops her mid-sentence.' }));
+    const mv = el('input', { type: 'range', min: 0, max: 100, value: WizraSound.volume('music') * 100 }); mv.oninput = () => WizraSound.volume('music', mv.value / 100);
+    const fv = el('input', { type: 'range', min: 0, max: 100, value: WizraSound.volume('fx') * 100 }); fv.oninput = () => WizraSound.volume('fx', fv.value / 100); fv.onchange = () => WizraSound.fx('pop');
+    p.append(el('label', { textContent: 'Music' }), mv, el('div', { className: 'scale' }, el('span', { textContent: 'off' }), el('span', { textContent: 'loud' })), el('label', { textContent: 'Sound effects' }), fv, el('div', { className: 'scale' }, el('span', { textContent: 'off' }), el('span', { textContent: 'loud' })));
   } else if (k === 'secret') {
     p.append(el('h3', { textContent: 'Hidden likes' }), el('div', { className: 'note', textContent: 'Dashed = still secret, filled = she has told you. Tap one to flip it. She can grow new ones from good moments; those say (grew). She only admits a secret once she trusts you enough.' }), listEditor('', 'hiddenLikes', true));
   }

@@ -138,6 +138,7 @@ export async function create(url) {
   }
   // ---- motion clips: recorded animation (walk, idle, talking...) laid over the posed skeleton. Loaded from the server if
   // there are any; without them everything falls back to the hand-made motion. A clip is { dur, fps, n, bones: { name: [x,y,z,w per frame] }, hips }.
+  const snd = n => window.dispatchEvent(new CustomEvent('wizra-sound', { detail: n }));   // sound.js listens for these
   const CLIPS = {}; fetch('/api/anims').then(r => r.ok ? r.json() : null).then(d => { if (d && d.clips) Object.assign(CLIPS, d.clips); }).catch(() => {});
   const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(); let clipHip = 0;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
@@ -293,7 +294,7 @@ export async function create(url) {
     liedown: () => { if (here === 'dorm' && CLIPS.female_laying_pose) { rt.liePose = CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose'; plan('lying on her bed', [go(places.bed.side), { lie: 45 + Math.random() * 60 }]); } },
     fetchbook: () => plan('getting a book from the shelf', [go(AT_SHELF), face(Math.PI), wait(1.3), run(() => { rt.carry = 'book'; rt.bookHome = 'table'; }), wait(0.5)], Math.random() < 0.75 ? 'read' : ''),
     returnbook: () => plan('putting her book back on the shelf', [run(() => { rt.carry = 'book'; }), wait(0.6), go(AT_SHELF), face(Math.PI), wait(1.2), run(() => { rt.carry = null; rt.bookHome = 'shelf'; }), wait(0.5)]),
-    fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), wait(2.2)], 'sip'),
+    fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), run(() => snd('pour')), wait(2.2)], 'sip'),
   };
   function startActivity(name) {
     const now = performance.now(); if (rt.act === 'gone' || rt.leaving) return;   // not here, or on her way out
@@ -311,9 +312,9 @@ export async function create(url) {
   function presence(mode, o = {}) {
     if (inCall) call(false);
     if (mode === 'gone') return vanish();
-    if (mode === 'leave') { if (rt.act === 'gone') return; if (OVER[rt.act]) rt.act = 'sit'; rt.leaving = true; rt.after = ''; if (rt.act === 'up') { rt.steps = [go(DOOR), run(vanish)]; rt.i = 0; rt.label = 'heading out'; } else plan('heading out', [go(DOOR), run(vanish)], '', true); return; }
+    if (mode === 'leave') { if (rt.act === 'gone') return; if (OVER[rt.act]) rt.act = 'sit'; rt.leaving = true; rt.after = ''; if (rt.act === 'up') { rt.steps = [go(DOOR), run(() => { snd('door'); vanish(); })]; rt.i = 0; rt.label = 'heading out'; } else plan('heading out', [go(DOOR), run(() => { snd('door'); vanish(); })], '', true); return; }
     if (mode === 'return') { // she appears at the door and walks to her chair; sneaking is slow, low and watchful
-      vrm.scene.visible = true; if (vrm.springBoneManager) vrm.springBoneManager.reset();
+      vrm.scene.visible = true; if (vrm.springBoneManager) vrm.springBoneManager.reset(); snd('door');
       Object.assign(rt, { act: 'up', leaving: false, stand: 1, k: 1, x: DOOR[0], z: DOOR[1], yaw: -Math.PI / 2, sneak: !!o.sneak, label: o.sneak ? 'sneaking back in' : 'coming back in', after: '', i: 0, stepT: 0 });
       rt.steps = wayHome();
     }
@@ -357,7 +358,7 @@ export async function create(url) {
             const off = turnTo(Math.atan2(dx, dz), dt, 5), sp = (rt.sneak ? 0.3 : rt.glow === 'hyper' ? 1.05 : rt.carry === 'phone' ? 0.6 : 0.85) * Math.max(0.12, 1 - off), nx = rt.x + dx / d * sp * dt, nz = rt.z + dz / d * sp * dt;
             const inWay = fp.on && !(st.tries > 4) && Math.hypot(nx - fp.x, nz - fp.z) < 0.5 && Math.hypot(nx - fp.x, nz - fp.z) < Math.hypot(rt.x - fp.x, rt.z - fp.z);
             if (inWay) { st.stuck += dt; if (st.stuck > 1.2) { st.tries = (st.tries || 0) + 1; st.path = null; } }   // you are in her way: she waits, then looks for a way round
-            else { moving = true; rt.x = nx; rt.z = nz; rt.phase += sp * dt * 4.6; rt.walkSp = sp; }
+            else { moving = true; rt.x = nx; rt.z = nz; const was = Math.floor(rt.phase / Math.PI); rt.phase += sp * dt * 4.6; rt.walkSp = sp; if (fp.on && Math.floor(rt.phase / Math.PI) !== was) snd('step2'); }
           }
         }
       }
@@ -434,11 +435,11 @@ export async function create(url) {
     const t = hit.tag; if (inCall) return '';
     if (fp.on) { // you are in the room: the floor is where you walk, the seat is where you sit, the TV is yours to switch on
       if (t === 'floor') { standUp(); fp.goal = [hit.x, hit.z]; return ''; }
-      const seat = places.seat[here]; if (t === seat.tag && (here === 'house' || rt.act !== 'up')) { fp.goal = null; fp.sit = seat; fp.x = seat.at[0]; fp.z = seat.at[1]; return here === 'house' ? 'yousit' : 'yousitbed'; }
-      if (t === 'tv') { places.tv.on = !places.tv.on; return places.tv.on ? 'tvon' : 'tvoff'; }
+      const seat = places.seat[here]; if (t === seat.tag && (here === 'house' || rt.act !== 'up')) { fp.goal = null; fp.sit = seat; fp.x = seat.at[0]; fp.z = seat.at[1]; snd('sit'); return here === 'house' ? 'yousit' : 'yousitbed'; }
+      if (t === 'tv') { places.tv.on = !places.tv.on; snd('tv'); return places.tv.on ? 'tvon' : 'tvoff'; }
     }
-    if (rt.act === 'gone' || rt.leaving) return t === 'lamp' ? (lampOn = !(lampLight.intensity > 0.7), '') : '';
-    if (t === 'lamp') { lampOn = !(lampLight.intensity > 0.7); return ''; }
+    if (rt.act === 'gone' || rt.leaving) return t === 'lamp' ? (lampOn = !(lampLight.intensity > 0.7), snd('click'), '') : '';
+    if (t === 'lamp') { lampOn = !(lampLight.intensity > 0.7); snd('click'); return ''; }
     if (t === 'shelf') { const had = rt.bookHome === 'table'; startActivity(had ? 'returnbook' : 'fetchbook'); return 'pointshelf'; }
     if (t === 'counter') { startActivity('fetchdrink'); return 'pointcounter'; }
     if (t === 'chair') { if (rt.act !== 'up') return ''; startActivity('sit'); return 'pointchair'; }
@@ -576,7 +577,7 @@ export async function create(url) {
     if (len > 0.01) {
       const st = 1.45 * dt / len, nx = fp.x + mx * st, nz = fp.z + mz * st;
       if (free(nx, nz)) { fp.x = nx; fp.z = nz; } else if (free(nx, fp.z) && Math.abs(mx) > 0.2 * len) fp.x = nx; else if (free(fp.x, nz) && Math.abs(mz) > 0.2 * len) fp.z = nz; else fp.goal = null;
-      fp.bob += dt * 9;
+      const was = Math.floor(fp.bob / Math.PI); fp.bob += dt * 9; if (Math.floor(fp.bob / Math.PI) !== was) snd('step');
     }
     const k = Math.min(1, dt * (fp.sit ? 4 : 10)); fp.cx += (fp.x - fp.cx) * k; fp.cz += (fp.z - fp.cz) * k;
     fp.ch += ((fp.sit ? fp.sit.h : places.eyeH) - fp.ch) * Math.min(1, dt * 4);

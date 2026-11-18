@@ -67,3 +67,9 @@ Fonts are hosted in `public/fonts` (SIL Open Font License): Fredoka for the inte
 - `avatar-vrm.js` lays them over the posed skeleton with `playClip`: `walking` (her walk), `idle` (standing), `talking` (hands moving when she talks on her feet and on calls), `texting_and_walking` (pacing), `female_laying_pose` (lying on her dorm bed: tap is not needed, she does it on her own or when her reply says so), `kiss` and `jump` (gestures, on her feet). With no clips stored, the hand-made motion is used.
 - To add clips: convert Mixamo "FBX Binary, without skin" files to that JSON shape and POST `{ clips: { name: clip } }` (the whole set each time). `window.WIZRA_CLIP = 'name'` previews one.
 - Second pass: `female_sitting_pose`, `_1`, `_2` are whole-body ways of sitting in her chair or on the couch (`SEATED` in avatar-vrm.js: curl, hair, knee), and `female_laying_pose_1` is a second way of lying on the bed.
+
+## Sound
+- `public/sound.js` makes all of it in the browser with Web Audio: no audio files. Music is written bar by bar from chord charts (`TRACKS`, `STYLE`): four lo-fi tracks for the chat room, three quiet jazz tracks at your house, three game tracks at her dorm (8-bit, tavern, dungeon), plus a romance theme and a mentor theme that take over for a while after a moment of that kind and join the rotation once that is what you two are.
+- Around you: cars passing at your house; birds, far traffic and now and then her roommate through the wall at her dorm.
+- Effects: typing (yours and hers), a sound per emoji that pops over her, footsteps, sitting, TV, lamp, door, pouring, phone dial, ringing, connect and hang up. The 3D view asks for them with a `wizra-sound` window event.
+- Volume for music and effects is under her settings, Voice. Music drops while she is speaking and stops on a call. Sound starts after the first tap or key press (browser rule).

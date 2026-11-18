@@ -434,7 +434,7 @@ async function comeBack(onDelta) {
 
 // ---------- http ----------
 // changes whenever a new version is deployed: pages left open use it to reload themselves
-const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js', 'public/sound.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
 const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
