@@ -155,3 +155,6 @@ The small camera button on your tile turns it on (`public/facecam.js`, `WizraCam
 
 ## Her clock
 She is told the actual time with every reply ("Right now it is 3:44 PM on Wednesday, November 18"), in the player's own time zone: the page sends the device's zone with `/api/state?tz=...`, it is kept per player (`db.tz`, global getter `TZ`), and everything about time (the hour, her sleep, when she is back) is worked out in it. Eastern until a device has reported one.
+
+## Her arms while seated
+`ARMS` in `public/avatar-vrm.js`: where her free arms rest (hands in her lap, hands folded, one hand in her lap and the other at her side). She changes between them every minute or so. A held thing (`OVER`) goes over the top at full weight, also while you talk: the phone is held in front of her chest with the screen tipped to her face. `WIZRA_DBG.live` exposes the pose tables for tuning from the console.

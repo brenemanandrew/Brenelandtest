@@ -87,8 +87,14 @@ export async function create(url, opts = {}) {
   const GRIP_MUG = grip(0.5, 0.25);
   const OVER = window.WIZRA_OVER || {
     read: { leftUpperArm: [-0.55, 0.25, -1.1], leftLowerArm: [0, -1.6, 0], rightUpperArm: [-0.55, -0.25, 1.1], rightLowerArm: [0, 1.6, 0] },
-    phone: { rightUpperArm: [-0.6, -0.2, 1.1], rightLowerArm: [0, 1.9, 0], ...grip(0.28, 0.15) },
+    phone: { rightUpperArm: [-0.45, 0.35, 1.25], rightLowerArm: [0, 1.8, 0], rightHand: [0, 0, 0.1], ...grip(0.28, 0.15) },   // in front of her chest, screen tipped up to her face
     sip: { rightUpperArm: [-0.7, 0.2, 1.2], rightLowerArm: [0, 2.5, 0], ...GRIP_MUG },
+  };
+  // where her arms rest while she is seated and her hands are free: she changes between these now and then
+  const ARMS = window.WIZRA_ARMS || {
+    lap: { leftUpperArm: [-0.12, -0.3, -1.3], leftLowerArm: [0, -1.1, 0], leftHand: [0, 0, -0.15], rightUpperArm: [-0.12, 0.3, 1.3], rightLowerArm: [0, 1.1, 0], rightHand: [0, 0, 0.15] },
+    folded: { leftUpperArm: [-0.12, -0.5, -1.3], leftLowerArm: [0, -1.2, 0], leftHand: [0, 0, -0.15], rightUpperArm: [-0.14, 0.5, 1.3], rightLowerArm: [0, 1.25, 0], rightHand: [0, 0, 0.15] },
+    side: { leftUpperArm: [-0.12, -0.3, -1.3], leftLowerArm: [0, -1.1, 0], leftHand: [0, 0, -0.15], rightUpperArm: [0.12, 0, 1.22], rightLowerArm: [0, 0.5, 0], rightHand: [0, 0, 0.1] },
   };
   // how her legs rest while she is seated, laid over the pose above: ankles crossed on the table, or feet down on the floor
   const LEGS = window.WIZRA_LEGS || {
@@ -322,7 +328,7 @@ export async function create(url, opts = {}) {
   // ---- her routine: what she is busy with when left alone, and the errands she can run ----
   // Seated she reads, checks her phone or sips. On her feet she follows a plan: a list of steps (go somewhere, turn, wait
   // with her hand out, do something), then walks back and sits down, optionally starting something once seated.
-  const standZ = Math.max(hip.z + 0.38, (hip.z + 0.3 + tableZ - 0.18) / 2), STAND_AT = [0, standZ]; window.WIZRA_DBG = { feet: feet.z - hip.z, stand: standZ - hip.z, table: tableZ - hip.z };                                               // she stands up in front of the chair, between it and the table
+  const standZ = Math.max(hip.z + 0.38, (hip.z + 0.3 + tableZ - 0.18) / 2), STAND_AT = [0, standZ]; window.WIZRA_DBG = { feet: feet.z - hip.z, stand: standZ - hip.z, table: tableZ - hip.z, live: { POSE, OVER, ARMS, get ATTACH() { return ATTACH; }, get rt() { return rt; } } };   // (live: for tuning poses from the console)                                               // she stands up in front of the chair, between it and the table
   const EXIT = [0.95, standZ];                                                // then steps out to the side past the armrest
   const R_BACK = [0.95, hip.z - 0.72], L_BACK = [-0.78, hip.z - 0.72];             // round the back of the chair
   const AT_SHELF = [SHELF.x + 0.12, SHELF.z + 0.5], AT_COUNTER = [COUNTER.x - 0.05, COUNTER.z + 0.52];
@@ -330,7 +336,7 @@ export async function create(url, opts = {}) {
   const stride = c => (c.hips ? Math.abs(c.hips[c.hips.length - 1] - c.hips[2]) * hipY0 : 0) || 1.3;   // metres one loop of a walking clip covers, at her size
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
   const rt = { act: 'sit', until: 0, nextAt: performance.now() + 60000 + Math.random() * 60000, lastTalk: 0, self: false, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
-    legs: 'up', lg: { crossed: 0, floor: 0, hair: 0, drape: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
+    legs: 'up', arms: 'lap', ar: {}, armsAt: performance.now() + 40000, lg: { crossed: 0, floor: 0, hair: 0, drape: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
   const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), stay = sec => ({ wait: sec, idle: true }), run = fn => ({ run: fn });
   // ---- finding her way: a grid of the room with the furniture (and you) blocked out, so she walks round things, not through them ----
   const CELL = 0.1, PAD = 0.17, navs = {};
@@ -513,10 +519,14 @@ export async function create(url, opts = {}) {
       if (LEGS[name]._yaw) { sideways += LEGS[name]._yaw * wgt; slide += LEGS[name]._x * wgt; perch += (LEGS[name]._y || 0) * wgt; }
       for (const n in LEGS[name]) { if (n[0] === '_') continue; const q = LEGS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; }
     }
+    // where her free arms rest (see ARMS); a held thing or a gesture goes over the top
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.armsAt && !window.WIZRA_STILL) { const names = Object.keys(ARMS); rt.arms = names[Math.random() * names.length | 0]; rt.armsAt = now + 45000 + Math.random() * 70000; }
+    for (const name in ARMS) { rt.ar[name] = (rt.ar[name] || 0) + ((rt.arms === name ? 1 : 0) - (rt.ar[name] || 0)) * Math.min(1, dt * 1.6); const v = rt.ar[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
+      for (const n in ARMS[name]) { const q = ARMS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; } }
     // what she is holding while seated
     rt.gazeProp = null; let hp = 0, hy = 0;
     for (const name in OVER) {
-      const want = rt.act === name ? (attending ? 0.55 : 1) : 0; rt.ov[name] += (want - rt.ov[name]) * Math.min(1, dt * 3.5);
+      const want = rt.act === name ? 1 : 0; /* she keeps hold of it while you talk; only her eyes come up to you */ rt.ov[name] += (want - rt.ov[name]) * Math.min(1, dt * 3.5);
       const wgt = rt.ov[name]; if (wgt < 0.002) continue;
       for (const n in OVER[name]) { const q = OVER[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; }
       if (rt.act === name && !attending && name !== 'sip') { rt.gazeProp = PROP[name]; hp = 0.28 * wgt; hy = name === 'phone' ? -0.18 * wgt : 0; }
