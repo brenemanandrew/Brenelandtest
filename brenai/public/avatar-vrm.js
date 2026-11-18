@@ -51,7 +51,7 @@ export async function create(url) {
   const set = (n, x = 0, y = 0, z = 0) => { const bone = B(n); if (bone) bone.rotation.set(x, y, z); };
   const POSE = window.WIZRA_POSE || {
     hips: [-0.32, 0, 0], spine: [0.14, 0, 0], chest: [0.1, 0, 0], neck: [0.08, 0, 0],
-    leftUpperLeg: [-1.3, 0, 0.05], rightUpperLeg: [-1.2, 0, -0.05], leftLowerLeg: [0.1, 0, 0], rightLowerLeg: [0.16, 0, 0], leftFoot: [0.25, 0, 0], rightFoot: [0.25, 0, 0],
+    leftUpperLeg: [-1.4, 0, 0.07], rightUpperLeg: [-1.36, 0, -0.07], leftLowerLeg: [0.62, 0, 0], rightLowerLeg: [0.58, 0, 0], leftFoot: [0.2, 0, 0], rightFoot: [0.2, 0, 0],
     leftUpperArm: [0.18, 0, -1.12], rightUpperArm: [0.18, 0, 1.12], leftLowerArm: [0, -0.45, 0], rightLowerArm: [0, 0.45, 0], leftHand: [0, 0, -0.1], rightHand: [0, 0, 0.1],
   };
   for (const side of ['left', 'right']) for (const f of ['Index', 'Middle', 'Ring', 'Little']) for (const j of ['Proximal', 'Intermediate', 'Distal'])
@@ -64,6 +64,11 @@ export async function create(url) {
     read: { leftUpperArm: [-0.55, 0.25, -1.1], leftLowerArm: [0, -1.6, 0], rightUpperArm: [-0.55, -0.25, 1.1], rightLowerArm: [0, 1.6, 0] },
     phone: { rightUpperArm: [-0.6, -0.2, 1.1], rightLowerArm: [0, 1.9, 0] },
     sip: { rightUpperArm: [-0.9, -0.3, 1.0], rightLowerArm: [0, 2.2, 0] },
+  };
+  // how her legs rest while she is seated, laid over the pose above: ankles crossed on the table, or feet down on the floor
+  const LEGS = window.WIZRA_LEGS || {
+    crossed: { leftUpperLeg: [-1.36, 0.1, -0.1], leftLowerLeg: [0.62, 0, 0], rightUpperLeg: [-1.5, -0.12, 0.16], rightLowerLeg: [0.6, 0, 0], leftFoot: [0.2, 0.25, 0], rightFoot: [0.2, -0.25, 0] },
+    floor: { _z: 0.17, hips: [-0.1, 0, 0], spine: [0.06, 0, 0], leftUpperLeg: [-1.36, 0, 0.06], rightUpperLeg: [-1.36, 0, -0.06], leftLowerLeg: [1.42, 0, 0], rightLowerLeg: [1.42, 0, 0], leftFoot: [0.02, 0, 0], rightFoot: [0.02, 0, 0] },
   };
   const FINGER = /Proximal|Intermediate|Distal/;
   const KEYS = [...new Set([...Object.keys(POSE), ...Object.keys(STAND), ...Object.values(OVER).flatMap(o => Object.keys(o))])];
@@ -140,7 +145,7 @@ export async function create(url) {
   box(0.6, 0.14, 0.62, 0, seatTop - 0.07, hip.z + 0.1, '#5b3570');                                               // seat cushion
   box(0.74, 0.95, 0.16, 0, seatTop + 0.3, hip.z - 0.36, '#4a2a5c', -0.28);                                       // back, tilted
   box(0.13, 0.3, 0.7, -0.38, seatTop + 0.08, hip.z + 0.05, '#4a2a5c'); box(0.13, 0.3, 0.7, 0.38, seatTop + 0.08, hip.z + 0.05, '#4a2a5c'); // arms
-  const tableTop = feet.y - 0.1, tableZ = feet.z + 0.1; TAG = 'table';
+  const tableTop = feet.y - (window.WIZRA_TABLE || 0.1), tableZ = feet.z + 0.03; TAG = 'table';
   box(0.8, 0.05, 0.5, 0, tableTop - 0.025, tableZ, '#3b2a1c');                                            // table top
   for (const [x, z] of [[-0.35, -0.2], [0.35, -0.2], [-0.35, 0.2], [0.35, 0.2]]) box(0.05, tableTop - floorY - 0.05, 0.05, x, (tableTop - 0.05 + floorY) / 2, tableZ + z, '#2a1d14');
   const rug = new THREE.Mesh(new THREE.CircleGeometry(1.25, 40), mat('#251a30')); rug.rotation.x = -Math.PI / 2; rug.position.set(0, floorY, (hip.z + feet.z) / 2); room.add(rug); tag(rug, 'floor');
@@ -202,39 +207,73 @@ export async function create(url) {
   // ---- her routine: what she is busy with when left alone, and the errands she can run ----
   // Seated she reads, checks her phone or sips. On her feet she follows a plan: a list of steps (go somewhere, turn, wait
   // with her hand out, do something), then walks back and sits down, optionally starting something once seated.
-  const STAND_AT = [0, hip.z + 0.4];                                               // she stands up in front of the chair, between it and the table
-  const EXIT = [0.95, hip.z + 0.5];                                                // then steps out to the side past the armrest
+  const standZ = Math.max(hip.z + 0.4, Math.min(hip.z + 0.55, (hip.z + 0.42 + tableZ - 0.25) / 2)), STAND_AT = [0, standZ];                                               // she stands up in front of the chair, between it and the table
+  const EXIT = [0.95, standZ];                                                // then steps out to the side past the armrest
   const R_BACK = [0.95, hip.z - 0.72], L_BACK = [-0.78, hip.z - 0.72];             // round the back of the chair
   const AT_SHELF = [SHELF.x + 0.12, SHELF.z + 0.5], AT_COUNTER = [COUNTER.x - 0.05, COUNTER.z + 0.52];
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
   const rt = { act: 'sit', until: 0, nextAt: performance.now() + 15000 + Math.random() * 15000, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
-    steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0 }, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
+    legs: 'up', lg: { crossed: 0, floor: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0 }, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
   const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), stay = sec => ({ wait: sec, idle: true }), run = fn => ({ run: fn });
-  // the way back to the chair from wherever she is: round the back if she is behind it, down the side if she is out front
-  function wayHome() {
-    const w = [];
-    if (rt.z < hip.z - 0.2) { if (rt.x < 0.3) w.push(go(L_BACK)); w.push(go(R_BACK)); }
-    else if (rt.z > hip.z + 0.62 && rt.x < 0.8) w.push(go([0.98, rt.z]));
-    return [...w, go(EXIT), go(STAND_AT)];
+  // ---- finding her way: a grid of the room with the furniture (and you) blocked out, so she walks round things, not through them ----
+  const CELL = 0.1, PAD = 0.17, navs = {};
+  function nav(name) {
+    if (navs[name]) return navs[name];
+    const b = places.bounds[name], nx = Math.ceil((b.x1 - b.x0) / CELL), nz = Math.ceil((b.z1 - b.z0) / CELL), g = new Uint8Array(nx * nz);
+    for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) {
+      const x = b.x0 + (ix + 0.5) * CELL, z = b.z0 + (iz + 0.5) * CELL; let hit = x < b.x0 + 0.22 || x > b.x1 - 0.22 || z < b.z0 + 0.22 || z > b.z1 - 0.22;
+      if (!hit) for (const [x0, x1, z0, z1] of places.solid[name]) if (x > x0 - PAD && x < x1 + PAD && z > z0 - PAD && z < z1 + PAD) { hit = true; break; }
+      g[iz * nx + ix] = hit ? 1 : 0;
+    }
+    return navs[name] = { b, nx, nz, g };
   }
-  function wayTo(x, z) { // and out to a spot on the floor, the same rules in reverse
-    const w = [];
-    if (z < hip.z - 0.2) { w.push(go(R_BACK)); if (x < 0.3) w.push(go(L_BACK)); }
-    else if (z > hip.z + 0.62 && x < 0.8) w.push(go([0.98, z]));
-    return [...w, go([x, z])];
+  const walkable = (x, z) => { const { b, nx, nz, g } = nav(here), ix = Math.floor((x - b.x0) / CELL), iz = Math.floor((z - b.z0) / CELL); return ix >= 0 && iz >= 0 && ix < nx && iz < nz && !g[iz * nx + ix]; };
+  function route(from, to, ignoreYou) { // the points to walk through to get from one spot to another
+    const { b, nx, nz, g } = nav(here), you = fp.on && !ignoreYou ? [fp.x, fp.z] : null;
+    const pos = (ix, iz) => [b.x0 + (ix + 0.5) * CELL, b.z0 + (iz + 0.5) * CELL];
+    const open = (ix, iz) => { if (ix < 0 || iz < 0 || ix >= nx || iz >= nz || g[iz * nx + ix]) return false; if (you) { const q = pos(ix, iz); if (Math.hypot(q[0] - you[0], q[1] - you[1]) < 0.55) return false; } return true; };
+    const nearest = p => { // the cell a point is in, or the closest free one if that is inside something (her own seat, say)
+      const cx = Math.max(0, Math.min(nx - 1, Math.floor((p[0] - b.x0) / CELL))), cz = Math.max(0, Math.min(nz - 1, Math.floor((p[1] - b.z0) / CELL)));
+      if (open(cx, cz)) return [cx, cz, true]; let best = null, bd = 1e9;
+      for (let r = 1; r < 16; r++) { for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== r || !open(cx + dx, cz + dz)) continue; const q = pos(cx + dx, cz + dz), d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = [cx + dx, cz + dz, false]; } } if (best && bd < (r + 0.5) * CELL) break; }
+      return best;
+    };
+    const A = nearest(from), Z = nearest(to); if (!A || !Z) return null;
+    const N = nx * nz, cost = new Float32Array(N).fill(Infinity), came = new Int32Array(N).fill(-1), done = new Uint8Array(N), start = A[1] * nx + A[0], goal = Z[1] * nx + Z[0], openSet = [start]; cost[start] = 0;
+    const h = i => Math.hypot(i % nx - Z[0], (i / nx | 0) - Z[1]);
+    let found = false;
+    while (openSet.length) {
+      let bi = 0; for (let i = 1; i < openSet.length; i++) if (cost[openSet[i]] + h(openSet[i]) < cost[openSet[bi]] + h(openSet[bi])) bi = i;
+      const cur = openSet.splice(bi, 1)[0]; if (cur === goal) { found = true; break; } if (done[cur]) continue; done[cur] = 1;
+      const cx = cur % nx, cz = cur / nx | 0;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dz) continue; const x = cx + dx, z = cz + dz; if (!open(x, z) || (dx && dz && (!open(cx + dx, cz) || !open(cx, cz + dz)))) continue; // no cutting corners
+        const n = z * nx + x, c = cost[cur] + (dx && dz ? 1.4142 : 1); if (c < cost[n]) { cost[n] = c; came[n] = cur; openSet.push(n); }
+      }
+    }
+    if (!found) return null;
+    let cells = []; for (let c = goal; c !== -1; c = came[c]) cells.push(pos(c % nx, c / nx | 0)); cells.reverse();
+    const clear = (p, q) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]), n = Math.ceil(d / 0.04); for (let i = 1; i < n; i++) { const x = p[0] + (q[0] - p[0]) * i / n, z = p[1] + (q[1] - p[1]) * i / n; if (!open(Math.floor((x - b.x0) / CELL), Math.floor((z - b.z0) / CELL))) return false; } return true; };
+    const out = []; let at = 0; if (!A[2]) out.push(cells[0]);                       // step out of whatever she started inside
+    while (at < cells.length - 1) { let j = cells.length - 1; while (j > at + 1 && !clear(cells[at], cells[j])) j--; out.push(cells[j]); at = j; } // straighten: skip to the furthest point in clear sight
+    if (Z[2] && out.length) out[out.length - 1] = [to[0], to[1]]; else out.push([to[0], to[1]]);   // finish on the exact spot (a last short step if it is inside something, like her seat)
+    return out;
   }
+  // the way back to her seat from wherever she is, and out to a spot on the floor: the path finder does the rest
+  const wayHome = () => [go(EXIT), go(STAND_AT)], wayTo = (x, z) => [go([x, z])];
   function plan(label, steps, after = '', stayOut = false) {
     if (rt.stand < 0.05) { rt.x = STAND_AT[0]; rt.z = STAND_AT[1]; rt.yaw = 0; }
     Object.assign(rt, { act: 'up', steps: [go(EXIT), ...steps, ...(stayOut ? [] : [run(() => { rt.steps.push(...wayHome()); })])], i: (rt.stand > 0.5 ? 1 : 0), stepT: 0, label, after });
   }
   const ERRAND = {
     pace: () => plan('up and pacing around the room', [go(R_BACK), go(L_BACK), go(R_BACK)]),
-    fetchbook: () => plan('getting a book from the shelf', [go(R_BACK), go(L_BACK), go(AT_SHELF), face(Math.PI), wait(1.3), run(() => { rt.carry = 'book'; rt.bookHome = 'table'; }), wait(0.5)], Math.random() < 0.75 ? 'read' : ''),
-    returnbook: () => plan('putting her book back on the shelf', [run(() => { rt.carry = 'book'; }), wait(0.6), go(R_BACK), go(L_BACK), go(AT_SHELF), face(Math.PI), wait(1.2), run(() => { rt.carry = null; rt.bookHome = 'shelf'; }), wait(0.5)]),
+    fetchbook: () => plan('getting a book from the shelf', [go(AT_SHELF), face(Math.PI), wait(1.3), run(() => { rt.carry = 'book'; rt.bookHome = 'table'; }), wait(0.5)], Math.random() < 0.75 ? 'read' : ''),
+    returnbook: () => plan('putting her book back on the shelf', [run(() => { rt.carry = 'book'; }), wait(0.6), go(AT_SHELF), face(Math.PI), wait(1.2), run(() => { rt.carry = null; rt.bookHome = 'shelf'; }), wait(0.5)]),
     fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), wait(2.2)], 'sip'),
   };
   function startActivity(name) {
     const now = performance.now(); if (rt.act === 'gone' || rt.leaving) return;   // not here, or on her way out
+    if (name === 'feetup' || name === 'crosslegs' || name === 'feetdown') { rt.legs = name === 'feetup' ? 'up' : name === 'crosslegs' ? 'crossed' : 'floor'; rt.legsAt = now + 60000 + Math.random() * 60000; return; }
     if (name === 'sit') { if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.after = ''; } else if (rt.act !== 'sitdown') rt.act = 'sit'; rt.nextAt = now + 20000 + Math.random() * 25000; return; }
     if (name === 'read' && rt.bookHome === 'shelf') name = 'fetchbook';             // nothing to read until she gets a book
     if (name === 'returnbook' && rt.bookHome === 'shelf') return;
@@ -279,9 +318,19 @@ export async function create(url) {
       if (!st) { rt.act = 'sitdown'; }
       else if (attending) turnTo(Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z), dt, 4);
       else if (st.go) {
-        const dx = st.go[0] - rt.x, dz = st.go[1] - rt.z, d = Math.hypot(dx, dz);
-        if (d < 0.06) rt.i++;
-        else { moving = true; const off = turnTo(Math.atan2(dx, dz), dt, 5), sp = (rt.sneak ? 0.3 : rt.glow === 'hyper' ? 0.8 : 0.62) * Math.max(0.12, 1 - off); rt.x += dx / d * sp * dt; rt.z += dz / d * sp * dt; rt.phase += sp * dt * 4.6; }
+        if (!st.path) { st.path = route([rt.x, rt.z], st.go, st.tries > 4) || [st.go]; st.stuck = 0; }
+        const tgt = st.path[0];
+        if (!tgt) rt.i++;
+        else {
+          const dx = tgt[0] - rt.x, dz = tgt[1] - rt.z, d = Math.hypot(dx, dz);
+          if (d < 0.06) st.path.shift();
+          else {
+            const off = turnTo(Math.atan2(dx, dz), dt, 5), sp = (rt.sneak ? 0.3 : rt.glow === 'hyper' ? 0.8 : 0.62) * Math.max(0.12, 1 - off), nx = rt.x + dx / d * sp * dt, nz = rt.z + dz / d * sp * dt;
+            const inWay = fp.on && !(st.tries > 4) && Math.hypot(nx - fp.x, nz - fp.z) < 0.5 && Math.hypot(nx - fp.x, nz - fp.z) < Math.hypot(rt.x - fp.x, rt.z - fp.z);
+            if (inWay) { st.stuck += dt; if (st.stuck > 1.2) { st.tries = (st.tries || 0) + 1; st.path = null; } }   // you are in her way: she waits, then looks for a way round
+            else { moving = true; rt.x = nx; rt.z = nz; rt.phase += sp * dt * 4.6; }
+          }
+        }
       }
       else if (st.face !== undefined) { if (turnTo(st.face, dt, 5) < 0.1) rt.i++; }
       else if (st.wait) { holdWant = st.idle ? holdWant : 1; if (st.idle) turnTo(Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z), dt, 4); rt.stepT += dt; if (rt.stepT >= st.wait) { rt.stepT = 0; rt.i++; } }
@@ -290,6 +339,14 @@ export async function create(url) {
     if (rt.act === 'sitdown') { // turn to face front, lower into the chair, then get on with whatever she came back to do
       turnTo(0, dt, 5);
       if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
+    }
+    // how her legs are resting: she changes it now and then, and it only applies while she is properly sat
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !window.WIZRA_STILL) { const r = Math.random(); rt.legs = r < 0.4 ? 'up' : r < 0.75 ? 'crossed' : 'floor'; rt.legsAt = now + 50000 + Math.random() * 90000; }
+    let scoot = 0;
+    for (const name in LEGS) {
+      rt.lg[name] += ((rt.legs === name ? 1 : 0) - rt.lg[name]) * Math.min(1, dt * 2.2); const v = rt.lg[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
+      if (LEGS[name]._z) scoot += LEGS[name]._z * wgt;                              // sitting forward on the seat
+      for (const n in LEGS[name]) { if (n[0] === '_') continue; const q = LEGS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; }
     }
     // what she is holding while seated
     rt.gazeProp = null; let hp = 0, hy = 0;
@@ -319,7 +376,7 @@ export async function create(url) {
     if (rt.glow === 'tipsy' && k > 0.5) { const wob = Math.sin(now / 430); CUR.hips[2] += 0.07 * wob; CUR.spine[2] -= 0.09 * wob; }                // not quite a straight line
     if (k > 0.98 && rt.leg < 0.5) { const sway = Math.sin(now / 1400) * (1 - rt.leg * 2); CUR.hips[2] += 0.035 * sway; CUR.spine[2] -= 0.03 * sway; CUR.leftUpperLeg[2] -= 0.03 * sway; CUR.rightUpperLeg[2] -= 0.03 * sway; } // standing still: shifting her weight
     for (const n of KEYS) set(n, CUR[n][0], CUR[n][1], CUR[n][2]);
-    vrm.scene.position.set(rt.x * k, floorY * k + 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, (ka - k) * 0.05 + rt.z * k);
+    vrm.scene.position.set(rt.x * k, floorY * k + 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, (ka - k) * 0.05 + rt.z * k + scoot);
     vrm.scene.rotation.y = rt.yaw * k;
     rt.zoom = 0.3 * k;
   }
@@ -347,8 +404,7 @@ export async function create(url) {
     if (t === 'phone') { startActivity('phone'); return 'pointphone'; }
     if (t === 'mug') { startActivity('sip'); return 'pointmug'; }
     if (t === 'floor') {
-      const x = hit.x, z = hit.z, d = Math.hypot(x, z - hip.z);
-      const blocked = d > 2.5 || (Math.abs(x) < 0.62 && z > hip.z - 0.62 && z < hip.z + 0.58) || (Math.abs(x) < 0.58 && Math.abs(z - tableZ) < 0.42) || (Math.abs(x - SHELF.x) < 0.6 && z < SHELF.z + 0.3) || (Math.abs(x - COUNTER.x) < 0.5 && z < COUNTER.z + 0.38);
+      const x = hit.x, z = hit.z, blocked = !walkable(x, z);
       if (blocked || rt.act === 'sitdown') return '';
       if (OVER[rt.act]) rt.act = 'sit';
       if (rt.act === 'up') { rt.steps = [...wayTo(x, z), stay(7), run(() => { rt.steps.push(...wayHome()); })]; rt.i = 0; rt.label = 'standing where you pointed'; rt.after = ''; }
@@ -485,6 +541,7 @@ export async function create(url) {
   }
   function placeCamera(dt) {
     if (inCall) return;                                                          // the call frames her itself
+    if (window.WIZRA_CAM) { const c = window.WIZRA_CAM; camera.position.set(hip.x + c[0], hip.y + c[1], hip.z + c[2]); camera.lookAt(hip.x + c[3], hip.y + c[4], hip.z + c[5]); if (fp.on) { const keep = camera.position.clone(), q = camera.quaternion.clone(); walkYou(dt); camera.position.copy(keep); camera.quaternion.copy(q); } return; } // test hook: a fixed camera, measured from her hips
     if (fp.on) return walkYou(dt);
     const want = Math.max(document.body.classList.contains('big') ? zoomWant : 0, gestureZoom, rt.zoom);
     zoom += (want - zoom) * Math.min(1, dt * 6);

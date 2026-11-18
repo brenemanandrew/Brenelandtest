@@ -149,8 +149,16 @@ export function buildPlaces(THREE, A) {
     dorm: [[-0.62, 0.62, hip.z - 0.62, hip.z + 0.58], [-0.58, 0.58, tableZ - 0.42, tableZ + 0.42], [SHELF.x - 0.6, SHELF.x + 0.6, D.z0, SHELF.z + 0.35], [COUNTER.x - 0.5, D.x1, D.z0, COUNTER.z + 0.42], [D.x0, bedX + 0.6, bedZ - 1.1, bedZ + 1.1], [deskX - 0.75, deskX + 0.75, deskZ - 0.95, D.z1]],
     house: [[cx - cw / 2 - 0.1, 0.55, hip.z - 0.62, hip.z + 0.58], [-1.3, 0.4, tableZ - 0.4, tableZ + 0.48], [SHELF.x - 0.6, SHELF.x + 0.6, Hh.z0, SHELF.z + 0.35], [kx0 - 0.1, Hh.x1, Hh.z0, COUNTER.z + 0.45], [tvX - 0.95, tvX + 0.95, tvZ - 0.4, Hh.z1], [dx - 1.25, dx + 1.25, dz - 0.75, dz + 0.75], [Hh.x1 - 0.85, Hh.x1, hip.z - 0.85, hip.z - 0.05]],
   };
+  // what she cannot walk through: the real footprints of the furniture [x0, x1, z0, z1] (her path finder pads them)
+  const pot = (x, z, r) => [x - r, x + r, z - r, z + r];
+  const solid = {
+    dorm: [[-0.44, 0.44, hip.z - 0.5, hip.z + 0.42], [-0.4, 0.4, tableZ - 0.25, tableZ + 0.25], [SHELF.x - 0.47, SHELF.x + 0.47, D.z0, SHELF.z + 0.15], [COUNTER.x - 0.38, COUNTER.x + 0.38, D.z0, COUNTER.z + 0.25], [COUNTER.x + 0.5, COUNTER.x + 1.0, D.z0, COUNTER.z + 0.27],
+      pot(0.75, backZ + 0.1, 0.04), [D.x0, bedX + 0.5, bedZ - 1.04, bedZ + 1.0], [deskX - 0.65, deskX + 0.65, deskZ - 0.3, D.z1], [deskX - 0.33, deskX + 0.13, deskZ - 0.87, deskZ - 0.4]],
+    house: [[cx - cw / 2 - 0.05, 0.49, hip.z - 0.5, hip.z + 0.45], [-1.2, 0.3, tableZ - 0.26, tableZ + 0.34], [SHELF.x - 0.47, SHELF.x + 0.47, Hh.z0, SHELF.z + 0.15], [kx0, Hh.x1, Hh.z0, COUNTER.z + 0.28], [Hh.x1 - 0.77, Hh.x1, hip.z - 0.75, hip.z - 0.09],
+      [tvX - 0.85, tvX + 0.85, tvZ - 0.21, Hh.z1], [dx - 1.1, dx + 1.1, dz - 0.62, dz + 0.62], pot(Hh.x0 + 0.4, Hh.z0 + 0.45, 0.3), pot(2.55, hip.z + 3.9, 0.24), pot(-2.3, tvZ - 0.05, 0.2), pot(-2.15, backZ + 0.05, 0.04)],
+  };
   return {
-    dorm, house, toon, outline, eyeH,
+    dorm, house, toon, outline, eyeH, solid,
     bounds: { dorm: D, house: Hh }, blocks,
     spawn: { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] },
     seat: { dorm: { tag: 'bed', at: [bedX + 0.62, bedZ + 0.2], out: [bedX + 0.95, bedZ + 0.2], h: floorY + 1.12 }, house: { tag: 'chair', at: [-0.78, hip.z + 0.22], out: [-2.6, hip.z + 0.5], h: seatTop + 0.66 } },

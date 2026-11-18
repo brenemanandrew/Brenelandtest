@@ -367,9 +367,9 @@ function planDue() {
 const awayView = () => { if (db.call && Date.now() - db.call.since > 25 * 60000) db.call = null; return awayView0(); }; // (a call left open is dropped)
 const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || clock(db.away.until), due: Date.now() >= db.away.until && !db.call } : null; // (back = when she said; the real time is hers to keep)
 const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
-// ---- visiting: once the relationship score reaches 100 they can be in the same room. db.place is '' (apart, the usual),
+// ---- visiting: once the relationship score reaches VISIT_AT they can be in the same room. db.place is '' (apart, the usual),
 // 'dorm' (he is at her dorm) or 'house' (she is at his house). The page shows it in first person.
-const VISIT_AT = 100;
+const VISIT_AT = 90;
 const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= VISIT_AT;
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
 const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: VISIT_AT, invite: inviteNow() });

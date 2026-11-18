@@ -129,6 +129,7 @@
     [/(puts?|returns?|slides?|places?|tucks?) (her |the |that )?(book|novel|tome) (back|away)|back on(to)? the (book ?)?shelf/i, 'returnbook'],
     [/book ?shelf|\bshel(f|ves)\b|(gets?|grabs?|fetch(es)?|finds?|picks? out|retrieves?|brings? (back|over)|comes? back with|goes? (to get|for|and gets?|to grab|to find)|looks? for) (him |you |herself )?(a |her |the |another |that |some |one of her )?(new |different |good )?(book|novel|tome|rulebook)/i, 'fetchbook'],
     [/(gets?|grabs?|fetch(es)?|makes?|pours?|refills?|brews?|tops? (up|off)|goes? (to get|for|to make)) (him |you |herself )?(a |an |her |the |another |some |more )?(fresh |new |hot )?(coffee|drink|tea|mug|cup|energy drink|water|refill|cocoa)|\bkettle\b|coffee ?maker|\bcounter\b|kitchen/i, 'fetchdrink'],
+    [/cross(es|ed|ing)? her (legs|ankles|feet|boots)/i, 'crosslegs'], [/(puts?|sets?|plants?|drops?|swings?) her (feet|boots) (back )?(down|on(to)? the floor|off the table)|feet off the table/i, 'feetdown'], [/(puts?|props?|kicks?|swings?) her (feet|boots) (back )?up/i, 'feetup'],
     [/sits? (back )?down|flops? (back )?(down|into|onto)|(drops?|sinks?|settles?|plops?) (back )?(down )?(into|onto|in) (her|the) (chair|seat|armchair)|returns? to her (chair|seat)/i, 'sit'],
     [/gets? up|stands? up|gets? to her feet|rises? (from|to)|\bpac(es|ing)\b|walks? (around|over|off|away|across)|wanders?|strolls?/i, 'pace'],
     [/(puts?|sets?|tosses?|lays?) (down )?(her |the )?(book|phone)|closes? (her|the) book|pockets? her phone/i, 'sit'],
