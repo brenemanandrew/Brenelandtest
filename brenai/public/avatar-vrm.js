@@ -882,7 +882,7 @@ export async function create(url, opts = {}) {
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
     activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
-    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow,
+    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, weather(kind) { places.sky = kind || ''; },
     doActivity(name) { rt.self = false; startActivity(name); },   // asked for (by you, or by what she wrote): not a whim to drop when you speak
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,

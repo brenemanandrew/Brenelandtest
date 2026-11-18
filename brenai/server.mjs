@@ -18,6 +18,7 @@ import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
 import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, requested, posed } from './pics.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import webpush from 'web-push';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
@@ -228,7 +229,7 @@ function setupText() {
   const hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24;
   const part = hour < 5 ? 'late night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 22 ? 'evening' : 'late night';
   const day = d.toLocaleString('en-US', { ...tz, weekday: 'long', month: 'long', day: 'numeric' }), time = d.toLocaleString('en-US', { ...tz, hour: 'numeric', minute: '2-digit' });
-  return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nRight now it is ${time} on ${day} (${part}). That is the real time for both of you: if the time of day comes up, go by it and not by a guess.\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
+  return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nRight now it is ${time} on ${day} (${part}). That is the real time for both of you: if the time of day comes up, go by it and not by a guess.${db.weather && Date.now() - db.weather.at < 3 * 3600000 ? ` Outside where ${USER_NAME} is, the weather is ${db.weather.text.replace('F', ' degrees Fahrenheit')}.` : ''}\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
 }
 // ---- silent touches: what he did to the avatar since her last reply. Never shown in the chat; she just knows. ----
 const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the bookshelf'], pointcounter: ['points her to the kettle', 'points her to the kettle'], pointchair: ['pats her chair for her to sit back down', 'pats her chair for her to sit back down'],
@@ -506,7 +507,7 @@ const tailView = () => { for (let i = db.log.length - 1; i >= 0 && i > db.log.le
 const RING_FOR = 50000;
 function ringNow() { // is she calling him right now? Once the ringing runs out unanswered it is a missed call.
   const a = db.away, now = Date.now(); if (!a || !a.callAt || a.rang || db.call || now < a.callAt) return false;
-  if (now > a.callAt + RING_FOR || now >= a.until) { a.rang = 'missed'; db.log.push({ who: 'sys', text: 'Missed call from Wizra.', at: now }); save(); return false; }
+  if (now > a.callAt + (a.pushedCall ? 180000 : RING_FOR) || now >= a.until) { a.rang = 'missed'; db.log.push({ who: 'sys', text: 'Missed call from Wizra.', at: now }); save(); return false; }
   return true;
 }
 const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || clock(db.away.until), due: Date.now() >= db.away.until && !db.call, ringing: ringNow() } : null; // (back = when she said; the real time is hers to keep)
@@ -545,6 +546,20 @@ function placeNote() {
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
   return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
 }
+// ---- notifications to a player's phone or PC when the page is closed (web push) ----
+// The keys are made once and kept with the shared data. A player's devices are in db.push = [subscription...]. Every 20 seconds
+// each player who is out of the room with her gets a note when she calls, sends something, or comes back.
+if (!shared.vapid) { shared.vapid = webpush.generateVAPIDKeys(); try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(SHARED, JSON.stringify(shared)); } catch {} }
+webpush.setVapidDetails('https://brenai.fly.dev', shared.vapid.publicKey, shared.vapid.privateKey);
+async function notify(title, body) { const subs = db.push || []; for (const sub of [...subs]) { try { await webpush.sendNotification(sub, JSON.stringify({ title, body }), { TTL: 600 }); } catch (e) { if (e.statusCode === 404 || e.statusCode === 410) { db.push = (db.push || []).filter(x => x.endpoint !== sub.endpoint); save(); } } } }
+function pushTick() {
+  for (const u of players.values()) als.run(u, () => { const a = db.away, now = Date.now(); if (!a || !(db.push || []).length) return;
+    if (a.callAt && !a.rang && !a.pushedCall && !db.call && now >= a.callAt && now < a.until) { a.pushedCall = true; save(); notify('Wizra is calling you', 'Open Brenai to pick up.'); }
+    else if (a.pics && a.pics.length && !a.pushedPic && now >= a.pics[0].at) { a.pushedPic = a.pics[0].at; save(); notify('Wizra sent you something', 'A picture from wherever she is.'); }
+    else if (now >= a.until && !a.pushedBack) { a.pushedBack = true; save(); notify('Wizra is back', 'She just got in.'); } });
+}
+try { for (const f of fs.readdirSync(USERS)) { const m = /^([a-f0-9]{24})\.json$/.exec(f); if (m) { const u = playerOf(m[1]); if (u && !(u.data.push || []).length) players.delete(m[1]); } } } catch {}   // players with notifications on are kept loaded so the timer can reach them
+setInterval(() => { try { pushTick(); } catch (e) { console.error('[push]', e.message); } }, 20000).unref();
 // ---- coins, gifts and your own decor ----
 // Coins come from time together (a reply of hers, a kept plan, the heart game). A gift lands in HER room in this player's game;
 // decor lands in YOUR house. Each takes the next free spot of its list. db.gifts / db.decor = [{ kind, at }]
@@ -788,6 +803,12 @@ async function handle(req, res) {
         save(); return json(res, 200, { dates: datesView() });
       }
 
+      if (url.pathname === '/api/push') { // GET: the public key to subscribe with; POST { sub } adds this device, { off: endpoint } removes it, { test } sends one now
+        if (req.method === 'POST') { const b = await readBody(req); db.push = db.push || [];
+          if (b.sub && typeof b.sub.endpoint === 'string' && /^https:\/\//.test(b.sub.endpoint) && b.sub.keys) { db.push = [...db.push.filter(x => x.endpoint !== b.sub.endpoint), { endpoint: b.sub.endpoint.slice(0, 600), keys: { p256dh: String(b.sub.keys.p256dh || '').slice(0, 200), auth: String(b.sub.keys.auth || '').slice(0, 100) } }].slice(-5); }
+          if (b.off) db.push = db.push.filter(x => x.endpoint !== b.off); save(); if (b.test) await notify('Wizra', 'Notifications are on. This is what they look like.'); }
+        return json(res, 200, { key: shared.vapid.publicKey, devices: (db.push || []).length });
+      }
       if (url.pathname === '/api/shop' && req.method === 'POST') {
         const { buy, id } = await readBody(req), row = (SHOP[buy] || []).find(r => r[0] === id), key = buy === 'gift' ? 'gifts' : 'decor'; if (!row) return json(res, 400, { error: 'No such thing in the shop.' });
         db[key] = db[key] || []; if (db[key].length >= SPOTS[buy].length) return json(res, 400, { error: buy === 'gift' ? 'Her room is full of your gifts already.' : 'Your house has no room left for more.' });
@@ -994,7 +1015,7 @@ async function handle(req, res) {
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text, doing, voice: wantVoice, visit, lean, cue, face } = await readBody(req); const faceNow = String(face || '').split(' and ').map(w => w.trim()).filter(w => FACE_WORDS.has(w)).slice(0, 2).join(' and '); /* what his camera showed: only these known phrases are let through */ const cued = String(cue || '').replace(/[^a-z '-]/gi, '').trim().slice(0, 60);
+        const { text, doing, voice: wantVoice, visit, lean, cue, face, weather } = await readBody(req); const faceNow = String(face || '').split(' and ').map(w => w.trim()).filter(w => FACE_WORDS.has(w)).slice(0, 2).join(' and '); /* what his camera showed: only these known phrases are let through */ const cued = String(cue || '').replace(/[^a-z '-]/gi, '').trim().slice(0, 60);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
@@ -1026,7 +1047,7 @@ async function handle(req, res) {
         }
         const lastSeen = db.log.filter(e => !e.hidden && e.who !== 'sys').slice(-2, -1)[0], gapMin = lastSeen ? (Date.now() - lastSeen.at) / 60000 : 999, clockNow = new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'long', hour: 'numeric', minute: '2-digit' });
         const timePre = gapMin > 20 || /\b(time|clock|late|early|morning|afternoon|evening|tonight|night|midnight|noon|o'?clock|today|day is it|a\.?m\.?|p\.?m\.?|bed|sleep|awake|up so)\b/i.test(msg) ? `the clock says ${clockNow}` : '';   // the time, right next to his words, when it matters: after a gap, or when the hour comes up
-        const giftPre = db.giftNote || ''; db.giftNote = '';
+        const giftPre = db.giftNote || ''; db.giftNote = ''; const wz = /^(clear|cloudy|foggy|rainy|snowy|stormy), -?\d{1,3}F( at night)?$/.test(String(weather || '')) ? String(weather) : ''; if (wz) db.weather = { text: wz, at: Date.now() };
         const pre = [timePre, giftPre, takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', faceNow ? `she can see him on his camera: he is ${faceNow}` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {

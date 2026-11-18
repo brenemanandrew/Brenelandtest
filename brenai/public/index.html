@@ -277,7 +277,7 @@
   #wheel.bar #ring .seg .ic { width:40px; height:40px; box-shadow:none; } #wheel.bar #ring .seg .ic svg { width:22px; height:22px; }
   #wheel.bar #ring .seg.cur { opacity:1; } #wheel.bar #ring .seg.cur .ic { box-shadow:0 0 0 3px #fff, 0 4px 12px hsl(var(--hue) 80% 50% / .6); }
   #wheel.bar #closeWheel { top:8px; right:8px; }
-  #wheel.bar #panel { flex:1; min-height:0; overflow-y:auto; width:calc(100% - 16px); margin:4px auto 8px; } #wheel.bar #switchPlayer, #wheel.bar #setWord { display:none !important; }
+  #wheel.bar #panel { flex:1; min-height:0; overflow-y:auto; width:calc(100% - 16px); margin:4px auto 8px; } #wheel.bar #switchPlayer, #wheel.bar #setWord, #wheel.bar #pushBtn, #wheel.bar #weatherBtn { display:none !important; }
   .memline { display:flex; gap:10px; align-items:baseline; padding:6px 0; border-bottom:1px dashed rgba(255,255,255,.14); font-size:14px; } .memline time { flex:none; width:74px; font-size:12px; opacity:.7; } .mempics { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; } .mempics .chatpic { width:100%; margin:0; border-width:2px; border-radius:10px; }
   #closeWheel { position:absolute; top:26px; right:-4px; left:auto; z-index:17; width:46px; height:46px; padding:9px; border-radius:50%; color:#fff; font-size:0; cursor:pointer;
     background:radial-gradient(circle at 35% 30%, #ff8f8f, #f03e3e 60%, #d42a2a); border:3px solid #fff; box-shadow:0 4px 0 #8a1c1c, 0 8px 14px rgba(0,0,0,.4); transform:rotate(6deg); transition:transform .1s, box-shadow .1s; }
@@ -972,7 +972,7 @@ async function send(quick, visit, lean) {
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   const cue = away ? null : cueFor(text); if (cue) { if (cue.gesture) avatar.gesture(cue.gesture, cue.hold || 3.5); if (cue.emote) avatar.emote(cue.emote, 2000); }   // something you said that she reacts to on the spot (the Studio's Reactions)
   try {
-    const r = await api('/api/chat', { text, ...(cue ? { cue: cue.label } : {}), ...(WizraCam.on && WizraCam.recent() ? { face: WizraCam.recent() } : {}), doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
+    const r = await api('/api/chat', { text, ...(cue ? { cue: cue.label } : {}), ...(WizraCam.on && WizraCam.recent() ? { face: WizraCam.recent() } : {}), ...(weatherNow ? { weather: weatherNow } : {}), doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     await readReply(r, body); armFollow();
   } catch (e) {
@@ -1073,7 +1073,26 @@ function cueFor(text) { const t = ' ' + String(text).toLowerCase().replace(/[^a-
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
 { const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('panel').insertAdjacentElement('afterend', sw);
-  const rw = el('button', { id: 'setWord', textContent: 'Set a recovery word (in case you forget your PIN)' }); rw.style.cssText = sw.style.cssText; rw.onclick = async () => { const w = prompt('Pick a recovery word or phrase. With it and your name you can set a new PIN if you forget yours.'); if (!w) return; const r = await api('/api/pin/word', { word: w }), d = await r.json().catch(() => ({})); alert(r.ok ? 'Saved. Keep it somewhere safe.' : (d.error || 'That did not work.')); }; sw.insertAdjacentElement('afterend', rw); }
+  const rw = el('button', { id: 'setWord', textContent: 'Set a recovery word (in case you forget your PIN)' }); rw.style.cssText = sw.style.cssText; rw.onclick = async () => { const w = prompt('Pick a recovery word or phrase. With it and your name you can set a new PIN if you forget yours.'); if (!w) return; const r = await api('/api/pin/word', { word: w }), d = await r.json().catch(() => ({})); alert(r.ok ? 'Saved. Keep it somewhere safe.' : (d.error || 'That did not work.')); }; sw.insertAdjacentElement('afterend', rw);
+  // notifications when the page is closed (she calls, sends something, comes back), and the weather where you are
+  const nb = el('button', { id: 'pushBtn', textContent: 'Notify me when she calls or texts' }); nb.style.cssText = sw.style.cssText; rw.insertAdjacentElement('afterend', nb);
+  const b64 = k => Uint8Array.from(atob(k.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+  nb.onclick = async () => { try { if (!('serviceWorker' in navigator) || !('PushManager' in window)) return alert('This browser cannot show notifications from a web page. On an iPhone, add Brenai to the Home Screen first and open it from there.');
+      const reg = await navigator.serviceWorker.register('/sw.js'), had = await reg.pushManager.getSubscription();
+      if (had) { await api('/api/push', { off: had.endpoint }); await had.unsubscribe(); nb.textContent = 'Notify me when she calls or texts'; return alert('Notifications are off on this device.'); }
+      if (await Notification.requestPermission() !== 'granted') return alert('Notifications were not allowed.');
+      const { key } = await (await api('/api/push')).json(), sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(key) }); await api('/api/push', { sub: sub.toJSON(), test: true }); nb.textContent = 'Notifications are on (tap to turn off)';
+    } catch (e) { alert('Notifications could not be turned on: ' + (e.message || e)); } };
+  if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistration().then(r => r && r.pushManager.getSubscription()).then(s => { if (s) nb.textContent = 'Notifications are on (tap to turn off)'; }).catch(() => {});
+  const wb = el('button', { id: 'weatherBtn', textContent: localStorage.getItem('brenai.weather') ? 'Local weather is on (tap to turn off)' : 'Use the weather where I am' }); wb.style.cssText = sw.style.cssText; nb.insertAdjacentElement('afterend', wb);
+  wb.onclick = () => { if (localStorage.getItem('brenai.weather')) { localStorage.removeItem('brenai.weather'); weatherNow = ''; wb.textContent = 'Use the weather where I am'; avatar.weather && avatar.weather(''); return; }
+    if (!confirm('This asks your device for its location and sends it, rounded to about 10 km, to the free weather service open-meteo.com to get the current weather. Nothing else is sent. OK?')) return; localStorage.setItem('brenai.weather', '1'); wb.textContent = 'Local weather is on (tap to turn off)'; weatherTick(); }; }
+// the weather where you are (only if you turned it on): she is told it, and the sky outside her windows follows it
+let weatherNow = '';
+function weatherTick() { if (!localStorage.getItem('brenai.weather') || !navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async pos => { try { const la = pos.coords.latitude.toFixed(1), lo = pos.coords.longitude.toFixed(1), d = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&current=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit`)).json(), c = d.current, w = c.weather_code;
+      const kind = w >= 95 ? 'stormy' : w >= 71 && w <= 77 || w === 85 || w === 86 ? 'snowy' : w >= 51 ? 'rainy' : w === 45 || w === 48 ? 'foggy' : w >= 2 ? 'cloudy' : 'clear'; weatherNow = `${kind}, ${Math.round(c.temperature_2m)}F${c.is_day ? '' : ' at night'}`; if (avatar.weather) avatar.weather(kind); } catch {} }, () => {}, { maximumAge: 3600000, timeout: 15000 }); }
+setTimeout(weatherTick, 6000); setInterval(weatherTick, 30 * 60000);
 // Two doors: the site password, then your own PIN. The PIN picks your save; everyone's game is their own.
 function showLogin(pin) { $('login').style.display = 'grid'; $('loginForm').hidden = !!pin; $('pinForm').hidden = !pin; if (pin) $('pin').focus(); }
 // The login screen also says whether her brain (the model on the owner's PC) is up. On that PC a link type set up once

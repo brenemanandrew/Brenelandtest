@@ -210,7 +210,8 @@ export function buildPlaces(THREE, A) {
     mugAt: new THREE.Vector3(-0.55, tableTop + 0.045, tableZ + 0.16), lampAt: new THREE.Vector3(-2.15, floorY + 1.62, backZ + 0.05),
     tv: { screen: tvScreen, on: false, at: new THREE.Vector3(tvX, floorY + 1.02, tvZ) },
     tick(night, t) { // dusk and dark outside; the TV flickers when it is on
-      const k = 1 - 0.72 * night; for (const m of worldMats) m.color.setRGB(k, k * (1 - 0.05 * night) + 0.03 * night, k + 0.12 * night);
+      const W = { cloudy: [0.78, 0.8, 0.84], rainy: [0.58, 0.62, 0.7], stormy: [0.42, 0.44, 0.55], foggy: [0.86, 0.86, 0.88], snowy: [0.92, 0.94, 1] }[this.sky] || [1, 1, 1];   // the player's real weather greys or brightens what is outside
+      const k = 1 - 0.72 * night; for (const m of worldMats) m.color.setRGB(k * W[0], (k * (1 - 0.05 * night) + 0.03 * night) * W[1], Math.min(1, (k + 0.12 * night) * W[2]));
       if (this.tv.on) this.tv.screen.material.color.setHSL((t / 9000) % 1, 0.55, 0.5 + 0.12 * Math.sin(t / 170)); else this.tv.screen.material.color.set('#101018');
     },
   };
