@@ -175,6 +175,9 @@
   .bwrap.me .balloon { max-height:var(--band); }
   #meBox { position:relative; width:var(--me); height:var(--me); align-self:end; }
   #meIcon { width:100%; height:100%; display:block; }
+  #meCam { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:20px; transform:scaleX(-1); background:#1d2a36; box-shadow:0 0 0 3px rgba(255,255,255,.85), 0 0 0 6px rgba(255,111,165,.6); } #meCam[hidden], #camRead[hidden] { display:none; }
+  #camBtn { position:absolute; right:-10px; bottom:-10px; width:34px; height:34px; border-radius:50%; border:0; background:rgba(30,20,60,.85); color:#fff; font-size:15px; line-height:1; padding:0; box-shadow:0 3px 10px rgba(0,0,0,.4); cursor:pointer; z-index:2; } #camBtn.on { background:linear-gradient(135deg,#ff6fa5,#a855f7); } #camBtn.wait { opacity:.6; }
+  #camRead { position:absolute; left:4px; bottom:4px; z-index:1; font-size:18px; line-height:1; padding:2px 5px; border-radius:999px; background:rgba(20,12,45,.65); pointer-events:none; }
   #actBtn { position:absolute; left:-12px; top:-12px; width:40px; height:40px; border-radius:50%; border:0; background:var(--grad); color:#fff; font-size:19px; line-height:1; padding:0; box-shadow:0 4px 12px rgba(0,0,0,.35); cursor:pointer; z-index:2; transition:transform .15s; }
   #meBox.fan #actBtn { transform:rotate(-20deg) scale(1.08); }
   #actFan { position:absolute; left:8px; top:8px; width:0; height:0; z-index:1; }
@@ -444,6 +447,8 @@
     <div class="bwrap me" id="meWrap"><div class="balloon" id="meBubble"></div></div>
     <div id="meBox">
       <img id="meIcon" src="me.svg" alt="You" title="Tap to choose your picture">
+      <video id="meCam" muted playsinline hidden></video><span id="camRead" hidden></span>
+      <button id="camBtn" title="Camera: let her see your face (it stays on this device)">&#128247;</button>
       <input id="mePick" type="file" accept="image/*" hidden>
       <button id="actBtn" title="Do something">&#9995;</button>
       <div id="actFan"></div>
@@ -485,6 +490,7 @@
 
 <script src="sound.js"></script>
 <script src="intro.js"></script>
+<script src="facecam.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -951,7 +957,7 @@ async function send(quick, visit, lean) {
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   const cue = away ? null : cueFor(text); if (cue) { if (cue.gesture) avatar.gesture(cue.gesture, cue.hold || 3.5); if (cue.emote) avatar.emote(cue.emote, 2000); }   // something you said that she reacts to on the spot (the Studio's Reactions)
   try {
-    const r = await api('/api/chat', { text, ...(cue ? { cue: cue.label } : {}), doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
+    const r = await api('/api/chat', { text, ...(cue ? { cue: cue.label } : {}), ...(WizraCam.on && WizraCam.recent() ? { face: WizraCam.recent() } : {}), doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
     await readReply(r, body); armFollow();
   } catch (e) {
@@ -1008,6 +1014,25 @@ function drawActs() {
   }
 }
 $('meIcon').onclick = () => $('mePick').click();
+// ---------- your camera: she can see your face (facecam.js reads it on this device; only a word like "smiling" is ever used) ----------
+// What she does when she sees it. [pose, emoji, how long she holds it]; she waits a beat first, the way a person would.
+const CAM_REACT = { smile: ['tilt', '\ud83d\ude0a', 2.6], laugh: ['chuckle', '\ud83d\ude04', 3], surprised: ['situp', '\u2753', 2.6], frown: ['lean', '\ud83e\udd7a', 3.5], yawn: ['yawn', '\ud83e\udd71', 3.5], wink: ['tilt', '\ud83d\ude09', 2.4], nod: ['nod', '', 1.5], shake: ['tilt', '\u2753', 2.2], lookaway: ['fingerwave', '\ud83d\udc40', 3], back: ['wave', '\ud83d\udc4b', 2.6] };
+const CAM_FACE = { smile: '\ud83d\ude42', laugh: '\ud83d\ude04', surprised: '\ud83d\ude2e', frown: '\ud83d\ude41', yawn: '\ud83e\udd71', wink: '\ud83d\ude09', nod: '\u2195\ufe0f', shake: '\u2194\ufe0f', lookaway: '\ud83d\udc40', away: '\ud83d\udeab', back: '\ud83d\udc4b' };
+let camReactAt = 0;
+function camSignal(name) {
+  $('camRead').textContent = CAM_FACE[name] || ''; clearTimeout(camSignal.t); camSignal.t = setTimeout(() => { $('camRead').textContent = WizraCam.reading() ? '\ud83d\udfe2' : ''; }, 2500);
+  const r = CAM_REACT[name], t = performance.now(); if (!r || away || phoneCall.on || sendBtn.disabled || speaker.busy() || document.hidden || t - camReactAt < 5000) return; camReactAt = t;
+  setTimeout(() => { if (away || phoneCall.on) return; avatar.gesture(r[0], r[2]); if (r[1]) avatar.emote(r[1], 1800); }, name === 'yawn' ? 1600 : 500);
+}
+async function camSet(on) {
+  const b = $('camBtn'); if (!on) { WizraCam.stop(); $('meCam').hidden = true; $('camRead').hidden = true; b.classList.remove('on'); localStorage.setItem('brenai.cam', ''); return; }
+  b.classList.add('wait'); const ok = await WizraCam.start($('meCam'), camSignal); b.classList.remove('wait');
+  if (!ok) { addSys(WizraCam.error || 'The camera could not be opened.'); localStorage.setItem('brenai.cam', ''); return; }
+  $('meCam').hidden = false; $('camRead').hidden = false; $('camRead').textContent = WizraCam.reading() ? '\ud83d\udfe2' : '\u26a0\ufe0f'; b.classList.add('on'); localStorage.setItem('brenai.cam', '1'); if (WizraCam.error) addSys(WizraCam.error);
+}
+$('camBtn').onclick = e => { e.stopPropagation(); if (!$('camBtn').classList.contains('wait')) camSet(!WizraCam.on); };
+$('meCam').onclick = () => camSet(false);
+if (localStorage.getItem('brenai.cam') && !new URLSearchParams(location.search).has('pip')) setTimeout(() => { if ($('login').style.display !== 'grid') camSet(true); }, 4000);
 $('mePick').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   try {

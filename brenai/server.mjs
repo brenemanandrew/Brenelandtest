@@ -633,6 +633,7 @@ function matchBlurb(t) {
   const top = Object.keys(TRAIT_WORD).map(k => [k, t[k] - 50]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3).map(([k, d]) => TRAIT_WORD[k][d >= 0 ? 1 : 0]);
   return { name: 'Wizra', age: 22, tags: ['goth', 'plays D&D', 'college student', 'night owl'], line: `${top[0][0].toUpperCase() + top[0].slice(1)}, ${top[1]} and ${top[2]}.`, fit: 86 + Math.round((t.warmth + t.playfulness + t.nerdiness) % 12) };
 }
+const FACE_WORDS = new Set(['smiling', 'laughing', 'looking surprised', 'frowning', 'yawning', 'winking at her', 'nodding', 'shaking his head', 'looking away from the screen', 'back at the screen after being away']);
 const SHOW_ME = /show me (where|around|the (room|place|view|bar|class|library|store)|your (room|surroundings|view)|what'?s (around|behind))|let me see (where|around|the (room|place|view)|behind)|(turn|flip|move|pan|point) (the |your )?(camera|phone)|look around|what'?s behind you|where are you (right now|really)\??.*(show|see)|prove (it|you'?re)/i;
 async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
@@ -917,7 +918,7 @@ async function handle(req, res) {
       }
 
       if (url.pathname === '/api/chat' && req.method === 'POST') {
-        const { text, doing, voice: wantVoice, visit, lean, cue } = await readBody(req); const cued = String(cue || '').replace(/[^a-z '-]/gi, '').trim().slice(0, 60);
+        const { text, doing, voice: wantVoice, visit, lean, cue, face } = await readBody(req); const faceNow = String(face || '').split(' and ').map(w => w.trim()).filter(w => FACE_WORDS.has(w)).slice(0, 2).join(' and '); /* what his camera showed: only these known phrases are let through */ const cued = String(cue || '').replace(/[^a-z '-]/gi, '').trim().slice(0, 60);
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
@@ -947,7 +948,7 @@ async function handle(req, res) {
           else if (wantsPic(msg)) { const pz = posed(msg, devData().cues); if (close * 100 >= rule('picAskMin') && (pz || Math.random() < 0.55 + 0.45 * close)) { pic = pz ? { ...selfie('dorm', kind, close), pose: 'plain', face: 'happy', ...(pz.gest ? { gest: pz.gest } : { clip: pz.clip, t: 0 }), ...(pz.cam ? { cam: pz.cam } : {}), desc: `a picture of her ${pz.label}, in her dorm room` } : (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
-        const pre = [takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
+        const pre = [takeTouches(), askPre, picPre, cued ? `at his words she ${cued}, on reflex, before she answers` : '', faceNow ? `she can see him on his camera: he is ${faceNow}` : '', seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
         try {
           let heard = '', early = false; // the first finished sentence goes to be voiced while she is still writing the rest
