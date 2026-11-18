@@ -149,7 +149,8 @@
     [/\bsips?\b|takes? a (sip|drink|swig|gulp)|drinks?|picks? up her (mug|cup|coffee|drink)/i, 'sip'],
   ];
   // what she drifts into on her own when nothing is happening, and how she physically takes a touch
-  const IDLE = [['shift', 3], ['feet', 2.4], ['tilt', 2], ['lookaway', 2.4], ['lookdown', 2], ['sigh', 2.2], ['flip', 1.6], ['stretch', 3.2], ['leanback', 3]];
+  const IDLE = [['shift', 3], ['feet', 2.4], ['tilt', 2], ['sigh', 2.2], ['flip', 1.6], ['stretch', 3.2], ['leanback', 3], ['think', 3]];   // on her own she fidgets, but she stays facing you
+  const IDLE_SHY = [...IDLE, ['lookaway', 2.4], ['lookdown', 2], ['lookaway', 2.4]];                                                              // shy, flustered or low: her eyes slide off you now and then
   // how she is for the hour after she comes back from somewhere, when it shows: [resting face, what she keeps doing]
   const STATE = { cagey: ['anxious', [['lookaway', 2], ['lookdown', 1.6], ['shift', 2], ['lookaway', 2.4]]], tipsy: ['tipsy', [['jolt', 1], ['laugh', 1.6], ['shift', 3], ['tilt', 2.4]]], high: ['high', [['tilt', 3], ['lookup', 2.6], ['laugh', 1.8], ['feet', 2.4]]],
     groggy: ['tired', [['yawn', 3], ['slump', 3], ['yawn', 3]]], hyper: ['excited', [['bounce', 2], ['feet', 2.4], ['shift', 2], ['nod', 1.2]]], upset: ['sad', [['lookdown', 3], ['sigh', 2.4], ['lookaway', 3]]] };
@@ -265,7 +266,7 @@
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
       // a gesture in progress: name, seconds since it began, and an ease in/out weight 0..1
       // left alone for a while, she moves on her own
-      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const pool = STATE[state] ? STATE[state][1] : IDLE; if (idleAt) { const pick = pool[Math.random() * pool.length | 0]; doGesture(pick[0], (pick[1] || 2.2) * (QUICK.has(pick[0]) ? 1 : 1.4)); } idleAt = t + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); }
+      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const shy = (face && face.blush > 0.3) || ['anxious', 'sad', 'tired'].includes(faceName), pool = STATE[state] ? STATE[state][1] : shy ? IDLE_SHY : IDLE; if (idleAt) { const pick = pool[Math.random() * pool.length | 0]; doGesture(pick[0], (pick[1] || 2.2) * (QUICK.has(pick[0]) ? 1 : 1.4)); } idleAt = t + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); }
       if ((talking || thinking) && idleAt < t + 25000) idleAt = t + 25000;   // while you two are talking she is with you, not fidgeting
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }

@@ -918,9 +918,9 @@ export async function create(url, opts = {}) {
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking
       if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else if (watching) target.position.copy(places.tv.at); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; if (gx.eyes[0] || gx.eyes[1]) { const yw = vrm.scene.rotation.y; target.position.x -= Math.cos(yw) * gx.eyes[0]; target.position.z += Math.sin(yw) * gx.eyes[0]; target.position.y += gx.eyes[1]; } }
       let facing = rt.stand > 0.5 ? 0 : camYaw * 0.55, tip = 0; // seated she turns her head to you; on her feet her whole body does
-      if (fp.on) { // you could be anywhere in the room: she turns as far as a neck goes, and looks up if you are standing over her
+      { // wherever you are watching from (your seat across from her, or anywhere in the room on a visit) and however she is sitting or standing, her head turns to you as far as a neck goes, and tips up if you are standing over her
         const dx = camera.position.x - eye.x, dz = camera.position.z - eye.z, off = Math.atan2(dx, dz) - vrm.scene.rotation.y, a = Math.atan2(Math.sin(off), Math.cos(off));
-        const wantY = watching ? 0 : Math.max(-1.05, Math.min(1.05, a)) * (rt.stand > 0.5 ? 0.3 : 0.62), wantP = watching ? 0 : Math.max(-0.3, Math.min(0.3, -Math.atan2(camera.position.y - eye.y, Math.hypot(dx, dz)) * 0.5));
+        const still = rt.stand > 0.5 && rt.leg < 0.3, wantY = watching ? 0 : Math.max(-1.05, Math.min(1.05, a)) * (rt.stand > 0.5 ? (still ? 0.6 : 0.3) : 0.62) * (1 - 0.6 * (rt.lie || 0)), wantP = watching ? 0 : Math.max(-0.3, Math.min(0.3, -Math.atan2(camera.position.y - eye.y, Math.hypot(dx, dz)) * 0.5));
         faceYaw += (wantY - faceYaw) * Math.min(1, s.dt * 4); facePitch += (wantP - facePitch) * Math.min(1, s.dt * 4); facing = faceYaw; tip = facePitch;
       }
       const roll = -s.rot * Math.PI / 180 * 1.6, yaw = s.tx * 0.045 + (rt.gazeProp ? 0 : s.look.x * 0.045 + facing) + rt.head[1], pitch = s.ty * 0.03 + (rt.gazeProp ? 0 : s.look.y * 0.03 + tip) + (1 - s.sq) * 1.5 + rt.head[0];
