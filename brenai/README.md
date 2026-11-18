@@ -95,3 +95,5 @@ A developer page with three tabs, saved through `GET/POST /api/dev` into `db.dev
 
 ## The heart game
 Stroke her hair: a heart pops up. Pop it and nine more follow, faster and bouncier, while the screen edge turns pink with bubbles, the view closes in on her heart, she squirms, blushes (4+) and tears up (7+). Ten pops: sparkles, a white flash, +10 romance (`POST /api/hearts`). Three misses: -1. Once a minute at most.
+- Studio, fourth tab **Character and rules**: temperament sliders (`sheet.traits`, a line in her prompt), her story, how she behaves, rapport and paths, her notes, the core character text (`db.persona`, `{user}` for your name, empty puts the original back) and the game's rules (`RULES` in server.mjs: visit gate, path thresholds, heart game numbers, picture and call rates). All through `POST /api/settings`.
+- The Studio's preview (`?pip=1`, `SANDBOX` in index.html) is its own instance: she is always home and awake in it and nothing is written to the real chat.

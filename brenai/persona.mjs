@@ -58,6 +58,9 @@ export const SETTINGS_DEFAULT = {
 
 const band = (v, words) => words[Math.min(words.length - 1, Math.floor(v / (100 / words.length)))];
 
+// Her temperament as sliders (the Studio's Personality tab): each 0..100, turned into words for her prompt. Anything can be added.
+export const TRAITS_DEFAULT = { sarcasm: 70, warmth: 45, confidence: 60, patience: 45, playfulness: 55, shyness: 30, nerdiness: 80, bluntness: 80 };
+const traitLine = t => { const e = Object.entries(t || {}).filter(([, v]) => Number.isFinite(+v)); if (!e.length) return ''; const w = v => ['almost none', 'low', 'moderate', 'high', 'very high'][Math.min(4, Math.floor(+v / 20.01))]; return `- Temperament: ${e.map(([k, v]) => `${k} ${w(v)}`).join('; ')}. Let these show in how you act and talk, never by naming them.\n`; };
 export const STATE_BLOCK = (user, s, sheet) => {
   const hiddenOpen = sheet.hiddenLikes.filter(h => h.revealed).map(h => h.text);
   const hiddenClosed = sheet.hiddenLikes.filter(h => !h.revealed).map(h => h.text);
@@ -76,7 +79,7 @@ export const STATE_BLOCK = (user, s, sheet) => {
 - Secret likes you keep to yourself for now: ${hiddenClosed.join('; ') || '(none)'}. These are real and can color your reactions, but you don't admit them unless you trust him enough (see rapport) and it comes up naturally, or he catches you.
 
 Where things stand
-- Rapport with ${user}: ${sheet.rapport}/100 (${band(sheet.rapport, ['guarded, a bit cold', 'polite but reserved', 'friendly', 'comfortable and open', 'close; you really like talking to him'])}). Let this shape how open, teasing and personal you are.
+${traitLine(sheet.traits)}- Rapport with ${user}: ${sheet.rapport}/100 (${band(sheet.rapport, ['guarded, a bit cold', 'polite but reserved', 'friendly', 'comfortable and open', 'close; you really like talking to him'])}). Let this shape how open, teasing and personal you are.
 ${BOND_LINE[sheet.path] ? '- ' + BOND_LINE[sheet.path](user) + '\n' : ''}- Mood: ${s.mood === 'auto' ? 'let it follow the conversation and your evening' : `you are feeling ${s.mood} right now; let it show`}.
 - How you react: ${band(s.expressiveness, ['very reserved, understated, dry', 'low-key', 'natural', 'expressive, lots of visible reactions', 'big, dramatic reactions'])}.
 - Spontaneity: ${band(s.temperature, ['predictable and steady, stay on topic', 'mostly steady', 'normal', 'loose and a bit random, tangents welcome', 'wild: unexpected takes, sudden tangents, chaotic energy'])}.

@@ -40,7 +40,7 @@
 </head>
 <body>
 <header><h1>BRENAI STUDIO</h1>
-  <nav><button data-tab="ui" class="on">Layout</button><button data-tab="ev">Events</button><button data-tab="map">Maps</button></nav>
+  <nav><button data-tab="ui" class="on">Layout</button><button data-tab="ev">Events</button><button data-tab="map">Maps</button><button data-tab="who">Character and rules</button></nav>
   <a href="/">Back to the game</a></header>
 
 <!-- 1. Layout: the real game page, with every piece draggable -->
@@ -69,6 +69,14 @@
   <div class="side right"><h2>Selected</h2><div id="selPanel"><p class="tip">Nothing selected. Click a thing in the room, or add one from the catalogue.</p></div>
     <div class="row" style="margin-top:16px"><button class="btn go" id="mapSave">Save rooms</button></div></div>
 </main>
+<!-- 4. Personality -->
+<main id="tab-who">
+  <div class="side"><h2>Personality</h2><p class="tip">Who she is. Changes take effect on her <b>next reply</b>; nothing here needs a restart.</p>
+    <div id="whoNav"></div>
+    <div class="row" style="margin-top:14px"><button class="btn go" id="whoSave">Save personality</button></div>
+    <p class="tip" id="whoState"></p></div>
+  <div class="work" id="whoWork"></div>
+</main>
 <div id="pip" hidden><div id="pipHead"><b>Preview</b><span id="pipNote"></span><button id="pipClose" title="Close the preview">✕</button></div><iframe id="pipFrame" title="A small copy of the game, where events play"></iframe></div>
 <div id="toast"></div>
 
@@ -92,7 +100,7 @@ const placeName = id => id === 'dorm' ? 'Her dorm' : id === 'house' ? 'Your hous
 const allPlaces = () => ['dorm', 'house', ...dev.maps.custom.map(m => m.id)];
 
 // ---------- tabs ----------
-for (const b of document.querySelectorAll('nav button')) b.onclick = () => { for (const x of document.querySelectorAll('nav button')) x.classList.toggle('on', x === b); for (const m of document.querySelectorAll('main')) m.classList.toggle('on', m.id === 'tab-' + b.dataset.tab); if (b.dataset.tab === 'map') mapStart(); if (b.dataset.tab === 'ev') drawEvents(); };
+for (const b of document.querySelectorAll('nav button')) b.onclick = () => { for (const x of document.querySelectorAll('nav button')) x.classList.toggle('on', x === b); for (const m of document.querySelectorAll('main')) m.classList.toggle('on', m.id === 'tab-' + b.dataset.tab); if (b.dataset.tab === 'map') mapStart(); if (b.dataset.tab === 'who') whoStart(); if (b.dataset.tab === 'ev') drawEvents(); };
 
 // ---------- 1. layout ----------
 function screen(kind) { const w = kind === 'phone' ? 430 : 1100, h = kind === 'phone' ? 860 : 740; $('frameWrap').style.width = w + 'px'; $('frameWrap').style.height = h + 'px'; $('scrPhone').classList.toggle('go', kind === 'phone'); $('scrPc').classList.toggle('go', kind === 'pc'); $('frame').src = '/?uiedit=1&k=' + kind; }
@@ -277,6 +285,58 @@ function drawSel() {
 }
 $('mapNew').onclick = () => { const m = { id: 'room' + uid(), name: 'New room', about: '', left: 0, right: 0, front: 0, wall: '#6d5a8f', floor: '#3a2f52', items: [] }; dev.maps.custom.push(m); mapSel = m.id; itemSel = null; drawMaps(); };
 $('mapSave').onclick = async () => { await post({ maps: dev.maps }); toast('Rooms saved. Open games reload to show them.'); };
+
+// ---------- 4. personality ----------
+// Everything here goes through the game's own settings (POST /api/settings): trait sliders, her sheet, how she behaves, her
+// notes about you, and the core text that tells the model who she is.
+let who = null, whoSec = 'traits', whoDirty = false;
+const MOODS = ['auto', 'happy', 'playful', 'chill', 'tired', 'grumpy', 'sad', 'excited', 'anxious', 'focused'];
+const dirty = () => { whoDirty = true; $('whoState').textContent = 'Unsaved changes.'; };
+async function whoStart() { if (!who) { const d = await (await fetch('/api/settings')).json(); who = d; who.sheet.traits = who.sheet.traits || { ...d.traitsDefault }; } drawWho(); }
+const SECS = { traits: ['Temperament', 'Sliders for how much of each trait shows.'], sheet: ['Her story', 'Birthday, backstory, likes, dislikes and secrets.'], manner: ['How she behaves', 'Mood, how big her reactions are, reply length, cussing.'], bond: ['You and her', 'Rapport and what you two are.'], notes: ['Her notes about you', 'What she has picked up. She rewrites these herself.'], core: ['Core character', 'The text that tells the model who she is. Advanced.'], rules: ['Game rules', 'The numbers the game runs on: when visits open up, how the heart game scores, how often she sends pictures or calls.'] };
+function drawWho() {
+  const nav = $('whoNav'); nav.textContent = ''; for (const k in SECS) { const it = el('div', { className: 'item' + (k === whoSec ? ' on' : '') }, el('i', { className: 'live' }), SECS[k][0]); it.onclick = () => { whoSec = k; drawWho(); }; nav.append(it); }
+  const w = $('whoWork'), sh = who.sheet, st = who.settings; w.textContent = ''; const card = (...kids) => { const c = el('div', { className: 'card' }, ...kids); w.append(c); return c; };
+  const range = (obj, key, lo, hi, min = 0, max = 100) => { const out = el('b', { textContent: obj[key] }), i = el('input', { type: 'range', min, max, value: obj[key] }); i.oninput = () => { obj[key] = +i.value; out.textContent = i.value; dirty(); }; return el('div', {}, i, el('div', { className: 'row', style: 'margin-top:0;justify-content:space-between;font-size:12px;color:#8a7aa8' }, el('span', { textContent: lo }), out, el('span', { textContent: hi }))); };
+  const chips = (obj, key, list, names) => { const r = el('div', { className: 'row' }); for (const v of list) { const b = el('button', { className: 'btn sm' + (obj[key] === v ? ' go' : ''), textContent: names ? names[v] : v }); b.onclick = () => { obj[key] = v; dirty(); drawWho(); }; r.append(b); } return r; };
+  const tags = (list, ph) => { const box = el('div', { className: 'row' }); list.forEach((t, i) => { const text = typeof t === 'string' ? t : t.text, c = el('span', { className: 'btn sm', textContent: text + '  \u2715' }); c.onclick = () => { list.splice(i, 1); dirty(); drawWho(); }; box.append(c); }); const add = el('input', { type: 'text', placeholder: ph, className: 'grow' }); add.onkeydown = e => { if (e.key === 'Enter' && add.value.trim()) { list.push(typeof list[0] === 'object' || ph.includes('secret') ? { text: add.value.trim(), revealed: false } : add.value.trim()); dirty(); drawWho(); } }; box.append(add); return box; };
+  w.append(el('div', { className: 'card' }, el('h2', { textContent: SECS[whoSec][0] }), el('p', { className: 'tip', textContent: SECS[whoSec][1] })));
+  if (whoSec === 'traits') {
+    const c = card(); for (const k of Object.keys(sh.traits)) { const del = el('button', { className: 'mini', textContent: '\u2715', title: 'Remove this trait' }); del.onclick = () => { delete sh.traits[k]; dirty(); drawWho(); }; c.append(el('div', { className: 'row', style: 'margin-bottom:0' }, el('strong', { textContent: k[0].toUpperCase() + k.slice(1), className: 'grow' }), del), range(sh.traits, k, 'none', 'a lot')); }
+    const nm = el('input', { type: 'text', placeholder: 'Add a trait, e.g. jealousy, curiosity, stubbornness', className: 'grow' }), add = el('button', { className: 'btn', textContent: 'Add' }); add.onclick = () => { const k = nm.value.trim().toLowerCase(); if (k && !(k in sh.traits)) { sh.traits[k] = 50; dirty(); drawWho(); } };
+    const reset = el('button', { className: 'btn', textContent: 'Back to her original temperament' }); reset.onclick = () => { sh.traits = { ...who.traitsDefault }; dirty(); drawWho(); };
+    card(el('div', { className: 'row' }, nm, add), el('div', { className: 'row' }, reset), el('p', { className: 'tip', textContent: 'Each slider becomes a word in her instructions (almost none, low, moderate, high, very high). She is told to show them, not name them.' }));
+  } else if (whoSec === 'sheet') {
+    const bd = el('input', { type: 'text', value: sh.birthday, className: 'grow' }); bd.oninput = () => { sh.birthday = bd.value; dirty(); }; const bs = el('textarea', { rows: 7, value: sh.backstory }); bs.oninput = () => { sh.backstory = bs.value; dirty(); };
+    card(el('h3', { textContent: 'Birthday' }), el('div', { className: 'row' }, bd), el('h3', { textContent: 'Backstory' }), bs);
+    card(el('h3', { textContent: 'Likes' }), tags(sh.likes, 'Add a like and press Enter'), el('h3', { textContent: 'Dislikes' }), tags(sh.dislikes, 'Add a dislike and press Enter'), el('h3', { textContent: 'Secret likes (she admits them only when she trusts you)' }), tags(sh.hiddenLikes, 'Add a secret like and press Enter'));
+  } else if (whoSec === 'manner') {
+    card(el('h3', { textContent: 'Mood' }), chips(st, 'mood', MOODS), el('h3', { textContent: 'How big her reactions are' }), range(st, 'expressiveness', 'reserved, dry', 'big, dramatic'), el('h3', { textContent: 'Spontaneity' }), range(st, 'temperature', 'steady, on topic', 'wild, tangents'));
+    const tog = (key, text) => { const i = el('input', { type: 'checkbox', checked: !!st[key] }); i.onchange = () => { st[key] = i.checked; dirty(); }; return el('div', { className: 'row' }, el('label', { style: 'min-width:0' }, i, ' ' + text)); };
+    card(el('h3', { textContent: 'Reply length' }), chips(st, 'length', ['short', 'medium', 'long']), el('h3', { textContent: 'Cussing' }), chips(sh, 'cussLevel', [0, 1, 2, 3], ['never', 'mild', 'casual', 'free']), tog('cussDevelop', 'She can pick up cussing over time'), tog('bleep', 'Bleep cuss words on screen'), tog('sfw', 'Keep everything safe for work'));
+  } else if (whoSec === 'bond') {
+    sh.bond = sh.bond || { romance: 0, friend: 0, mentor: 0 };
+    card(el('h3', { textContent: 'Rapport (how much she likes and trusts you)' }), range(sh, 'rapport', 'guarded', 'close'), el('h3', { textContent: 'Romance' }), range(sh.bond, 'romance', '0', '100'), el('h3', { textContent: 'Friends' }), range(sh.bond, 'friend', '0', '100'), el('h3', { textContent: 'Mentor' }), range(sh.bond, 'mentor', '0', '100'),
+      el('h3', { textContent: 'What you two are' }), chips(sh, 'pathLock', ['', 'romance', 'friend', 'mentor'], { '': 'Follow the scores', romance: 'Romance', friend: 'Friends', mentor: 'Mentor' }));
+  } else if (whoSec === 'rules') {
+    const groups = { 'Getting together': ['visitAt', 'momentPts', 'pathMin', 'pathLead'], 'Heart game': ['heartPops', 'heartTries', 'heartWin', 'heartLose', 'heartCooldown', 'bonusTaps', 'bonusHeart', 'bonusFace', 'bonusOther'], 'Pictures and calls': ['picRate', 'picAskMin', 'callRate'] };
+    for (const gname in groups) { const c = card(el('h3', { textContent: gname })); for (const k of groups[gname]) { const [d, lo, hi, text] = who.rulesSpec[k], i = el('input', { type: 'number', min: lo, max: hi, value: who.rules[k], style: 'width:90px' }); i.oninput = () => { who.rules[k] = +i.value; dirty(); };
+      const back = el('button', { className: 'mini', textContent: '\u21ba', title: 'Back to ' + d }); back.onclick = () => { who.rules[k] = d; dirty(); drawWho(); }; c.append(el('div', { className: 'row' }, el('span', { className: 'grow', textContent: text }), i, el('span', { style: 'font-size:12px;color:#8a7aa8;width:74px', textContent: 'normally ' + d }), back)); } }
+  } else if (whoSec === 'notes') {
+    const nt = el('textarea', { rows: 18, value: who.notes || '' }); nt.oninput = () => { who.notes = nt.value; dirty(); }; card(nt, el('p', { className: 'tip', textContent: 'She rewrites these every few messages, so an edit here steers her but may not stay word for word.' }));
+  } else {
+    const tx = el('textarea', { rows: 26, value: who.persona, style: 'font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.45' }); tx.oninput = () => { who.persona = tx.value; who.personaEdited = true; dirty(); };
+    const reset = el('button', { className: 'btn bad', textContent: 'Put the original text back' }); reset.onclick = () => { if (!confirm('Replace this with her original core character text?')) return; who.persona = who.personaDefault; who.personaEdited = false; who.personaReset = true; dirty(); drawWho(); };
+    card(el('p', { className: 'tip', textContent: 'This is the base instruction her model reads before everything else: who she is and how she talks. Write {user} wherever your name should go. ' + (who.personaEdited ? 'You are using your own edited version.' : 'This is the original.') }), tx, el('div', { className: 'row' }, reset));
+  }
+}
+$('whoSave').onclick = async () => {
+  const sh = who.sheet, body = { settings: { mood: who.settings.mood, expressiveness: who.settings.expressiveness, temperature: who.settings.temperature, length: who.settings.length, sfw: who.settings.sfw, bleep: who.settings.bleep, cussDevelop: who.settings.cussDevelop },
+    sheet: { birthday: sh.birthday, backstory: sh.backstory, likes: sh.likes, dislikes: sh.dislikes, hiddenLikes: sh.hiddenLikes, rapport: sh.rapport, cussLevel: sh.cussLevel, pathLock: sh.pathLock || '', bond: sh.bond, traits: sh.traits }, notes: who.notes || '', rules: who.rules };
+  if (who.personaReset) body.persona = ''; else if (who.personaEdited) body.persona = who.persona;
+  const r = await fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) return toast('Could not save');
+  const d = await r.json(); who = d; whoDirty = false; $('whoState').textContent = 'Saved. She uses it from her next reply.'; toast('Personality saved'); drawWho();
+};
 
 // ---------- start ----------
 (async () => {

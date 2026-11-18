@@ -17,6 +17,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
 import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates } from './pics.mjs';
+import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -169,7 +170,8 @@ function authed(req) {
 function systemBlocks() {
   // Stable first so the cache holds; this only changes when settings, the sheet or the notes change.
   fixBond();
-  const blocks = [{ type: 'text', text: PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') }];
+  if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
+  const blocks = [{ type: 'text', text: db.persona ? db.persona.replaceAll('{user}', USER_NAME) : PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') }];
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -354,7 +356,7 @@ const BOND = ['romance', 'friend', 'mentor'];
 function fixBond() {
   const sh = db.sheet; if (!sh.bond || typeof sh.bond !== 'object') sh.bond = {}; for (const k of BOND) sh.bond[k] = Math.max(0, Math.min(100, Math.round(+sh.bond[k] || 0)));
   const order = [...BOND].sort((a, b) => sh.bond[b] - sh.bond[a]), top = order[0];
-  sh.path = BOND.includes(sh.pathLock) ? sh.pathLock : (sh.bond[top] >= 5 && sh.bond[top] - sh.bond[order[1]] >= 2 ? top : '');
+  sh.path = BOND.includes(sh.pathLock) ? sh.pathLock : (sh.bond[top] >= rule('pathMin') && sh.bond[top] - sh.bond[order[1]] >= rule('pathLead') ? top : '');
 }
 function addBond(kind, n) { fixBond(); db.sheet.bond[kind] = Math.min(100, db.sheet.bond[kind] + n); fixBond(); }
 const bondView = () => { fixBond(); return { bond: db.sheet.bond, path: db.sheet.path, pathLock: db.sheet.pathLock || '' }; };
@@ -371,6 +373,9 @@ function applySettings(body) {
   if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140), String(x[2] || '').trim().slice(0, 8)]).filter(x => x[0] && x[1]).slice(0, 18);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
   if (typeof body.notes === 'string') db.profile = body.notes.slice(0, 6000);
+  if (body.rules && typeof body.rules === 'object') { db.rules = db.rules || {}; for (const k in RULES) if (Number.isFinite(+body.rules[k])) db.rules[k] = Math.max(RULES[k][1], Math.min(RULES[k][2], Math.round(+body.rules[k]))); fixBond(); }
+  if (typeof body.persona === 'string') db.persona = body.persona.trim().length > 40 ? body.persona.slice(0, 16000) : '';   // her core character text; empty puts the original back
+  if (body.sheet && body.sheet.traits && typeof body.sheet.traits === 'object') { const t = {}; for (const [k, v] of Object.entries(body.sheet.traits).slice(0, 20)) { const name = String(k).toLowerCase().replace(/[^a-z0-9 '-]/g, '').trim().slice(0, 28); if (name && Number.isFinite(+v)) t[name] = Math.max(0, Math.min(100, Math.round(+v))); } db.sheet.traits = t; }
   const h = body.sheet || {}, H = db.sheet;
   for (const k of ['birthday', 'backstory']) if (typeof h[k] === 'string') H[k] = h[k].slice(0, 4000);
   for (const k of ['likes', 'dislikes']) if (Array.isArray(h[k])) H[k] = h[k].map(String).map(x => x.trim()).filter(Boolean).slice(0, 60);
@@ -429,10 +434,30 @@ const awayView0 = () => db.away ? { where: db.away.where, back: db.away.said || 
 const glowView = () => { const g = currentGlow(); return g ? { kind: g.kind, until: g.until, sneak: !!g.lying } : null; };
 // ---- visiting: once the relationship score reaches VISIT_AT they can be in the same room. db.place is '' (apart, the usual),
 // 'dorm' (he is at her dorm) or 'house' (she is at his house). The page shows it in first person.
-const VISIT_AT = 90;
-const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= VISIT_AT;
+// The game's rules as numbers you can change (the Studio's Rules section): [default, min, max, what it is]
+const RULES = {
+  visitAt: [90, 0, 100, 'Rapport needed before you can visit each other'],
+  momentPts: [2, 0, 20, 'Points a visit moment (flirt / hang out / guide) adds to its path'],
+  pathMin: [5, 1, 100, 'Points a path needs before it becomes what you two are'],
+  pathLead: [2, 0, 50, 'How far ahead of the next path it must be'],
+  heartPops: [10, 3, 20, 'Heart game: hearts to pop to win'],
+  heartTries: [3, 1, 9, 'Heart game: missed taps allowed'],
+  heartWin: [10, 0, 100, 'Heart game: romance for winning'],
+  heartLose: [1, 0, 50, 'Heart game: romance lost for losing'],
+  heartCooldown: [45, 0, 3600, 'Heart game: seconds before it can be played again'],
+  bonusTaps: [3, 0, 20, 'Heart game bonus: taps you get'],
+  bonusHeart: [6, 0, 50, 'Heart game bonus: points for her heart'],
+  bonusFace: [2, 0, 50, 'Heart game bonus: points for her face'],
+  bonusOther: [1, 0, 50, 'Heart game bonus: points for her hands or shoulders'],
+  picRate: [100, 0, 500, 'How often she sends pictures on her own (percent of normal)'],
+  picAskMin: [25, 0, 100, 'Rapport needed before she sends a picture when asked'],
+  callRate: [100, 0, 500, 'How often she calls you while she is out (percent of normal)'],
+};
+const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinite(+db.rules[k]) ? +db.rules[k] : d; return Math.max(lo, Math.min(hi, v)); };
+const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
+const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
-const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: VISIT_AT, invite: inviteNow(), ...bondView() });
+const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), ...bondView() });
 function placeNote() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
@@ -456,11 +481,11 @@ function leaveNow(leave, since = Date.now()) {
   const drift = a.minutes < 12 ? 0 : (Math.random() * (a.out.lying ? 50 : 32) - (a.out.lying ? 0 : 6)) * 60000;
   a.until = (said || now + leave.minutes * 60000 / AWAY_SPEED) + drift / AWAY_SPEED; a.said = said ? clock(said) : clock(now + leave.minutes * 60000 / AWAY_SPEED);
   // now and then she is the one who calls, part way through being out: rare, and likelier the closer they are
-  const close = (db.sheet.rapport | 0) / 100, chance = (0.02 + 0.16 * close * close) * (db.sheet.path === 'romance' ? 1.4 : 1);
+  const close = (db.sheet.rapport | 0) / 100, chance = (0.02 + 0.16 * close * close) * (db.sheet.path === 'romance' ? 1.4 : 1) * rule('callRate') / 100;
   // and now and then a picture from wherever she is. If she is somewhere she should not be, most of the time she sends
   // nothing; when she does, she has not thought about what is behind her (slip), and the picture gives her away.
   a.pics = [];
-  for (let i = 0; i < 2; i++) if (process.env.PIC_TEST ? i === 0 : a.minutes >= 15 && Math.random() < awayChance(close, db.sheet.path === 'romance') / (i + 1)) {
+  for (let i = 0; i < 2; i++) if (process.env.PIC_TEST ? i === 0 : a.minutes >= 15 && Math.random() < awayChance(close, db.sheet.path === 'romance') * rule('picRate') / 100 / (i + 1)) {
     if (a.out.lying && !process.env.PIC_TEST && Math.random() > 0.4) continue;
     a.pics.push({ at: process.env.PIC_TEST ? now + 4000 : now + (a.until - now) * (0.15 + 0.7 * Math.random()), slip: !!a.out.lying });
   }
@@ -572,7 +597,8 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/settings') {
         if (req.method === 'POST') applySettings(await readBody(req));
-        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile });
+        if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
+        return json(res, 200, { settings: db.settings, sheet: db.sheet, notes: db.profile, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, personaDefault: PERSONA('{user}'), traitsDefault: TRAITS_DEFAULT, rules: rulesView(), rulesSpec: RULES });
       }
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
@@ -651,10 +677,10 @@ const server = http.createServer(async (req, res) => {
       }
       // the heart game (rub her head, pop the hearts): ten pops is +10 romance, three misses is -1. Once a minute at most.
       if (url.pathname === '/api/hearts' && req.method === 'POST') {
-        const { result, bonus } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < 45000) return json(res, 429, { error: 'too soon', ...placeView() });
+        const { result, bonus } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < rule('heartCooldown') * 1000) return json(res, 429, { error: 'too soon', ...placeView() });
         db.heartsAt = now; fixBond();
-        if (result === 'win') { addBond('romance', 10 + Math.max(0, Math.min(60, Math.round(+bonus || 0)))); touches.push({ kind: 'heartwin', at: now }); }
-        else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - 1); fixBond(); touches.push({ kind: 'heartlose', at: now }); }
+        if (result === 'win') { addBond('romance', rule('heartWin') + Math.max(0, Math.min(rule('bonusTaps') * Math.max(rule('bonusHeart'), rule('bonusFace'), rule('bonusOther')), Math.round(+bonus || 0)))); touches.push({ kind: 'heartwin', at: now }); }
+        else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - rule('heartLose')); fixBond(); touches.push({ kind: 'heartlose', at: now }); }
         save(); return json(res, 200, placeView());
       }
       // a scripted event at work: note that it fired, put a line she says in the log, or have her react in her own words
@@ -718,8 +744,8 @@ const server = http.createServer(async (req, res) => {
         let pic = null, picPre = '';
         if (!db.place && !askPre) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
-          if (wantsPic(msg)) { if (close >= 0.25 && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
-          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance')) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
+          if (wantsPic(msg)) { if (close * 100 >= rule('picAskMin') && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
         const pre = [takeTouches(), askPre, picPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });
@@ -734,7 +760,7 @@ const server = http.createServer(async (req, res) => {
           if (wantVoice) prewarm(full);
           db.log.push({ who: 'her', text: full, at: Date.now(), ...(pic ? { pic } : {}) });
           db.sinceLearn++;
-          if (db.place && BOND.includes(lean)) addBond(lean, 2);                       // one of the moments he chose while they are together
+          if (db.place && BOND.includes(lean)) addBond(lean, rule('momentPts'));                       // one of the moments he chose while they are together
           if (ask) db.log.push({ who: 'sys', text: ask === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: Date.now() });
           notePlan(full); const leave = detectLeave(full); if (leave) leaveNow(leave);
           else if (!db.place && !askPre && canVisit()) { const inv = detectInvite(full); if (inv) db.invite = { place: inv, at: Date.now() }; }

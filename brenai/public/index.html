@@ -587,6 +587,7 @@ async function api(path, body) {
 // less and less time, bouncing about near the end. Each pop: she squirms, the edges of the screen go a deeper pink with bubbles
 // drifting round them, and the view closes in on her heart. From 4 she blushes, from 7 there are happy tears, and the 10th is a
 // burst of sparkles, a flash of white and +10 romance. Miss three and it ends badly (-1).
+const RU = () => ({ heartPops: 10, heartTries: 3, heartWin: 10, heartLose: 1, bonusTaps: 3, bonusHeart: 6, bonusFace: 2, bonusOther: 1, ...(visitInfo.rules || {}) });   // the game's rules (set in the Studio)
 const heartGame = (() => {
   const HEART = '<svg viewBox="0 0 32 30"><path d="M16 28 C2 18 1 9 6 4.500 C10 1 14.500 3 16 7 C17.500 3 22 1 26 4.500 C31 9 30 18 16 28 Z" fill="#ff4f9a" stroke="#fff" stroke-width="2"/><ellipse cx="10.500" cy="9" rx="3" ry="2" fill="rgba(255,255,255,.7)" transform="rotate(-30 10.500 9)"/></svg>';
   const g = { on: false, n: 0, miss: 0, last: 0, cur: null, raf: 0, wasBig: false }; let layer = null;
@@ -608,7 +609,7 @@ const heartGame = (() => {
     g.raf = requestAnimationFrame(tick);
     h.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (g.cur !== h) return; g.cur = null; cancelAnimationFrame(g.raf); sparkle(x + size / 2, y + size / 2); h.classList.add('gone'); setTimeout(() => h.remove(), 260); starter ? start() : pop(); });
   }
-  function hud() { $('heartN').textContent = g.n + ' / 10'; $('heartMiss').textContent = '♥'.repeat(Math.max(0, 3 - g.miss)) + '♡'.repeat(Math.min(3, g.miss)); }
+  function hud() { $('heartN').textContent = g.n + ' / ' + RU().heartPops; $('heartMiss').textContent = '♥'.repeat(Math.max(0, RU().heartTries - g.miss)) + '♡'.repeat(Math.min(RU().heartTries, g.miss)); }
   function start() {
     if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, wasBig: document.body.classList.contains('big') });
     if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
@@ -619,12 +620,12 @@ const heartGame = (() => {
   function pop() {
     g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.squirm(g.n >= 7);
     if (g.n >= 4) avatar.flash(g.n >= 7 ? 'joy' : 'blush', 4000); if (g.n >= 4) avatar.emote(g.n >= 7 ? '💦' : '💗', 900); if (g.n >= 7) avatar.tears(true);
-    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.heartPose(g.n); avatar.heartStage(g.n / 10); avatar.focus(g.n / 10); vig().style.setProperty('--deep', (g.n / 10).toFixed(2)); bubbles(g.n * 3); if (g.n >= 10) return win(); spawn(false); });   // hold, then cut
+    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.heartPose(g.n); avatar.heartStage(g.n / RU().heartPops); avatar.focus(g.n / RU().heartPops); vig().style.setProperty('--deep', (g.n / RU().heartPops).toFixed(2)); bubbles(g.n * 3); if (g.n >= RU().heartPops) return win(); spawn(false); });   // hold, then cut
   }
-  function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= 3) { cancelAnimationFrame(g.raf); if (g.cur) g.cur.remove(); g.cur = null; lose(); } }
+  function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= RU().heartTries) { cancelAnimationFrame(g.raf); if (g.cur) g.cur.remove(); g.cur = null; lose(); } }
   async function score(result, bonusPts = 0) { // tell the server how it went; show what it was worth
     g.last = Date.now();
-    try { const r = await api('/api/hearts', { result, bonus: bonusPts }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+' + (10 + bonusPts) + ' 💗' : '-1 💗'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
+    try { const r = await api('/api/hearts', { result, bonus: bonusPts }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+' + (RU().heartWin + bonusPts) + ' 💗' : '-' + RU().heartLose + ' 💗'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
   }
   function close(after = 0) { // out of the game: the view, the edges of the screen and her face all go back to normal
     g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true;
@@ -636,14 +637,14 @@ const heartGame = (() => {
   // nothing. Each tap gets its beat, then the view cuts to another part of her. After the third her pose stays as it is and
   // the view is yours: drag to move round her, scroll or pinch to move in and out, and Exit at the bottom when you are done.
   function bonus() {
-    const L = ensure(); L.textContent = ''; let total = 0, tries = 3, busy = false, looking = false; const pad = el('div', { id: 'bonusPad' }); L.append(pad); avatar.bonus(true); vig().style.setProperty('--deep', 1);
+    const L = ensure(); L.textContent = ''; let total = 0, tries = RU().bonusTaps, busy = false, looking = false; const pad = el('div', { id: 'bonusPad' }); L.append(pad); avatar.bonus(true); vig().style.setProperty('--deep', 1);
     const show = () => { $('heartN').textContent = looking ? 'YOURS TO LOOK' : 'BONUS'; $('heartMiss').textContent = (looking ? '' : '♥'.repeat(tries) + '  ') + '+' + total; }; show();
     let drag = null; const fingers = new Map(); let gap = 0;
     pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fingers.set(e.pointerId, [e.clientX, e.clientY]);
       if (looking) { drag = [e.clientX, e.clientY]; try { pad.setPointerCapture(e.pointerId); } catch {} if (fingers.size === 2) { const [p, q] = [...fingers.values()]; gap = Math.hypot(p[0] - q[0], p[1] - q[1]); } return; }
-      if (busy || tries <= 0) return; busy = true; tries--; const pts = avatar.bonusHit(e), r = L.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; total += pts;
-      const f = el('span', { className: 'pts p' + pts, textContent: pts ? '+' + pts : '·' }); f.style.left = x + 'px'; f.style.top = y + 'px'; L.append(f); setTimeout(() => f.remove(), 800);
-      if (pts) sparkle(x, y, pts === 6 ? 10 : 4); WizraSound.fx(pts === 6 ? 'heart' : pts === 2 ? 'sparkle' : pts ? 'pop' : 'sweat'); show();
+      if (busy || tries <= 0) return; busy = true; tries--; const zone = avatar.bonusHit(e), pts = zone === 6 ? RU().bonusHeart : zone === 2 ? RU().bonusFace : zone === 1 ? RU().bonusOther : 0, r = L.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; total += pts;
+      const f = el('span', { className: 'pts p' + zone, textContent: pts ? '+' + pts : '·' }); f.style.left = x + 'px'; f.style.top = y + 'px'; L.append(f); setTimeout(() => f.remove(), 800);
+      if (pts) sparkle(x, y, zone === 6 ? 10 : 4); WizraSound.fx(zone === 6 ? 'heart' : zone === 2 ? 'sparkle' : pts ? 'pop' : 'sweat'); show();
       eyecatch(pts ? '+' + pts : 'miss', () => { busy = false; if (!g.on) return; if (tries > 0) return avatar.bonusShot();
         looking = true; avatar.bonus('orbit'); show(); score('win', total); $('heartExit').hidden = false; pad.style.cursor = 'grab'; }); });
     pad.addEventListener('pointermove', e => { if (!looking || !fingers.has(e.pointerId)) return; fingers.set(e.pointerId, [e.clientX, e.clientY]);
@@ -790,7 +791,7 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '' };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules };
   if (sheet) { sheet.bond = visitInfo.bond; sheet.path = visitInfo.path; sheet.rapport = d.rapport; }
   for (const k in PATHS) if (was && old[k] !== undefined && visitInfo.bond[k] > old[k]) { const pop = $('bondPop'); pop.textContent = '+' + (visitInfo.bond[k] - old[k]) + ' ' + PATHS[k][0]; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
   drawMoments(); WizraSound.path(visitInfo.path);
