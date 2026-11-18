@@ -760,7 +760,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
-      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), extras: extrasView(), coins: db.coins | 0, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), extras: extrasView(), coins: db.coins | 0, wx: db.wx || shared.wx || null, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
       // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"
       // and opens their first conversation herself.
@@ -809,6 +809,12 @@ async function handle(req, res) {
           if (b.sub && typeof b.sub.endpoint === 'string' && /^https:\/\//.test(b.sub.endpoint) && b.sub.keys) { db.push = [...db.push.filter(x => x.endpoint !== b.sub.endpoint), { endpoint: b.sub.endpoint.slice(0, 600), keys: { p256dh: String(b.sub.keys.p256dh || '').slice(0, 200), auth: String(b.sub.keys.auth || '').slice(0, 100) } }].slice(-5); }
           if (b.off) db.push = db.push.filter(x => x.endpoint !== b.off); save(); if (b.test) await notify('Wizra', 'Notifications are on. This is what they look like.'); }
         return json(res, 200, { key: shared.vapid.publicKey, devices: (db.push || []).length });
+      }
+      // where the weather comes from: a town's coordinates (rounded), for this player, or with { all: true } from the owner as the game's default
+      if (url.pathname === '/api/weather' && req.method === 'POST') {
+        const b = await readBody(req), la = +b.lat, lo = +b.lon; let wx = null;
+        if (Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) wx = { lat: +la.toFixed(1), lon: +lo.toFixed(1), label: String(b.label || '').replace(/[<>]/g, '').slice(0, 60) };
+        if (b.all && isOwner()) shared.wx = wx; else db.wx = wx; save(); return json(res, 200, { wx: db.wx || shared.wx || null });
       }
       if (url.pathname === '/api/shop' && req.method === 'POST') {
         const { buy, id } = await readBody(req), row = (SHOP[buy] || []).find(r => r[0] === id), key = buy === 'gift' ? 'gifts' : 'decor'; if (!row) return json(res, 400, { error: 'No such thing in the shop.' });
