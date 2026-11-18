@@ -114,6 +114,9 @@
   // ---- the controller: moods, passing expressions, touch, her reserve, the springs. The same for every renderer. ----
   // things she physically does, read from the actions in her reply: [pattern, gesture, seconds]
   const GEST = [
+    [/finger heart|heart with her (fingers|thumb)|(tiny|little|small) heart/i, 'fingerheart', 3.2], [/peace sign|throws? (up )?(a |the )?(peace|deuces)|\bv[- ]sign|victory sign/i, 'peace', 3], [/ok(ay)? (sign|gesture|hand)|\ba-ok\b/i, 'oksign', 2.8],
+    [/fox (sign|hand|gesture|ears)|makes? a (little )?fox/i, 'fox', 3], [/cross(es|ed|ing)? her fingers|fingers crossed/i, 'crossed', 3], [/flips? (him|you|it|that) off|(gives?|shows?) (him|you) the (middle )?finger|middle finger|flips? the bird/i, 'flipoff', 2.6],
+    [/(wiggl|waggl)(es|ing)? her fingers|finger wave|(little|tiny) wave/i, 'fingerwave', 3],
     [/\bwav(e|es|ed|ing)\b|raises? a hand|lifts? a hand|holds up a hand|high[- ]fiv/i, 'wave', 2.6], [/\bnod(s|ded|ding)?\b/i, 'nod', 1.5],
     [/shak(es|ing) her head/i, 'shake', 1.7], [/\bshrug/i, 'shrug', 1.8], [/\byawn/i, 'yawn', 3], [/\bstretch/i, 'stretch', 3.2],
     [/\bbows?\b|dips her head/i, 'bow', 2], [/lean(s|ed|ing)? (in|forward|closer)|sits? forward|scoots? (closer|forward)/i, 'lean', 3], [/lean(s|ed|ing)? back|sinks? (back|into)|settles? (back|into)|reclin/i, 'leanback', 3],

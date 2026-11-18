@@ -84,7 +84,44 @@ export async function create(url) {
   // _face expression weights. P(n) is the resting rotation of a bone, for "rest plus a bit".
   const P = n => CUR[n] || [0, 0, 0], plus = (n, x = 0, y = 0, z = 0) => [P(n)[0] + x, P(n)[1] + y, P(n)[2] + z];
   const sin = Math.sin, abs = Math.abs;
+  // ---- hand signs: her right hand comes up beside her face and makes a shape. hand() builds the fingers:
+  // curls [index, middle, ring, little] 0 straight .. 1 fist; spread fans them; thumb 0 out .. 1 folded in; tw turns the wrist (1.5 = palm to you).
+  const FN = ['Index', 'Middle', 'Ring', 'Little'];
+  function hand(side, curls, o = {}) {
+    const sd = side === 'right' ? 1 : -1, out = {};
+    FN.forEach((f, i) => { const c = curls[i], sp = (o.spread ? o.spread[i] : 0) * sd; out[side + f + 'Proximal'] = [0, sp, sd * c * 1.4]; out[side + f + 'Intermediate'] = [0, 0, sd * c * 1.65]; out[side + f + 'Distal'] = [0, 0, sd * c * 1.1]; });
+    const th = o.thumb || 0; out[side + 'ThumbMetacarpal'] = [0, -sd * 0.9 * th, 0]; out[side + 'ThumbProximal'] = [0, -sd * 0.65 * th, 0]; out[side + 'ThumbDistal'] = [0, -sd * 0.3 * th, 0];
+    out._tw = o.tw || 0;                                                           // how far the palm turns to face you: done by the forearm, like a real arm, with only a little left for the wrist
+    return out;
+  }
+  for (const n of ['leftLowerArm', 'rightLowerArm']) { const bn = B(n); if (bn) bn.rotation.order = 'ZYX'; }   // so a forearm can bend at the elbow and then roll about its own length
+  const HAND_UP = { rightUpperArm: [0.9, 0, -0.3], rightLowerArm: [0, 0, -1.6] };
+  const SIGN = {
+    peace: hand('right', [0, 0, 1, 1], { spread: [0.16, -0.16, 0, 0], thumb: 1, tw: 1.5 }), oksign: hand('right', [0.62, 0.05, 0, 0], { spread: [0, 0, -0.1, -0.22], thumb: 0.6, tw: 1.5 }),
+    fox: hand('right', [0, 0.58, 0.58, 0], { spread: [0.1, 0, 0, -0.1], thumb: 0.75, tw: 0.9 }), fingerheart: hand('right', [0.38, 1, 1, 1], { spread: [-0.2, 0, 0, 0], thumb: 0.35, tw: 1.5 }),
+    crossed: hand('right', [0, 0.08, 1, 1], { spread: [-0.2, 0.24, 0, 0], thumb: 1, tw: 1.5 }), flipoff: hand('right', [1, 0, 1, 1], { thumb: 1, tw: -1.5 }),
+  };
+  const FIST = hand('right', [1, 1, 1, 1], { thumb: 1 });
+  // The way it moves is the point: a small dip first, the arm swings up past its mark and settles, the fingers snap open one
+  // after another a beat later, the wrist gives a little shake, and her head tips toward it.
+  const pop = (t, speed = 9, ring = 15) => t <= 0 ? 0 : 1 - Math.exp(-speed * t) * Math.cos(ring * t);
+  function sign(name, t, face) {
+    const tgt = SIGN[name], out = {}, arm = (t < 0.09 ? -0.1 * Math.sin(Math.PI * t / 0.09) : pop(t - 0.09, 8, 13));
+    for (const n in HAND_UP) { const r = P(n), q = HAND_UP[n]; out[n] = [r[0] + (q[0] - r[0]) * arm, r[1] + (q[1] - r[1]) * arm, r[2] + (q[2] - r[2]) * arm]; }
+    const roll = tgt._tw * Math.min(1.06, pop(t - 0.12, 9, 11)), shake = 0.16 * Math.exp(-3.2 * Math.max(0, t - 0.3)) * Math.sin(22 * Math.max(0, t - 0.3));
+    out.rightLowerArm[0] = roll * 0.72 + shake; out.rightHand = [roll * 0.2, 0, 0.08 * Math.sin(t * 2.4)];
+    for (const n in tgt) {
+      if (n[0] === '_') continue;
+      const i = Math.max(0, FN.findIndex(f => n.includes(f))), open = pop(t - 0.2 - 0.045 * i, 13, 19), f = FIST[n] || [0, 0, 0], q = tgt[n];   // from a loose fist, finger by finger
+      out[n] = [f[0] + (q[0] - f[0]) * open, f[1] + (q[1] - f[1]) * open, f[2] + (q[2] - f[2]) * open];
+    }
+    const lean = pop(t - 0.1, 7, 11); out.spine = plus('spine', -0.04 * lean, 0, -0.05 * lean); out._head = [-0.03 * lean, -0.1 * lean, -0.2 * lean + 0.03 * Math.sin(t * 2.4)]; out._hipY = 0.012 * Math.exp(-5 * t) * Math.abs(Math.sin(14 * t));
+    out._face = face; return out;
+  }
   const GESTURE = {
+    peace: t => sign('peace', t, { happy: 0.3, relaxed: 0.5 }), oksign: t => sign('oksign', t, { happy: 0.25, relaxed: 0.4 }), fox: t => sign('fox', t, { happy: 0.3, relaxed: 0.4 }), fingerheart: t => sign('fingerheart', t, { happy: 0.35, relaxed: 0.5 }),
+    crossed: t => sign('crossed', t, { relaxed: 0.4 }), flipoff: t => sign('flipoff', t, { angry: 0.4 }),
+    fingerwave: t => { const o = sign('peace', t, { happy: 0.3, relaxed: 0.4 }); FN.forEach((f, i) => { const c = 0.32 + 0.32 * Math.sin(t * 9 - i * 0.9); o['right' + f + 'Proximal'] = [0, (0.14 - i * 0.1), c * 1.2]; o['right' + f + 'Intermediate'] = [0, 0, c * 0.9]; o['right' + f + 'Distal'] = [0, 0, c * 0.5]; }); o.rightThumbMetacarpal = [0, -0.2, 0]; o.rightThumbProximal = [0, 0, 0]; return o; },
     wave: t => ({ rightUpperArm: [0, 0, -0.7], rightLowerArm: [0, 0, -0.95 + 0.42 * sin(t * 9)], rightHand: [0, 0, -0.1], _head: [0, 0, 0.08] }),
     shrug: () => ({ leftShoulder: [0, 0, 0.38], rightShoulder: [0, 0, -0.38], leftUpperArm: [0.18, 0, -1.2], rightUpperArm: [0.18, 0, 1.2], leftLowerArm: [0, -0.75, 0], rightLowerArm: [0, 0.75, 0], leftHand: [0, 0, 0.5], rightHand: [0, 0, -0.5], _head: [0, 0, 0.12] }),
     stretch: t => ({ leftUpperArm: [0, 0, 1.25], rightUpperArm: [0, 0, -1.25], leftLowerArm: [0, -0.25, 0], rightLowerArm: [0, 0.25, 0], spine: plus('spine', -0.2 + 0.02 * sin(t * 2)), _head: [-0.15, 0, 0], _face: { blink: 1 } }),
@@ -111,10 +148,11 @@ export async function create(url) {
     cringe: () => ({ leftShoulder: [0, 0, 0.3], rightShoulder: [0, 0, -0.3], spine: plus('spine', -0.08), _head: [0.1, 0.3, 0.12], _face: { blink: 0.7, sad: 0.4 } }),
     kiss: () => ({ spine: plus('spine', 0.14), _head: [0.06, 0, 0.12], _face: { blink: 1, relaxed: 0.3 } }),
     jump: t => ({ _hipY: 0.03 * abs(sin(t * 6)), leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _face: { happy: 0.9 } }),
+    test: () => window.WIZRA_GEST || {},                                           // test hook: try a pose from the console
     jolt: t => ({ spine: plus('spine', -0.14 * Math.exp(-t * 2.5)), leftShoulder: [0, 0, 0.25 * Math.exp(-t * 2.5)], rightShoulder: [0, 0, -0.25 * Math.exp(-t * 2.5)], _head: [-0.12 * Math.exp(-t * 2.5), 0, 0] }),
   };
   const REST = n => CUR[n] || [0, 0, 0];
-  const WIDE = { wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, handsup: 0.3, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
+  const WIDE = { peace: 0.24, oksign: 0.24, fox: 0.24, fingerheart: 0.24, crossed: 0.24, flipoff: 0.24, fingerwave: 0.24, wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, handsup: 0.3, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
   let touchedBones = [], gestureZoom = 0;
   const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0 };
   const hipsNode = B('hips'), hipY0 = hipsNode ? hipsNode.position.y : 0;
@@ -128,7 +166,7 @@ export async function create(url) {
     const want = BODY[faceName] || [0, 0, 0, 0, 0]; for (let i = 0; i < 5; i++) body[i] += (want[i] - body[i]) * Math.min(1, dt * 5);
     if (!g || !GESTURE[g.name]) return;
     if (CLIP_GEST[g.name] && CLIPS[CLIP_GEST[g.name]] && rt.k > 0.9) { const c = CLIPS[CLIP_GEST[g.name]]; playClip(CLIP_GEST[g.name], g.w * g.w * (3 - 2 * g.w), Math.min(g.t, c.dur - 0.04)); return; } // a recorded one, when she is on her feet
-    const tg = GESTURE[g.name](g.t), k = g.w * g.w * (3 - 2 * g.w); gx.k = k;
+    const tg = GESTURE[g.name](g.t), k0 = g.w * g.w * (3 - 2 * g.w), k = k0 * (1 + 0.13 * Math.exp(-5 * g.t) * Math.sin(17 * g.t)); gx.k = k0; // every gesture arrives a little past its mark and settles
     for (const n in tg) {
       const q = tg[n];
       if (n === '_head') gx.head = [q[0] * k, q[1] * k, q[2] * k]; else if (n === '_hipY') gx.hipY = q * k; else if (n === '_face') gx.face = q;
