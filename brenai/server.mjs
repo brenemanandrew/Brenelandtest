@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
-import { wantsPic, selfie, thing, chatChance, awayChance, picNote, fromPack } from './pics.mjs';
+import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates } from './pics.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -28,6 +28,22 @@ const ANIMS = path.join(DATA_DIR, 'anims.json');
 const PACK = path.join(DATA_DIR, 'pack');             // the ready-made picture pack (tools/picpack): manifest.json + images
 let pack = []; const loadPack = () => { try { pack = JSON.parse(fs.readFileSync(path.join(PACK, 'manifest.json'), 'utf8')); } catch { pack = []; } }; loadPack();
 const sent = () => (db.sentPics || []), noteSent = spec => { if (spec && spec.file) db.sentPics = [...sent(), spec.file].slice(-45); return spec; };
+// Which picture: the server finds a few that fit (where she is, how close they are, what they are to each other) and SHE picks,
+// in a short side question to her model with the last few lines of the conversation. No answer, or nonsense: the first one.
+async function choosePic(ctx) {
+  const opts = candidates(pack, { ...ctx, recent: sent() }); if (!opts.length) return null; if (opts.length === 1) return noteSent(opts[0]);
+  let pickN = 0;
+  try {
+    const recent = db.log.filter(e => e.who !== 'sys' && e.text).slice(-6).map(e => `${e.who === 'me' ? USER_NAME : 'Wizra'}: ${e.text}`).join('\n');
+    const ask = `You are Wizra (22, goth, dry, plays D&D). You are about to send ${USER_NAME} a picture${ctx.ask ? ' because he asked for one' : ctx.home ? ' on a whim' : ' from where you are'}. Rapport with him: ${db.sheet.rapport}/100${db.sheet.path ? ', and what you two are: ' + db.sheet.path : ''}.\n\nThe last things said:\n${recent || '(nothing yet)'}\n\nPictures you could send:\n${opts.map((o, i) => `${i + 1}. ${o.desc}`).join('\n')}\n\nWhich one do you send? Answer with the number only.`;
+    let text = '';
+    if (brain.ws) text = await brainJob({ system: 'Answer with a single number.', messages: [{ role: 'user', content: ask }], max_tokens: 8, temperature: 0.7 });
+    else if (client) { const res = await client.messages.create({ model: MODEL, max_tokens: 2000, output_config: { effort: 'low' }, messages: [{ role: 'user', content: ask }] }); text = res.content.filter(b => b.type === 'text').map(b => b.text).join(''); }
+    const m = /[1-9]/.exec(String(text)); if (m && opts[+m[0] - 1]) pickN = +m[0] - 1;
+    console.log(`[pic] she chose ${pickN + 1} of ${opts.length}${m ? '' : ' (no clear answer, took the first)'}`);
+  } catch (e) { console.error('[pic] choosing:', e.message); }
+  return noteSent(opts[pickN]);
+}
 const PICS = path.join(DATA_DIR, 'pics');             // the pictures she has sent, once a page has drawn them   // her motion clips (made from licensed animation files, so kept on the volume, not in the repo)
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
@@ -394,7 +410,7 @@ async function awayPic() {
   const due = a.pics.shift(); if (now > due.at + 20 * 60000 || now >= a.until || (!brain.ws && !client)) { save(); return; }
   busy = true;
   try {
-    const close = (db.sheet.rapport | 0) / 100, spec = noteSent(fromPack(pack, { home: false, scene: sceneFor(a), close, path: db.sheet.path, slip: due.slip, recent: sent() })) || selfie(sceneFor(a), (a.out || {}).kind || '', close);
+    const close = (db.sheet.rapport | 0) / 100, spec = await choosePic({ home: false, scene: sceneFor(a), close, path: db.sheet.path, slip: due.slip }) || selfie(sceneFor(a), (a.out || {}).kind || '', close);
     const pre = `is not with her; she is out and sends him a picture from where she is: ${spec.desc}. She writes one short line to go with it${due.slip ? `. She has not thought about the fact that what is behind her shows she is not at ${a.where}` : ''}`;
     db.log.push({ who: 'me', text: '', at: now, pre, hidden: true });
     const text = await reply(`*${pre}*`, () => {});
@@ -657,8 +673,8 @@ const server = http.createServer(async (req, res) => {
         let pic = null, picPre = '';
         if (!db.place && !askPre) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
-          if (wantsPic(msg)) { if (close >= 0.25 && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && noteSent(fromPack(pack, { home: true, close, path: db.sheet.path, recent: sent(), ask: true }))) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
-          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance')) { pic = (!kind && Math.random() < 0.85 && noteSent(fromPack(pack, { home: true, close, path: db.sheet.path, recent: sent() }))) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
+          if (wantsPic(msg)) { if (close >= 0.25 && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance')) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
         const pre = [takeTouches(), askPre, picPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
         db.log.push({ who: 'me', text: msg, at: Date.now(), ...(pre ? { pre } : {}) });

@@ -39,4 +39,10 @@ export function fromPack(pack, ctx) {
   let r = Math.random() * ok.reduce((a, p) => a + weight(p), 0); const p = ok.find(p => (r -= weight(p)) < 0) || ok[0];
   return { id: id(), kind: 'pack', file: p.file, theme: p.theme, desc: p.desc };
 }
+// a few different pictures that all fit, for her to choose between
+export function candidates(pack, ctx, n = 4) {
+  const out = [], recent = [...(ctx.recent || [])];
+  for (let i = 0; i < n; i++) { const s = fromPack(pack, { ...ctx, recent }); if (!s) break; out.push(s); recent.push(s.file); }
+  return out;
+}
 export const picNote = p => p ? `*sends a picture: ${p.desc}* ` : '';
