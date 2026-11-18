@@ -171,7 +171,7 @@ function systemBlocks() {
   // Stable first so the cache holds; this only changes when settings, the sheet or the notes change.
   fixBond();
   if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
-  const blocks = [{ type: 'text', text: db.persona ? db.persona.replaceAll('{user}', USER_NAME) : PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') }];
+  const blocks = [{ type: 'text', text: db.persona ? db.persona.replaceAll('{user}', USER_NAME) : PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') + (db.sheet.path === 'romance' && ROM_STAGE[db.sheet.romLevel] ? '\n- Where the two of you are: ' + ROM_STAGE[db.sheet.romLevel] : '') }];
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -353,13 +353,42 @@ async function learn() {
 // Each lean adds points (more when they are together in person). The clear leader becomes sheet.path, which her prompt uses.
 // sheet.pathLock (set from her Character menu) pins it by hand; '' lets it follow the points again.
 const BOND = ['romance', 'friend', 'mentor'];
+// Romance has levels on top: 0 to 3. The romance score fills up to what the next level costs (100, then 500, then 700), the
+// level goes up and the score starts again from what was left over. At level 3 it fills to 1000 and stops.
+const ROM_MAX = 3;
+const romNeed = lvl => lvl >= ROM_MAX ? rule('lvlCap') : rule('lvl' + (lvl + 1));
 function fixBond() {
-  const sh = db.sheet; if (!sh.bond || typeof sh.bond !== 'object') sh.bond = {}; for (const k of BOND) sh.bond[k] = Math.max(0, Math.min(100, Math.round(+sh.bond[k] || 0)));
-  const order = [...BOND].sort((a, b) => sh.bond[b] - sh.bond[a]), top = order[0];
-  sh.path = BOND.includes(sh.pathLock) ? sh.pathLock : (sh.bond[top] >= rule('pathMin') && sh.bond[top] - sh.bond[order[1]] >= rule('pathLead') ? top : '');
+  const sh = db.sheet; if (!sh.bond || typeof sh.bond !== 'object') sh.bond = {}; sh.romLevel = Math.max(0, Math.min(ROM_MAX, Math.round(+sh.romLevel || 0)));
+  for (const k of BOND) sh.bond[k] = Math.max(0, Math.min(k === 'romance' ? romNeed(sh.romLevel) : 100, Math.round(+sh.bond[k] || 0)));
+  const worth = k => sh.bond[k] + (k === 'romance' ? sh.romLevel * 10000 : 0);                       // a romance level outweighs any score
+  const order = [...BOND].sort((a, b) => worth(b) - worth(a)), top = order[0];
+  sh.path = BOND.includes(sh.pathLock) ? sh.pathLock : (worth(top) >= rule('pathMin') && worth(top) - worth(order[1]) >= rule('pathLead') ? top : '');
 }
-function addBond(kind, n) { fixBond(); db.sheet.bond[kind] = Math.min(100, db.sheet.bond[kind] + n); fixBond(); }
-const bondView = () => { fixBond(); return { bond: db.sheet.bond, path: db.sheet.path, pathLock: db.sheet.pathLock || '' }; };
+function addBond(kind, n) {
+  fixBond(); const sh = db.sheet;
+  if (kind !== 'romance') { sh.bond[kind] = Math.min(100, sh.bond[kind] + n); return fixBond(); }
+  sh.bond.romance += n;
+  while (sh.romLevel < ROM_MAX && sh.bond.romance >= romNeed(sh.romLevel)) { sh.bond.romance -= romNeed(sh.romLevel); sh.romLevel++; db.log.push({ who: 'sys', text: `Romance reached level ${sh.romLevel}.`, at: Date.now() }); console.log(`[bond] romance level ${sh.romLevel}`); }
+  fixBond();
+}
+const bondView = () => { fixBond(); return { bond: db.sheet.bond, path: db.sheet.path, pathLock: db.sheet.pathLock || '', level: db.sheet.romLevel, need: romNeed(db.sheet.romLevel), levelMax: ROM_MAX }; };
+const ROM_STAGE = ['', 'You two have admitted there is something here; it is new and you are both a bit careful with it.', 'You two are together now, comfortable being affectionate, with your own little habits and in-jokes.', 'You are deeply in love with him and sure of it; it is steady, warm and unshowy.'];
+
+// ---- outfits: a different model of her per romance level and per situation (assigned in the Studio). The game shows
+// whichever fits right now; an empty slot falls back to the same situation at a lower level, then Daily, then her base model.
+const OUTFITS = path.join(DATA_DIR, 'outfits'), SITUATIONS = ['Daily', 'School', 'Nightly', 'Weekend', 'Going Out'];
+const outfitData = () => { const o = db.outfits || (db.outfits = {}); o.situations = Array.isArray(o.situations) && o.situations.length ? o.situations : [...SITUATIONS]; o.slots = o.slots || {}; o.force = o.force || ''; return o; };
+function situationNow() { // what kind of moment it is for her, from where she is and the clock (Eastern, like everything else)
+  const o = outfitData(); if (o.force && o.situations.includes(o.force)) return o.force;
+  const a = db.away, d = new Date(), tz = { timeZone: 'America/New_York' }, hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24, day = d.toLocaleString('en-US', { ...tz, weekday: 'short' });
+  if (a) { if (/class|study/.test(a.where)) return 'School'; if (a.where !== 'bed' && a.where !== 'the bathroom') return 'Going Out'; return 'Nightly'; }
+  if (hour >= 21 || hour < 6) return 'Nightly'; if (day === 'Sat' || day === 'Sun') return 'Weekend'; return 'Daily';
+}
+function outfitNow() {
+  const o = outfitData(), sit = situationNow(); fixBond(); const lvl = db.sheet.romLevel;
+  for (const s of sit === 'Daily' ? ['Daily'] : [sit, 'Daily']) for (let l = lvl; l >= 0; l--) { const slot = o.slots[l + '|' + s]; if (slot && fs.existsSync(path.join(OUTFITS, slot.file))) return { url: '/api/outfit/' + slot.file + '?v=' + slot.v, key: slot.file + ':' + slot.v, situation: sit, level: lvl, from: `Lv${l} ${s}` }; }
+  return { url: '', key: '', situation: sit, level: lvl, from: 'her base model' };
+}
 
 // Only known fields, sane types; the sheet is fully editable from the wheel.
 function applySettings(body) {
@@ -382,6 +411,7 @@ function applySettings(body) {
   if (Array.isArray(h.hiddenLikes)) H.hiddenLikes = h.hiddenLikes.filter(x => x && String(x.text || '').trim()).slice(0, 60).map(x => ({ text: String(x.text).trim().slice(0, 200), revealed: !!x.revealed, ...(x.grown ? { grown: true } : {}) }));
   if (Number.isFinite(+h.rapport)) H.rapport = Math.max(0, Math.min(100, Math.round(+h.rapport)));
   if (h.pathLock === '' || BOND.includes(h.pathLock)) H.pathLock = h.pathLock;
+  if (Number.isFinite(+h.romLevel)) H.romLevel = Math.max(0, Math.min(ROM_MAX, Math.round(+h.romLevel)));
   if (h.bond && typeof h.bond === 'object') { fixBond(); for (const k of BOND) if (Number.isFinite(+h.bond[k])) H.bond[k] = +h.bond[k]; }
   fixBond();
   if (Number.isFinite(+h.cussLevel)) H.cussLevel = Math.max(0, Math.min(3, Math.round(+h.cussLevel)));
@@ -452,12 +482,13 @@ const RULES = {
   picRate: [100, 0, 500, 'How often she sends pictures on her own (percent of normal)'],
   picAskMin: [25, 0, 100, 'Rapport needed before she sends a picture when asked'],
   callRate: [100, 0, 500, 'How often she calls you while she is out (percent of normal)'],
+  lvl1: [100, 1, 100000, 'Romance points to reach level 1'], lvl2: [500, 1, 100000, 'Romance points to go from level 1 to 2'], lvl3: [700, 1, 100000, 'Romance points to go from level 2 to 3'], lvlCap: [1000, 1, 100000, 'Romance points level 3 fills to'],
 };
 const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinite(+db.rules[k]) ? +db.rules[k] : d; return Math.max(lo, Math.min(hi, v)); };
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
 const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
-const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), ...bondView() });
+const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
 function placeNote() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
@@ -552,6 +583,32 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
 
+      // outfits: GET the set-up, POST changes to it ({ situations }, { force }, { clear: slot }); a model for a slot is uploaded to /api/outfit/slot
+      if (url.pathname === '/api/outfits') {
+        const o = outfitData();
+        if (req.method === 'POST') { const b = await readBody(req);
+          if (Array.isArray(b.situations)) o.situations = [...new Set([...SITUATIONS, ...b.situations.map(x => String(x).replace(/[|<>]/g, '').trim().slice(0, 24)).filter(Boolean)])].slice(0, 14);
+          if (typeof b.force === 'string') o.force = o.situations.includes(b.force) ? b.force : '';
+          if (typeof b.clear === 'string' && o.slots[b.clear]) { const f = o.slots[b.clear].file; delete o.slots[b.clear]; if (!Object.values(o.slots).some(x => x.file === f)) fs.rmSync(path.join(OUTFITS, f), { force: true }); }
+          if (typeof b.drop === 'string' && !SITUATIONS.includes(b.drop)) { o.situations = o.situations.filter(x => x !== b.drop); for (const k of Object.keys(o.slots)) if (k.endsWith('|' + b.drop)) { fs.rmSync(path.join(OUTFITS, o.slots[k].file), { force: true }); delete o.slots[k]; } if (o.force === b.drop) o.force = ''; }
+          save(); }
+        return json(res, 200, { situations: o.situations, slots: o.slots, force: o.force, levels: ROM_MAX + 1, now: outfitNow(), level: db.sheet.romLevel, builtIn: SITUATIONS });
+      }
+      if (url.pathname === '/api/outfit/slot' && req.method === 'POST') {
+        const o = outfitData(), lvl = Math.round(+url.searchParams.get('level')), sit = String(url.searchParams.get('situation') || '');
+        if (!(lvl >= 0 && lvl <= ROM_MAX) || !o.situations.includes(sit)) return json(res, 400, { error: 'unknown level or situation' });
+        fs.mkdirSync(OUTFITS, { recursive: true }); const file = 'o' + Math.random().toString(36).slice(2, 10) + '.vrm', tmp = path.join(OUTFITS, file + '.upload'); let size = 0, magic = null, tooBig = false; const out = fs.createWriteStream(tmp);
+        await new Promise((resolve, reject) => { req.on('data', c => { if (!magic) magic = c.subarray(0, 4).toString('latin1'); size += c.length; if (size > 120e6) { tooBig = true; req.destroy(); out.destroy(); resolve(); } }); req.pipe(out); out.on('finish', resolve); out.on('error', reject); req.on('error', reject); });
+        if (tooBig || magic !== 'glTF' || size < 1000) { fs.rmSync(tmp, { force: true }); return json(res, 400, { error: tooBig ? 'That file is over 120 MB.' : 'That is not a .vrm model file.' }); }
+        fs.renameSync(tmp, path.join(OUTFITS, file)); const key = lvl + '|' + sit, old = o.slots[key];
+        o.slots[key] = { file, v: Date.now(), name: decodeURIComponent(String(req.headers['x-name'] || 'model.vrm')).slice(0, 80), mb: +(size / 1e6).toFixed(1) };
+        if (old && !Object.values(o.slots).some(x => x.file === old.file)) fs.rmSync(path.join(OUTFITS, old.file), { force: true });
+        save(); return json(res, 200, { ok: true, slot: key, ...o.slots[key] });
+      }
+      if (url.pathname.startsWith('/api/outfit/') && req.method === 'GET') {
+        const f = url.pathname.slice(12), file = path.join(OUTFITS, f); if (!/^o[a-z0-9]{6,10}\.vrm$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such outfit' });
+        res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=31536000, immutable' }); return fs.createReadStream(file).pipe(res);
+      }
       // the picture pack: GET one image; POST the whole pack at once { manifest: [...], files: { name: base64 } }
       if (url.pathname.startsWith('/api/pack')) {
         if (req.method === 'GET') { const f = url.pathname.slice(10); if (!/^[a-z0-9_]+\.webp$/.test(f) || !fs.existsSync(path.join(PACK, f))) return json(res, 404, { error: 'no such picture' }); res.writeHead(200, { 'content-type': 'image/webp', 'cache-control': 'private, max-age=86400' }); return fs.createReadStream(path.join(PACK, f)).pipe(res); }

@@ -716,7 +716,7 @@ async function loadDev() { try { const r = await fetch('/api/dev'); if (r.ok) { 
 async function load() {
   await loadDev();
   const r = await api('/api/state'); const s = await r.json();
-  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
+  myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
   if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
@@ -791,7 +791,11 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  if (was !== undefined && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
+  setPlace.level = visitInfo.level;
+  const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
+  setPlace.fit = fitKey;
   if (sheet) { sheet.bond = visitInfo.bond; sheet.path = visitInfo.path; sheet.rapport = d.rapport; }
   for (const k in PATHS) if (was && old[k] !== undefined && visitInfo.bond[k] > old[k]) { const pop = $('bondPop'); pop.textContent = '+' + (visitInfo.bond[k] - old[k]) + ' ' + PATHS[k][0]; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
   drawMoments(); WizraSound.path(visitInfo.path);
@@ -929,11 +933,12 @@ sendBtn.onclick = () => send();
 // Which picture she uses: the cartoon, or the uploaded 3D model. Swaps live; the cartoon stays up until the model is ready.
 let avatarShown = 'puppet', avatarNote = '';
 async function applyAvatar() {
-  const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + settings.avatarV : 'puppet';
+  const fit = visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
+  const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + (fit ? fit.key : settings.avatarV) : 'puppet';
   if (want === avatarShown) return; avatarShown = want; avatarNote = '';
   if (want === 'puppet') return avatar.setRenderer(null);
   try {
-    const m = await import('./avatar-vrm.js'); const r = await m.create('/api/avatar?v=' + settings.avatarV, { maps: dev.maps });
+    const m = await import('./avatar-vrm.js'); const r = await m.create(fit ? fit.url : '/api/avatar?v=' + settings.avatarV, { maps: dev.maps });
     if (avatarShown === want) avatar.setRenderer(r); else r.dispose();
   } catch (e) { console.error(e); if (avatarShown === want) { avatarShown = 'puppet'; avatarNote = 'The 3D model could not be shown on this device (' + e.message + '). Showing the cartoon.'; avatar.setRenderer(null); } }
 }
@@ -1309,8 +1314,9 @@ function buildPanel(k) {
     const adj = el('button', { className: 'ghost', textContent: 'adjust' }); adj.onclick = () => { rp.hidden = !rp.hidden; };
     p.append(el('div', { className: 'heart' }, el('div', { className: 'hl' }, el('b', { textContent: '♥ ' + sheet.rapport }), el('span', { textContent: 'Rapport. Moves on its own as you talk.' }), adj), el('div', { className: 'hbar' }, fill, tick(60, '🗣'), tick(v.visitAt || 90, '🏠')), rp));
     // what you are to each other: follows how you treat her, or pin it
+    const lvl = v.level || sheet.romLevel || 0, need = v.need || 100;
     const tri = el('div', { className: 'tri' });
-    for (const key of ['romance', 'friend', 'mentor']) { const [ico, name] = PATHS[key], bar = el('i', {}); bar.style.height = Math.min(100, (bond[key] || 0) * 2.5 + 4) + '%'; tri.append(el('div', { className: path === key ? 'on' : '' }, el('span', {}, bar), el('b', { textContent: ico }), el('small', { textContent: name + ' ' + (bond[key] || 0) }))); }
+    for (const key of ['romance', 'friend', 'mentor']) { const [ico, name] = PATHS[key], bar = el('i', {}); bar.style.height = Math.min(100, key === 'romance' ? (bond[key] || 0) / need * 96 + 4 : (bond[key] || 0) * 2.5 + 4) + '%'; tri.append(el('div', { className: path === key ? 'on' : '' }, el('span', {}, bar), el('b', { textContent: ico }), el('small', { textContent: key === 'romance' ? `Lv ${lvl}  ${bond[key] || 0}/${need}` : name + ' ' + (bond[key] || 0) }))); }
     const lock = el('div', { className: 'chips' });
     for (const [key, name] of [['', 'Let it follow how I treat her'], ['romance', 'Romance'], ['friend', 'Friends'], ['mentor', 'Mentor']]) { const c = el('span', { className: 'chip' + ((sheet.pathLock || '') === key ? ' sel' : ''), textContent: name }); c.onclick = () => saveSettings({ sheet: { pathLock: key } }).then(again); lock.append(c); }
     p.append(fold('bond', '💞', 'You and her', PATHS[path] ? PATHS[path][1] : 'not settled yet', el('div', { className: 'note', textContent: 'Flirt, hang out or guide her, mostly when you are at each other\'s places, and this fills in by itself.' }), tri, lock));
