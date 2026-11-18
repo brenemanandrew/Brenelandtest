@@ -394,6 +394,7 @@
   .eyec b { position:relative; font:400 64px "Bangers","Fredoka",sans-serif; color:#fff; letter-spacing:.04em; text-shadow:0 4px 0 #c0267e, 0 0 18px rgba(255,90,170,.9); animation:eyePop .43s cubic-bezier(.3,1.5,.5,1) forwards; }
   @keyframes eyeSweep { from { transform:translateX(-45%); } to { transform:translateX(45%); } } @keyframes eyePop { 0% { transform:scale(.3) rotate(-8deg); opacity:0; } 35% { transform:scale(1.15) rotate(-4deg); opacity:1; } 100% { transform:scale(1) rotate(-4deg); opacity:1; } }
   #heartExit { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:49; border:0; border-radius:999px; padding:13px 36px; font:400 24px "Bangers","Fredoka",sans-serif; letter-spacing:.08em; color:#fff; background:linear-gradient(135deg,#a855f7,#ec4899); box-shadow:0 5px 0 rgba(90,10,60,.5), 0 8px 22px rgba(0,0,0,.4); cursor:pointer; } #heartExit[hidden] { display:none; }
+  #rom30 { position:fixed; right:10px; top:10px; z-index:9; border:0; border-radius:999px; padding:6px 13px; font:700 14px "Fredoka",sans-serif; color:#fff; background:linear-gradient(135deg,#a855f7,#ec4899); box-shadow:0 3px 10px rgba(0,0,0,.35); cursor:pointer; } body.calling #rom30, body.fp #rom30, body.big #rom30 { display:none; }
   #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
   #herWrap { display:none !important; }   /* her words are in the chat area and spoken: no balloon up top */
   /* pictures she sends */
@@ -445,7 +446,7 @@
   </div>
 </div>
 <div id="stageBack"></div>
-<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 10</span><i id="heartMiss"></i></div><div id="whiteOut"></div><button id="heartExit" hidden>Exit</button>
+<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 10</span><i id="heartMiss"></i></div><button id="rom30" title="Set the romance score to 30">♥ 30</button><div id="whiteOut"></div><button id="heartExit" hidden>Exit</button>
 <div id="picView" hidden><img alt="Picture from Wizra"></div>
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
@@ -654,6 +655,7 @@ const heartGame = (() => {
   }
   function lose() { vig().classList.add('bad'); avatar.flash('grumpy', 3500); avatar.gesture('cringe', 1.8); avatar.emote('💢', 1800); WizraSound.fx('anger'); score('lose'); close(1400); }
   $('heartExit').onclick = () => close(0);
+  $('rom30').onclick = async () => { try { const r = await api('/api/settings', { sheet: { bond: { romance: 30 } } }); if (!r.ok) throw 0; if (sheet) (sheet.bond = sheet.bond || {}).romance = 30; const d = await (await fetch('/api/away')).json(); setPlace(d); addSys('Romance set to 30.'); } catch { addError('Could not set romance.'); } };
   return { bonus, offer() { if (g.on || g.cur || away || phoneCall.on || Date.now() - g.last < 50000 || !avatar.canVisit()) return; spawn(true); }, state: g, start };
 })();
 
