@@ -658,6 +658,9 @@ const heartGame = (() => {
   return { bonus, offer() { if (g.on || g.cur || away || phoneCall.on || Date.now() - g.last < 50000 || !avatar.canVisit()) return; spawn(true); }, state: g, start };
 })();
 
+// The Studio's preview window (?pip=1) is its own little world: she is always home and awake in it, nothing you do in it
+// reaches the real chat, and it ignores what the real game is up to.
+const SANDBOX = new URLSearchParams(location.search).has('pip');
 // ---------- the Studio's work (dev.html): where the page's pieces sit, scripted events, and the rooms ----------
 let dev = { ui: {}, events: [], maps: {}, fired: {}, v: 0 };
 const UI_PARTS = ['stageWrap', 'herSide', 'logHead', 'logWrap', 'meWrap', 'meBox', 'bar', 'visitBtn', 'bigBtn', 'brainBtn', 'actBtn', 'mic', 'send'];
@@ -672,10 +675,10 @@ addEventListener('resize', () => applyUi(dev.ui));
 // Events: each has when (time / rapport / arrive / every / manual), where, and steps she carries out one after another.
 const EV = { busy: false, last: JSON.parse(localStorage.getItem('brenai.ev') || '{}') }, sleep = ms => new Promise(ok => setTimeout(ok, ms));
 async function runEvent(ev, preview) { // preview (the Studio's little window): play it, but do not count it as having happened
-  if (EV.busy || away || phoneCall.on) return false; EV.busy = true; if (!preview) { EV.last[ev.id] = Date.now(); localStorage.setItem('brenai.ev', JSON.stringify(EV.last)); api('/api/event', { id: ev.id, fired: true }).catch(() => {}); }
+  if (EV.busy || ((away || phoneCall.on) && !SANDBOX)) return false; EV.busy = true; if (!preview) { EV.last[ev.id] = Date.now(); localStorage.setItem('brenai.ev', JSON.stringify(EV.last)); api('/api/event', { id: ev.id, fired: true }).catch(() => {}); }
   try {
     for (const st of ev.steps || []) {
-      if (away || phoneCall.on) break;
+      if ((away || phoneCall.on) && !SANDBOX) break;
       if (st.type === 'walk') await avatar.walkTo(+st.x, +st.z);
       else if (st.type === 'wait') await sleep((+st.s || 1) * 1000);
       else if (st.type === 'gesture') { avatar.gesture(st.name, +st.s || 2.5); await sleep((+st.s || 2.5) * 1000); }
@@ -684,8 +687,8 @@ async function runEvent(ev, preview) { // preview (the Studio's little window): 
       else if (st.type === 'face') { avatar.feel(st.name); avatar.setMood(st.name); await sleep(300); }
       else if (st.type === 'emote') { avatar.emote(st.ch || '\u2728', 1600); await sleep(600); }
       else if (st.type === 'sound') { WizraSound.fx(st.name); await sleep(300); }
-      else if (st.type === 'say' && st.text) { const r = await api('/api/event', { say: st.text }); const d = await r.json(); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
-      else if (st.type === 'react' && st.text) { avatar.setThinking(true); const r = await api('/api/event', { react: st.text }); const d = await r.json(); avatar.setThinking(false); if (d.text) { const body = addLine('her', ''); avatar.feel(d.text); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
+      else if (st.type === 'say' && st.text) { const d = preview ? { text: st.text } : await (await api('/api/event', { say: st.text })).json(); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
+      else if (st.type === 'react' && st.text) { avatar.setThinking(true); const r = await api('/api/event', { react: st.text, preview: !!preview }); const d = await r.json(); avatar.setThinking(false); if (d.text) { const body = addLine('her', ''); avatar.feel(d.text); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
       else if (st.type === 'home') { avatar.routine('sit'); await sleep(1500); }
     }
   } catch (e) { console.error('event', ev.name, e); } finally { EV.busy = false; avatar.setMood(settings.mood); }
@@ -706,7 +709,7 @@ function eventsTick(arrived) {
     if (go) { runEvent(ev); return; }
   }
 }
-setInterval(() => eventsTick(false), 20000);
+setInterval(() => { if (!SANDBOX) eventsTick(false); }, 20000);
 let devRunSeen = 0;
 async function loadDev() { try { const r = await fetch('/api/dev'); if (r.ok) { dev = await r.json(); devRunSeen = dev.run ? dev.run.at : 0; } } catch {} applyUi(dev.ui); }
 async function load() {
@@ -715,6 +718,7 @@ async function load() {
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
+  if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
   setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); setPlace(s); if (s.depart === 'say') depart();
 }
 function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
@@ -763,7 +767,7 @@ async function comeBack(force) {
   finally { returning = false; sendBtn.disabled = false; }
 }
 setInterval(async () => { // keep time with the server: is she due back, has the after-effect worn off
-  if (document.hidden || $('login').style.display === 'grid') return;
+  if (SANDBOX || document.hidden || $('login').style.display === 'grid') return;
   try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
     if (phoneCall.on) return;
     if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } setPlace(d); setRinging(!!(d.away && d.away.ringing)); }

@@ -659,13 +659,17 @@ const server = http.createServer(async (req, res) => {
       }
       // a scripted event at work: note that it fired, put a line she says in the log, or have her react in her own words
       if (url.pathname === '/api/event' && req.method === 'POST') {
-        const { id, fired, say, react } = await readBody(req), d = devData();
+        const { id, fired, say, react, preview } = await readBody(req), d = devData();
         if (id && fired) { d.fired[String(id).slice(0, 40)] = Date.now(); save(); }
         if (typeof say === 'string' && say.trim()) { const text = say.trim().slice(0, 2000); db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text }); }
         if (typeof react === 'string' && react.trim()) {
           if (busy) return json(res, 409, { error: 'busy' }); busy = true;
-          try { const pre = react.trim().slice(0, 400); db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true }); const text = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text }); }
-          catch (e) { db.log.pop(); return json(res, 503, { error: e.message }); } finally { busy = false; }
+          const pre = react.trim().slice(0, 400), keep = { log: db.log.length, history: db.history.length };
+          try {
+            if (preview) { const text = await reply(`*${pre}*`, () => {}); return json(res, 200, { text }); }   // the Studio's preview: she answers as if home and awake, and none of it is kept
+            db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true }); const text = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text });
+          } catch (e) { if (!preview) db.log.pop(); return json(res, 503, { error: e.message }); }
+          finally { if (preview) { db.log.length = keep.log; db.history.length = Math.min(db.history.length, keep.history); } busy = false; }
         }
         return json(res, 200, { ok: true });
       }

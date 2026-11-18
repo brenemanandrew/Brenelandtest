@@ -263,7 +263,7 @@
       if ((talking || thinking) && idleAt < t + 25000) idleAt = t + 25000;   // while you two are talking she is with you, not fidgeting
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
-      try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, voice: talking ? voice : null, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
+      try { R.draw({ t, dt, face, faceName, thinking, lid, blink, mouth, talking, phase, voice: talking ? voice : null, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
       const eo = Math.max(0, Math.min(1, (emoteUntil - t) / 300)); em.style.opacity = eo; em.style.transform = `translateY(${(eo - 1) * 6}px)`;
       em.style.setProperty('--emote', Math.max(1, stage.clientWidth / 104));
       if (stage.isConnected) requestAnimationFrame(frame); else R.dispose();

@@ -421,7 +421,7 @@ export async function create(url, opts = {}) {
     if (window.WIZRA_CLIP) { for (const n of KEYS) set(n, ...standOf(n)); vrm.scene.position.set(0, floorY, hip.z + 0.4); playClip(window.WIZRA_CLIP, 1, window.WIZRA_CLIP_T != null ? window.WIZRA_CLIP_T : s.t / 1000); return; } // test hook: look at one clip
     if (rt.act === 'call') return callFrame(s);
     if (rt.act === 'gone') return;                                               // the chair is empty
-    const now = performance.now(), dt = s.dt, attending = (s.talking || s.faceName === 'thinking') && !rt.leaving; rt.attending = attending; if (attending) rt.lastTalk = now;
+    const now = performance.now(), dt = s.dt, attending = (s.talking || s.thinking) && !rt.leaving;   // (really working on a reply: a thoughtful face alone does not stop her) rt.attending = attending; if (attending) rt.lastTalk = now;
     const inTalk = now - rt.lastTalk < 100000;                                    // you two are (or just were) talking: she stays with you
     if (attending && rt.self && rt.act === 'up') { rt.self = false; rt.steps = wayHome(); rt.i = 0; rt.stepT = 0; rt.after = ''; rt.label = 'coming back to sit with you'; if (rt.carry === 'phone') rt.carry = null; }   // you spoke while she was off on a whim: she drops it and comes back
     // on her own schedule
