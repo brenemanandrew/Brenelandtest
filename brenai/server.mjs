@@ -256,10 +256,10 @@ async function replyLocal(userText, onDelta) {
   const system = '';
   const text = await brainJob({ system, messages: turns, max_tokens: L.tokens, temperature: tempOf(db.settings.temperature), stream: true,
     repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
-  return trimLength(dropRepeats(dropTags(cleanLocal(text))), L);
+  return dropDangling(trimLength(dropRepeats(dropTags(cleanLocal(text))), L));
 }
 const LENGTHS = { // tokens: hard cap on the model; say/act: how many spoken sentences and actions survive the trim
-  short: { tokens: 90, say: 2, act: 1 },
+  short: { tokens: 130, say: 2, act: 1 },
   medium: { tokens: 220, say: 5, act: 2 },
   long: { tokens: 600, say: 99, act: 9 },
 };
@@ -283,6 +283,18 @@ function dropTags(text) {
   const us = units(text).filter(u => !SPEECH_TAG.test(u.trim()) && !TAG_TAIL.test(u.trim())).map(shortAction);
   while (us.length > 1 && /[,:]\s*\*?\s*$/.test(us[us.length - 1].trim())) us.pop();
   return us.join('').trim() || text;
+}
+// A reply must not stop in the middle of a thought. Two ways it happens: the token cap cuts the last sentence off ("You must
+// be good with"), or the model trails off on its own ("You must be good with..."). If she has already said something whole,
+// the dangling end is dropped; if the fragment is all there is, it is closed with a full stop rather than left hanging.
+function dropDangling(text) {
+  const us = units(text), spoken = i => us[i].trim() && !us[i].trim().startsWith('*'), whole = u => /[.!?]["')\]]*$/.test(u.trim()) && !/(\.\.\.|\u2026)["')\]]*$/.test(u.trim());
+  let last = us.length - 1; while (last >= 0 && !us[last].trim()) last--;
+  if (last < 0 || !spoken(last) || whole(us[last])) return text;
+  const trailing = /(\.\.\.|\u2026)["')\]]*$/.test(us[last].trim()), short = us[last].trim().split(/\s+/).length <= 9;
+  const before = us.slice(0, last).some((u, i) => spoken(i) && whole(u));
+  if (before && (!trailing || short)) return us.slice(0, last).join('').trim() || text;   // (an action just before the fragment stays)
+  return trailing ? text : text.trim().replace(/[\s,;:\u2014-]+$/, '') + '.';
 }
 // Whatever the model wrote, only the first few sentences and actions are kept (roleplay models pad).
 function trimLength(text, L) {

@@ -83,7 +83,7 @@ ${traitLine(sheet.traits)}- Rapport with ${user}: ${sheet.rapport}/100 (${band(s
 ${BOND_LINE[sheet.path] ? '- ' + BOND_LINE[sheet.path](user) + '\n' : ''}- Mood: ${s.mood === 'auto' ? 'let it follow the conversation and your evening' : `you are feeling ${s.mood} right now; let it show`}.
 - How you react: ${band(s.expressiveness, ['very reserved, understated, dry', 'low-key', 'natural', 'expressive, lots of visible reactions', 'big, dramatic reactions'])}.
 - Spontaneity: ${band(s.temperature, ['predictable and steady, stay on topic', 'mostly steady', 'normal', 'loose and a bit random, tangents welcome', 'wild: unexpected takes, sudden tangents, chaotic energy'])}.
-- Reply length: ${{ short: 'very short. One or two short sentences, like a text message or a line of spoken conversation. Often one is enough. One short action at most.', medium: 'a short paragraph at most.', long: 'take the room you need, a few paragraphs at most.' }[s.length] || 'short.'} Longer only when he asks for a write-up.
+- Reply length: ${{ short: 'very short. One or two short sentences, like a text message or a line of spoken conversation. Often one is enough. One short action at most.', medium: 'a short paragraph at most.', long: 'take the room you need, a few paragraphs at most.' }[s.length] || 'short.'} Longer only when he asks for a write-up. Always finish the sentence you start: never end a message trailing off with "..." or stopping mid-thought.
 - Never repeat yourself: do not reuse an action, phrase, joke or question you already used; each reply moves things forward.
 - Cussing: ${cuss}
 - Content: ${s.sfw ? 'keep everything safe for work.' : 'no content filter beyond your own judgment as a person.'}`;
