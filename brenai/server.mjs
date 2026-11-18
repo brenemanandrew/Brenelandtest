@@ -193,6 +193,7 @@ function systemBlocks() {
   fixBond();
   if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
   const blocks = [{ type: 'text', text: db.persona ? db.persona.replaceAll('{user}', USER_NAME) : PERSONA(USER_NAME) }, { type: 'text', text: STATE_BLOCK(USER_NAME, db.settings, db.sheet) + (currentGlow() ? '\n' + glowNote(db.glow, USER_NAME) : '') + (db.call && db.away ? '\n' + callNote(db.away, USER_NAME) : '') + (placeNote() ? '\n' + placeNote() : '') + (db.sheet.path === 'romance' && ROM_STAGE[db.sheet.romLevel] ? '\n- Where the two of you are: ' + ROM_STAGE[db.sheet.romLevel] : '') }];
+  if (db.intro === 'first') blocks.push({ type: 'text', text: `IMPORTANT, right now: this is your very first conversation with ${USER_NAME}. A matching service just paired the two of you (you signed up to be someone's research buddy and company in the evenings; he picked you from your profile a minute ago). You have never spoken before and you know nothing about him except his name. Introduce yourself the way you really would, in your own voice and temperament, find out who he is and what he is into, and let him get to know you a little at a time. Do not act like you already know him.` });
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
@@ -342,6 +343,7 @@ async function replyClaude(userText, onDelta) {
 }
 
 // Every few messages, a short side call updates her notes on how the user talks and what they like.
+function metYet() { if (db.intro === 'first' && db.log.filter(e => e.who === 'her' && !e.hidden).length >= 12) db.intro = 'met'; }
 async function learn() {
   const recent = db.log.filter(e => e.who !== 'sys' && e.text).slice(-40).map(e => `${e.who === 'me' ? USER_NAME : 'Wizra'}: ${e.text}`).join('\n');
   const prompt = LEARN_PROMPT(USER_NAME, db.profile, db.sheet, db.settings, recent);
@@ -582,6 +584,18 @@ function readBody(req) {
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
 let busy = false;
+// the match questions (the page shows them as picture cards, in this order): what each answer does to her temperament
+const MATCH = [
+  [{ playfulness: -15, patience: 25, confidence: -5 }, { playfulness: 30, sarcasm: 10 }, { confidence: 25, patience: -15, bluntness: 5 }],                 // her energy: calm / playful / fiery
+  [{ warmth: 35, sarcasm: -35, bluntness: -25 }, { sarcasm: 20, playfulness: 10 }, { bluntness: 15, warmth: -15, sarcasm: -10 }],                          // how she talks: sweet / sarcastic / blunt
+  [{ shyness: 40, confidence: -25, nerdiness: 10 }, { nerdiness: 15, playfulness: 10 }, { confidence: 25, shyness: -20, nerdiness: -25 }],                 // her vibe: shy bookworm / nerdy gamer / confident rebel
+  [{ warmth: 15, playfulness: 15 }, { bluntness: 15, confidence: 10, patience: -10 }, { warmth: 20, patience: 20, shyness: 5 }],                           // you want: to hang out / to be pushed / to be understood
+];
+const TRAIT_WORD = { sarcasm: ['earnest', 'sarcastic'], warmth: ['cool and guarded', 'warm'], confidence: ['unsure of herself', 'confident'], patience: ['short-fused', 'patient'], playfulness: ['serious', 'playful'], shyness: ['outgoing', 'shy'], nerdiness: ['not much of a nerd', 'a huge nerd'], bluntness: ['gentle with her words', 'blunt'] };
+function matchBlurb(t) {
+  const top = Object.keys(TRAIT_WORD).map(k => [k, t[k] - 50]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3).map(([k, d]) => TRAIT_WORD[k][d >= 0 ? 1 : 0]);
+  return { name: 'Wizra', age: 22, tags: ['goth', 'plays D&D', 'college student', 'night owl'], line: `${top[0][0].toUpperCase() + top[0].slice(1)}, ${top[1]} and ${top[2]}.`, fit: 86 + Math.round((t.warmth + t.playfulness + t.nerdiness) % 12) };
+}
 async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   try {
@@ -608,7 +622,7 @@ async function handle(req, res) {
         if (!u && claim && legacyOpen()) { // the save from before PINs: whoever claims it first with a PIN owns it from then on
           const mine = { ...legacy }; for (const k of SHARED_KEYS) delete mine[k]; u = playerOf(id, mine); als.run(u, save); fs.renameSync(STORE, STORE.replace(/\.json$/, '.claimed.json')); console.log('[players] the original save was claimed');
         }
-        if (!u && create) { const nm = String(name || '').replace(/[^\p{L}\p{N} '._-]/gu, '').trim().slice(0, 24); if (!nm) return json(res, 400, { error: 'What should she call you?' }); u = playerOf(id, { name: nm }); als.run(u, save); console.log('[players] new player'); }
+        if (!u && create) { const nm = String(name || '').replace(/[^\p{L}\p{N} '._-]/gu, '').trim().slice(0, 24); if (!nm) return json(res, 400, { error: 'What should she call you?' }); u = playerOf(id, { name: nm, intro: 'todo' }); als.run(u, save); console.log('[players] new player'); }
         if (!u) { fails.push(now); pinFails.set(ip, fails); return json(res, 404, { error: 'No save with that PIN.', canClaim: legacyOpen() }); }
         res.writeHead(200, { 'set-cookie': `brenai_u=${u.id}.${sign(u.id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`, 'content-type': 'application/json' });
         return res.end(JSON.stringify({ ok: true, name: u.data.name || '' }));
@@ -616,7 +630,23 @@ async function handle(req, res) {
       if (url.pathname === '/api/pin/out' && req.method === 'POST') { res.writeHead(200, { 'set-cookie': 'brenai_u=; Path=/; Max-Age=0', 'content-type': 'application/json' }); return res.end('{"ok":true}'); }
       if (!als.getStore()) { const u = playerFrom(req); if (!u) return json(res, 401, { error: 'pin', canClaim: legacyOpen() }); wearModel(u); return als.run(u, () => handle(req, res)); }   // from here on, `db` is this player's save
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+
+      // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"
+      // and opens their first conversation herself.
+      if (url.pathname === '/api/intro' && req.method === 'POST') {
+        const { answers } = await readBody(req); if (db.intro !== 'todo') return json(res, 409, { error: 'already met' });
+        const t = { ...TRAITS_DEFAULT }; (Array.isArray(answers) ? answers : []).slice(0, MATCH.length).forEach((a, i) => { const d = MATCH[i][a | 0] || {}; for (const k in d) t[k] = Math.max(5, Math.min(95, (t[k] || 50) + d[k])); });
+        db.sheet.traits = t; save(); return json(res, 200, { traits: t, overview: matchBlurb(t) });
+      }
+      if (url.pathname === '/api/intro/start' && req.method === 'POST') {
+        if (db.intro !== 'todo') return json(res, 409, { error: 'already met' }); if (busy) return json(res, 409, { error: 'busy' }); busy = true;
+        db.intro = 'first'; db.away = null; const pre = `${USER_NAME} has just picked you on the matching service and the chat has opened for the first time. You speak first: say hi and introduce yourself`; let text = '';
+        try { db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true }); text = await reply(`*${pre}*`, () => {}); }
+        catch (e) { console.error('[intro]', e.message); db.log.pop(); text = `hey. so, I'm Wizra. guess the matching thing picked us. ...hi, ${USER_NAME}.`; }   // her PC is off: a plain hello, so the first minute still works
+        finally { busy = false; }
+        db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text });
+      }
 
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
 
@@ -860,7 +890,7 @@ async function handle(req, res) {
           else if (!db.place && !askPre && canVisit()) { const inv = detectInvite(full); if (inv) db.invite = { place: inv, at: Date.now() }; }
           save();
           send({ t: 'done', text: full, pic, away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
-          if (db.sinceLearn >= LEARN_EVERY) { db.sinceLearn = 0; learn().catch(e => console.error('[learn]', e.message)); }
+          metYet(); if (db.sinceLearn >= LEARN_EVERY) { db.sinceLearn = 0; learn().catch(e => console.error('[learn]', e.message)); }
         } catch (e) {
           console.error('[chat]', e.status || '', e.message);
           db.log.pop(); if (ask) setPlace(''); save();

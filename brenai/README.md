@@ -117,3 +117,9 @@ Everyone who plays has their own game. After the site password the page asks for
 - A room made in the Studio can now be outdoors (`open`, with a day, sunset or night sky), can hide her usual dorm furniture (`bare`) and can have mood lighting (`dim`). In a bare room she still sits at the same spot and walks to the same shelf and counter spots, so put a seat and props there.
 - Four rooms were built with them and saved in the Studio: the game night den, the study nook, the campsite under the stars, the fireside room. They are ordinary Studio rooms and can be edited or deleted there.
 - She does not sit on the new seats by herself (bean bags, camp chair): her sitting spot is still the one seat every room has.
+
+## A new player's first minutes (the match)
+A player made with "I am new here" gets `public/intro.js` before the game: a computer screen ("MatchLink") with four picture questions (three cards each), a search bar, then "Match found" with her picture, a short overview and a tick or a cross. The cross asks the questions again.
+- The answers set her temperament sliders for that player only (`MATCH` in `server.mjs`, `POST /api/intro`). Her core character stays the same for everyone.
+- The tick (`POST /api/intro/start`) flashes the screen on and she speaks first. Until she has said about twelve things, her prompt tells her this is their first conversation and she knows nothing about them yet.
+- Saves from before this (and the claimed original save) skip it.

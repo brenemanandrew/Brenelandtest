@@ -468,6 +468,7 @@
 </div>
 
 <script src="sound.js"></script>
+<script src="intro.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -722,6 +723,13 @@ async function load() {
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
   if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
   setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); setPlace(s); if (s.depart === 'say') depart();
+  if (s.intro && window.WizraIntro && !introOn) firstMeet(s);
+}
+// a new player: the match screens (intro.js), then she says the first words of their first conversation
+let introOn = false;
+async function firstMeet(s) {
+  introOn = true; const text = await WizraIntro.run({ name: s.name, snapshot: spec => avatar.snapshot(spec), fx: n => { try { WizraSound.fx(n); } catch {} } });
+  if (text) { const body = addLine('her', ''); avatar.act(text); speaker.say(speechOf(text, 'her')); await typeOut(body, text); }
 }
 function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
