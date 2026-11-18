@@ -193,3 +193,6 @@ She is told the actual time with every reply ("Right now it is 3:44 PM on Wednes
 
 ## Shadows from a flame
 In each room the strongest flame among the placed things (`FLAME` in `places.js`: campfire, fireplace, candle cluster, the candle on the table for two, camp lantern) casts shadows of its own (a 512 cube shadow map), and its light shifts a little so the shadows move. One per room, phones included.
+
+## Movie night
+The player plays the real film on their own screen; the game keeps a clock beside it. `movies.mjs` holds the films (`MOVIES`: title, minutes, the colour the screen throws, and plot beats by minute in our own words). On a visit the clapperboard button starts one (`POST /api/movie { start }`, also `pause`, `resume`, `nudge` seconds, `stop`). While it runs: the ceiling light and lamp go off and a flickering light in the film's colour comes from the TV (`avatar.movie`), a clock bar shows at the top, her instructions say where the film is and to talk like someone watching with a date, and every 45 seconds the page asks (`{ react: true }`) whether the film has reached a new beat; if so she says a line (at least two and a half minutes apart). At the end the credits line, a memory, five points on the path and eight coins. To add a film, add an entry to `MOVIES`.

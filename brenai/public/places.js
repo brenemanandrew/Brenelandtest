@@ -255,7 +255,8 @@ export function buildPlaces(THREE, A) {
       { const clear = { '': 1, cloudy: 0.4, foggy: 0.55, snowy: 0.5, rainy: 0.12, stormy: 0 }[this.sky] ?? 1, day = (1 - night) * clear, moon = night * 0.3 * Math.max(clear, 0.2) * (this.sky === 'stormy' ? 0 : 1), a = 0.26 * day + 0.1 * moon + 0.55 * this.flash, cold = this.flash > 0 || night > 0.6;
         for (const b of beams) { b.shaft.opacity = a; b.patch.opacity = Math.min(0.9, a * 2.4); b.motes.opacity = Math.min(1, (day + moon * 0.6) * (0.55 + 0.35 * Math.sin(t / 900))); const col = cold ? '#bcd0ff' : '#fff0c8'; b.shaft.color.set(col); b.patch.color.set(col); b.pts.position.y = 0.02 * Math.sin(t / 2300); } }
       const F = 1 + 1.4 * this.flash, k = (1 - 0.72 * night) * F; for (const m of worldMats) m.color.setRGB(k * W[0], (k * (1 - 0.05 * night) + 0.03 * night) * W[1], Math.min(1.6, (k + 0.12 * night) * W[2]));
-      if (this.tv.on) this.tv.screen.material.color.setHSL((t / 9000) % 1, 0.55, 0.5 + 0.12 * Math.sin(t / 170)); else this.tv.screen.material.color.set('#101018');
+      if (this.tv.on && this.tv.film) { const f = 0.5 + 0.5 * Math.sin(t / 140) * Math.sin(t / 370); this.tv.screen.material.color.set(this.tv.film).multiplyScalar(0.55 + 0.4 * f); }   // a film is on: its own colour, flickering
+      else if (this.tv.on) this.tv.screen.material.color.setHSL((t / 9000) % 1, 0.55, 0.5 + 0.12 * Math.sin(t / 170)); else this.tv.screen.material.color.set('#101018');
     },
   };
 }

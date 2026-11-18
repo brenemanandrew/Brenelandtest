@@ -377,6 +377,8 @@
   #panel .tri { display:flex; gap:10px; margin:12px 0 4px; } #panel .tri > div { flex:1; text-align:center; padding:8px 4px; border-radius:16px; background:rgba(0,0,0,.22); } #panel .tri > div.on { background:var(--grad); box-shadow:0 3px 0 rgba(0,0,0,.28); }
   #panel .tri span { display:flex; align-items:flex-end; justify-content:center; height:46px; } #panel .tri span i { width:18px; border-radius:6px 6px 2px 2px; background:#fff; opacity:.85; } #panel .tri b { display:block; font-size:22px; } #panel .tri small { font-size:12px; font-weight:600; }
   /* together in person: three kinds of moment down the left edge, and what each one offers */
+  #movieBar { position:fixed; left:50%; top:10px; transform:translateX(-50%); z-index:7; display:flex; align-items:center; gap:10px; padding:6px 8px 6px 16px; border-radius:999px; background:rgba(8,14,10,.78); color:#9dffb8; font:600 14px "Fredoka",sans-serif; letter-spacing:.03em; box-shadow:0 4px 14px rgba(0,0,0,.5); white-space:nowrap; } #movieBar[hidden] { display:none; } #movieBar button { width:32px; height:32px; border-radius:50%; border:0; background:#9dffb8; color:#06140b; font-size:14px; cursor:pointer; }
+  #stage[data-cinema="1"]::before { background:radial-gradient(90% 70% at 50% 100%, rgba(90,255,150,.10), transparent 70%) !important; } #stage[data-cinema="1"]::after { background:radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0,4,2,.72) 100%) !important; }
   #fpMoments { display:none; } body.fp #fpMoments { display:flex; flex-direction:column; gap:10px; position:fixed; left:10px; top:34%; z-index:6; }
   #fpMoments button { width:48px; height:48px; border-radius:50%; border:0; background:#fff; font-size:22px; line-height:1; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); position:relative; } #fpMoments button.lead { box-shadow:0 0 0 3px #ff8fc0, 0 4px 0 rgba(0,0,0,.3); }
   #fpMoments button small { position:absolute; right:-6px; bottom:-4px; min-width:20px; padding:1px 5px; border-radius:999px; background:#3a2a66; color:#fff; font:700 11px "Fredoka",sans-serif; }
@@ -475,7 +477,7 @@
 <div id="picView" hidden><img alt="Picture from Wizra"></div>
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
-<div id="fpMoments"></div><div id="fpChoices" hidden></div><div id="bondPop"></div>
+<div id="movieBar" hidden><span id="movieClock"></span><button id="moviePause" title="Pause or resume"></button></div><div id="fpMoments"></div><div id="fpChoices" hidden></div><div id="bondPop"></div>
 <div id="fpBar"><button id="fpLeave">Head home</button><button id="fpLog" class="quiet">Chat log</button><span id="fpHint"></span></div>
 <!-- the video call: a phone on the screen with her on it. Nothing is written during a call; you talk, she answers out loud. -->
 <div id="call">
@@ -505,7 +507,7 @@
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 // Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
-const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); const L = avatar.layout(); if (L && JSON.stringify(L) !== JSON.stringify(dev.layout)) { dev.layout = L; fetch('/api/dev', { method: 'POST', body: JSON.stringify({ layout: L }) }).catch(() => {}); } }, onThumb: url => setHerThumb(url), onEmote: ch => WizraSound.emote(ch), onTouch: kind => { if (kind === 'petEnd') heartGame.offer(); fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
+const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); try { film.key = ''; filmSync(); } catch {} const L = avatar.layout(); if (L && JSON.stringify(L) !== JSON.stringify(dev.layout)) { dev.layout = L; fetch('/api/dev', { method: 'POST', body: JSON.stringify({ layout: L }) }).catch(() => {}); } }, onThumb: url => setHerThumb(url), onEmote: ch => WizraSound.emote(ch), onTouch: kind => { if (kind === 'petEnd') heartGame.offer(); fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -832,7 +834,7 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
   if (was !== undefined && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
   setPlace.level = visitInfo.level;
   const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
@@ -841,7 +843,7 @@ function setPlace(d, arriving) {
   for (const k in PATHS) if (was && old[k] !== undefined && visitInfo.bond[k] > old[k]) { const pop = $('bondPop'); pop.textContent = '+' + (visitInfo.bond[k] - old[k]) + ' ' + PATHS[k][0]; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
   drawMoments(); WizraSound.path(visitInfo.path);
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
-  showInvite();
+  showInvite(); filmSync();
 }
 function showInvite() {
   const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite, due = visitInfo.place || away ? null : visitInfo.due;
@@ -894,8 +896,23 @@ const ROOM_DO = { gametable: [() => 'rolls a d20 at the battle map table and it 
   blanketfort: ['crawls into the blanket fort with her', 'romance'], chest: ['opens the treasure chest and hands her the best loot', 'friend'], pizza: ['splits the last slice of pizza with her', 'friend'], snacks: ['passes her the snacks', 'friend'], beanbag: ['flops onto the bean bag next to hers', 'friend'], stringlights: ['switches the string lights on and the big light off', 'romance'], candles: ['lights the candles', 'romance'], roses: ['hands her one of the roses', 'romance'] };
 const ROOM_BUILTIN = { dorm: ['bookpile', 'stringlights'], house: ['tv', 'snacks'] };
 function roomDoList() { const pl = visitInfo.place, m = (dev.maps && dev.maps.custom || []).find(x => x.id === pl), items = m ? m.items : ((dev.maps || {})[pl] || {}).items || [], kinds = [...new Set([...(ROOM_BUILTIN[pl] || []), ...items.map(i => i.kind)])].filter(k => ROOM_DO[k]); return kinds.sort(() => Math.random() - 0.5).slice(0, 4).map(k => { const [t, lean] = ROOM_DO[k]; return [typeof t === 'function' ? t() : t, lean]; }); }
+// ---- movie night: you play the real film on your own screen; the game keeps the clock, dims the room, and she watches with you ----
+const film = { at: 0, key: '', timer: 0, tick: 0 };
+const filmPos = () => { const m = visitInfo.movie; return m ? m.pos + (m.paused ? 0 : (Date.now() - film.at) / 60000) : 0; };
+async function filmDo(body) { try { const d = await (await api('/api/movie', body)).json(); film.at = Date.now(); if (d.place !== undefined) setPlace(d, true); return d; } catch { return {}; } }
+function filmSync() { // called whenever the place info changes
+  const m0 = visitInfo.place ? visitInfo.movie : null, key = m0 ? m0.id + ':' + m0.paused : ''; film.at = Date.now(); if (key === film.key) return; film.key = key;   // (the clock is refreshed on every update; the rest only when the film starts, stops or pauses)
+  const bar = $('movieBar'); bar.hidden = !m0; avatar.movie(!!m0, m0 && m0.tint); clearInterval(film.tick); clearInterval(film.timer); if (!m0) return;
+  const show = () => { const m = visitInfo.movie; if (!m) return; const p = Math.max(0, filmPos()), h = Math.floor(p / 60), mi = Math.floor(p % 60), s = Math.floor(p * 60 % 60); $('movieClock').textContent = `${m.title}  ${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}${m.paused ? '  (paused)' : ''}`; $('moviePause').textContent = m.paused ? '\u25B6' : '\u23F8'; };
+  show(); film.tick = setInterval(show, 1000);
+  film.timer = setInterval(async () => { const m = visitInfo.movie; if (!m || m.paused || sendBtn.disabled || speaker.busy() || input.value.trim()) return; sendBtn.disabled = true; try { const d = await filmDo({ react: true }); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } } finally { sendBtn.disabled = false; } }, 45000);
+}
+$('moviePause').onclick = () => { const m = visitInfo.movie; if (m) filmDo(m.paused ? { resume: true } : { pause: true }); };
 function drawMoments() {
   const box = $('fpMoments'); box.textContent = '';
+  { const b = el('button', { title: 'Movie night', textContent: '\ud83c\udfac' }); b.onclick = e => { e.stopPropagation(); const c = $('fpChoices'); if (!c.hidden && c.dataset.k === 'film') { c.hidden = true; return; } c.dataset.k = 'film'; c.textContent = ''; c.hidden = false; const opt = (t, fn) => { const o = el('button', { textContent: t }); o.onclick = () => { c.hidden = true; fn(); }; c.append(o); };
+      if (visitInfo.movie) { opt(visitInfo.movie.paused ? 'Resume the film' : 'Pause the film', () => filmDo(visitInfo.movie.paused ? { resume: true } : { pause: true })); opt('My screen is ahead: skip the game forward 30 seconds', () => filmDo({ nudge: 30 })); opt('My screen is behind: move the game back 30 seconds', () => filmDo({ nudge: -30 })); opt('Switch the film off', () => filmDo({ stop: true })); }
+      else for (const f of visitInfo.films || []) opt(`Watch ${f.title} together. Press play on your own screen, then tap this at the same moment.`, () => filmDo({ start: f.id })); }; box.append(b); }
   { const b = el('button', { title: 'Things to do here', textContent: '\ud83c\udfaf' }); b.onclick = e => { e.stopPropagation(); const c = $('fpChoices'); if (!c.hidden && c.dataset.k === 'room') { c.hidden = true; return; } const list = roomDoList(); c.dataset.k = 'room'; c.textContent = ''; c.hidden = false; if (!list.length) c.append(el('button', { textContent: 'Nothing special to do here yet. Add things to this room in the Studio.', disabled: true }));
       for (const [text, lean] of list) { const o = el('button', { textContent: text[0].toUpperCase() + text.slice(1).replace(/\bhe\b/g, 'you').replace(/\bhim\b/g, 'you').replace(/\bhis\b/g, 'your') }); o.onclick = () => { c.hidden = true; WizraSound.moment(lean); send('*' + text + '*', '', lean); }; c.append(o); } }; box.append(b); }
   for (const k in PATHS) { const b = el('button', { title: PATHS[k][1], className: visitInfo.path === k ? 'lead' : '' }, PATHS[k][0], el('small', { textContent: (visitInfo.bond || {})[k] || 0 })); b.onclick = e => { e.stopPropagation(); showChoices(k); }; box.append(b); }

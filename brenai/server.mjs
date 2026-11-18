@@ -19,6 +19,7 @@ import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, c
 import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, requested, posed } from './pics.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import webpush from 'web-push';
+import { MOVIES, beatAt } from './movies.mjs';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
@@ -238,6 +239,7 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   yousit: ['sits down on the couch next to her', 'sits down on the couch next to her'], yousitbed: ['sits down on the edge of her bed', 'sits down on the edge of her bed'], tvon: ['turns the TV on', 'turns the TV on'], tvoff: ['turns the TV off', 'turns the TV off'],
   cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
   powerout: ['is there when the storm knocks the power out: every light and screen in the room just died and it is dark except for the lightning', ''], powerback: ['is there as the power comes back on and the lights flicker up again', ''],
+  moviestart: ['dims the lights and starts the film; she settles in next to him on the couch', ''],
   planned: ['just put a plan with her on the calendar (see the plans in your notes); she can say how she feels about it', ''],
   heartwin: ['kept stroking her hair until she melted: squirming, blushing, happy tears in her eyes, and then a rush of warmth she cannot explain away', ''], heartlose: ['kept fussing with her hair clumsily until she got annoyed and ducked away', ''],
   petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
@@ -540,8 +542,14 @@ const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinit
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
 const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
-const placeView = () => ({ due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
-function placeNote() {
+const placeView = () => ({ movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
+// ---- movie night: he plays the real film on his own screen; db.movie = { id, t0 (when minute zero was), paused (ms) or 0, said (last beat she reacted to), saidAt }
+const moviePos = () => { const m = db.movie; return m ? ((m.paused || Date.now()) - m.t0) / 60000 : 0; };
+const movieView = () => { const m = db.movie, M = m && MOVIES[m.id]; return M ? { id: m.id, title: M.title, minutes: M.minutes, pos: +moviePos().toFixed(2), paused: !!m.paused, tint: M.tint } : null; };
+function movieNote() { const m = db.movie, M = m && MOVIES[m.id]; if (!M || !db.place) return ''; const pos = Math.max(0, Math.min(M.minutes, moviePos()));
+  return ` The two of you are watching ${M.title} together, side by side with the lights down${m.paused ? ' (it is paused right now)' : ''}. It is about ${Math.round(pos)} minutes in. On the screen about now: ${beatAt(M, pos).text}. You have seen it before and love it. Talk like someone watching a film with a date: short, low, in the moment, a reaction or a whisper or a tease; never narrate the plot, and never give away what happens later.`; }
+function placeNote() { const base = placeNote0(); return base && db.movie ? base + movieNote() : base; }
+function placeNote0() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
@@ -601,7 +609,7 @@ function dateDue() { const now = Date.now(), d = (db.dates || []).find(d => !d.d
 // the memory book: firsts and milestones, each kept once ({ key, at, text })
 function remember(key, text) { db.memories = db.memories || []; if (db.memories.some(m => m.key === key)) return; db.memories.push({ key, at: Date.now(), text }); if (db.memories.length > 200) db.memories.shift(); }
 const memoryView = () => ({ moments: (db.memories || []).slice().sort((a, b) => a.at - b.at), pics: db.log.filter(e => e.pic && !e.hidden).slice(-24).map(e => ({ at: e.at, pic: e.pic })), since: (db.log[0] || {}).at || 0 });
-function setPlace(place) { db.place = place || ''; db.invite = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; earn(5); remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
+function setPlace(place) { db.place = place || ''; db.invite = null; if (!place) db.movie = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; earn(5); remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
   if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
 // ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
 // things the player says that she reacts to on the spot (a pose and an emoji), before her words come: edited in the Studio
@@ -815,6 +823,24 @@ async function handle(req, res) {
         const b = await readBody(req), la = +b.lat, lo = +b.lon; let wx = null;
         if (Number.isFinite(la) && Number.isFinite(lo) && Math.abs(la) <= 90 && Math.abs(lo) <= 180) wx = { lat: +la.toFixed(1), lon: +lo.toFixed(1), label: String(b.label || '').replace(/[<>]/g, '').slice(0, 60) };
         if (b.all && isOwner()) shared.wx = wx; else db.wx = wx; save(); return json(res, 200, { wx: db.wx || shared.wx || null });
+      }
+      // movie night controls: { start: id } { pause } { resume } { nudge: seconds } { stop }, and { react } which the page sends every minute:
+      // she says something when the film has reached a new beat (or, with { credits }, when it is over)
+      if (url.pathname === '/api/movie' && req.method === 'POST') {
+        const b = await readBody(req), now = Date.now(); let m = db.movie, M = m && MOVIES[m.id];
+        if (b.start) { if (!db.place) return json(res, 409, { error: 'You two need to be in the same place first.' }); if (!MOVIES[b.start]) return json(res, 400, { error: 'No such film.' }); db.movie = { id: b.start, t0: now, paused: 0, said: -1, saidAt: 0 }; db.log.push({ who: 'sys', text: `Movie night: ${MOVIES[b.start].title}.`, at: now }); cur().touches.push({ kind: 'moviestart', at: now }); save(); return json(res, 200, placeView()); }
+        if (!M) return json(res, 200, placeView());
+        if (b.pause && !m.paused) m.paused = now; if (b.resume && m.paused) { m.t0 += now - m.paused; m.paused = 0; } if (Number.isFinite(+b.nudge)) m.t0 -= Math.max(-600, Math.min(600, +b.nudge)) * 1000;
+        if (b.stop) { db.movie = null; db.log.push({ who: 'sys', text: 'The film was switched off.', at: now }); save(); return json(res, 200, placeView()); }
+        if (b.react) { const pos = moviePos(), over = pos >= M.minutes, beat = beatAt(M, Math.min(pos, M.minutes));
+          if (busy || m.paused || db.away || (!over && (beat.i <= m.said || now - m.saidAt < 150000))) { save(); return json(res, 200, { ...placeView(), text: '' }); }
+          busy = true; const pre = over ? `the credits of ${M.title} are rolling and the lights come back up; she stretches and says what she thought of watching it with him` : `(watching ${M.title}, about ${Math.round(pos)} minutes in) on the screen right now: ${beat.text}. She reacts to it, quietly, the way you do next to someone on the couch: one short line or a small action. No plot summary, nothing about what comes later`;
+          try { db.log.push({ who: 'me', text: '', at: now, pre, hidden: true }); const text = (await reply(`*${pre}*`, () => {})).trim(); m.said = beat.i; m.saidAt = Date.now();
+            if (over) { db.movie = null; remember('movie:' + m.id, `You watched ${M.title} together.`); addBond(db.sheet.path || 'friend', 5); earn(8); }
+            if (!text) { db.log.pop(); save(); return json(res, 200, { ...placeView(), text: '' }); }
+            db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { ...placeView(), text, over });
+          } catch (e) { db.log.pop(); return json(res, 200, { ...placeView(), text: '' }); } finally { busy = false; } }
+        save(); return json(res, 200, placeView());
       }
       if (url.pathname === '/api/shop' && req.method === 'POST') {
         const { buy, id } = await readBody(req), row = (SHOP[buy] || []).find(r => r[0] === id), key = buy === 'gift' ? 'gifts' : 'decor'; if (!row) return json(res, 400, { error: 'No such thing in the shop.' });

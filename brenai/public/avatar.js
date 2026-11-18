@@ -302,6 +302,7 @@
       call(on, scene) { if (R.call) R.call(on, scene); },
       callShow() { if (R.callShow) R.callShow(); },
       weather(kind) { if (R.weather) R.weather(kind); },
+      movie(on, tint) { if (R.movie) R.movie(on, tint); },                            // movie night: lights down, the screen lights the room
       power(on, ms) { if (R.power) R.power(on, ms); },                               // cut or restore the power (a storm does this by itself now and then)                              // the sky outside follows the player's real weather                                  // on a video call: she turns the phone to show where she is
       // the after-effect that still shows for a while once she is back: '', tipsy, high, groggy, hyper, upset
       setState(kind) { state = STATE[kind] ? kind : ''; if (R.glow) R.glow(state); },

@@ -319,17 +319,19 @@ export async function create(url, opts = {}) {
   const bulb = new THREE.Group(), bulbGlass = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), new THREE.MeshBasicMaterial({ color: '#fff1cf' })), bulbLight = new THREE.PointLight('#ffdcae', 0, 12, 1.5);
   { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.08, 14), mat('#2b2433')); cap.position.y = 0.09; bulb.add(cap, bulbGlass, bulbLight); scene.add(bulb); }
   const SUN_L = new THREE.Vector3(0.7, -0.8, 0.55).normalize(), MOON_L = new THREE.Vector3(0.35, -0.55, 0.76).normalize();   // the way sunlight and moonlight travel
+  let cinema = ''; const screenLight = new THREE.PointLight('#ffffff', 0, 9, 1.4); scene.add(screenLight);   // a film playing: the colour its screen throws on the room
   relight = day => {
     const b = places.bounds[here] || places.bounds.dorm, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, out = !!places.outdoor[here], staged = stageK !== null || inCall;
     bulb.visible = !out && !staged; bulb.position.set(cx, floorY + (b.h || 2.5) - 0.1, cz);
     if (staged) { sun.position.copy(FRONT); sun.target.position.set(0, 0.4, 1); bulbLight.intensity = 0; rim.intensity = 0.5; return; }
-    const dark = day < 0.45 || gloom > 0.5, lit = !out && places.power && dark && mood < 0.5;   // dark enough for the room light, and it has power
+    const dark = day < 0.45 || gloom > 0.5, lit = !out && places.power && dark && mood < 0.5 && !cinema;   // dark enough for the room light, and it has power
     bulbGlass.material.color.set(lit ? '#fff1cf' : '#4a4458'); bulbLight.intensity = lit ? 2.6 : 0; sun.target.position.set(cx, floorY, cz);
     if (lit) { sun.position.set(cx + 0.3, floorY + (b.h || 2.5) + 4, cz + 0.5); sun.color.set('#ffdcae'); sun.intensity = 1.5; amb.intensity = 0.2; }
     else { sun.position.set(cx, floorY, cz).addScaledVector(day >= 0.45 ? SUN_L : MOON_L, -12);
       if (day < 0.45) { sun.color.set('#9fb4ff'); sun.intensity = (out ? 0.6 : 0.3) * (1 - 0.8 * gloom) * (1 - 0.4 * mood); amb.intensity = out ? 0.2 : 0.1; }
       else amb.intensity = (0.5 + 0.2 * day) * (1 - 0.55 * gloom) * (1 - 0.3 * mood); }                                  // by day the rest is light bouncing round the room
-    rim.intensity = (0.2 + 0.5 * day) * (1 - 0.7 * gloom);                                                              // sky light from the back windows
+    if (cinema) { sun.intensity *= 0.12; amb.intensity = 0.07; }                                                         // movie night: lights down, the screen does the lighting
+    rim.intensity = (0.2 + 0.5 * day) * (1 - 0.7 * gloom) * (cinema ? 0.3 : 1);                                                              // sky light from the back windows
   };
   scene.add(...Object.values(places.groups)); for (const g of Object.values(places.groups)) shadeUp(g); shadeUp(room); vrm.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
 
@@ -610,7 +612,7 @@ export async function create(url, opts = {}) {
     else if (storm.flashing) { storm.flashing = false; daylight(); }
     bolt.intensity = fl * 1.1;
   }
-  function lampTick(dt) { const want = places.power && (lampOn === null ? night > 0.45 || gloom > 0.5 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
+  function lampTick(dt) { const want = places.power && !cinema && (lampOn === null ? night > 0.45 || gloom > 0.5 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
   // ---- tap to direct: you tap a thing in her room, she goes and deals with it ----
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   function pick(e) {
@@ -923,7 +925,8 @@ export async function create(url, opts = {}) {
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
     activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
-    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, weather(kind) { places.sky = kind || ''; (el.closest('#stage') || el).dataset.weather = kind || ''; if (kind !== 'stormy' && !places.power) power(true); regloom(); }, power,
+    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, movie(on, tint) { cinema = on ? (tint || '#cfe0ff') : ''; places.tv.film = cinema; if (here === 'house') places.tv.on = !!on && places.power; (el.closest('#stage') || el).dataset.cinema = on ? '1' : ''; daylight(); },
+    weather(kind) { places.sky = kind || ''; (el.closest('#stage') || el).dataset.weather = kind || ''; if (kind !== 'stormy' && !places.power) power(true); regloom(); }, power,
     doActivity(name) { rt.self = false; startActivity(name); },   // asked for (by you, or by what she wrote): not a whim to drop when you speak
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,
@@ -984,6 +987,7 @@ export async function create(url, opts = {}) {
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
       placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now());
+      if (cinema && places.power) { const f = 0.5 + 0.5 * Math.sin(s.t / 140) * Math.sin(s.t / 370); screenLight.color.set(cinema); screenLight.intensity = 1.2 + 1.3 * f; if (here === 'house') screenLight.position.copy(places.tv.at).add(tmpB.set(0, 0, 0.35)); else screenLight.position.set(0.2, floorY + 1.25, hip.z + 2.4); } else screenLight.intensity = 0;
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();
       const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;
