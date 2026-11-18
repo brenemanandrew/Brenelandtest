@@ -152,3 +152,6 @@ Ask for a picture of her doing something ("a selfie with your hands up", "a pic 
 
 ## Your camera (she can see your face)
 The small camera button on your tile turns it on (`public/facecam.js`, `WizraCam`). The picture shows in your own tile and is read on the device by MediaPipe Face Landmarker (library from jsdelivr, model from Google's model store, loaded on first use); no frame is sent anywhere. It emits words: smile, laugh, surprised, frown, yawn, wink, nod, shake, lookaway, away, back. `CAM_REACT` in `index.html` pairs each with a pose and an emoji (at most one reaction every five seconds, none while she is talking or out). With a message, the last minute's most telling words go along as `face` and, checked against `FACE_WORDS` on the server, become a line in her instructions ("she can see him on his camera: he is smiling"). Off by default; the choice is remembered per device.
+
+## Her clock
+She is told the actual time with every reply ("Right now it is 3:44 PM on Wednesday, November 18"), in the player's own time zone: the page sends the device's zone with `/api/state?tz=...`, it is kept per player (`db.tz`, global getter `TZ`), and everything about time (the hour, her sleep, when she is back) is worked out in it. Eastern until a device has reported one.

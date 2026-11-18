@@ -40,7 +40,7 @@ const EVENT = '(class|lecture|lab|seminar|exam|midterm|quiz|study group|study se
 const RE_START = new RegExp('\\b' + EVENT + "\\b[^.!?*]{0,40}?\\b(?:starts?|begins?|is|'s|kicks off)?\\s*(?:at|by|around)\\s+" + T + '(?![\\d:]|\\s*(?:minutes|mins|hours|hrs|percent|%|pages|people|of))', 'i');
 const RE_GO = new RegExp("\\b(?:leave|leaving|head(?:ing)? out|heading (?:to|over)|take off|taking off|out of here|gotta go|have to go|need to go|go)\\b[^.!?*]{0,24}?\\b(?:at|by|around)\\s+" + T + '(?![\\d:]|\\s*(?:minutes|mins|hours|hrs|percent|%))', 'i');
 const RE_BACK = new RegExp("\\b(?:back|home|done|finished|free|out)\\b[^.!?*]{0,18}?\\b(?:around|at|by|about|until|til|till|like)\\s+" + T + "(?:\\s*(?:or|to|-)\\s*" + T + ')?(?![\\d:]|\\s*(?:minutes|mins|hours|hrs|percent|%))', 'i');
-const ET = 'America/New_York';
+const zone = () => globalThis.TZ || 'America/New_York';   // the player's own time zone (server.mjs keeps it per player); her clock is his clock
 // the next time the clock (Eastern) shows this hour and minute after `after`; with no am/pm it is whichever comes first
 function nextAt(tok, half, after) {
   if (!tok) return null;
@@ -49,7 +49,7 @@ function nextAt(tok, half, after) {
   if (!(h >= 0 && h <= 23) || !(m >= 0 && m < 60)) return null;
   const hf = (half || '').toLowerCase().replace(/\./g, '');
   let hours = h > 12 || w === 'midnight' || w === 'noon' ? [h] : /^am|morning/.test(hf) ? [h % 12] : /^pm|tonight|evening|afternoon|night/.test(hf) ? [h % 12 + 12] : [h % 12, h % 12 + 12];
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: ET, hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date(after));
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone(), hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date(after));
   const nowMin = (+parts.find(x => x.type === 'hour').value % 24) * 60 + +parts.find(x => x.type === 'minute').value;
   let best = null;
   for (const hh of hours) { let d = hh * 60 + m - nowMin; if (d <= 0) d += 1440; const t = after + d * 60000; if (best === null || t < best) best = t; }
@@ -72,7 +72,7 @@ export function detectLeave(text, now = new Date()) {
   for (const [re, name, span, canCover] of WHERE) if (re.test(t)) {
     where = name; cover = canCover;
     if (span === 'sleep') { // until about 8 the next morning, Eastern; at least five hours
-      const h = Number(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false })) % 24;
+      const h = Number(now.toLocaleString('en-US', { timeZone: zone(), hour: 'numeric', hour12: false })) % 24;
       minutes = Math.max(300, ((8 - h + 24) % 24 || 24) * 60 - now.getMinutes() + between([0, 40]));
     } else minutes = between(span);
     break;
@@ -112,7 +112,7 @@ export function glowNote(glow, user) {
     : `- Right now and for the next hour or so: you just got back from ${glow.where}, and ${glow.truth}. It shows: ${glow.tells}. How it comes out when you talk: ${glow.talk}.`;
 }
 
-export const clock = (ms) => new Date(ms).toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+export const clock = (ms) => new Date(ms).toLocaleString('en-US', { timeZone: zone(), hour: 'numeric', minute: '2-digit' });
 
 // ---- video calls while she is out ----
 // Where she really is decides what is behind her on the call. sceneFor(away) -> a backdrop name the page knows how to draw.

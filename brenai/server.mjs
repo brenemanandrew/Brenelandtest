@@ -50,6 +50,10 @@ const PICS = path.join(DATA_DIR, 'pics');             // the pictures she has se
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
 const PASSWORD = process.env.APP_PASSWORD || ''; // empty = no login (local only)
+// the clock she lives by is the player's own: the page tells us its time zone, and everything about time (what hour it is, when she
+// sleeps, when she is back) is worked out in it. Eastern until a player's device has said otherwise.
+const okZone = z => { try { new Intl.DateTimeFormat('en-US', { timeZone: z }); return true; } catch { return false; } };
+Object.defineProperty(globalThis, 'TZ', { get: () => cur().data.tz || 'America/New_York' });
 Object.defineProperty(globalThis, 'USER_NAME', { get: () => cur().data.name || process.env.USER_NAME || 'Andrew' });   // each player's own name, wherever the code says USER_NAME
 const COMPACT_AT = Number(process.env.COMPACT_AT || 600000); // tokens of history before old turns get summarized
 const LEARN_EVERY = Number(process.env.LEARN_EVERY || 6); // user messages between profile updates
@@ -210,7 +214,7 @@ function echoable(content) {
   return content.filter((b, i) => i > lastFb || !['thinking', 'redacted_thinking', 'tool_use'].includes(b.type));
 }
 
-const STAMP = () => new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const STAMP = () => new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const systemText = () => systemBlocks().map(b => b.text).join('\n\n');
 
 // The local model gets the log as plain turns, newest kept, oldest dropped to fit the loaded context.
@@ -218,11 +222,11 @@ const systemText = () => systemBlocks().map(b => b.text).join('\n\n');
 // sheet instead of what he said. So no system prompt here: the sheet goes in as the very first turn, marked as setup, and
 // his newest message is sent bare (no timestamp, no reminder; she was replying to those too).
 function setupText() {
-  const d = new Date(), tz = { timeZone: 'America/New_York' };
+  const d = new Date(), tz = { timeZone: TZ };
   const hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24;
   const part = hour < 5 ? 'late night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 22 ? 'evening' : 'late night';
-  const day = d.toLocaleString('en-US', { ...tz, weekday: 'long', month: 'long', day: 'numeric' });
-  return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nIt is ${day}, ${part}.\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
+  const day = d.toLocaleString('en-US', { ...tz, weekday: 'long', month: 'long', day: 'numeric' }), time = d.toLocaleString('en-US', { ...tz, hour: 'numeric', minute: '2-digit' });
+  return `[SETUP. Background for a chat roleplay. This is not a message from ${USER_NAME}; never reply to it or mention it.]\n\n${systemText()}\n\nRight now it is ${time} on ${day} (${part}). That is the real time for both of you: if the time of day comes up, go by it and not by a guess.\n\n[END OF SETUP. From here on every message is ${USER_NAME} talking to you. Answer what he just said or did, as Wizra, and nothing else.]`;
 }
 // ---- silent touches: what he did to the avatar since her last reply. Never shown in the chat; she just knows. ----
 const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the bookshelf'], pointcounter: ['points her to the kettle', 'points her to the kettle'], pointchair: ['pats her chair for her to sit back down', 'pats her chair for her to sit back down'],
@@ -334,8 +338,8 @@ async function reply(userText, onDelta) {
 
 async function replyClaude(userText, onDelta) {
   // The time rides on the user turn (not the system prompt) so the cached prefix stays the same between messages.
-  const now = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  db.history.push({ role: 'user', content: [{ type: 'text', text: `[${now} Eastern]` }, { type: 'text', text: userText }] });
+  const now = new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  db.history.push({ role: 'user', content: [{ type: 'text', text: `[${now}]` }, { type: 'text', text: userText }] });
   const stream = client.beta.messages.stream({
     model: MODEL,
     max_tokens: 64000,
@@ -419,7 +423,7 @@ const OUTFITS = path.join(DATA_DIR, 'outfits'), SITUATIONS = ['Daily', 'School',
 const outfitData = () => { const o = db.outfits || (db.outfits = {}); o.situations = Array.isArray(o.situations) && o.situations.length ? o.situations : [...SITUATIONS]; o.slots = o.slots || {}; o.force = o.force || ''; return o; };
 function situationNow() { // what kind of moment it is for her, from where she is and the clock (Eastern, like everything else)
   const o = outfitData(); if (o.force && o.situations.includes(o.force)) return o.force;
-  const a = db.away, d = new Date(), tz = { timeZone: 'America/New_York' }, hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24, day = d.toLocaleString('en-US', { ...tz, weekday: 'short' });
+  const a = db.away, d = new Date(), tz = { timeZone: TZ }, hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24, day = d.toLocaleString('en-US', { ...tz, weekday: 'short' });
   if (a) { if (/class|study/.test(a.where)) return 'School'; if (a.where !== 'bed' && a.where !== 'the bathroom') return 'Going Out'; return 'Nightly'; }
   if (hour >= 21 || hour < 6) return 'Nightly'; if (day === 'Sat' || day === 'Sun') return 'Weekend'; return 'Daily';
 }
@@ -689,6 +693,7 @@ async function handle(req, res) {
       }
       if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
+      if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
       if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
       // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"

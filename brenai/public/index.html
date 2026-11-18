@@ -739,7 +739,8 @@ let devRunSeen = 0;
 async function loadDev() { try { const r = await fetch('/api/dev'); if (r.ok) { dev = await r.json(); devRunSeen = dev.run ? dev.run.at : 0; } } catch {} applyUi(dev.ui); }
 async function load() {
   await loadDev();
-  const r = await api('/api/state'); const s = await r.json();
+  let zone = ''; try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch {}
+  const r = await api('/api/state' + (zone ? '?tz=' + encodeURIComponent(zone) : '')); const s = await r.json();
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
