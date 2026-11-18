@@ -31,6 +31,9 @@
   #frameWrap { margin:0 auto; border-radius:22px; overflow:hidden; box-shadow:0 10px 34px rgba(40,20,90,.3); background:#000; } #frameWrap iframe { display:block; border:0; width:100%; height:100%; }
   #mapView { position:absolute; inset:0; } #mapView canvas { display:block; width:100%; height:100%; touch-action:none; } #mapHint { position:absolute; left:14px; bottom:12px; font-size:13px; color:#fff; background:rgba(30,20,60,.65); padding:6px 12px; border-radius:999px; pointer-events:none; }
   .cat { display:grid; grid-template-columns:1fr 1fr; gap:6px; } .cat button { border:1.5px solid #e2d9f0; background:#fff; border-radius:12px; padding:8px 6px; cursor:pointer; font-size:13px; font-weight:500; display:flex; align-items:center; gap:7px; text-align:left; } .cat button:hover { border-color:#a855f7; } .cat button i { width:16px; height:16px; border-radius:5px; flex:none; }
+  #pip { position:fixed; right:16px; bottom:16px; z-index:40; width:400px; height:560px; min-width:300px; min-height:380px; max-width:92vw; max-height:86vh; display:flex; flex-direction:column; border-radius:18px; overflow:hidden; resize:both; background:#1a1026; box-shadow:0 14px 44px rgba(30,10,70,.55); } #pip[hidden] { display:none; }
+  #pipHead { display:flex; align-items:center; gap:10px; padding:8px 12px; background:linear-gradient(120deg,#6a3aa8,#c0267e); color:#fff; font-size:13px; } #pipHead b { font:400 18px "Bangers","Fredoka",sans-serif; letter-spacing:.05em; } #pipNote { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; opacity:.9; } #pipClose { border:0; background:rgba(255,255,255,.2); color:#fff; border-radius:50%; width:26px; height:26px; cursor:pointer; }
+  #pipFrame { flex:1; border:0; width:100%; background:#000; }
   #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#2a1d45; color:#fff; padding:9px 18px; border-radius:999px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:50; } #toast.on { opacity:1; }
   @media (max-width:900px) { main.on { flex-direction:column; } .side, .side.right { width:auto; max-height:38vh; border:0; border-bottom:1px solid #ddd3ee; } #mapView { position:relative; height:52vh; } }
 </style>
@@ -66,6 +69,7 @@
   <div class="side right"><h2>Selected</h2><div id="selPanel"><p class="tip">Nothing selected. Click a thing in the room, or add one from the catalogue.</p></div>
     <div class="row" style="margin-top:16px"><button class="btn go" id="mapSave">Save rooms</button></div></div>
 </main>
+<div id="pip" hidden><div id="pipHead"><b>Preview</b><span id="pipNote"></span><button id="pipClose" title="Close the preview">✕</button></div><iframe id="pipFrame" title="A small copy of the game, where events play"></iframe></div>
 <div id="toast"></div>
 
 <script type="module">
@@ -150,10 +154,28 @@ function drawEvents() {
   const mapCard = el('div', { className: 'card' }, el('h2', { textContent: 'Where she walks' }), el('p', { className: 'tip', textContent: 'Select a "Walk to" step, then click the room to set its spot. Yellow dots are her usual places; she finds her own way round the furniture.' }), el('canvas', { id: 'evMap', width: 560, height: 440 }));
   w.append(mapCard); drawMap(); $('evMap').onclick = clickMap;
   const save = el('button', { className: 'btn go', textContent: 'Save events' }); save.onclick = async () => { await post({ events: dev.events }); toast('Events saved'); };
-  const run = el('button', { className: 'btn', textContent: 'Save and run now' }); run.onclick = async () => { await post({ events: dev.events, run: e.id }); toast('Sent. An open game plays it within about 15 seconds.'); };
+  const run = el('button', { className: 'btn', textContent: '\u25b6 Save and play it here' }); run.onclick = async () => { await post({ events: dev.events }); playHere(e); };
   const del = el('button', { className: 'btn bad', textContent: 'Delete event' }); del.onclick = () => { if (!confirm('Delete "' + (e.name || 'this event') + '"?')) return; dev.events = dev.events.filter(x => x !== e); evSel = ''; drawEvents(); };
   w.append(el('div', { className: 'row' }, save, run, el('span', { className: 'grow' }), del));
 }
+// The preview: a small copy of the game in the corner of the Studio. Events play in it directly, from a wide view of the room.
+let pipReady = null;
+function pipOpen() {
+  $('pip').hidden = false; if (pipReady) return pipReady;
+  const f = $('pipFrame'); f.src = '/?pip=1';
+  return pipReady = new Promise((ok, fail) => { const t0 = Date.now(), t = setInterval(() => { const w = f.contentWindow; try {
+    if (w && w.brenaiDev && w.brenaiDev.avatar.canVisit()) { clearInterval(t); w.document.body.classList.add('big'); ok(w); }
+    else if (Date.now() - t0 > 45000) { clearInterval(t); pipReady = null; fail(new Error(w && w.brenaiDev ? 'her 3D model did not load in the preview (events need it)' : 'the preview did not load')); } } catch (e) { clearInterval(t); pipReady = null; fail(e); } }, 400); });
+}
+async function playHere(ev) {
+  $('pipNote').textContent = 'Loading the preview...';
+  try { const w = await pipOpen(), elsewhere = ev.where && ev.where !== 'any' && ev.where !== 'dorm'; w.brenaiDev.avatar.visit(elsewhere ? ev.where : '');      // show the room the event belongs to
+    w.WIZRA_CAM = ev.where === 'house' ? [4.8, 4.2, 8.2, -0.9, -0.5, 1.4] : [4.4, 3.6, 6.0, -0.2, -0.45, 0.8];   // stand back so her walking shows
+    $('pipNote').textContent = 'Playing "' + (ev.name || 'event') + '"...'; const ok = await w.brenaiDev.run(JSON.parse(JSON.stringify(ev)), true);
+    $('pipNote').textContent = ok ? 'Finished.' : 'It did not play: she is out, on a call, or already in the middle of an event.'; }
+  catch (e) { $('pipNote').textContent = 'Could not play it: ' + e.message; }
+}
+$('pipClose').onclick = () => { $('pip').hidden = true; $('pipFrame').src = 'about:blank'; pipReady = null; };
 $('evNew').onclick = () => { const e = { id: uid(), name: 'New event', enabled: true, when: { type: 'manual' }, where: 'dorm', once: false, steps: [] }; dev.events.push(e); evSel = e.id; stepSel = -1; drawEvents(); };
 const mapPlace = () => { const e = cur(); return e && e.where && e.where !== 'any' ? e.where : 'dorm'; };
 function mapXf() { const b = boundsOf(mapPlace()), c = $('evMap'), pad = 26, k = Math.min((c.width - pad * 2) / (b.x1 - b.x0), (c.height - pad * 2) / (b.z1 - b.z0)); return { b, k, ox: (c.width - (b.x1 - b.x0) * k) / 2, oz: (c.height - (b.z1 - b.z0) * k) / 2, X: x => (c.width - (b.x1 - b.x0) * k) / 2 + (x - b.x0) * k, Z: z => (c.height - (b.z1 - b.z0) * k) / 2 + (z - b.z0) * k }; }

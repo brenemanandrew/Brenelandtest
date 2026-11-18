@@ -671,8 +671,8 @@ function applyUi(ui) { // each piece can be moved, resized or hidden; kept per s
 addEventListener('resize', () => applyUi(dev.ui));
 // Events: each has when (time / rapport / arrive / every / manual), where, and steps she carries out one after another.
 const EV = { busy: false, last: JSON.parse(localStorage.getItem('brenai.ev') || '{}') }, sleep = ms => new Promise(ok => setTimeout(ok, ms));
-async function runEvent(ev) {
-  if (EV.busy || away || phoneCall.on) return false; EV.busy = true; EV.last[ev.id] = Date.now(); localStorage.setItem('brenai.ev', JSON.stringify(EV.last)); api('/api/event', { id: ev.id, fired: true }).catch(() => {});
+async function runEvent(ev, preview) { // preview (the Studio's little window): play it, but do not count it as having happened
+  if (EV.busy || away || phoneCall.on) return false; EV.busy = true; if (!preview) { EV.last[ev.id] = Date.now(); localStorage.setItem('brenai.ev', JSON.stringify(EV.last)); api('/api/event', { id: ev.id, fired: true }).catch(() => {}); }
   try {
     for (const st of ev.steps || []) {
       if (away || phoneCall.on) break;
@@ -691,6 +691,7 @@ async function runEvent(ev) {
   } catch (e) { console.error('event', ev.name, e); } finally { EV.busy = false; avatar.setMood(settings.mood); }
   return true;
 }
+window.brenaiDev = { run: runEvent, get avatar() { return avatar; } };   // what the Studio's preview window reaches in for
 function eventsTick(arrived) {
   if (EV.busy || away || phoneCall.on || sendBtn.disabled || !avatar.canVisit()) return;
   const now = new Date(), hm = now.getHours() * 60 + now.getMinutes(), place = shownPlace || 'dorm', day = now.toDateString();
