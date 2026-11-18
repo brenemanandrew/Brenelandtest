@@ -92,7 +92,7 @@ export function buildPlaces(THREE, A) {
   const bedX = D.x0 + 0.55, bedZ = hip.z + 2.0; TAG = 'bed';
   box(1.0, 0.28, 2.0, bedX, floorY + 0.2, bedZ, '#2a2038'); box(0.96, 0.2, 1.96, bedX, floorY + 0.42, bedZ, '#e8e0f0'); box(0.98, 0.08, 1.3, bedX, floorY + 0.53, bedZ + 0.32, '#4b2a6b');   // frame, mattress, blanket
   box(1.0, 0.75, 0.08, bedX, floorY + 0.55, bedZ - 1.0, '#2a2038'); box(0.6, 0.12, 0.36, bedX, floorY + 0.59, bedZ - 0.72, '#f6f1fa');                                       // headboard, pillow
-  TAG = ''; ball(0.1, bedX + 0.2, floorY + 0.64, bedZ - 0.4, '#f2b6cf'); ball(0.065, bedX + 0.2, floorY + 0.77, bedZ - 0.4, '#f2b6cf'); ball(0.03, bedX + 0.15, floorY + 0.84, bedZ - 0.4, '#f2b6cf'); ball(0.03, bedX + 0.25, floorY + 0.84, bedZ - 0.4, '#f2b6cf'); // the plushie she would deny owning
+  TAG = ''; ball(0.1, bedX - 0.36, floorY + 0.64, bedZ - 0.86, '#f2b6cf'); ball(0.065, bedX - 0.36, floorY + 0.77, bedZ - 0.86, '#f2b6cf'); ball(0.03, bedX - 0.41, floorY + 0.84, bedZ - 0.86, '#f2b6cf'); ball(0.03, bedX - 0.31, floorY + 0.84, bedZ - 0.86, '#f2b6cf'); // the plushie she would deny owning
   // desk and laptop under the front wall, mini fridge by the counter, a rug of her own
   const deskX = 0.6, deskZ = D.z1 - 0.38;
   box(1.3, 0.05, 0.6, deskX, floorY + 0.74, deskZ, '#3b2a1c'); for (const [dx, dz] of [[-0.6, -0.25], [0.6, -0.25], [-0.6, 0.25], [0.6, 0.25]]) box(0.05, 0.72, 0.05, deskX + dx, floorY + 0.36, deskZ + dz, '#2a1d14');
@@ -162,6 +162,7 @@ export function buildPlaces(THREE, A) {
     bounds: { dorm: D, house: Hh }, blocks,
     spawn: { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] },
     seat: { dorm: { tag: 'bed', at: [bedX + 0.62, bedZ + 0.2], out: [bedX + 0.95, bedZ + 0.2], h: floorY + 1.12 }, house: { tag: 'chair', at: [-0.78, hip.z + 0.22], out: [-2.6, hip.z + 0.5], h: seatTop + 0.66 } },
+    bed: { side: [bedX + 0.8, bedZ - 0.1], at: [bedX, bedZ - 0.1], top: floorY + 0.58 },
     mugAt: new THREE.Vector3(-0.55, tableTop + 0.045, tableZ + 0.16), lampAt: new THREE.Vector3(-2.15, floorY + 1.62, backZ + 0.05),
     tv: { screen: tvScreen, on: false, at: new THREE.Vector3(tvX, floorY + 1.02, tvZ) },
     tick(night, t) { // dusk and dark outside; the TV flickers when it is on

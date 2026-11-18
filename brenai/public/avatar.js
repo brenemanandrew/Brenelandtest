@@ -122,7 +122,7 @@
     [/tilt(s|ed|ing)? her head|cock(s|ed)? her head/i, 'tilt', 2.2], [/headbang|bangs her head|bobs her head/i, 'headbang', 2.6], [/flips? her hair|toss(es)? her hair|hair flip/i, 'flip', 1.6],
     [/looks? away|glances? away|turns? away|averts?|looks? (off )?to the side/i, 'lookaway', 2.6], [/looks? down|stares? at (her|the) (lap|boots|floor|table)|hangs her head/i, 'lookdown', 2.4], [/looks? up|stares? at the ceiling|rolls her eyes/i, 'lookup', 1.8],
     [/laugh|giggl|snicker|cackl|snort|chuckl/i, 'laugh', 2.2], [/\bsigh|exhales|huffs?/i, 'sigh', 2.2], [/bounc(es|ing)|bops|hops in her seat/i, 'bounce', 2], [/\bdanc|sways? to|grooves?|shimm/i, 'dance', 3.5],
-    [/cring|winc|recoil|shudder|shrinks? back/i, 'cringe', 2], [/jumps?|startl|flinch|jolts?/i, 'jolt', 1.4],
+    [/cring|winc|recoil|shudder|shrinks? back/i, 'cringe', 2], [/jumps? (up|for joy|up and down|in excitement)|hops? up/i, 'jump', 1.6], [/blows? (him |you )?a kiss|kiss(es|ed)? (him|his|you|your)|gives? (him|you) a (quick |soft |little )?kiss/i, 'kiss', 6.5], [/jumps?|startl|flinch|jolts?/i, 'jolt', 1.4],
   ];
   // bigger things she does, also read from her actions: these change what she is busy with (see the routine in avatar-vrm.js)
   const ROUTINE = [
@@ -130,6 +130,7 @@
     [/book ?shelf|\bshel(f|ves)\b|(gets?|grabs?|fetch(es)?|finds?|picks? out|retrieves?|brings? (back|over)|comes? back with|goes? (to get|for|and gets?|to grab|to find)|looks? for) (him |you |herself )?(a |her |the |another |that |some |one of her )?(new |different |good )?(book|novel|tome|rulebook)/i, 'fetchbook'],
     [/(gets?|grabs?|fetch(es)?|makes?|pours?|refills?|brews?|tops? (up|off)|goes? (to get|for|to make)) (him |you |herself )?(a |an |her |the |another |some |more )?(fresh |new |hot )?(coffee|drink|tea|mug|cup|energy drink|water|refill|cocoa)|\bkettle\b|coffee ?maker|\bcounter\b|kitchen/i, 'fetchdrink'],
     [/cross(es|ed|ing)? her (legs|ankles|feet|boots)/i, 'crosslegs'], [/(puts?|sets?|plants?|drops?|swings?) her (feet|boots) (back )?(down|on(to)? the floor|off the table)|feet off the table/i, 'feetdown'], [/(puts?|props?|kicks?|swings?) her (feet|boots) (back )?up/i, 'feetup'],
+    [/(lies?|lays?|flops?|sprawls?|stretches) (back |down |out )*(on|onto|across) (her|the) bed|climbs? (on|onto|into) (her|the) bed/i, 'liedown'],
     [/sits? (back )?down|flops? (back )?(down|into|onto)|(drops?|sinks?|settles?|plops?) (back )?(down )?(into|onto|in) (her|the) (chair|seat|armchair)|returns? to her (chair|seat)/i, 'sit'],
     [/gets? up|stands? up|gets? to her feet|rises? (from|to)|\bpac(es|ing)\b|walks? (around|over|off|away|across)|wanders?|strolls?/i, 'pace'],
     [/(puts?|sets?|tosses?|lays?) (down )?(her |the )?(book|phone)|closes? (her|the) book|pockets? her phone/i, 'sit'],

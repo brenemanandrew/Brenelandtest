@@ -23,6 +23,7 @@ const PORT = Number(process.env.PORT || 8080);
 const DATA_DIR = process.env.DATA_DIR || path.join(here, 'data');
 const STORE = path.join(DATA_DIR, 'brenai.json');
 const AVATAR = path.join(DATA_DIR, 'avatar.vrm');
+const ANIMS = path.join(DATA_DIR, 'anims.json');   // her motion clips (made from licensed animation files, so kept on the volume, not in the repo)
 const MODEL = process.env.MODEL || 'claude-opus-5-5';
 const EFFORT = process.env.EFFORT || 'low'; // chat: low is fast and cheap; raise for deeper research
 const PASSWORD = process.env.APP_PASSWORD || ''; // empty = no login (local only)
@@ -487,6 +488,20 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
+      if (url.pathname === '/api/anims') {
+        if (req.method === 'GET') {
+          if (!fs.existsSync(ANIMS)) return json(res, 200, { clips: {} });
+          res.writeHead(200, { 'content-type': 'application/json', 'content-length': fs.statSync(ANIMS).size, 'cache-control': 'private, no-cache' });
+          return fs.createReadStream(ANIMS).pipe(res);
+        }
+        if (req.method === 'POST') { // the whole set at once: { clips: { name: clip } }
+          const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 30e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+          let d; try { d = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
+          if (!d || typeof d.clips !== 'object') return json(res, 400, { error: 'no clips' });
+          fs.writeFileSync(ANIMS + '.tmp', JSON.stringify({ v: Date.now(), clips: d.clips })); fs.renameSync(ANIMS + '.tmp', ANIMS);
+          return json(res, 200, { ok: true, clips: Object.keys(d.clips) });
+        }
+      }
       if (url.pathname === '/api/avatar') {
         if (req.method === 'GET') {
           if (!fs.existsSync(AVATAR)) return json(res, 404, { error: 'no model' });

@@ -61,3 +61,8 @@ Fonts are hosted in `public/fonts` (SIL Open Font License): Fredoka for the inte
 - Once one is clearly ahead (5+ points and 2 clear of the next) it becomes `sheet.path` and a line in her prompt (`BOND_LINE` in persona.mjs) sets how she relates to you. Her Character menu shows the three scores and can pin a path by hand.
 - Her Character menu is a card (picture, birthday, heart meter with the cussing and visit marks) with everything else folded away.
 - Test hooks in the 3D view: `WIZRA_CAM` (fixed camera), `WIZRA_YOU` (where you stand), `WIZRA_LEGS`, `WIZRA_TABLE`.
+
+## Recorded motion (Mixamo clips)
+- `GET/POST /api/anims` serves and stores `anims.json` on the volume: clips already converted for her skeleton (rotations for the VRM humanoid bones at 30 fps). The source FBX files and the converted clips stay out of the repo (licensed animation data).
+- `avatar-vrm.js` lays them over the posed skeleton with `playClip`: `walking` (her walk), `idle` (standing), `talking` (hands moving when she talks on her feet and on calls), `texting_and_walking` (pacing), `female_laying_pose` (lying on her dorm bed: tap is not needed, she does it on her own or when her reply says so), `kiss` and `jump` (gestures, on her feet). With no clips stored, the hand-made motion is used.
+- To add clips: convert Mixamo "FBX Binary, without skin" files to that JSON shape and POST `{ clips: { name: clip } }` (the whole set each time). `window.WIZRA_CLIP = 'name'` previews one.
