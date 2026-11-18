@@ -16,7 +16,7 @@ const EXPR = {
 };
 const NAMES = ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blink', 'aa', 'oh'];
 
-export async function create(url) {
+export async function create(url, opts = {}) {
   const el = document.createElement('div');
   el.style.cssText = 'width:100%;height:100%;background:radial-gradient(circle at 50% 35%, #8a5bb8, #4a2d7a 55%, #2a1b4d 100%)';
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -256,6 +256,10 @@ export async function create(url) {
   const blushMat = new THREE.MeshBasicMaterial({ color: '#ff5f8f', transparent: true, opacity: 0, depthTest: false });
   const eyeOff = (vrm.lookAt && vrm.lookAt.offsetFromHeadBone) ? vrm.lookAt.offsetFromHeadBone : new THREE.Vector3(0, 0.07, 0.03);
   const cheeks = [-1, 1].map(sx => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.014, 20), blushMat); m.scale.set(1.45, 0.8, 1); m.position.set(sx * 0.047, eyeOff.y - 0.04, eyeOff.z + 0.062); m.renderOrder = 20; rawHead.add(m); return m; });
+  // happy tears at the corners of her eyes (the heart game), and how far the camera has closed in on her heart (0..1)
+  const tearMat = new THREE.MeshBasicMaterial({ color: '#a8dcff', transparent: true, opacity: 0, depthTest: false });
+  [-1, 1].forEach(sx => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 12, 10), tearMat); m.scale.set(1, 1.5, 0.6); m.position.set(sx * 0.04, eyeOff.y - 0.02, eyeOff.z + 0.066); m.renderOrder = 21; rawHead.add(m); });
+  let tearsWant = 0, focusWant = 0, focusNow = 0; const heartAt = new THREE.Vector3(), heartCam = new THREE.Vector3();
   const fwd = new THREE.Vector3(), toCam = new THREE.Vector3();
   let blushNow = 0;
 
@@ -265,8 +269,8 @@ export async function create(url) {
   const lampLight = new THREE.PointLight('#ffc27a', 0, 5, 1.6); lampLight.position.copy(shade.position); scene.add(lampLight);
   let lampOn = null; // null = follows the hour; true/false once you have tapped it
   // the walls, windows and the rest of her dorm, and your house (see places.js)
-  const places = buildPlaces(THREE, { cel: kit, floorY, hip, feet, seatTop, tableTop, tableZ, backZ, SHELF, COUNTER, DOOR, tagged });
-  scene.add(places.dorm, places.house);
+  const places = buildPlaces(THREE, { maps: opts.maps, cel: kit, floorY, hip, feet, seatTop, tableTop, tableZ, backZ, SHELF, COUNTER, DOOR, tagged });
+  scene.add(...Object.values(places.groups));
 
   // ---- props: they rest on the furniture and go to her hands when she uses them ----
   const group = (...kids) => { const g = new THREE.Group(); g.add(...kids); scene.add(g); return g; };
@@ -371,6 +375,14 @@ export async function create(url) {
     if (!OVER[name] || rt.act === 'up' || rt.act === 'sitdown') return;
     rt.act = name; rt.until = now + (name === 'sip' ? 4200 : name === 'phone' ? 14000 + Math.random() * 12000 : 22000 + Math.random() * 22000);
   }
+  // ---- scripted (the Studio's events): walk her to a spot, or hold a recorded clip for a while ----
+  function walkTo(x, z, done) { // she gets up if she has to, goes there by her own path finding, and stays until told otherwise
+    if (rt.act === 'gone' || rt.leaving || inCall) { if (done) done(false); return; }
+    if (OVER[rt.act]) rt.act = 'sit';
+    const steps = [go([x, z]), run(() => { if (done) done(true); }), stay(600)];
+    if (rt.act === 'up') { rt.steps = [...steps, run(() => { rt.steps.push(...wayHome()); })]; rt.i = 0; rt.stepT = 0; rt.label = 'walking over'; rt.after = ''; } else plan('walking over', steps);
+  }
+  function holdClip(name, seconds) { if (CLIPS[name]) Object.assign(rt, { scriptClip: name, scriptFrom: performance.now(), scriptUntil: performance.now() + seconds * 1000 }); return !!CLIPS[name]; }
   // leaving the room and coming back (the page tells us when; see setPresence there)
   const vanish = () => { for (const n of KEYS) { const q = POSE[n] || [0, 0, 0]; CUR[n][0] = q[0]; CUR[n][1] = q[1]; CUR[n][2] = q[2]; set(n, q[0], q[1], q[2]); } rt.act = 'gone'; rt.leaving = false; rt.stand = 0; rt.k = 0; rt.leg = 0; rt.carry = null; rt.sneak = false; vrm.scene.visible = false; vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; };
   function presence(mode, o = {}) {
@@ -482,6 +494,7 @@ export async function create(url) {
       const holdArm = n => WALK_ARM[n] ? Math.min(1, rt.hold * 2) : 0;
       playClip('idle', k * (1 - rt.leg) * (1 - lie), now / 1000, holdArm); playClip('talking', k * rt.talkW * (1 - rt.leg) * (1 - lie), now / 1000, holdArm);
       if (walkClip) { if (moving) rt.walkT += (rt.walkSp || 0.6) * dt / stride(CLIPS[walkClip]) * CLIPS[walkClip].dur; playClip(walkClip, k * rt.leg, rt.walkT, walkClip === 'walking' ? holdArm : null); }
+      if (rt.scriptClip) { if (now > rt.scriptUntil) rt.scriptClip = null; else playClip(rt.scriptClip, k * Math.min(1, (now - rt.scriptFrom) / 300, (rt.scriptUntil - now) / 300), (now - rt.scriptFrom) / 1000); }
       if (lie > 0.003) playClip(rt.liePose || 'female_laying_pose', lie, 0);
     }
     const bob = walkClip ? 0 : 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, bed = places.bed, turn = Math.atan2(Math.sin(-Math.PI / 2 - rt.yaw), Math.cos(-Math.PI / 2 - rt.yaw));
@@ -501,7 +514,7 @@ export async function create(url) {
     const t = hit.tag; if (inCall) return '';
     if (fp.on) { // you are in the room: the floor is where you walk, the seat is where you sit, the TV is yours to switch on
       if (t === 'floor') { standUp(); fp.goal = [hit.x, hit.z]; return ''; }
-      const seat = places.seat[here]; if (t === seat.tag && (here === 'house' || rt.act !== 'up')) { fp.goal = null; fp.sit = seat; fp.x = seat.at[0]; fp.z = seat.at[1]; snd('sit'); return here === 'house' ? 'yousit' : 'yousitbed'; }
+      const seat = places.seat[here]; if (seat && t === seat.tag && (here === 'house' || rt.act !== 'up')) { fp.goal = null; fp.sit = seat; fp.x = seat.at[0]; fp.z = seat.at[1]; snd('sit'); return here === 'house' ? 'yousit' : 'yousitbed'; }
       if (t === 'tv') { places.tv.on = !places.tv.on; snd('tv'); return places.tv.on ? 'tvon' : 'tvoff'; }
     }
     if (rt.act === 'gone' || rt.leaving) return t === 'lamp' ? (lampOn = !(lampLight.intensity > 0.7), snd('click'), '') : '';
@@ -618,7 +631,7 @@ export async function create(url) {
   let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0;
   const mugDorm = REST_AT.mug[0].clone();
   function setPlace(name) {
-    here = name === 'house' ? 'house' : 'dorm'; room.visible = places.dorm.visible = here === 'dorm'; places.house.visible = here === 'house';
+    here = places.groups[name] ? name : 'dorm'; for (const k in places.groups) places.groups[k].visible = k === here; room.visible = here !== 'house';   // (her own furniture is in every room but your house)
     pickable = tagged.filter(o => !o.userData.place || o.userData.place === here);
     REST_AT.mug[0].copy(here === 'house' ? places.mugAt : mugDorm); lampLight.position.copy(here === 'house' ? places.lampAt : shade.position);
   }
@@ -627,7 +640,7 @@ export async function create(url) {
   function visit(name) { // 'dorm' or 'house' = you are there in person; '' = back to seeing her from afar, in her own room
     if (inCall) return;
     if (!name) { const was = here; fp.on = false; fp.keys.clear(); places.tv.on = false; setPlace('dorm'); if (was !== 'dorm') seatHer(); camera.fov = 26; camera.updateProjectionMatrix(); return; }
-    if ((name === 'house') !== (here === 'house')) { setPlace(name); seatHer(); }
+    if (name !== here) { const sameSeat = name !== 'house' && here !== 'house'; setPlace(name); if (!sameSeat) seatHer(); }
     const [x, z] = places.spawn[here];
     Object.assign(fp, { on: true, x, z, cx: x, cz: z, ch: places.eyeH, goal: null, sit: null, pitch: -0.06, yaw: Math.atan2(-x, hip.z + 0.3 - z) });
     camera.fov = 62; camera.updateProjectionMatrix();
@@ -674,6 +687,7 @@ export async function create(url) {
     camera.lookAt(aim);
   }
   placeCamera(1);
+  const chestNode = B('upperChest') || B('chest') || B('spine');
   const target = new THREE.Object3D(); scene.add(target); if (vrm.lookAt) vrm.lookAt.target = target;
 
   const em = vrm.expressionManager, has = n => em && em.getExpression(n);
@@ -699,7 +713,7 @@ export async function create(url) {
     const want = EXPR[spec.face] || EXPR.happy; if (em) for (const n of NAMES) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.3, want[n] || 0) : n === 'aa' || n === 'oh' ? 0 : (want[n] || 0)); if (em && spec.faceW) for (const n in spec.faceW) if (has(n)) em.setValue(n, spec.faceW[n]);   // a closed-mouth smile for the camera
     // where: her own room as it is, or a painted backdrop of wherever she is
     const custom = spec.scene === 'custom' && window.WIZRA_BG, inDorm = !custom && (spec.scene === 'dorm' || !BACKDROP[spec.scene]); vrm.scene.visible = true;
-    room.visible = places.dorm.visible = inDorm; places.house.visible = false; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
+    for (const k in places.groups) places.groups[k].visible = inDorm && k === 'dorm'; room.visible = inDorm; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
     if (inDorm) { if (lying) { vrm.scene.position.set(places.bed.at[0], places.bed.top, places.bed.at[1]); vrm.scene.rotation.y = -Math.PI / 2; } else if (sitting) { vrm.scene.position.set(places.bed.at[0] + 0.32, places.bed.top - 0.4, places.bed.at[1] + 0.35); vrm.scene.rotation.y = Math.PI / 2 - 0.25; } else { vrm.scene.position.set(1.0, floorY, hip.z + 1.25); vrm.scene.rotation.y = 0.5; } }
     else { vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; const c = bdCanvas.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.clearRect(0, 0, 384, 704); const l = custom ? (c.drawImage(window.WIZRA_BG, 0, 0, 384, 704), spec.light || [1, 1, 1]) : BACKDROP[spec.scene](c, 384, 704); bdTex.needsUpdate = true; sun.intensity = Math.PI * 0.9; sun.color.setRGB(l[0], l[1], l[2]); amb.intensity = 0.35; el.style.background = '#000'; }
     if (vrm.springBoneManager) vrm.springBoneManager.reset(); vrm.update(0); vrm.scene.updateMatrixWorld(true);
@@ -715,7 +729,7 @@ export async function create(url) {
     renderer.render(scene, camera); blushMat.opacity = blushNow;
     let url = ''; try { url = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
     // and put everything back for the live view (the pose and camera are rebuilt every frame anyway)
-    backdrop.visible = false; backdrop.scale.set(1, 1, 1); room.visible = keep.room; places.dorm.visible = keep.dorm; places.house.visible = keep.house; props.forEach((o, i) => { o.visible = propVis[i]; });
+    backdrop.visible = false; backdrop.scale.set(1, 1, 1); setPlace(here); props.forEach((o, i) => { o.visible = propVis[i]; });
     vrm.scene.visible = keep.vis; camera.fov = keep.fov; camera.updateProjectionMatrix(); sun.intensity = keep.sun; sun.color.copy(keep.sunC); amb.intensity = keep.amb; el.style.background = keep.bg; clipHip = 0; if (vrm.springBoneManager) vrm.springBoneManager.reset();
     return url;
   }
@@ -736,6 +750,9 @@ export async function create(url) {
     pick, direct,
     // visiting (see visit above): where you are, whether you are seeing through your own eyes, and turning your head
     visit, place: () => here, fp: () => fp.on,
+    walkTo, holdClip, where: () => [rt.k > 0.5 ? rt.x : 0, rt.k > 0.5 ? rt.z : hip.z], clips: () => Object.keys(CLIPS), gestures: () => Object.keys(GESTURE).filter(n => n !== 'test'),
+    // what the Studio needs to draw the rooms without her model: floor height, each room's walls and the built-in furniture's footprints
+    layout: () => ({ floorY, hipZ: hip.z, bounds: { dorm: places.bounds.dorm, house: places.bounds.house }, solid: places.baseSolid, anchors: { seat: [0, hip.z], stand: STAND_AT, shelf: AT_SHELF, counter: AT_COUNTER, door: DOOR, bed: places.bed.side } }),
     look(dx, dy) { if (!fp.on) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
     zoom(d) { if (inCall || !document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
@@ -744,7 +761,7 @@ export async function create(url) {
       if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
       return { x: 100 + (e.clientX - c.x) / k / UNIT, y: 100 + (e.clientY - c.y) / k / UNIT };
     },
-    snapshot,
+    snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
       const W = el.clientWidth, H = el.clientHeight, key = W + 'x' + H;
@@ -758,6 +775,11 @@ export async function create(url) {
       const gf = gx.face || {}, mix = (n, v) => Math.max(v, (gf[n] || 0) * gx.k);
       if (em) { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised']) if (has(n)) em.setValue(n, mix(n, w[n])); if (has('blink')) em.setValue('blink', mix('blink', blink)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh); }
       placeCamera(s.dt);
+      focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
+      if (focusNow > 0.003 && !fp.on && !inCall && chestNode) { // the heart game: each pop brings the view closer to her heart
+        const e = focusNow * focusNow * (3 - 2 * focusNow); chestNode.getWorldPosition(heartAt); heartAt.x += 0.04 * Math.cos(vrm.scene.rotation.y); heartAt.y += 0.03;
+        heartCam.copy(camera.position).sub(heartAt).normalize().multiplyScalar(0.3).add(heartAt); camera.position.lerp(heartCam, e); head.getWorldPosition(tmpB); tmpB.y += 0.04; camera.lookAt(tmpB.lerp(heartAt, 0.25 + 0.75 * e));
+      }
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking

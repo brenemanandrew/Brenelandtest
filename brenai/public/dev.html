@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brenai Studio</title>
+<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/addons/" } }</script>
+<style>
+  @font-face { font-family:"Bangers"; src:url(fonts/bangers-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family:"Fredoka"; font-weight:500; src:url(fonts/fredoka-latin-500-normal.woff2) format("woff2"); }
+  @font-face { font-family:"Fredoka"; font-weight:700; src:url(fonts/fredoka-latin-700-normal.woff2) format("woff2"); }
+  * { box-sizing:border-box; } html, body { height:100%; margin:0; }
+  body { font-family:"Fredoka", system-ui, sans-serif; background:#efeaf6; color:#2a1d45; display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; background:linear-gradient(120deg,#6a3aa8,#c0267e); color:#fff; flex:none; }
+  header h1 { margin:0; font:400 26px "Bangers","Fredoka",sans-serif; letter-spacing:.06em; } header a { color:#fff; margin-left:auto; font-size:14px; }
+  nav { display:flex; gap:6px; } nav button { font:inherit; font-weight:600; font-size:15px; border:0; border-radius:999px; padding:8px 18px; cursor:pointer; background:rgba(255,255,255,.18); color:#fff; } nav button.on { background:#fff; color:#6a3aa8; }
+  main { flex:1; min-height:0; display:none; } main.on { display:flex; }
+  .side { width:300px; flex:none; overflow-y:auto; padding:14px; background:#fff; border-right:1px solid #ddd3ee; } .side.right { border-right:0; border-left:1px solid #ddd3ee; width:320px; }
+  .work { flex:1; min-width:0; overflow:auto; padding:16px; position:relative; }
+  h2 { margin:0 0 4px; font:400 22px "Bangers","Fredoka",sans-serif; letter-spacing:.05em; color:#6a3aa8; } h3 { margin:18px 0 6px; font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:#8a7aa8; }
+  p.tip { margin:0 0 12px; font-size:13.5px; line-height:1.35; color:#6a5a8a; }
+  button, select, input, textarea { font:inherit; font-size:14px; } input[type=text], input[type=number], input[type=time], select, textarea { border:1.5px solid #d6cbe8; border-radius:10px; padding:6px 9px; background:#fff; color:inherit; min-width:0; }
+  textarea { width:100%; resize:vertical; } input[type=range] { width:100%; accent-color:#a855f7; } input[type=color] { width:44px; height:30px; padding:0; border:1.5px solid #d6cbe8; border-radius:8px; background:#fff; }
+  .btn { border:0; border-radius:999px; padding:8px 15px; font-weight:600; cursor:pointer; background:#ece6f7; color:#4a3a7c; } .btn.go { background:linear-gradient(135deg,#a855f7,#ec4899); color:#fff; } .btn.bad { background:#fde8e8; color:#b3261e; } .btn.sm { padding:4px 10px; font-size:13px; }
+  .row { display:flex; gap:8px; align-items:center; margin:6px 0; flex-wrap:wrap; } .row > label { font-size:13px; color:#6a5a8a; min-width:64px; } .grow { flex:1; }
+  .item { display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:12px; cursor:pointer; margin-bottom:4px; } .item:hover { background:#f4effa; } .item.on { background:#ece6f7; font-weight:600; } .item i { width:10px; height:10px; border-radius:50%; background:#c9c0d8; flex:none; } .item i.live { background:#3bbf6b; }
+  .card { background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:12px; box-shadow:0 2px 8px rgba(60,30,110,.08); }
+  .step { display:flex; gap:8px; align-items:center; padding:8px 10px; margin-bottom:6px; border-radius:12px; background:#f7f3fc; border:1.5px solid transparent; } .step.on { border-color:#a855f7; background:#f1e8ff; } .step b { width:22px; height:22px; border-radius:50%; background:#6a3aa8; color:#fff; font-size:12px; display:grid; place-items:center; flex:none; }
+  .step .f { flex:1; display:flex; gap:6px; align-items:center; flex-wrap:wrap; min-width:0; } .step .f input[type=text] { flex:1; min-width:120px; } .step .f input[type=number] { width:64px; } .mini { border:0; background:none; cursor:pointer; font-size:15px; padding:2px 4px; color:#8a7aa8; }
+  #evMap { width:100%; max-width:560px; border-radius:14px; background:#2a2240; cursor:crosshair; display:block; }
+  #frameWrap { margin:0 auto; border-radius:22px; overflow:hidden; box-shadow:0 10px 34px rgba(40,20,90,.3); background:#000; } #frameWrap iframe { display:block; border:0; width:100%; height:100%; }
+  #mapView { position:absolute; inset:0; } #mapView canvas { display:block; width:100%; height:100%; touch-action:none; } #mapHint { position:absolute; left:14px; bottom:12px; font-size:13px; color:#fff; background:rgba(30,20,60,.65); padding:6px 12px; border-radius:999px; pointer-events:none; }
+  .cat { display:grid; grid-template-columns:1fr 1fr; gap:6px; } .cat button { border:1.5px solid #e2d9f0; background:#fff; border-radius:12px; padding:8px 6px; cursor:pointer; font-size:13px; font-weight:500; display:flex; align-items:center; gap:7px; text-align:left; } .cat button:hover { border-color:#a855f7; } .cat button i { width:16px; height:16px; border-radius:5px; flex:none; }
+  #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#2a1d45; color:#fff; padding:9px 18px; border-radius:999px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:50; } #toast.on { opacity:1; }
+  @media (max-width:900px) { main.on { flex-direction:column; } .side, .side.right { width:auto; max-height:38vh; border:0; border-bottom:1px solid #ddd3ee; } #mapView { position:relative; height:52vh; } }
+</style>
+</head>
+<body>
+<header><h1>BRENAI STUDIO</h1>
+  <nav><button data-tab="ui" class="on">Layout</button><button data-tab="ev">Events</button><button data-tab="map">Maps</button></nav>
+  <a href="/">Back to the game</a></header>
+
+<!-- 1. Layout: the real game page, with every piece draggable -->
+<main id="tab-ui" class="on">
+  <div class="side"><h2>Layout</h2>
+    <p class="tip">This is the real game page. Every piece has a frame: <b>drag</b> it to move, drag the <b>pink corner</b> to grow or shrink, tap the <b>eye</b> to hide. The bar at the bottom brings hidden pieces back and saves.</p>
+    <h3>Screen</h3><div class="row"><button class="btn go" id="scrPhone">Phone</button><button class="btn" id="scrPc">PC</button></div>
+    <p class="tip">Phone and PC keep separate layouts. Save in the bar under the game; open games pick the change up within about 15 seconds.</p>
+  </div>
+  <div class="work"><div id="frameWrap"><iframe id="frame" title="The game, in layout mode"></iframe></div></div>
+</main>
+
+<!-- 2. Events -->
+<main id="tab-ev">
+  <div class="side"><h2>Events</h2><p class="tip">A scripted moment: <b>when</b> it happens, <b>where</b>, and what she <b>does</b>, step by step.</p>
+    <div id="evList"></div><div class="row"><button class="btn go" id="evNew">+ New event</button></div></div>
+  <div class="work" id="evWork"></div>
+</main>
+
+<!-- 3. Maps -->
+<main id="tab-map">
+  <div class="side"><h2>Maps</h2><p class="tip">Pick a room, then add things from the catalogue. <b>Drag</b> a thing to move it, drag the floor to turn the view, scroll to zoom.</p>
+    <div id="mapList"></div><div class="row"><button class="btn go" id="mapNew">+ New room</button></div><div id="mapProps"></div>
+    <h3>Catalogue</h3><div id="catalog"></div></div>
+  <div class="work" style="padding:0"><div id="mapView"></div><div id="mapHint">R turns the selected thing, D copies it, Delete removes it</div></div>
+  <div class="side right"><h2>Selected</h2><div id="selPanel"><p class="tip">Nothing selected. Click a thing in the room, or add one from the catalogue.</p></div>
+    <div class="row" style="margin-top:16px"><button class="btn go" id="mapSave">Save rooms</button></div></div>
+</main>
+<div id="toast"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { CATALOG, buildItem, place, fresh, footprint } from './mapkit.js';
+const $ = id => document.getElementById(id);
+const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids.filter(k => k != null)); return e; };
+const toast = t => { $('toast').textContent = t; $('toast').classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => $('toast').classList.remove('on'), 2200); };
+const uid = () => Math.random().toString(36).slice(2, 9);
+let dev = { ui: {}, events: [], maps: { custom: [] }, layout: null }, clips = [];
+async function post(body) { const r = await fetch('/api/dev', { method: 'POST', body: JSON.stringify(body) }); if (!r.ok) throw new Error('save failed'); const d = await r.json(); dev.layout = d.layout; return d; }
+// the rooms' shape: learned from the game the first time it runs with her 3D model; a sensible guess until then
+const GUESS = { floorY: 0, hipZ: 0, bounds: { dorm: { x0: -2.05, x1: 3.1, z0: -1.57, z1: 3.05, h: 2.5 }, house: { x0: -4.5, x1: 3.1, z0: -1.61, z1: 4.7, h: 2.75 } }, solid: { dorm: [[-0.44, 0.44, -0.5, 0.3], [-0.4, 0.4, 0.6, 1.0], [-1.77, -0.83, -1.57, -1.1], [1.07, 1.83, -1.57, -0.95], [-2.05, -1.0, 0.86, 2.9], [-0.05, 1.25, 2.37, 3.05]], house: [[-2.18, 0.49, -0.5, 0.31], [-1.2, 0.3, 0.6, 1.1], [-1.77, -0.83, -1.61, -1.1], [0.95, 3.1, -1.61, -0.92], [-1.55, 0.15, 4.17, 4.7], [-4.35, -2.15, 2.88, 4.12]] },
+  anchors: { seat: [0, 0], stand: [0, 0.46], shelf: [-1.18, -0.75], counter: [1.4, -0.68], door: [2.75, 0.55], bed: [-0.7, 1.9] } };
+const L = () => dev.layout || GUESS;
+const boundsOf = id => { const B = L().bounds; if (B[id]) return B[id]; const m = dev.maps.custom.find(x => x.id === id) || {}; return { x0: B.dorm.x0 - (+m.left || 0), x1: B.dorm.x1 + (+m.right || 0), z0: B.dorm.z0, z1: B.dorm.z1 + (+m.front || 0), h: +m.height || 2.6 }; };
+const solidOf = id => id === 'house' ? L().solid.house : id === 'dorm' ? L().solid.dorm : L().solid.dorm.slice(0, 4);
+const itemsOf = id => id === 'dorm' || id === 'house' ? ((dev.maps[id] = dev.maps[id] || { items: [] }).items = dev.maps[id].items || []) : ((dev.maps.custom.find(x => x.id === id) || {}).items || []);
+const placeName = id => id === 'dorm' ? 'Her dorm' : id === 'house' ? 'Your house' : id === 'any' ? 'Anywhere' : (dev.maps.custom.find(x => x.id === id) || {}).name || 'A new room';
+const allPlaces = () => ['dorm', 'house', ...dev.maps.custom.map(m => m.id)];
+
+// ---------- tabs ----------
+for (const b of document.querySelectorAll('nav button')) b.onclick = () => { for (const x of document.querySelectorAll('nav button')) x.classList.toggle('on', x === b); for (const m of document.querySelectorAll('main')) m.classList.toggle('on', m.id === 'tab-' + b.dataset.tab); if (b.dataset.tab === 'map') mapStart(); if (b.dataset.tab === 'ev') drawEvents(); };
+
+// ---------- 1. layout ----------
+function screen(kind) { const w = kind === 'phone' ? 430 : 1100, h = kind === 'phone' ? 860 : 740; $('frameWrap').style.width = w + 'px'; $('frameWrap').style.height = h + 'px'; $('scrPhone').classList.toggle('go', kind === 'phone'); $('scrPc').classList.toggle('go', kind === 'pc'); $('frame').src = '/?uiedit=1&k=' + kind; }
+$('scrPhone').onclick = () => screen('phone'); $('scrPc').onclick = () => screen('pc');
+addEventListener('message', e => { if (e.data && e.data.studio === 'saved') toast('Layout saved'); });
+
+// ---------- 2. events ----------
+const GESTURES = ['wave', 'nod', 'shake', 'shrug', 'laugh', 'sigh', 'yawn', 'stretch', 'bow', 'tilt', 'lean', 'leanback', 'situp', 'slump', 'feet', 'shift', 'bounce', 'dance', 'headbang', 'flip', 'lookaway', 'lookdown', 'lookup', 'cringe', 'jolt', 'jump', 'kiss', 'peace', 'oksign', 'fox', 'fingerheart', 'crossed', 'fingerwave', 'flipoff'];
+const ACTIVITIES = { read: 'Read her book', phone: 'Look at her phone', sip: 'Sip her drink', fetchbook: 'Fetch a book', returnbook: 'Put the book back', fetchdrink: 'Get a drink', pace: 'Pace, texting', liedown: 'Lie on her bed (dorm)', drape: 'Sit sideways, legs over the arm', crosslegs: 'Cross her ankles', feetup: 'Feet up on the table', feetdown: 'Feet on the floor', hair: 'Hand in her hair' };
+const FACES = ['happy', 'playful', 'chill', 'focused', 'excited', 'tired', 'grumpy', 'sad', 'anxious', 'joy', 'blush', 'surprised', 'angry', 'thinking', 'suspicious'];
+const SOUNDS = ['pop', 'sparkle', 'heart', 'anger', 'ask', 'sweat', 'door', 'click', 'tv', 'pour', 'bond', 'phone'];
+const STEP = { // each kind of step: its label, a fresh one, and its fields
+  walk: ['Walk to', () => ({ x: 1, z: 1 }), s => [el('span', { textContent: `spot (${(+s.x).toFixed(1)}, ${(+s.z).toFixed(1)}): click the map` })]],
+  wait: ['Wait', () => ({ s: 2 }), s => [num(s, 's'), 'seconds']],
+  gesture: ['Gesture', () => ({ name: 'wave', s: 2.5 }), s => [pick(s, 'name', GESTURES), 'for', num(s, 's'), 's']],
+  clip: ['Animation clip', () => ({ name: clips[0] || 'talking', s: 4 }), s => [pick(s, 'name', clips.length ? clips : ['talking']), 'for', num(s, 's'), 's (on her feet)']],
+  activity: ['Activity', () => ({ name: 'read', s: 6 }), s => [pick(s, 'name', Object.keys(ACTIVITIES), ACTIVITIES), 'then wait', num(s, 's'), 's']],
+  face: ['Expression', () => ({ name: 'happy' }), s => [pick(s, 'name', FACES)]],
+  emote: ['Emoji pop', () => ({ ch: '✨' }), s => [pick(s, 'ch', ['✨', '💗', '💢', '❓', '💦'])]],
+  sound: ['Sound', () => ({ name: 'sparkle' }), s => [pick(s, 'name', SOUNDS)]],
+  say: ['Say exactly', () => ({ text: '' }), s => [text(s, 'text', 'Her exact words. *Stars* make an action.')]],
+  react: ['React in her own words', () => ({ text: '' }), s => [text(s, 'text', 'What happens, e.g. "notices it has started to rain outside"')]],
+  home: ['Go back to her seat', () => ({}), () => []],
+};
+let evSel = '', stepSel = -1;
+const cur = () => dev.events.find(e => e.id === evSel);
+const num = (o, k) => { const i = el('input', { type: 'number', value: o[k], step: 0.5, min: 0 }); i.oninput = () => { o[k] = +i.value; }; return i; };
+const text = (o, k, ph) => { const i = el('input', { type: 'text', value: o[k] || '', placeholder: ph }); i.oninput = () => { o[k] = i.value; }; return i; };
+const pick = (o, k, list, names) => { const s = el('select'); for (const v of list) s.append(el('option', { value: v, textContent: names ? names[v] : v, selected: o[k] === v })); s.onchange = () => { o[k] = s.value; drawMap(); }; return s; };
+function drawEvents() {
+  const list = $('evList'); list.textContent = '';
+  for (const e of dev.events) { const it = el('div', { className: 'item' + (e.id === evSel ? ' on' : '') }, el('i', { className: e.enabled ? 'live' : '' }), e.name || 'Untitled event'); it.onclick = () => { evSel = e.id; stepSel = -1; drawEvents(); }; list.append(it); }
+  const w = $('evWork'), e = cur(); w.textContent = '';
+  if (!e) { w.append(el('div', { className: 'card' }, el('h2', { textContent: dev.events.length ? 'Pick an event' : 'No events yet' }), el('p', { className: 'tip', textContent: 'An event is a little scene: for example "at 9pm, in her dorm, she gets up, walks to the window, sighs and says it is raining". Press + New event to make one.' }))); return; }
+  // what and when
+  const name = el('input', { type: 'text', value: e.name || '', placeholder: 'Name this event', className: 'grow' }); name.oninput = () => { e.name = name.value; };
+  const on = el('input', { type: 'checkbox', checked: !!e.enabled }); on.onchange = () => { e.enabled = on.checked; drawEvents(); };
+  const when = e.when = e.when || { type: 'manual' }, wt = el('select'); for (const [v, t] of [['time', 'Every day at a time'], ['arrive', 'When you two get there'], ['rapport', 'When rapport reaches'], ['every', 'Every so often'], ['manual', 'Only when I press Run']]) wt.append(el('option', { value: v, textContent: t, selected: when.type === v })); wt.onchange = () => { when.type = wt.value; drawEvents(); };
+  const wrow = el('div', { className: 'row' }, el('label', { textContent: 'When' }), wt);
+  if (when.type === 'time') { const t = el('input', { type: 'time', value: when.at || '21:00' }); when.at = t.value; t.oninput = () => { when.at = t.value; }; wrow.append(t); }
+  if (when.type === 'rapport') { when.min = when.min || 90; wrow.append(num(when, 'min'), 'points'); }
+  if (when.type === 'every') { when.minutes = when.minutes || 30; when.chance = when.chance || 50; wrow.append(num(when, 'minutes'), 'minutes, with a', num(when, 'chance'), '% chance'); }
+  const where = el('select'); for (const id of ['any', ...allPlaces()]) where.append(el('option', { value: id, textContent: placeName(id) + (id === 'dorm' ? ' (also the normal chat view)' : ''), selected: (e.where || 'any') === id })); where.onchange = () => { e.where = where.value; drawMap(); };
+  const once = el('input', { type: 'checkbox', checked: !!e.once }); once.onchange = () => { e.once = once.checked; };
+  w.append(el('div', { className: 'card' }, el('div', { className: 'row' }, name, el('label', {}, on, ' On')), wrow, el('div', { className: 'row' }, el('label', { textContent: 'Where' }), where, el('label', {}, once, ' Only ever once'))));
+  // what she does
+  const steps = e.steps = e.steps || [], box = el('div', { className: 'card' }, el('h2', { textContent: 'What she does' }));
+  if (!steps.length) box.append(el('p', { className: 'tip', textContent: 'No steps yet. Add the first one below; they run top to bottom.' }));
+  steps.forEach((s, i) => {
+    const def = STEP[s.type] || STEP.wait, row = el('div', { className: 'step' + (i === stepSel ? ' on' : '') }, el('b', { textContent: i + 1 }), el('strong', { textContent: def[0] }), el('div', { className: 'f' }, ...def[2](s)));
+    const mv = (d, t) => { const b = el('button', { className: 'mini', textContent: t, title: d < 0 ? 'Earlier' : 'Later' }); b.onclick = ev => { ev.stopPropagation(); const j = i + d; if (j < 0 || j >= steps.length) return; [steps[i], steps[j]] = [steps[j], steps[i]]; stepSel = j; drawEvents(); }; return b; };
+    const del = el('button', { className: 'mini', textContent: '✕', title: 'Remove' }); del.onclick = ev => { ev.stopPropagation(); steps.splice(i, 1); stepSel = -1; drawEvents(); };
+    row.append(mv(-1, '↑'), mv(1, '↓'), del); row.onclick = ev => { if (/INPUT|SELECT/.test(ev.target.tagName)) return; stepSel = i; drawEvents(); }; box.append(row);
+  });
+  const add = el('select'); add.append(el('option', { value: '', textContent: '+ Add a step...' })); for (const k in STEP) add.append(el('option', { value: k, textContent: STEP[k][0] }));
+  add.onchange = () => { if (!add.value) return; steps.push({ type: add.value, ...STEP[add.value][1]() }); stepSel = steps.length - 1; drawEvents(); };
+  box.append(el('div', { className: 'row' }, add)); w.append(box);
+  // where she walks
+  const mapCard = el('div', { className: 'card' }, el('h2', { textContent: 'Where she walks' }), el('p', { className: 'tip', textContent: 'Select a "Walk to" step, then click the room to set its spot. Yellow dots are her usual places; she finds her own way round the furniture.' }), el('canvas', { id: 'evMap', width: 560, height: 440 }));
+  w.append(mapCard); drawMap(); $('evMap').onclick = clickMap;
+  const save = el('button', { className: 'btn go', textContent: 'Save events' }); save.onclick = async () => { await post({ events: dev.events }); toast('Events saved'); };
+  const run = el('button', { className: 'btn', textContent: 'Save and run now' }); run.onclick = async () => { await post({ events: dev.events, run: e.id }); toast('Sent. An open game plays it within about 15 seconds.'); };
+  const del = el('button', { className: 'btn bad', textContent: 'Delete event' }); del.onclick = () => { if (!confirm('Delete "' + (e.name || 'this event') + '"?')) return; dev.events = dev.events.filter(x => x !== e); evSel = ''; drawEvents(); };
+  w.append(el('div', { className: 'row' }, save, run, el('span', { className: 'grow' }), del));
+}
+$('evNew').onclick = () => { const e = { id: uid(), name: 'New event', enabled: true, when: { type: 'manual' }, where: 'dorm', once: false, steps: [] }; dev.events.push(e); evSel = e.id; stepSel = -1; drawEvents(); };
+const mapPlace = () => { const e = cur(); return e && e.where && e.where !== 'any' ? e.where : 'dorm'; };
+function mapXf() { const b = boundsOf(mapPlace()), c = $('evMap'), pad = 26, k = Math.min((c.width - pad * 2) / (b.x1 - b.x0), (c.height - pad * 2) / (b.z1 - b.z0)); return { b, k, ox: (c.width - (b.x1 - b.x0) * k) / 2, oz: (c.height - (b.z1 - b.z0) * k) / 2, X: x => (c.width - (b.x1 - b.x0) * k) / 2 + (x - b.x0) * k, Z: z => (c.height - (b.z1 - b.z0) * k) / 2 + (z - b.z0) * k }; }
+function drawMap() {
+  const c = $('evMap'); if (!c) return; const g = c.getContext('2d'), T = mapXf(), id = mapPlace(), e = cur(), hz = L().hipZ;
+  g.fillStyle = '#2a2240'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#4a3f6b'; g.fillRect(T.X(T.b.x0), T.Z(T.b.z0), (T.b.x1 - T.b.x0) * T.k, (T.b.z1 - T.b.z0) * T.k);
+  g.fillStyle = '#7a6ba3'; for (const [x0, x1, z0, z1] of solidOf(id)) g.fillRect(T.X(x0), T.Z(z0), (x1 - x0) * T.k, (z1 - z0) * T.k);
+  g.fillStyle = '#b49ae0'; for (const it of itemsOf(id)) if (it.solid) { const [x0, x1, z0, z1] = footprint(it); g.fillRect(T.X(x0), T.Z(z0), (x1 - x0) * T.k, (z1 - z0) * T.k); }
+  g.font = '12px Fredoka, sans-serif'; g.textAlign = 'center';
+  const A = L().anchors || {}; for (const k in A) { if (k === 'bed' && id !== 'dorm') continue; g.fillStyle = '#ffd166'; g.beginPath(); g.arc(T.X(A[k][0]), T.Z(A[k][1]), 5, 0, 7); g.fill(); g.fillText(k, T.X(A[k][0]), T.Z(A[k][1]) - 9); }
+  g.fillStyle = 'rgba(255,255,255,.6)'; g.fillText('back wall', c.width / 2, T.Z(T.b.z0) - 8); g.fillText('front (where you usually watch from)', c.width / 2, T.Z(T.b.z1) + 16);
+  if (!e) return; let px = T.X(0), pz = T.Z(hz), n = 0; g.strokeStyle = '#ff8fc0'; g.lineWidth = 2; g.setLineDash([6, 5]);
+  e.steps.forEach((s, i) => { if (s.type !== 'walk') return; const x = T.X(+s.x), z = T.Z(+s.z); g.beginPath(); g.moveTo(px, pz); g.lineTo(x, z); g.stroke(); px = x; pz = z; });
+  g.setLineDash([]); e.steps.forEach((s, i) => { if (s.type !== 'walk') return; const x = T.X(+s.x), z = T.Z(+s.z); g.fillStyle = i === stepSel ? '#fff' : '#ff8fc0'; g.beginPath(); g.arc(x, z, 11, 0, 7); g.fill(); g.fillStyle = '#2a1d45'; g.fillText(i + 1, x, z + 4); });
+}
+function clickMap(ev) {
+  const e = cur(); if (!e) return; const c = $('evMap'), r = c.getBoundingClientRect(), T = mapXf(), x = ((ev.clientX - r.left) * c.width / r.width - T.ox) / T.k + T.b.x0, z = ((ev.clientY - r.top) * c.height / r.height - T.oz) / T.k + T.b.z0;
+  let s = e.steps[stepSel]; if (!s || s.type !== 'walk') { s = { type: 'walk' }; e.steps.push(s); stepSel = e.steps.length - 1; }
+  s.x = +Math.max(T.b.x0 + 0.3, Math.min(T.b.x1 - 0.3, x)).toFixed(2); s.z = +Math.max(T.b.z0 + 0.3, Math.min(T.b.z1 - 0.3, z)).toFixed(2); drawEvents();
+}
+
+// ---------- 3. maps ----------
+let mapSel = 'dorm', itemSel = null, three = null;
+const toon = c => new THREE.MeshLambertMaterial({ color: c });
+function mapStart() {
+  if (!three) {
+    const host = $('mapView'), renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); host.append(renderer.domElement);
+    const scene = new THREE.Scene(); scene.background = new THREE.Color('#d8cfe9'); scene.add(new THREE.AmbientLight(0xffffff, 1.5)); const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(2, 6, 4); scene.add(sun);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 80), roomG = new THREE.Group(), itemsG = new THREE.Group(); scene.add(roomG, itemsG);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.56, 40), new THREE.MeshBasicMaterial({ color: '#ff3f9a', side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
+    three = { renderer, scene, camera, roomG, itemsG, ring, orbit: { yaw: 0.5, pitch: 0.95, dist: 9 }, centre: new THREE.Vector3() };
+    const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit = new THREE.Vector3(); let drag = null;
+    const aim = e => { const r = renderer.domElement.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); };
+    const owner = o => { while (o && !o.userData.item) o = o.parent; return o; };
+    renderer.domElement.addEventListener('pointerdown', e => { aim(e); const h = ray.intersectObjects(itemsG.children, true)[0], g = h && owner(h.object); renderer.domElement.setPointerCapture(e.pointerId);
+      if (g) { select(g.userData.item); ray.ray.intersectPlane(floor, hit); drag = { item: g.userData.item, dx: g.userData.item.x - hit.x, dz: g.userData.item.z - hit.z }; } else { drag = { orbit: true, x: e.clientX, y: e.clientY, moved: 0 }; } });
+    renderer.domElement.addEventListener('pointermove', e => { if (!drag) return;
+      if (drag.orbit) { const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy); three.orbit.yaw -= dx * 0.006; three.orbit.pitch = Math.max(0.15, Math.min(1.5, three.orbit.pitch + dy * 0.005)); return; }
+      aim(e); if (!ray.ray.intersectPlane(floor, hit)) return; const b = boundsOf(mapSel), snap = v => Math.round(v * 20) / 20;
+      drag.item.x = snap(Math.max(b.x0 + 0.05, Math.min(b.x1 - 0.05, hit.x + drag.dx))); drag.item.z = snap(Math.max(b.z0 + 0.05, Math.min(b.z1 - 0.05, hit.z + drag.dz))); sync(drag.item); });
+    const up = () => { if (drag && drag.orbit && drag.moved < 4) select(null); if (drag && drag.item) drawSel(); drag = null; }; renderer.domElement.addEventListener('pointerup', up); renderer.domElement.addEventListener('pointercancel', up);
+    renderer.domElement.addEventListener('wheel', e => { e.preventDefault(); three.orbit.dist = Math.max(3, Math.min(22, three.orbit.dist * (1 + e.deltaY * 0.001))); }, { passive: false });
+    addEventListener('keydown', e => { if (!$('tab-map').classList.contains('on') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || !itemSel) return; const k = e.key.toLowerCase();
+      if (k === 'r') { itemSel.rot = ((itemSel.rot || 0) + Math.PI / 12) % (Math.PI * 2); sync(itemSel); drawSel(); } else if (k === 'delete' || k === 'backspace') removeSel(); else if (k === 'd') copySel(); });
+    (function loop() { const w = host.clientWidth, h = host.clientHeight; if (w && h && (renderer.domElement.width !== Math.round(w * renderer.getPixelRatio()) || renderer.domElement.height !== Math.round(h * renderer.getPixelRatio()))) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+      const o = three.orbit, c = three.centre; camera.position.set(c.x + o.dist * Math.sin(o.yaw) * Math.cos(o.pitch), o.dist * Math.sin(o.pitch), c.z + o.dist * Math.cos(o.yaw) * Math.cos(o.pitch)); camera.lookAt(c.x, 0.4, c.z);
+      if (itemSel) { const s = CATALOG[itemSel.kind].size, r = Math.max(s[0] * (itemSel.sx || 1), s[2] * (itemSel.sz || 1)) * 0.75 + 0.15; three.ring.visible = true; three.ring.position.set(itemSel.x, 0.02, itemSel.z); three.ring.scale.setScalar(r / 0.53); } else three.ring.visible = false;
+      if ($('tab-map').classList.contains('on')) renderer.render(scene, camera); requestAnimationFrame(loop); })();
+  }
+  drawMaps();
+}
+const groupOf = it => three.itemsG.children.find(g => g.userData.item === it);
+const sync = it => { const g = groupOf(it); if (g) place(g, it); };
+function rebuildItem(it) { const g = groupOf(it); if (g) three.itemsG.remove(g); three.itemsG.add(buildItem(THREE, toon, null, it)); }
+function select(it) { itemSel = it; drawSel(); }
+function removeSel() { if (!itemSel) return; const list = itemsOf(mapSel), i = list.indexOf(itemSel); if (i >= 0) list.splice(i, 1); three.itemsG.remove(groupOf(itemSel)); select(null); }
+function copySel() { if (!itemSel) return; const c = { ...itemSel, id: uid(), x: itemSel.x + 0.4, z: itemSel.z + 0.4 }; itemsOf(mapSel).push(c); rebuildItem(c); select(c); }
+function drawRoom() {
+  const b = boundsOf(mapSel), g = three.roomG, m = dev.maps.custom.find(x => x.id === mapSel); g.clear(); three.itemsG.clear();
+  const floorCol = m ? (m.floor || '#3a2f52') : mapSel === 'house' ? '#c99a63' : '#3a2f52', wallCol = m ? (m.wall || '#6d5a8f') : mapSel === 'house' ? '#f1dfc2' : '#6d5a8f';
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(b.x1 - b.x0, b.z1 - b.z0), toon(floorCol)); fl.rotation.x = -Math.PI / 2; fl.position.set((b.x0 + b.x1) / 2, -0.01, (b.z0 + b.z1) / 2); g.add(fl);
+  const wallM = new THREE.MeshLambertMaterial({ color: wallCol, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
+  for (const [w, x, z, ry] of [[b.x1 - b.x0, (b.x0 + b.x1) / 2, b.z0, 0], [b.z1 - b.z0, b.x0, (b.z0 + b.z1) / 2, Math.PI / 2], [b.z1 - b.z0, b.x1, (b.z0 + b.z1) / 2, Math.PI / 2]]) { const wl = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.2), wallM); wl.position.set(x, 0.6, z); wl.rotation.y = ry; g.add(wl); }
+  const ghost = new THREE.MeshLambertMaterial({ color: '#8f7fb8', transparent: true, opacity: 0.6 });
+  for (const [x0, x1, z0, z1] of solidOf(mapSel)) { const bx = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.7, z1 - z0), ghost); bx.position.set((x0 + x1) / 2, 0.35, (z0 + z1) / 2); g.add(bx); }
+  const me = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.5, 16), new THREE.MeshLambertMaterial({ color: '#ff6fa5' })); me.position.set(0, 0.75, L().hipZ); g.add(me);   // where she sits
+  for (const it of itemsOf(mapSel)) three.itemsG.add(buildItem(THREE, toon, null, it));
+  three.centre.set((b.x0 + b.x1) / 2, 0, (b.z0 + b.z1) / 2); three.orbit.dist = Math.max(9, (b.x1 - b.x0 + b.z1 - b.z0) * 1.25);
+}
+function drawMaps() {
+  const list = $('mapList'); list.textContent = '';
+  for (const id of allPlaces()) { const it = el('div', { className: 'item' + (id === mapSel ? ' on' : '') }, el('i', { className: 'live' }), placeName(id) + ' (' + itemsOf(id).length + ')'); it.onclick = () => { mapSel = id; itemSel = null; drawMaps(); }; list.append(it); }
+  const props = $('mapProps'), m = dev.maps.custom.find(x => x.id === mapSel); props.textContent = '';
+  if (m) {
+    const slider = (label, key, max) => { const i = el('input', { type: 'range', min: 0, max, step: 0.25, value: m[key] || 0 }); i.oninput = () => { m[key] = +i.value; drawRoom(); }; return el('div', { className: 'row' }, el('label', { textContent: label }), el('div', { className: 'grow' }, i)); };
+    const colour = (label, key, d) => { const i = el('input', { type: 'color', value: m[key] || d }); i.oninput = () => { m[key] = i.value; drawRoom(); }; return el('div', { className: 'row' }, el('label', { textContent: label }), i); };
+    const nm = el('input', { type: 'text', value: m.name || '', className: 'grow' }); nm.oninput = () => { m.name = nm.value; }; nm.onchange = drawMaps;
+    const ab = el('textarea', { rows: 2, value: m.about || '', placeholder: 'What this place is, in a sentence. She is told this when you two are here.' }); ab.oninput = () => { m.about = ab.value; };
+    const del = el('button', { className: 'btn bad sm', textContent: 'Delete this room' }); del.onclick = () => { if (!confirm('Delete "' + (m.name || 'this room') + '" and everything in it?')) return; dev.maps.custom = dev.maps.custom.filter(x => x !== m); mapSel = 'dorm'; itemSel = null; drawMaps(); };
+    props.append(el('h3', { textContent: 'This room' }), el('div', { className: 'row' }, nm), ab, slider('Wider left', 'left', 6), slider('Wider right', 'right', 6), slider('Deeper', 'front', 8), colour('Walls', 'wall', '#6d5a8f'), colour('Floor', 'floor', '#3a2f52'), el('p', { className: 'tip', textContent: 'Every new room comes with her chair, table, shelf, counter and door (the grey blocks), so everything she already does works here.' }), del);
+  }
+  const cat = $('catalog'); cat.textContent = ''; const groups = {};
+  for (const k in CATALOG) (groups[CATALOG[k].group] = groups[CATALOG[k].group] || []).push(k);
+  for (const gname in groups) { const grid = el('div', { className: 'cat' }); for (const k of groups[gname]) { const b = el('button', {}, el('i', {}), CATALOG[k].name); b.firstChild.style.background = CATALOG[k].color; b.onclick = () => { const bb = boundsOf(mapSel), n = itemsOf(mapSel).length, it = fresh(k, +((bb.x0 + bb.x1) / 2 + 0.5 + (n % 4) * 0.5).toFixed(2), +((bb.z0 + bb.z1) / 2 + 0.9 + (Math.floor(n / 4) % 3) * 0.5).toFixed(2));   // each new thing lands a little further along itemsOf(mapSel).push(it); rebuildItem(it); select(it); }; grid.append(b); } cat.append(el('h3', { textContent: gname }), grid); }
+  drawRoom(); drawSel();
+}
+function drawSel() {
+  const p = $('selPanel'), it = itemSel; p.textContent = '';
+  if (!it) { p.append(el('p', { className: 'tip', textContent: 'Nothing selected. Click a thing in the room, or add one from the catalogue.' })); return; }
+  const slider = (label, key, min, max, step, show = v => v) => { const out = el('span', { textContent: show(it[key] ?? (key[0] === 's' ? 1 : 0)) }), i = el('input', { type: 'range', min, max, step, value: it[key] ?? (key[0] === 's' ? 1 : 0) }); i.oninput = () => { it[key] = +i.value; out.textContent = show(+i.value); sync(it); }; return el('div', {}, el('div', { className: 'row', style: 'margin-bottom:0' }, el('label', { textContent: label, className: 'grow' }), out), i); };
+  const all = el('input', { type: 'range', min: 0.3, max: 3, step: 0.05, value: it.sx || 1 }); all.oninput = () => { it.sx = it.sy = it.sz = +all.value; sync(it); };
+  const col = el('input', { type: 'color', value: it.color || CATALOG[it.kind].color }); col.oninput = () => { it.color = col.value; rebuildItem(it); };
+  const solid = el('input', { type: 'checkbox', checked: !!it.solid }); solid.onchange = () => { it.solid = solid.checked; };
+  const dup = el('button', { className: 'btn sm', textContent: 'Copy' }); dup.onclick = copySel; const del = el('button', { className: 'btn bad sm', textContent: 'Remove' }); del.onclick = removeSel;
+  p.append(el('div', { className: 'card' }, el('strong', { textContent: CATALOG[it.kind].name }), el('div', { className: 'row' }, el('label', { textContent: 'Colour' }), col, el('label', {}, solid, ' She walks round it')),
+    slider('Turn', 'rot', 0, 6.283, 0.1309, v => Math.round(v * 57.3) + '°'), el('div', {}, el('div', { className: 'row', style: 'margin-bottom:0' }, el('label', { textContent: 'Size (all)' })), all),
+    slider('Width', 'sx', 0.2, 4, 0.05, v => v.toFixed(2) + 'x'), slider('Height', 'sy', 0.2, 4, 0.05, v => v.toFixed(2) + 'x'), slider('Depth', 'sz', 0.2, 4, 0.05, v => v.toFixed(2) + 'x'), slider('Lift off the floor', 'y', 0, 2.4, 0.05, v => v.toFixed(2) + ' m'),
+    el('div', { className: 'row' }, dup, del)));
+}
+$('mapNew').onclick = () => { const m = { id: 'room' + uid(), name: 'New room', about: '', left: 0, right: 0, front: 0, wall: '#6d5a8f', floor: '#3a2f52', items: [] }; dev.maps.custom.push(m); mapSel = m.id; itemSel = null; drawMaps(); };
+$('mapSave').onclick = async () => { await post({ maps: dev.maps }); toast('Rooms saved. Open games reload to show them.'); };
+
+// ---------- start ----------
+(async () => {
+  const r = await fetch('/api/dev'); if (r.status === 401) { location.href = '/'; return; } const d = await r.json();
+  dev = { ui: d.ui || {}, events: d.events || [], maps: d.maps || {}, layout: d.layout }; dev.maps.custom = dev.maps.custom || [];
+  try { const a = await (await fetch('/api/anims')).json(); clips = Object.keys(a.clips || {}); } catch {}
+  screen('phone'); drawEvents();
+})();
+</script>
+</body>
+</html>

@@ -85,3 +85,13 @@ Fonts are hosted in `public/fonts` (SIL Open Font License): Fredoka for the inte
 - When: if you ask for one (she may say no below 25 rapport), on a whim with a reply (`chatChance`), and up to twice while she is out (`awayChance`, scheduled in `leaveNow`, sent when the page checks `/api/away`). All get likelier with rapport, more so on the romance path.
 - Test switches: `PIC_TEST=1` (one picture a few seconds after she leaves), `PIC_TEST_CHAT=1` (a picture with every reply).
 - The picture pack: `tools/picpack/gen.cjs` (run against a local Brenai with her model loaded) makes about a hundred ready pictures: painted nature and architecture (`paint.js`), selfies where she really is, cute poses at home, her out at painted places, and pictures that belong to romance, friends or mentor. `POST /api/pack` stores them on the volume, `GET /api/pack/<file>` serves them, and `fromPack` in pics.mjs chooses one that fits where she is, how close you are and what you are to each other, without repeating the last 45. Her mouth is repainted at load (the model's mouth picture is grey).
+
+## Studio (public/dev.html)
+A developer page with three tabs, saved through `GET/POST /api/dev` into `db.dev` and read by the game at load.
+- **Layout**: the real game in an iframe with `?uiedit=1` (`uiedit.js`): every piece of the page gets a frame to drag, resize or hide; kept per screen kind (phone / PC) and applied by `applyUi` as `translate` / `scale` rules.
+- **Events**: when (a time each day, on arriving, at a rapport level, every so often, or only on Run), where, and a list of steps (walk to a spot picked on a top-down map, wait, gesture, animation clip, activity, expression, emoji, sound, say exactly, react in her own words, back to her seat). The game runs them (`runEvent`, `eventsTick`); "Save and run now" plays one in any open game within about 15 seconds.
+- **Maps**: add things from the catalogue (`mapkit.js`: shapes, furniture, decor) to her dorm or your house, or make new rooms (her usual furniture in a shell of your size and colours). Drag to move, sliders to turn, scale, lift and recolour; solid things are walked round. New rooms show up under the house button as "Go to ...".
+- The Studio learns the rooms' real sizes from the game the first time it runs with her 3D model (`layout`).
+
+## The heart game
+Stroke her hair: a heart pops up. Pop it and nine more follow, faster and bouncier, while the screen edge turns pink with bubbles, the view closes in on her heart, she squirms, blushes (4+) and tears up (7+). Ten pops: sparkles, a white flash, +10 romance (`POST /api/hearts`). Three misses: -1. Once a minute at most.

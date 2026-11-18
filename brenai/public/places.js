@@ -7,6 +7,7 @@
 //   places.bounds[name]          the walls, for first person   places.blocks[name]   boxes you cannot walk into
 //   places.spawn[name]           where you stand when you arrive, and places.seat[name] where you can sit
 //   places.tick(night, t)        outside light and the TV
+import { buildItem, footprint } from './mapkit.js';
 // cel shading: light falls in three flat bands instead of a smooth ramp, and big shapes get a dark outline
 export function cel(THREE) {
   const ramp = new THREE.DataTexture(new Uint8Array([118, 118, 118, 255, 188, 188, 188, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
@@ -157,10 +158,34 @@ export function buildPlaces(THREE, A) {
     house: [[cx - cw / 2 - 0.05, 0.49, hip.z - 0.5, hip.z + 0.31], [-1.2, 0.3, tableZ - 0.18, tableZ + 0.32], [SHELF.x - 0.47, SHELF.x + 0.47, Hh.z0, SHELF.z + 0.15], [kx0, Hh.x1, Hh.z0, COUNTER.z + 0.28], [Hh.x1 - 0.77, Hh.x1, hip.z - 0.75, hip.z - 0.09],
       [tvX - 0.85, tvX + 0.85, tvZ - 0.21, Hh.z1], [dx - 1.1, dx + 1.1, dz - 0.62, dz + 0.62], pot(Hh.x0 + 0.4, Hh.z0 + 0.45, 0.3), pot(2.55, hip.z + 3.9, 0.24), pot(-2.3, tvZ - 0.05, 0.2), pot(-2.15, backZ + 0.05, 0.04)],
   };
+  // ---- from the Studio's map editor: extra things placed in her dorm and your house, and whole new rooms.
+  // A new room is her usual furniture (chair, table, shelf, counter, door: so her routine works) in a shell of its own size
+  // and colours, plus whatever was placed in it.
+  const maps = A.maps || {}, groups = { dorm, house }, names = { dorm: 'her dorm', house: 'your house' }, bounds = { dorm: D, house: Hh }, spawn = { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] };
+  const baseSolid = { dorm: solid.dorm.map(r => [...r]), house: solid.house.map(r => [...r]) };
+  function addItems(group, name, items) {
+    const g = new THREE.Group(); g.position.y = floorY;
+    for (const it of items || []) { try { g.add(buildItem(THREE, toon, outline, it)); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
+    group.add(g);
+  }
+  addItems(dorm, 'dorm', (maps.dorm || {}).items); addItems(house, 'house', (maps.house || {}).items);
+  for (const m of maps.custom || []) {
+    if (!m || !m.id || groups[m.id]) continue;
+    const g = new THREE.Group(); g.visible = false; into = g; place = m.id; TAG = '';
+    const B = { x0: -2.05 - (+m.left || 0), x1: 3.1 + (+m.right || 0), z0: D.z0, z1: hip.z + 3.05 + (+m.front || 0), h: Math.max(2.3, +m.height || 2.6) }, out = world(m.outside === 'yard' ? 'yard' : 'campus');
+    TAG = 'floor'; reg(flat(B.x1 - B.x0, B.z1 - B.z0, (B.x0 + B.x1) / 2, floorY - 0.006, (B.z0 + B.z1) / 2, toon(m.floor || '#3a2f52'), true));
+    TAG = ''; flat(B.x1 - B.x0, B.z1 - B.z0, (B.x0 + B.x1) / 2, floorY + B.h, (B.z0 + B.z1) / 2, toon('#f2eef6'), false);
+    const wc = m.wall || '#6d5a8f';
+    wall('N', B.z0, B.x0, B.x1, B.h, wc, m.windows === false ? [] : [{ at: 0.1, w: 1.15, y0: 1.05, y1: 2.05 }], out);
+    wall('W', B.x0, B.z0, B.z1, B.h, wc, m.windows === false ? [] : [{ at: (B.z0 + B.z1) / 2, w: 1.4, y0: 0.95, y1: 2.05 }], out); wall('E', B.x1, B.z0, B.z1, B.h, wc); wall('S', B.z1, B.x0, B.x1, B.h, wc);
+    groups[m.id] = g; names[m.id] = m.name || 'a new place'; bounds[m.id] = B; spawn[m.id] = [2.2, hip.z + 1.1];
+    solid[m.id] = [solid.dorm[0], solid.dorm[1], solid.dorm[2], solid.dorm[3], solid.dorm[5]].map(r => [...r]); blocks[m.id] = blocks.dorm.slice(0, 4).map(r => [...r]);
+    addItems(g, m.id, m.items);
+  }
   return {
+    groups, names, baseSolid, floorY,
     dorm, house, toon, outline, eyeH, solid,
-    bounds: { dorm: D, house: Hh }, blocks,
-    spawn: { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] },
+    bounds, blocks, spawn,
     seat: { dorm: { tag: 'bed', at: [bedX + 0.62, bedZ + 0.2], out: [bedX + 0.95, bedZ + 0.2], h: floorY + 1.12 }, house: { tag: 'chair', at: [-0.78, hip.z + 0.22], out: [-2.6, hip.z + 0.5], h: seatTop + 0.66 } },
     bed: { side: [bedX + 0.8, bedZ - 0.1], at: [bedX, bedZ - 0.1], top: floorY + 0.58 },
     mugAt: new THREE.Vector3(-0.55, tableTop + 0.045, tableZ + 0.16), lampAt: new THREE.Vector3(-2.15, floorY + 1.62, backZ + 0.05),

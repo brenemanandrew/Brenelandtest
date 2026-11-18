@@ -203,6 +203,7 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   poke: ['pokes her cheek', 'pokes her cheek %n times'], boop: ['boops her nose', 'boops her nose %n times'], pat: ['pats her on the head', 'pats her on the head %n times'],
   yousit: ['sits down on the couch next to her', 'sits down on the couch next to her'], yousitbed: ['sits down on the edge of her bed', 'sits down on the edge of her bed'], tvon: ['turns the TV on', 'turns the TV on'], tvoff: ['turns the TV off', 'turns the TV off'],
   cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
+  heartwin: ['kept stroking her hair until she melted: squirming, blushing, happy tears in her eyes, and then a rush of warmth she cannot explain away', ''], heartlose: ['kept fussing with her hair clumsily until she got annoyed and ducked away', ''],
   petEnd: ['strokes her hair', 'strokes her hair for a while'], swat: ['swats at her', 'swats at her %n times'], body: ['tugs at her hoodie', 'tugs at her hoodie %n times'], spam: ['keeps poking her over and over', 'will not stop poking her'] };
 let touches = [];
 function takeTouches() {
@@ -434,10 +435,14 @@ const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.in
 const placeView = () => ({ place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: VISIT_AT, invite: inviteNow(), ...bondView() });
 function placeNote() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
+  if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
   return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
 }
 function setPlace(place) { db.place = place || ''; db.invite = null; }
+// ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
+const devData = () => { const d = db.dev || (db.dev = {}); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
+const customMap = id => devData().maps.custom.find(m => m.id === id);
 function leaveNow(leave, since = Date.now()) {
   if (db.place) setPlace('');                                                       // wherever she is going, the visit is over
   const now = since, p = db.plan || {};
@@ -487,7 +492,7 @@ async function comeBack(onDelta) {
 
 // ---------- http ----------
 // changes whenever a new version is deployed: pages left open use it to reload themselves
-const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js', 'public/sound.js', 'pics.mjs'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/places.js', 'public/sound.js', 'pics.mjs', 'public/mapkit.js', 'public/uiedit.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
 const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -520,7 +525,7 @@ const server = http.createServer(async (req, res) => {
 
       if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
-      if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), ...placeView() }); }
+      if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
 
       // the picture pack: GET one image; POST the whole pack at once { manifest: [...], files: { name: base64 } }
       if (url.pathname.startsWith('/api/pack')) {
@@ -553,8 +558,12 @@ const server = http.createServer(async (req, res) => {
         const { place, decline } = await readBody(req), now = Date.now();
         if (decline) { db.invite = null; save(); return json(res, 200, placeView()); }
         if (!place) {
-          if (db.place) { db.log.push({ who: 'sys', text: db.place === 'dorm' ? 'You headed home.' : 'Wizra headed home.', at: now }); touches.push({ kind: db.place === 'dorm' ? 'homeDorm' : 'homeHouse', at: now }); setPlace(''); save(); }
+          if (db.place) { db.log.push({ who: 'sys', text: db.place === 'house' ? 'Wizra headed home.' : 'You headed home.', at: now }); touches.push({ kind: db.place === 'house' ? 'homeHouse' : 'homeDorm', at: now }); setPlace(''); save(); }
           return json(res, 200, placeView());
+        }
+        if (customMap(place)) { // a place made in the Studio: you just go there together
+          if (db.away) return json(res, 409, { error: 'She is out.', ...placeView() });
+          setPlace(place); db.log.push({ who: 'sys', text: `You two went to ${customMap(place).name}.`, at: now }); save(); return json(res, 200, placeView());
         }
         if (place !== inviteNow()) return json(res, 409, { error: 'There is no invitation open right now.', ...placeView() });
         setPlace(place); db.log.push({ who: 'sys', text: place === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: now }); touches.push({ kind: place === 'dorm' ? 'cameDorm' : 'cameHouse', at: now }); save();
@@ -628,6 +637,38 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
 
+      // the Studio's data: GET all of it; POST replaces the sections given ({ ui }, { events }, { maps }, { layout })
+      if (url.pathname === '/api/dev') {
+        const d = devData();
+        if (req.method === 'POST') {
+          const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 3e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+          let b; try { b = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
+          if (b.ui && typeof b.ui === 'object') d.ui = b.ui; if (Array.isArray(b.events)) d.events = b.events.slice(0, 200); if (b.maps && typeof b.maps === 'object') { d.maps = b.maps; devData(); } if (b.layout && typeof b.layout === 'object') d.layout = b.layout;
+          if (b.run) d.run = { id: String(b.run), at: Date.now() };                      // "run this event now" from the Studio
+          d.v = Date.now(); save();
+        }
+        return json(res, 200, { ui: d.ui, events: d.events, maps: d.maps, layout: d.layout || null, fired: d.fired, run: d.run || null, v: d.v || 0 });
+      }
+      // the heart game (rub her head, pop the hearts): ten pops is +10 romance, three misses is -1. Once a minute at most.
+      if (url.pathname === '/api/hearts' && req.method === 'POST') {
+        const { result } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < 45000) return json(res, 429, { error: 'too soon', ...placeView() });
+        db.heartsAt = now; fixBond();
+        if (result === 'win') { addBond('romance', 10); touches.push({ kind: 'heartwin', at: now }); }
+        else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - 1); fixBond(); touches.push({ kind: 'heartlose', at: now }); }
+        save(); return json(res, 200, placeView());
+      }
+      // a scripted event at work: note that it fired, put a line she says in the log, or have her react in her own words
+      if (url.pathname === '/api/event' && req.method === 'POST') {
+        const { id, fired, say, react } = await readBody(req), d = devData();
+        if (id && fired) { d.fired[String(id).slice(0, 40)] = Date.now(); save(); }
+        if (typeof say === 'string' && say.trim()) { const text = say.trim().slice(0, 2000); db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text }); }
+        if (typeof react === 'string' && react.trim()) {
+          if (busy) return json(res, 409, { error: 'busy' }); busy = true;
+          try { const pre = react.trim().slice(0, 400); db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true }); const text = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text }); }
+          catch (e) { db.log.pop(); return json(res, 503, { error: e.message }); } finally { busy = false; }
+        }
+        return json(res, 200, { ok: true });
+      }
       // Rewind: undo everything said from a moment onward and put the world back to "she is home, nothing pending".
       // Works by timestamp only and answers with counts, never with the messages. The file as it was is kept beside it first.
       if (url.pathname === '/api/rewind' && req.method === 'POST') {

@@ -297,6 +297,12 @@
       // her routine (3D model only): what she is busy with right now, in words, and a way to start something
       activity() { return R.activity ? R.activity() : ''; },
       // a posed picture of her (3D model only): resolves to an image URL, or '' if it cannot be drawn
+      // scripted (the Studio's events): walk her somewhere (resolves true when she arrives), hold a recorded clip, and what is on offer
+      walkTo(x, z) { return new Promise(ok => { if (R.walkTo) R.walkTo(x, z, ok); else ok(false); setTimeout(() => ok(false), 40000); }); },
+      holdClip(name, s) { return R.holdClip ? R.holdClip(name, s) : false; }, emote, layout() { return R.layout ? R.layout() : null; }, lists() { return { clips: R.clips ? R.clips() : [], gestures: R.gestures ? R.gestures() : GEST.map(g => g[1]) }; },
+      // the heart game: a passing face, a wriggle, the camera closing in on her heart, happy tears
+      flash(face, ms) { show(face, ms || 1500); }, squirm(hard) { kick((Math.random() - 0.5) * 300, (Math.random() - 0.5) * 160, 60, hard ? -5 : -3); doGesture(Math.random() < 0.5 ? 'shift' : 'feet', 1.1); },
+      focus(k) { if (R.focus) R.focus(k); }, tears(on) { if (R.tears) R.tears(on); },
       snapshot(spec) { return R.snapshot ? R.snapshot(spec) : Promise.resolve(''); },
       // visiting in person (3D model only): 'dorm' or 'house' puts you in the room in first person, '' takes you home
       visit(name) { if (R.visit) R.visit(name || ''); return !!R.visit; }, canVisit() { return !!R.visit; },

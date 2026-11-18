@@ -360,7 +360,7 @@
   #fpMoments button small { position:absolute; right:-6px; bottom:-4px; min-width:20px; padding:1px 5px; border-radius:999px; background:#3a2a66; color:#fff; font:700 11px "Fredoka",sans-serif; }
   #fpChoices { position:fixed; left:68px; top:34%; z-index:7; display:flex; flex-direction:column; gap:8px; max-width:min(300px, calc(100vw - 84px)); } #fpChoices[hidden] { display:none; }
   #fpChoices button { text-align:left; border:0; border-radius:16px; padding:10px 14px; background:#fff; color:#3a2a5c; font-family:"Patrick Hand","Fredoka",sans-serif; font-size:17px; line-height:1.2; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); }
-  #bondPop { position:fixed; left:50%; top:22%; z-index:8; transform:translateX(-50%); font-family:"Bangers","Fredoka",sans-serif; font-size:34px; color:#fff; text-shadow:0 3px 0 #a8327a, 0 0 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; } #bondPop.go { animation:bondPop 1.8s ease-out; }
+  #bondPop { position:fixed; left:50%; top:22%; z-index:48; transform:translateX(-50%); font-family:"Bangers","Fredoka",sans-serif; font-size:34px; color:#fff; text-shadow:0 3px 0 #a8327a, 0 0 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; } #bondPop.go { animation:bondPop 1.8s ease-out; }
   @keyframes bondPop { 0% { opacity:0; transform:translate(-50%, 20px) scale(.7); } 15% { opacity:1; transform:translate(-50%, 0) scale(1.1); } 100% { opacity:0; transform:translate(-50%, -50px) scale(1); } }
   /* the chat area: a light page with dark ink, and bigger speech */
   #logWrap { background:rgba(255,251,246,.93); border:2px solid rgba(255,255,255,.95); box-shadow:0 8px 26px rgba(20,8,50,.35); backdrop-filter:none; -webkit-backdrop-filter:none; }
@@ -375,6 +375,18 @@
   #callBtn .rays { display:none; } #callBtn.incoming .rays { display:block; position:absolute; inset:-55%; border-radius:50%; pointer-events:none; background:repeating-conic-gradient(#fff 0 7deg, transparent 7deg 36deg);
     -webkit-mask:radial-gradient(circle, transparent 56%, #000 58%, #000 80%, transparent 82%); mask:radial-gradient(circle, transparent 56%, #000 58%, #000 80%, transparent 82%); animation:rays .5s steps(2) infinite; }
   @keyframes rays { 0% { transform:scale(.82) rotate(0); opacity:1; } 100% { transform:scale(1.12) rotate(18deg); opacity:.55; } }
+  #herSide, #meWrap { pointer-events:none; } #herSide .balloon, #meWrap .balloon, #awayNote { pointer-events:auto; }   /* the balloon areas never block what is moved under them */
+  /* the heart game: hearts to pop over her picture, a pink vignette that deepens, bubbles round the edge */
+  #heartLayer { position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; border-radius:inherit; }
+  .hrt { position:absolute; pointer-events:auto; cursor:pointer; touch-action:none; display:grid; place-items:center; animation:hrtIn .22s cubic-bezier(.3,1.6,.5,1); filter:drop-shadow(0 3px 6px rgba(160,20,80,.5)); }
+  .hrt svg { width:100%; height:100%; animation:hrtBeat .5s ease-in-out infinite alternate; } .hrt.gone { animation:hrtOut .25s ease-in forwards; pointer-events:none; }
+  @keyframes hrtIn { from { transform:scale(0); } } @keyframes hrtBeat { to { transform:scale(1.14); } } @keyframes hrtOut { to { transform:scale(.2); opacity:0; } }
+  .spk { position:absolute; pointer-events:none; font-size:20px; color:#fff; text-shadow:0 0 6px #ff8fc0, 0 0 2px #fff; animation:spk .6s ease-out forwards; } @keyframes spk { to { transform:translate(var(--dx), var(--dy)) scale(.3) rotate(140deg); opacity:0; } }
+  #vig { position:fixed; inset:0; z-index:44; pointer-events:none; opacity:0; transition:opacity .5s; background:radial-gradient(ellipse at 50% 50%, rgba(255,120,180,0) calc(62% - var(--deep, 0) * 34%), rgba(255,60,150, calc(.25 + var(--deep, 0) * .6)) 100%); } #vig.on { opacity:1; } #vig.bad { background:radial-gradient(ellipse at 50% 50%, rgba(40,40,60,0) 40%, rgba(30,30,50,.8) 100%); }
+  #vig .bub { position:absolute; border-radius:50%; background:radial-gradient(circle at 32% 28%, rgba(255,255,255,.95), rgba(255,170,210,.75) 38%, rgba(255,90,160,.55) 70%, rgba(190,40,120,.5)); box-shadow:inset -3px -5px 8px rgba(150,20,90,.35), 0 2px 8px rgba(120,10,70,.3); animation:bub var(--t, 6s) ease-in-out infinite alternate; }
+  @keyframes bub { from { transform:translate(0, 0) scale(1); } to { transform:translate(var(--bx, 10px), var(--by, -18px)) scale(1.12); } }
+  #heartHud { position:fixed; left:50%; top:10px; transform:translateX(-50%); z-index:46; display:none; gap:10px; align-items:center; padding:6px 14px; border-radius:999px; background:rgba(255,255,255,.92); color:#b81f74; font:400 20px "Bangers","Fredoka",sans-serif; letter-spacing:.05em; box-shadow:0 4px 14px rgba(120,10,70,.35); } #heartHud.on { display:flex; } #heartHud i { font-style:normal; color:#8a7aa8; font-size:15px; font-family:"Fredoka",sans-serif; }
+  #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
   /* pictures she sends */
   .chatpic { display:block; width:min(230px, 72%); aspect-ratio:4/5; object-fit:cover; margin:4px 0 8px; border-radius:16px; border:4px solid #fff; box-shadow:0 4px 14px rgba(20,8,50,.35); background:#d9d2e6; cursor:zoom-in; transform:rotate(-1.5deg); }
   .chatpic.wait { animation:picWait 1s ease-in-out infinite alternate; } @keyframes picWait { from { opacity:.45; } to { opacity:.9; } }
@@ -424,6 +436,7 @@
   </div>
 </div>
 <div id="stageBack"></div>
+<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 10</span><i id="heartMiss"></i></div><div id="whiteOut"></div>
 <div id="picView" hidden><img alt="Picture from Wizra"></div>
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
@@ -449,7 +462,7 @@
 const $ = id => document.getElementById(id);
 const log = $('log'), input = $('in'), sendBtn = $('send'), stage = $('stage');
 // Touching her never shows in the chat: it goes to the server quietly and rides along with your next message.
-const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); }, onThumb: url => setHerThumb(url), onEmote: ch => WizraSound.emote(ch), onTouch: kind => { fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
+const avatar = WizraAvatar.mount(stage, { onRenderer: () => { if (away) avatar.presence('gone'); shownPlace = ''; syncPlace(); const L = avatar.layout(); if (L && JSON.stringify(L) !== JSON.stringify(dev.layout)) { dev.layout = L; fetch('/api/dev', { method: 'POST', body: JSON.stringify({ layout: L }) }).catch(() => {}); } }, onThumb: url => setHerThumb(url), onEmote: ch => WizraSound.emote(ch), onTouch: kind => { if (kind === 'petEnd') heartGame.offer(); fetch('/api/touch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) }).catch(() => {}); } });
 let myName = 'You';
 
 // "*waves* hey" -> segments; actions are inside asterisks, speech is everything else. Also counted as actions:
@@ -559,7 +572,108 @@ async function api(path, body) {
   return r;
 }
 
+// ---------- the heart game ----------
+// Stroke her hair and a heart pops up. Pop it and more follow, one at a time, all over her picture: different sizes, there for
+// less and less time, bouncing about near the end. Each pop: she squirms, the edges of the screen go a deeper pink with bubbles
+// drifting round them, and the view closes in on her heart. From 4 she blushes, from 7 there are happy tears, and the 10th is a
+// burst of sparkles, a flash of white and +10 romance. Miss three and it ends badly (-1).
+const heartGame = (() => {
+  const HEART = '<svg viewBox="0 0 32 30"><path d="M16 28 C2 18 1 9 6 4.500 C10 1 14.500 3 16 7 C17.500 3 22 1 26 4.500 C31 9 30 18 16 28 Z" fill="#ff4f9a" stroke="#fff" stroke-width="2"/><ellipse cx="10.500" cy="9" rx="3" ry="2" fill="rgba(255,255,255,.7)" transform="rotate(-30 10.500 9)"/></svg>';
+  const g = { on: false, n: 0, miss: 0, last: 0, cur: null, raf: 0, wasBig: false }; let layer = null;
+  const vig = () => $('vig'), stageEl = () => $('stageWrap');
+  const ensure = () => { if (!layer || !layer.isConnected) { layer = el('div', { id: 'heartLayer' }); stageEl().append(layer); } return layer; };
+  function sparkle(x, y, n = 8) { for (let i = 0; i < n; i++) { const s = el('span', { className: 'spk', textContent: '\u2726' }), a = Math.random() * 6.28, d = 30 + Math.random() * 50; s.style.left = x + 'px'; s.style.top = y + 'px'; s.style.setProperty('--dx', Math.cos(a) * d + 'px'); s.style.setProperty('--dy', Math.sin(a) * d + 'px'); ensure().append(s); setTimeout(() => s.remove(), 650); } }
+  function bubbles(count) { const v = vig(); while (v.children.length < count) { const b = el('div', { className: 'bub' }), a = Math.random() * 6.28, sz = 14 + Math.random() * 34; b.style.width = b.style.height = sz + 'px'; b.style.left = `calc(${50 + 47 * Math.cos(a)}% - ${sz / 2}px)`; b.style.top = `calc(${50 + 46 * Math.sin(a)}% - ${sz / 2}px)`; b.style.setProperty('--t', 3 + Math.random() * 4 + 's'); b.style.setProperty('--bx', (Math.random() * 40 - 20) + 'px'); b.style.setProperty('--by', (Math.random() * 40 - 30) + 'px'); v.append(b); } }
+  function hud() { $('heartN').textContent = g.n + ' / 10'; $('heartMiss').textContent = g.miss ? '\u2715'.repeat(g.miss) : ''; }
+  function spawn(starter) {
+    cancelAnimationFrame(g.raf); const L = ensure(), W = L.clientWidth, H = L.clientHeight, base = Math.max(34, Math.min(W, H) * 0.16), size = base * (0.7 + Math.random() * 0.9);
+    const h = el('div', { className: 'hrt' }); h.innerHTML = HEART; h.style.width = h.style.height = size + 'px';
+    let x = Math.random() * (W - size), y = (starter ? 0.05 : 0.06 + Math.random() * 0.8) * (H - size), born = performance.now(), prev = born;
+    const life = starter ? 5000 : Math.max(1000, 2800 - g.n * 190), fast = g.n >= 6, sp = fast ? 90 + (g.n - 5) * 45 : 0; let a = Math.random() * 6.28, vx = Math.cos(a) * sp, vy = Math.sin(a) * sp;
+    const put = () => { h.style.left = x + 'px'; h.style.top = y + 'px'; }; put(); L.append(h); g.cur = h;
+    const tick = t => { if (g.cur !== h) return; const dt = Math.min(0.05, (t - prev) / 1000); prev = t;
+      if (sp) { x += vx * dt; y += vy * dt; if (x < 0 || x > W - size) { vx = -vx; x = Math.max(0, Math.min(W - size, x)); } if (y < 0 || y > H - size) { vy = -vy; y = Math.max(0, Math.min(H - size, y)); } put(); }
+      if (t - born > life) { g.cur = null; h.classList.add('gone'); setTimeout(() => h.remove(), 260); return starter ? null : missed(); }
+      g.raf = requestAnimationFrame(tick); };
+    g.raf = requestAnimationFrame(tick);
+    h.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (g.cur !== h) return; g.cur = null; cancelAnimationFrame(g.raf); sparkle(x + size / 2, y + size / 2); h.classList.add('gone'); setTimeout(() => h.remove(), 260); starter ? start() : pop(); });
+  }
+  function start() {
+    if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, wasBig: document.body.classList.contains('big') });
+    if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
+    vig().classList.remove('bad'); vig().classList.add('on'); $('heartHud').classList.add('on'); avatar.routine('sit'); avatar.flash('surprised', 900); setTimeout(pop, 30);
+  }
+  function pop() {
+    g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.squirm(g.n >= 7); avatar.focus(g.n / 10);
+    vig().style.setProperty('--deep', (g.n / 10).toFixed(2)); bubbles(g.n * 3);
+    if (g.n >= 4) avatar.flash(g.n >= 7 ? 'joy' : 'blush', 4000); if (g.n >= 4) avatar.emote(g.n >= 7 ? '\uD83D\uDCA6' : '\uD83D\uDC97', 900); if (g.n >= 7) avatar.tears(true);
+    if (g.n >= 10) return win();
+    setTimeout(() => { if (g.on) spawn(false); }, 260);
+  }
+  function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= 3) return lose(); setTimeout(() => { if (g.on) spawn(false); }, 350); }
+  async function finish(result) {
+    g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; setTimeout(() => { if (layer) layer.textContent = ''; }, 700);
+    setTimeout(() => { avatar.focus(0); vig().classList.remove('on'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); avatar.tears(false); if (!g.wasBig) document.body.classList.remove('big'); }, result === 'win' ? 500 : 1400);
+    try { const r = await api('/api/hearts', { result }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+10 \uD83D\uDC97' : '-1 \uD83D\uDC97'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
+  }
+  function win() { const L = ensure(); for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); WizraSound.fx('sparkle'); WizraSound.fx('bond'); avatar.emote('\u2728', 2200); avatar.flash('joy', 5000);
+    const w = $('whiteOut'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); finish('win'); }
+  function lose() { vig().classList.add('bad'); avatar.flash('grumpy', 3500); avatar.gesture('cringe', 1.8); avatar.emote('\uD83D\uDCA2', 1800); WizraSound.fx('anger'); finish('lose'); }
+  return { offer() { if (g.on || g.cur || away || phoneCall.on || Date.now() - g.last < 50000 || !avatar.canVisit()) return; spawn(true); }, state: g, start };
+})();
+
+// ---------- the Studio's work (dev.html): where the page's pieces sit, scripted events, and the rooms ----------
+let dev = { ui: {}, events: [], maps: {}, fired: {}, v: 0 };
+const UI_PARTS = ['stageWrap', 'herSide', 'logHead', 'logWrap', 'meWrap', 'meBox', 'bar', 'visitBtn', 'bigBtn', 'brainBtn', 'actBtn', 'mic', 'send'];
+const uiMode = () => innerWidth < 700 ? 'phone' : 'pc';
+function applyUi(ui) { // each piece can be moved, resized or hidden; kept per screen kind (phone / PC)
+  const set = (ui || {})[uiMode()] || {}; let css = '';
+  for (const id of UI_PARTS) { const u = set[id]; if (!u) continue; const sel = id === 'stageWrap' ? 'body:not(.fp):not(.big):not(.calling) #stageWrap' : '#' + id;
+    css += u.hide ? `${sel} { display:none !important; }\n` : `${sel} { translate:${Math.round(u.x || 0)}px ${Math.round(u.y || 0)}px; scale:${u.s || 1}; transform-origin:0 0; }\n`; }
+  let st = $('devUi'); if (!st) { st = el('style', { id: 'devUi' }); document.head.append(st); } st.textContent = css;
+}
+addEventListener('resize', () => applyUi(dev.ui));
+// Events: each has when (time / rapport / arrive / every / manual), where, and steps she carries out one after another.
+const EV = { busy: false, last: JSON.parse(localStorage.getItem('brenai.ev') || '{}') }, sleep = ms => new Promise(ok => setTimeout(ok, ms));
+async function runEvent(ev) {
+  if (EV.busy || away || phoneCall.on) return false; EV.busy = true; EV.last[ev.id] = Date.now(); localStorage.setItem('brenai.ev', JSON.stringify(EV.last)); api('/api/event', { id: ev.id, fired: true }).catch(() => {});
+  try {
+    for (const st of ev.steps || []) {
+      if (away || phoneCall.on) break;
+      if (st.type === 'walk') await avatar.walkTo(+st.x, +st.z);
+      else if (st.type === 'wait') await sleep((+st.s || 1) * 1000);
+      else if (st.type === 'gesture') { avatar.gesture(st.name, +st.s || 2.5); await sleep((+st.s || 2.5) * 1000); }
+      else if (st.type === 'clip') { avatar.holdClip(st.name, +st.s || 3); await sleep((+st.s || 3) * 1000); }
+      else if (st.type === 'activity') { avatar.routine(st.name); await sleep((+st.s || 4) * 1000); }
+      else if (st.type === 'face') { avatar.feel(st.name); avatar.setMood(st.name); await sleep(300); }
+      else if (st.type === 'emote') { avatar.emote(st.ch || '\u2728', 1600); await sleep(600); }
+      else if (st.type === 'sound') { WizraSound.fx(st.name); await sleep(300); }
+      else if (st.type === 'say' && st.text) { const r = await api('/api/event', { say: st.text }); const d = await r.json(); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
+      else if (st.type === 'react' && st.text) { avatar.setThinking(true); const r = await api('/api/event', { react: st.text }); const d = await r.json(); avatar.setThinking(false); if (d.text) { const body = addLine('her', ''); avatar.feel(d.text); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
+      else if (st.type === 'home') { avatar.routine('sit'); await sleep(1500); }
+    }
+  } catch (e) { console.error('event', ev.name, e); } finally { EV.busy = false; avatar.setMood(settings.mood); }
+  return true;
+}
+function eventsTick(arrived) {
+  if (EV.busy || away || phoneCall.on || sendBtn.disabled || !avatar.canVisit()) return;
+  const now = new Date(), hm = now.getHours() * 60 + now.getMinutes(), place = shownPlace || 'dorm', day = now.toDateString();
+  for (const ev of dev.events || []) {
+    if (!ev.enabled || !(ev.steps || []).length || (ev.where && ev.where !== 'any' && ev.where !== place)) continue;
+    const last = Math.max(EV.last[ev.id] || 0, (dev.fired || {})[ev.id] || 0), w = ev.when || {}; if (ev.once && last) continue;
+    let go = false;
+    if (w.type === 'time') { const [h, m] = String(w.at || '20:00').split(':').map(Number), t = h * 60 + m; go = hm >= t && hm < t + 3 && new Date(last).toDateString() !== day; }
+    else if (w.type === 'rapport') go = visitInfo.rapport >= (+w.min || 0) && !last;
+    else if (w.type === 'arrive') go = !!arrived;
+    else if (w.type === 'every') go = Date.now() - last > (+w.minutes || 30) * 60000 && Math.random() < (+w.chance || 100) / 100;
+    if (go) { runEvent(ev); return; }
+  }
+}
+setInterval(() => eventsTick(false), 20000);
+let devRunSeen = 0;
+async function loadDev() { try { const r = await fetch('/api/dev'); if (r.ok) { dev = await r.json(); devRunSeen = dev.run ? dev.run.at : 0; } } catch {} applyUi(dev.ui); }
 async function load() {
+  await loadDev();
   const r = await api('/api/state'); const s = await r.json();
   myName = s.name || 'You'; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); applyAvatar();
   log.textContent = '';
@@ -616,6 +730,8 @@ setInterval(async () => { // keep time with the server: is she due back, has the
   try { const r = await fetch('/api/away'); if (!r.ok) return; const d = await r.json();
     if (phoneCall.on) return;
     if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } setPlace(d); setRinging(!!(d.away && d.away.ringing)); }
+    if (d.devRun && d.devRun.at > devRunSeen) { devRunSeen = d.devRun.at; await loadDev(); const ev = (dev.events || []).find(e => e.id === d.devRun.id); if (ev) runEvent(ev); }   // "run now" from the Studio
+    else if (d.devV && d.devV !== dev.v && !EV.busy && !sendBtn.disabled && !input.value && !new URLSearchParams(location.search).has('uiedit')) { const hadMaps = JSON.stringify(dev.maps); await loadDev(); if (JSON.stringify(dev.maps) !== hadMaps) location.reload(); }
     if (d.tail && d.tail.at > lastAuto) { lastAuto = d.tail.at; addLine('her', d.tail.text, d.tail.pic); bubble('her', d.tail.text); WizraSound.fx('pop'); }   // something she sent on her own, like a picture while she is out
   } catch {}
 }, 15000);
@@ -628,8 +744,8 @@ function syncPlace(arriving) {
   const want = visitInfo.place && avatar.canVisit() && !away ? visitInfo.place : '';
   if (want === shownPlace || seeingOut) return; shownPlace = want; $('fpChoices').hidden = true;
   document.body.classList.toggle('fp', !!want); document.body.classList.remove('fplog', 'big'); $('visitMenu').hidden = true;
-  avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return'); WizraSound.scene(want || 'chat');
-  if (want) { const h = $('fpHint'); h.textContent = 'Drag to look. Tap the floor to walk. Tap ' + (want === 'house' ? 'the couch to sit, the TV to switch it on.' : 'her bed to sit.'); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => { h.style.opacity = 0; }, 9000); }
+  avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return'); WizraSound.scene(want === 'house' ? 'house' : want ? 'dorm' : 'chat'); if (want) setTimeout(() => eventsTick(true), 2500);
+  if (want) { const h = $('fpHint'); h.textContent = 'Drag to look. Tap the floor to walk.' + (want === 'house' ? ' Tap the couch to sit, the TV to switch it on.' : want === 'dorm' ? ' Tap her bed to sit.' : ''); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => { h.style.opacity = 0; }, 9000); }
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
@@ -657,6 +773,8 @@ $('visitBtn').onclick = e => {
   const a = el('button', { textContent: 'Invite her over' }), b = el('button', { textContent: 'Go to her dorm' });
   a.onclick = () => { m.hidden = true; send('Want to come over to my place?', 'house'); }; b.onclick = () => { m.hidden = true; send('Can I come over to yours?', 'dorm'); };
   m.append(el('b', { textContent: 'Get together' }), 'Ask her. She may say no if she is not up for it.', el('div', {}, a, b));
+  const made = ((dev.maps || {}).custom || []).filter(x => x && x.id); // places built in the Studio: you just go
+  if (made.length) { const row = el('div', {}); for (const mp of made) { const c = el('button', { className: 'no', textContent: 'Go to ' + (mp.name || 'new place') }); c.onclick = async () => { m.hidden = true; try { const r = await api('/api/visit', { place: mp.id }); const d = await r.json(); if (r.ok) addSys('You two went to ' + (mp.name || 'a new place') + '.'); setPlace(d, true); } catch {} }; row.append(c); } m.append(row); }
 };
 $('picView').onclick = () => { $('picView').hidden = true; };
 document.addEventListener('click', e => { if (!$('visitMenu').hidden && !$('visitMenu').contains(e.target)) $('visitMenu').hidden = true; });
@@ -664,7 +782,7 @@ $('fpLog').onclick = () => { document.body.classList.toggle('fplog'); log.scroll
 $('fpLeave').onclick = async () => {
   const was = visitInfo.place; if (seeingOut) return;
   try {
-    const r = await api('/api/visit', { place: '' }); const d = await r.json(); if (was) addSys(was === 'dorm' ? 'You headed home.' : 'Wizra headed home.');
+    const r = await api('/api/visit', { place: '' }); const d = await r.json(); if (was) addSys(was === 'house' ? 'Wizra headed home.' : 'You headed home.');
     if (was === 'house' && shownPlace === 'house' && !away) { // see her out: she walks to your door before the view goes back to her room
       seeingOut = true; avatar.presence('leave'); const t0 = Date.now(); while (avatar.activity() !== 'out' && Date.now() - t0 < 20000) await new Promise(ok => setTimeout(ok, 300));
       seeingOut = false; setPlace(d); if (!away) avatar.presence('return');
@@ -773,7 +891,7 @@ async function applyAvatar() {
   if (want === avatarShown) return; avatarShown = want; avatarNote = '';
   if (want === 'puppet') return avatar.setRenderer(null);
   try {
-    const m = await import('./avatar-vrm.js'); const r = await m.create('/api/avatar?v=' + settings.avatarV);
+    const m = await import('./avatar-vrm.js'); const r = await m.create('/api/avatar?v=' + settings.avatarV, { maps: dev.maps });
     if (avatarShown === want) avatar.setRenderer(r); else r.dispose();
   } catch (e) { console.error(e); if (avatarShown === want) { avatarShown = 'puppet'; avatarNote = 'The 3D model could not be shown on this device (' + e.message + '). Showing the cartoon.'; avatar.setRenderer(null); } }
 }
@@ -1270,5 +1388,6 @@ async function brainStatus() {
 brainStatus(); setInterval(brainStatus, 20000);
 load().then(() => voice.start()).catch(() => {});
 </script>
+<script>if (new URLSearchParams(location.search).has('uiedit')) { const s = document.createElement('script'); s.src = 'uiedit.js'; document.body.append(s); }</script>
 </body>
 </html>
