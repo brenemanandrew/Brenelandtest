@@ -559,6 +559,20 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { ok: true });
       }
 
+      // Rewind: undo everything said from a moment onward and put the world back to "she is home, nothing pending".
+      // Works by timestamp only and answers with counts, never with the messages. The file as it was is kept beside it first.
+      if (url.pathname === '/api/rewind' && req.method === 'POST') {
+        const { to, rapport } = await readBody(req), t = Number(to);
+        if (!Number.isFinite(t) || t < Date.now() - 7 * 86400000 || t > Date.now()) return json(res, 400, { error: 'to must be a time in the last week (ms)' });
+        if (busy) return json(res, 409, { error: 'busy' });
+        save(); const backup = STORE.replace(/\.json$/, `.before-rewind-${Date.now()}.json`); try { fs.copyFileSync(STORE, backup); } catch (e) { return json(res, 500, { error: 'could not back up: ' + e.message }); }
+        const before = db.log.length, gone = db.log.filter(e => e.at >= t), turns = gone.filter(e => e.who === 'her').length;
+        db.log = db.log.filter(e => e.at < t); db.history = db.history.slice(0, Math.max(0, db.history.length - turns * 2));
+        db.away = null; db.glow = null; db.plan = null; db.call = null; db.place = ''; db.invite = null; db.sinceLearn = 0; touches = [];
+        if (Number.isFinite(+rapport)) db.sheet.rapport = Math.max(0, Math.min(100, Math.round(+rapport)));
+        save();
+        return json(res, 200, { ok: true, removed: before - db.log.length, kept: db.log.length, backup: path.basename(backup), ...placeView() });
+      }
       if (url.pathname === '/api/reset' && req.method === 'POST') {
         db.history = []; db.log = []; db.sinceLearn = 0; db.away = null; db.glow = null; db.plan = null; db.call = null; db.place = ''; db.invite = null; save();
         return json(res, 200, { ok: true });
