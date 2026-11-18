@@ -133,3 +133,9 @@ A player made with "I am new here" gets `public/intro.js` before the game: a com
 - `db.feeling` ({ text, at }): the note keeper (`LEARN_PROMPT`) writes how she was left feeling; `systemBlocks()` hands it back to her for 72 hours.
 - `db.memories` via `remember(key, text)`: one entry per first. `GET /api/settings` returns `memories` ({ moments, pics }) for the Memory book fold in the Character menu.
 - `POST /api/pin/word { word }` sets a recovery word for the current save (`shared.words`, hashed with the name). `POST /api/pin/recover { name, word, pin }` moves the save to a new PIN.
+
+## More gestures, yoga, follow-ups
+- New hand-made gestures in `GESTURE` (`public/avatar-vrm.js`): eyeroll, chuckle, clap, facepalm, think, crossarms, hips, cheer, pout, and a fuller yawn and stretch. `_eyes: [right, up]` in a gesture pulls her gaze off you. The words in her `*actions*` that set each one off are in `GEST` (`public/avatar.js`).
+- Poses hold: a held pose runs half as long again as its listed time, a second action in the same reply waits for the first to finish plus a beat, and quick motions (nod, wave, eyeroll) are listed in `QUICK`.
+- Yoga: four one-frame clips made in code (`yoga_moon`, `yoga_tree`, `yoga_warrior`, `yoga_sit`) and the `yoga` errand: she walks to a clear patch of floor and holds each in turn. Set off by "*does some yoga*" and the like. Test hooks: `WIZRA_CLIP = 'yoga_tree'`, `WIZRA_YOGA`.
+- Follow-ups: `POST /api/followup`. The page asks 16 to 38 seconds after a reply if you have not started typing; the rule `followRate` (30 percent) and then the model decide (it may answer "..." for nothing to add). The small arrow after her last line sends `{ ask: true }`: she continues the thought. One automatic follow-up per message of yours.

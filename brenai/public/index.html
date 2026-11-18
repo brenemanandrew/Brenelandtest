@@ -408,6 +408,7 @@
   #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
   #herWrap { display:none !important; }   /* her words are in the chat area and spoken: no balloon up top */
   /* pictures she sends */
+  .msg .more { grid-column:2; justify-self:start; margin:4px 0 0; border:0; border-radius:999px; padding:2px 9px; font-size:12px; line-height:1.4; cursor:pointer; color:#fff; background:linear-gradient(135deg,#a855f7,#ec4899); opacity:.75; } .msg .more:hover { opacity:1; }
   .chatpic { display:block; width:min(230px, 72%); aspect-ratio:4/5; object-fit:cover; margin:4px 0 8px; border-radius:16px; border:4px solid #fff; box-shadow:0 4px 14px rgba(20,8,50,.35); background:#d9d2e6; cursor:zoom-in; transform:rotate(-1.5deg); }
   .chatpic.wait { animation:picWait 1s ease-in-out infinite alternate; } @keyframes picWait { from { opacity:.45; } to { opacity:.9; } }
   #picView { position:fixed; inset:0; z-index:40; display:grid; place-items:center; background:rgba(8,6,12,.88); cursor:zoom-out; } #picView[hidden] { display:none; }
@@ -925,8 +926,23 @@ async function readReply(r, body, beforeType) {
   }
 }
 
+// ---------- her follow-ups: a second message when she has more to say ----------
+// A little after a reply the page asks the server whether she has an afterthought (the game's rate, then she herself, decide).
+// The small arrow after her last line asks her to go on right now.
+let followTimer = 0;
+function moreArrow() { for (const b of log.querySelectorAll('.more')) b.remove(); if (away || SANDBOX) return; const last = [...log.querySelectorAll('.msg.her')].pop(); if (!last || last !== log.lastElementChild) return;
+  const b = el('button', { className: 'more', title: 'Let her go on', textContent: '\u25B8\u25B8' }); b.onclick = () => followUp(true); last.append(b); }
+function armFollow() { clearTimeout(followTimer); moreArrow(); let tries = 0; const go = () => { if (input.value.trim() || sendBtn.disabled || away || phoneCall.on || document.hidden) return; if (speaker.busy() && tries++ < 8) { followTimer = setTimeout(go, 5000); return; } followUp(false); }; followTimer = setTimeout(go, 16000 + Math.random() * 22000); }
+async function followUp(ask) {
+  if (sendBtn.disabled || away || phoneCall.on) return; clearTimeout(followTimer); sendBtn.disabled = true; for (const b of log.querySelectorAll('.more')) b.remove();
+  let body = null; if (ask) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; avatar.setThinking(true); }
+  try { const d = await (await api('/api/followup', { ask: !!ask })).json();
+    if (d.text) { body = body || addLine('her', ''); avatar.setThinking(false); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); }
+    else if (body) body.parentElement.remove();
+  } catch { if (body && body.parentElement) body.parentElement.remove(); } finally { sendBtn.disabled = false; avatar.setThinking(false); moreArrow(); }
+}
 async function send(quick, visit, lean) {
-  const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return;
+  const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return; clearTimeout(followTimer);
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
@@ -936,7 +952,7 @@ async function send(quick, visit, lean) {
   try {
     const r = await api('/api/chat', { text, doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
-    await readReply(r, body);
+    await readReply(r, body); armFollow();
   } catch (e) {
     if (e.message !== 'login') { if (body && body.parentElement && body.parentElement.isConnected) body.parentElement.remove(); addError(e.message); }
   } finally {

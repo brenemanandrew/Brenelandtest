@@ -151,8 +151,6 @@ export async function create(url, opts = {}) {
     fingerwave: t => { const o = sign('peace', t, { happy: 0.3, relaxed: 0.4 }); FN.forEach((f, i) => { const c = 0.32 + 0.32 * Math.sin(t * 9 - i * 0.9); o['right' + f + 'Proximal'] = [0, (0.14 - i * 0.1), c * 1.2]; o['right' + f + 'Intermediate'] = [0, 0, c * 0.9]; o['right' + f + 'Distal'] = [0, 0, c * 0.5]; }); o.rightThumbMetacarpal = [0, -0.2, 0]; o.rightThumbProximal = [0, 0, 0]; return o; },
     wave: t => ({ rightUpperArm: [0, 0, -0.7], rightLowerArm: [0, 0, -0.95 + 0.42 * sin(t * 9)], rightHand: [0, 0, -0.1], _head: [0, 0, 0.08] }),
     shrug: () => ({ leftShoulder: [0, 0, 0.38], rightShoulder: [0, 0, -0.38], leftUpperArm: [0.18, 0, -1.2], rightUpperArm: [0.18, 0, 1.2], leftLowerArm: [0, -0.75, 0], rightLowerArm: [0, 0.75, 0], leftHand: [0, 0, 0.5], rightHand: [0, 0, -0.5], _head: [0, 0, 0.12] }),
-    stretch: t => ({ leftUpperArm: [0, 0, 1.25], rightUpperArm: [0, 0, -1.25], leftLowerArm: [0, -0.25, 0], rightLowerArm: [0, 0.25, 0], spine: plus('spine', -0.2 + 0.02 * sin(t * 2)), _head: [-0.15, 0, 0], _face: { blink: 1 } }),
-    yawn: t => ({ leftUpperArm: [0, 0, 1.1], leftLowerArm: [0, -0.5, 0], spine: plus('spine', -0.12), _head: [-0.2, 0, 0.1], _face: { aa: 0.9, blink: 1 } }),
     lean: () => ({ spine: plus('spine', 0.16), _head: [0.05, 0, 0] }),
     bow: t => ({ spine: plus('spine', 0.3), _head: [0.3, 0, 0], _face: { blink: 1 } }),
     slump: () => ({ spine: plus('spine', 0.16), leftShoulder: [0, 0, -0.1], rightShoulder: [0, 0, 0.1], _head: [0.35, 0, 0.08] }),
@@ -175,13 +173,25 @@ export async function create(url, opts = {}) {
     cringe: () => ({ leftShoulder: [0, 0, 0.3], rightShoulder: [0, 0, -0.3], spine: plus('spine', -0.08), _head: [0.1, 0.3, 0.12], _face: { blink: 0.7, sad: 0.4 } }),
     kiss: () => ({ spine: plus('spine', 0.14), _head: [0.06, 0, 0.12], _face: { blink: 1, relaxed: 0.3 } }),
     jump: t => ({ _hipY: 0.03 * abs(sin(t * 6)), leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _face: { happy: 0.9 } }),
+    // _eyes: [right, up] pulls her gaze off you (her eyes only turn a little, so the head carries the rest of the look)
+    eyeroll: t => { const a = Math.min(1, t / 1.5) * Math.PI; return { _eyes: [-2.6 * Math.cos(a), 3.2 * Math.sin(a) + 0.6], _head: [-0.2 * Math.sin(a), 0.22 * Math.cos(a), 0.1 * Math.sin(a)], _face: { blink: 0.28, relaxed: 0.3 } }; },
+    chuckle: t => ({ leftShoulder: [0, 0, 0.07 * abs(sin(t * 11))], rightShoulder: [0, 0, -0.07 * abs(sin(t * 11))], spine: plus('spine', 0.05 + 0.015 * sin(t * 11)), _head: [0.12 + 0.03 * sin(t * 11), 0.1, 0.06], _face: { happy: 0.75, blink: 0.55 } }),
+    yawn: t => ({ rightUpperArm: [-0.75, 0.25, 1.15], rightLowerArm: [0, 2.45, 0], rightHand: [0, 0, 0.25], leftUpperArm: [0, 0, 1.2], leftLowerArm: [0, -0.6, 0], spine: plus('spine', -0.14 + 0.02 * sin(t * 1.6)), _head: [-0.24, 0, 0.08], _face: { aa: 0.95, blink: 1 } }),
+    stretch: t => ({ leftUpperArm: [0, 0, 1.42], rightUpperArm: [0, 0, -1.42], leftLowerArm: [0, -0.35, 0], rightLowerArm: [0, 0.35, 0], leftHand: [0, 0, 0.3], rightHand: [0, 0, -0.3], spine: plus('spine', -0.2, 0, 0.1 * sin(t * 1.3)), _head: [-0.2, 0, 0.06 * sin(t * 1.3)], _face: { blink: 1, relaxed: 0.5 } }),
+    clap: t => { const c = 0.16 * (0.5 + 0.5 * sin(t * 16)); return { leftUpperArm: [-0.32, -0.3, -1.15], rightUpperArm: [-0.32, 0.3, 1.15], leftLowerArm: [0, -1.85 + c, 0], rightLowerArm: [0, 1.85 - c, 0], leftHand: [0, 0, 0.1], rightHand: [0, 0, -0.1], _head: [0.03 * sin(t * 8), 0, 0.05], _face: { happy: 0.9 } }; },
+    facepalm: () => ({ rightUpperArm: [-0.95, 0.2, 1.15], rightLowerArm: [0, 2.5, 0], rightHand: [0, 0, 0.2], spine: plus('spine', 0.08), _head: [0.3, -0.12, 0], _face: { blink: 1, sad: 0.2 } }),
+    think: t => ({ rightUpperArm: [-0.6, 0.2, 1.2], rightLowerArm: [0, 2.4, 0], rightHand: [0, 0, 0.1], leftUpperArm: [-0.2, 0.5, -1.25], leftLowerArm: [0, -1.5, 0], _eyes: [1.4, 1.8], _head: [-0.06, -0.14, 0.14], _face: { relaxed: 0.2 } }),
+    crossarms: () => ({ leftUpperArm: [-0.08, -0.5, -1.25], rightUpperArm: [-0.16, 0.5, 1.25], leftLowerArm: [0, -1.8, 0], rightLowerArm: [0, 1.62, 0], leftHand: [0, 0, 0.2], rightHand: [0, 0, -0.2], leftShoulder: [0, 0, 0.08], rightShoulder: [0, 0, -0.08], _head: [0, 0, 0.08] }),
+    hips: () => ({ leftUpperArm: [0.25, 0, -0.85], rightUpperArm: [0.25, 0, 0.85], leftLowerArm: [0, -1.5, 0], rightLowerArm: [0, 1.5, 0], leftHand: [0, 0, -0.5], rightHand: [0, 0, 0.5], _head: [0, 0, 0.08] }),
+    cheer: t => ({ leftUpperArm: [0, 0, 1.1 + 0.1 * sin(t * 9)], rightUpperArm: [0, 0, -1.1 - 0.1 * sin(t * 9)], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], _hipY: 0.012 * abs(sin(t * 9)), _head: [-0.1, 0, 0], _face: { happy: 1 } }),
+    pout: () => ({ leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _eyes: [2.2, -0.6], _head: [0.1, 0.3, -0.1], _face: { sad: 0.45, angry: 0.25, ou: 0.5 } }),
     test: () => window.WIZRA_GEST || {},                                           // test hook: try a pose from the console
     jolt: t => ({ spine: plus('spine', -0.14 * Math.exp(-t * 2.5)), leftShoulder: [0, 0, 0.25 * Math.exp(-t * 2.5)], rightShoulder: [0, 0, -0.25 * Math.exp(-t * 2.5)], _head: [-0.12 * Math.exp(-t * 2.5), 0, 0] }),
   };
   const REST = n => CUR[n] || [0, 0, 0];
-  const WIDE = { peace: 0.24, oksign: 0.24, fox: 0.24, fingerheart: 0.24, crossed: 0.24, flipoff: 0.24, fingerwave: 0.24, wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, handsup: 0.3, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
+  const WIDE = { peace: 0.24, oksign: 0.24, fox: 0.24, fingerheart: 0.24, crossed: 0.24, flipoff: 0.24, fingerwave: 0.24, wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, clap: 0.2, facepalm: 0.15, think: 0.15, crossarms: 0.15, hips: 0.2, cheer: 0.34, handsup: 0.3, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
   let touchedBones = [], gestureZoom = 0;
-  const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0 };
+  const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0, eyes: [0, 0] };
   const hipsNode = B('hips'), hipY0 = hipsNode ? hipsNode.position.y : 0;
   // Her mood also sits in her body, not just her face: [spine lean, head pitch, head yaw, head roll, shoulders up]
   const BODY = { tipsy: [0.02, 0.03, 0, 0.1, 0], high: [-0.05, -0.05, 0, 0.1, -0.05], sad: [0.1, 0.22, 0, 0.05, -0.06], grumpy: [-0.04, 0.08, 0.3, 0, 0.05], tired: [0.06, 0.2, 0, 0.14, -0.08], excited: [0.1, -0.06, 0, 0, 0.08], joy: [-0.03, -0.1, 0, 0.05, 0.06],
@@ -189,14 +199,14 @@ export async function create(url, opts = {}) {
     anxious: [0.03, 0.08, 0, 0.04, 0.2], chill: [-0.06, -0.04, 0, 0.06, -0.04], playful: [0.05, 0, 0, 0.12, 0.03], eyeroll: [-0.03, -0.14, 0.15, 0.08, 0], flinch: [-0.1, 0.05, 0, 0, 0.3], dizzy: [0, 0.1, 0, 0.2, 0], focused: [0.1, 0.06, 0, 0, 0], happy: [0.02, -0.04, 0, 0.04, 0.03] };
   const body = [0, 0, 0, 0, 0];
   function applyGesture(g, faceName, dt) {
-    for (const n of touchedBones) if (!CUR[n]) set(n, 0, 0, 0); touchedBones = []; gestureZoom = 0; gx.head = [0, 0, 0]; gx.hipY = 0; gx.face = null; gx.k = 0;
+    for (const n of touchedBones) if (!CUR[n]) set(n, 0, 0, 0); touchedBones = []; gestureZoom = 0; gx.head = [0, 0, 0]; gx.hipY = 0; gx.face = null; gx.k = 0; gx.eyes[0] = gx.eyes[1] = 0;
     const want = BODY[faceName] || [0, 0, 0, 0, 0]; for (let i = 0; i < 5; i++) body[i] += (want[i] - body[i]) * Math.min(1, dt * 5);
     if (!g || !GESTURE[g.name]) return;
     if (CLIP_GEST[g.name] && CLIPS[CLIP_GEST[g.name]] && rt.k > 0.9) { const c = CLIPS[CLIP_GEST[g.name]]; playClip(CLIP_GEST[g.name], g.w * g.w * (3 - 2 * g.w), Math.min(g.t, c.dur - 0.04)); return; } // a recorded one, when she is on her feet
     const tg = GESTURE[g.name](g.t), k0 = g.w * g.w * (3 - 2 * g.w), k = k0 * (1 + 0.13 * Math.exp(-5 * g.t) * Math.sin(17 * g.t)); gx.k = k0; // every gesture arrives a little past its mark and settles
     for (const n in tg) {
       const q = tg[n];
-      if (n === '_head') gx.head = [q[0] * k, q[1] * k, q[2] * k]; else if (n === '_hipY') gx.hipY = q * k; else if (n === '_face') gx.face = q;
+      if (n === '_head') gx.head = [q[0] * k, q[1] * k, q[2] * k]; else if (n === '_hipY') gx.hipY = q * k; else if (n === '_face') gx.face = q; else if (n === '_eyes') { gx.eyes[0] = q[0] * k; gx.eyes[1] = q[1] * k; }
       else { const r = REST(n); set(n, r[0] + (q[0] - r[0]) * k, r[1] + (q[1] - r[1]) * k, r[2] + (q[2] - r[2]) * k); touchedBones.push(n); }
     }
     gestureZoom = (WIDE[g.name] || 0) * k;
@@ -205,6 +215,18 @@ export async function create(url, opts = {}) {
   // there are any; without them everything falls back to the hand-made motion. A clip is { dur, fps, n, bones: { name: [x,y,z,w per frame] }, hips }.
   const snd = n => window.dispatchEvent(new CustomEvent('wizra-sound', { detail: n }));   // sound.js listens for these
   const CLIPS = {}; fetch('/api/anims').then(r => r.ok ? r.json() : null).then(d => { if (d && d.clips) Object.assign(CLIPS, d.clips); }).catch(() => {});
+  // Poses made by hand, in the same shape as a recorded clip (one frame), so she can hold them on her feet: the yoga set.
+  // leg: [bend at the hip (forward is negative), turn the knee out (her left is positive), lift sideways]; the rest are plain bone turns.
+  { const E = new THREE.Euler(), qx = new THREE.Quaternion(), qy = new THREE.Quaternion(), qz = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
+    const eul = ([x, y, z]) => { const q = new THREE.Quaternion().setFromEuler(E.set(x, y, z)); return [q.x, q.y, q.z, q.w]; }, leg = ([f, t, a]) => { const q = qz.setFromAxisAngle(Z, a).clone().multiply(qy.setFromAxisAngle(Y, t)).multiply(qx.setFromAxisAngle(X, f)); return [q.x, q.y, q.z, q.w]; };
+    const pose = (hip, legs, rest) => { const bones = {}; for (const n in legs) bones[n] = leg(legs[n]); for (const n in rest) bones[n] = eul(rest[n]); return { dur: 1 / 30, fps: 30, n: 1, bones, hips: [0, hip, 0], made: true }; };
+    const UP = { leftUpperArm: [0, 0, 1.42], rightUpperArm: [0, 0, -1.42], leftLowerArm: [0, -0.3, 0], rightLowerArm: [0, 0.3, 0], leftHand: [0, 0, 0.25], rightHand: [0, 0, -0.25] };
+    Object.assign(CLIPS, window.WIZRA_YOGA || {
+      yoga_tree: pose(1, { rightUpperLeg: [-1.0, -1.35, 0], leftUpperLeg: [0, 0, 0] }, { ...UP, rightLowerLeg: [2.3, 0, 0], rightFoot: [0.5, 0, 0], leftLowerLeg: [0, 0, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0, 0, 0] }),
+      yoga_warrior: pose(0.76, { leftUpperLeg: [-1.1, 1.5, 0], rightUpperLeg: [0, -0.3, -0.72] }, { leftLowerLeg: [1.1, 0, 0], leftFoot: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightFoot: [0, 0, 0.72], leftUpperArm: [0, 0, 0], rightUpperArm: [0, 0, 0], leftLowerArm: [0, 0, 0], rightLowerArm: [0, 0, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0, 1.1, 0] }),
+      yoga_moon: pose(1, { leftUpperLeg: [0, 0, 0], rightUpperLeg: [0, 0, 0] }, { ...UP, leftLowerLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], spine: [0, 0, 0.22], chest: [0, 0, 0.2], head: [0, 0, 0.12] }),
+      yoga_sit: pose(0.17, { leftUpperLeg: [-1.4, 1.05, 0], rightUpperLeg: [-1.4, -1.05, 0] }, { leftLowerLeg: [2.45, 0, 0], rightLowerLeg: [2.45, 0, 0], leftFoot: [0.4, 0, 0], rightFoot: [0.4, 0, 0], leftUpperArm: [-0.35, 0, -1.0], rightUpperArm: [-0.35, 0, 1.0], leftLowerArm: [0, -0.45, 0], rightLowerArm: [0, 0.45, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.06, 0, 0] }),
+    }); }
   const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(); let clipHip = 0;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
     const c = CLIPS[name]; if (!c || weight < 0.003) return false;
@@ -361,6 +383,10 @@ export async function create(url, opts = {}) {
   const ERRAND = {
     pace: () => plan(CLIPS.texting_and_walking ? 'pacing around the room, texting' : 'up and pacing around the room', [run(() => { if (CLIPS.texting_and_walking) rt.carry = 'phone'; }), go(R_BACK), go(L_BACK), go(R_BACK), run(() => { if (rt.carry === 'phone') rt.carry = null; })]),
     liedown: () => { if (here === 'dorm' && CLIPS.female_laying_pose) { rt.liePose = CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose'; rt.lieAt = null; plan('lying on her bed', [go(places.bed.side), { lie: 45 + Math.random() * 60 }]); } },
+    // her yoga: she finds a clear patch of floor and holds four poses, one after another
+    yoga: () => { const spots = [[1.25, hip.z + 1.55], [-1.2, hip.z + 1.5], [0.9, hip.z + 2.1], STAND_AT], at = spots.find(p => walkable(p[0], p[1])) || STAND_AT, order = ['yoga_moon', 'yoga_tree', 'yoga_warrior', 'yoga_sit'];
+      const steps = [go(at)]; for (const n of order) steps.push(run(() => { rt.liePose = n; rt.lieAt = { x: at[0], z: at[1], y: floorY, yaw: Math.atan2(camera.position.x - at[0], camera.position.z - at[1]) }; }), { lie: n === 'yoga_sit' ? 22 : 13 }, wait(1.2));
+      plan('doing yoga', steps); },
     // one of the things placed in this room (a bean bag, the log by the fire, the picnic blanket): she goes over and settles on it for a while
     perch: () => { if (window.WIZRA_PERCH != null) window.WIZRA_RT = rt; const list = (places.perches[here] || []).filter(p => CLIPS[p.lie ? 'female_laying_pose' : 'female_sitting_pose']); if (!list.length) return; const p = list[window.WIZRA_PERCH != null ? window.WIZRA_PERCH % list.length : Math.floor(Math.random() * list.length)];
       const pose = p.lie ? (CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose') : ['female_sitting_pose', 'female_sitting_pose_1', 'female_sitting_pose_2'].filter(n => CLIPS[n])[Math.floor(Math.random() * 3)] || 'female_sitting_pose';
@@ -872,7 +898,7 @@ export async function create(url, opts = {}) {
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking
-      if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else if (watching) target.position.copy(places.tv.at); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; }
+      if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else if (watching) target.position.copy(places.tv.at); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; if (gx.eyes[0] || gx.eyes[1]) { const yw = vrm.scene.rotation.y; target.position.x -= Math.cos(yw) * gx.eyes[0]; target.position.z += Math.sin(yw) * gx.eyes[0]; target.position.y += gx.eyes[1]; } }
       let facing = rt.stand > 0.5 ? 0 : camYaw * 0.55, tip = 0; // seated she turns her head to you; on her feet her whole body does
       if (fp.on) { // you could be anywhere in the room: she turns as far as a neck goes, and looks up if you are standing over her
         const dx = camera.position.x - eye.x, dz = camera.position.z - eye.z, off = Math.atan2(dx, dz) - vrm.scene.rotation.y, a = Math.atan2(Math.sin(off), Math.cos(off));

@@ -114,6 +114,9 @@
   // ---- the controller: moods, passing expressions, touch, her reserve, the springs. The same for every renderer. ----
   // things she physically does, read from the actions in her reply: [pattern, gesture, seconds]
   const GEST = [
+    [/rolls? her eyes|eye[- ]?roll/i, 'eyeroll', 3.2], [/chuckl|snicker|soft laugh|laughs? (softly|quietly|under her breath)|huffs? a laugh/i, 'chuckle', 3.4], [/\bclap/i, 'clap', 4], [/face ?palm|buries her face in her hand|hand over her (face|eyes)|pinches the bridge of her nose/i, 'facepalm', 4.5],
+    [/taps? her chin|strokes? her chin|hand (on|to) her chin|thinks? (about|for|it over)|ponders?|considers? (it|this|that|him|you)|mulls?|thoughtful/i, 'think', 5], [/cross(es|ed|ing)? her arms|folds? her arms|arms crossed|arms folded/i, 'crossarms', 6], [/hands? on her hips?|plants? her hands/i, 'hips', 5],
+    [/cheers?\b|throws? (up )?her (hands|arms)|fist pump|pumps? (a|her) fist|arms? in the air|whoops?/i, 'cheer', 3.6], [/pouts?|sulks?|puffs? (out )?her cheeks/i, 'pout', 5],
     [/finger heart|heart with her (fingers|thumb)|(tiny|little|small) heart/i, 'fingerheart', 3.2], [/peace sign|throws? (up )?(a |the )?(peace|deuces)|\bv[- ]sign|victory sign/i, 'peace', 3], [/ok(ay)? (sign|gesture|hand)|\ba-ok\b/i, 'oksign', 2.8],
     [/fox (sign|hand|gesture|ears)|makes? a (little )?fox/i, 'fox', 3], [/cross(es|ed|ing)? her fingers|fingers crossed/i, 'crossed', 3], [/flips? (him|you|it|that) off|(gives?|shows?) (him|you) the (middle )?finger|middle finger|flips? the bird/i, 'flipoff', 2.6],
     [/(wiggl|waggl)(es|ing)? her fingers|finger wave|(little|tiny) wave/i, 'fingerwave', 3],
@@ -135,6 +138,7 @@
     [/hugs? (one|a) knee|rests? her chin on her knee|pulls? (one|a) (knee|leg) up/i, 'knee'], [/curls? up|hugs? her knees|pulls? her (knees|legs) (up|in|to her chest)|tucks? her (legs|feet) (up|under)/i, 'curl'], [/(plays?|fiddles?|toys?) with her hair|runs? (a hand|her fingers) through her hair|twirls? (a strand|a lock|her hair)/i, 'hair'],
     [/(drapes?|swings?|throws?|hooks?|kicks?) her legs over|sits? sideways|sideways in (her|the) (chair|seat|armchair)/i, 'drape'],
     [/cross(es|ed|ing)? her (legs|ankles|feet|boots)/i, 'crosslegs'], [/(puts?|sets?|plants?|drops?|swings?) her (feet|boots) (back )?(down|on(to)? the floor|off the table)|feet off the table/i, 'feetdown'], [/(puts?|props?|kicks?|swings?) her (feet|boots) (back )?up/i, 'feetup'],
+    [/\byoga\b|tree pose|warrior pose|sun salutation|does? (some |a few |her )?(stretches|poses)|rolls? out (her|a|the) (yoga )?mat|meditat/i, 'yoga'],
     [/(lies?|lays?|flops?|sprawls?|stretches) (back |down |out )*(on|onto|across) (her|the) bed|climbs? (on|onto|into) (her|the) bed/i, 'liedown'],
     [/(sits?|flops?|settles?|curls? up|plops?|drops?|sinks?|lies?|lays?|stretches?|sprawls?) (back |down |out )*(on|onto|in|into|across) (the|a|her|his|one of the) (bean ?bags?|log|camp chair|sofa|couch|picnic blanket|blanket|sleeping bag|blanket fort|fort|stool)/i, 'perch'],
     [/sits? (back )?down|flops? (back )?(down|into|onto)|(drops?|sinks?|settles?|plops?) (back )?(down )?(into|onto|in) (her|the) (chair|seat|armchair)|returns? to her (chair|seat)/i, 'sit'],
@@ -163,6 +167,7 @@
     const now = () => performance.now();
 
     let voice = null, state = ''; let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
+    const QUICK = new Set(['nod', 'shake', 'flip', 'jump', 'kiss', 'wave', 'fingerwave', 'eyeroll', 'laugh', 'bounce', 'headbang']);   // these are over when they are over; the rest are poses that hold
     function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
     function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; if (opts.onEmote) opts.onEmote(ch); }
@@ -260,7 +265,7 @@
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
       // a gesture in progress: name, seconds since it began, and an ease in/out weight 0..1
       // left alone for a while, she moves on her own
-      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const pool = STATE[state] ? STATE[state][1] : IDLE; if (idleAt) doGesture(...pool[Math.random() * pool.length | 0]); idleAt = t + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); }
+      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const pool = STATE[state] ? STATE[state][1] : IDLE; if (idleAt) { const pick = pool[Math.random() * pool.length | 0]; doGesture(pick[0], (pick[1] || 2.2) * (QUICK.has(pick[0]) ? 1 : 1.4)); } idleAt = t + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); }
       if ((talking || thinking) && idleAt < t + 25000) idleAt = t + 25000;   // while you two are talking she is with you, not fidgeting
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
@@ -286,7 +291,7 @@
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) { const hit = ROUTINE.find(([re]) => re.test(m[1])); if (hit && R.doActivity) { R.doActivity(hit[1]); break; } }
         const found = [];
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) for (const [re, name, dur] of GEST) if (re.test(m[1])) { found.push([name, dur]); break; }
-        let wait = 0; for (const [name, dur] of found.slice(0, 2)) { setTimeout(() => doGesture(name, dur), wait); wait += dur * 1000 * 0.85; }
+        let wait = 0; for (const [name, dur] of found.slice(0, 2)) { const hold = dur * (QUICK.has(name) ? 1 : 1.5); setTimeout(() => doGesture(name, hold), wait); wait += hold * 1000 + 1200; }   // each pose is held, then a breath before the next
         return found.map(f => f[0]);
       },
       gesture: doGesture,

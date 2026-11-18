@@ -521,6 +521,7 @@ const RULES = {
   bonusOther: [1, 0, 50, 'Heart game bonus: points for her hands or shoulders'],
   picRate: [100, 0, 500, 'How often she sends pictures on her own (percent of normal)'],
   picAskMin: [25, 0, 100, 'Rapport needed before she sends a picture when asked'],
+  followRate: [30, 0, 100, 'How often she adds a second message on her own after a reply (percent of replies; she can still decide she has nothing to add)'],
   callRate: [100, 0, 500, 'How often she calls you while she is out (percent of normal)'],
   lvl1: [100, 1, 100000, 'Romance points to reach level 1'], lvl2: [500, 1, 100000, 'Romance points to go from level 1 to 2'], lvl3: [700, 1, 100000, 'Romance points to go from level 2 to 3'], lvlCap: [1000, 1, 100000, 'Romance points level 3 fills to'],
 };
@@ -686,6 +687,21 @@ async function handle(req, res) {
         catch (e) { console.error('[intro]', e.message); db.log.pop(); text = `hey. so, I'm Wizra. guess the matching thing picked us. ...hi, ${USER_NAME}.`; }   // her PC is off: a plain hello, so the first minute still works
         finally { busy = false; }
         db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { text });
+      }
+
+      // a second message from her: on her own a little after a reply (the page asks; the rate and then she herself decide), or
+      // because he tapped the arrow after her line ({ ask: true }) to hear the rest of the thought
+      if (url.pathname === '/api/followup' && req.method === 'POST') {
+        const { ask } = await readBody(req), seen = db.log.filter(e => !e.hidden && e.who !== 'sys'), last = seen[seen.length - 1];
+        if (busy || db.away || db.call || !last || last.who !== 'her' || !brain.ws && !client) return json(res, 200, { text: '' });
+        const mine = seen.filter(e => e.who === 'me').pop(), key = mine ? mine.at : 0;
+        if (!ask && (db.followed === key || Date.now() - last.at > 180000 || Math.random() * 100 >= rule('followRate'))) { db.followed = key; return json(res, 200, { text: '' }); }
+        db.followed = key; busy = true;
+        const pre = ask ? `${USER_NAME} waits for you to go on. Continue the thought you just had: say the next thing, do not repeat what you already said` : `a little while passes and ${USER_NAME} has not answered yet. If a real follow-up comes to you (an afterthought, a second question, a correction, a tease, something you just remembered), send it now as one short message. If you have nothing to add, answer with only: ...`;
+        try { db.log.push({ who: 'me', text: '', at: Date.now(), pre, hidden: true }); const text = (await reply(`*${pre}*`, () => {})).trim();
+          if (!text || /^[\s.\u2026*_-]*$/.test(text) || /^\W*(nothing( to add)?|no follow[- ]?up|n\/a)\W*$/i.test(text)) { db.log.pop(); save(); return json(res, 200, { text: '' }); }
+          db.log.push({ who: 'her', text, at: Date.now(), more: true }); save(); return json(res, 200, { text }); }
+        catch (e) { db.log.pop(); return json(res, 200, { text: '', error: e.message }); } finally { busy = false; }
       }
 
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
