@@ -108,6 +108,6 @@ Everyone who plays has their own game. After the site password the page asks for
 - An existing PIN opens that player's save. "I am new here" makes a new one (pick a PIN, say what she should call you).
 - Per player (`/data/users/<id>.json`, the id is a hash of the PIN): the chat, her notes, the scores, levels, where she is, settings.
 - Shared by everyone (`/data/shared.json`): the Studio's work (layout, events, maps), outfits, game rules, her core character text and her model.
-- "Switch player" sits under "New chat" in the settings. Eight wrong PINs from one address locks PIN entry for ten minutes.
+- "Switch player" sits at the bottom of the settings menu. Eight wrong PINs from one address locks PIN entry for ten minutes.
 - The save from before PINs (`brenai.json`) could be claimed once with a PIN; it is then renamed `brenai.claimed.json`.
 - A PIN is not a strong password: anyone with the site password could guess a 4 digit PIN over a few days. It keeps saves apart, it does not guard secrets.

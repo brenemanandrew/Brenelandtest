@@ -97,7 +97,6 @@
   #panel .scale { display:flex; justify-content:space-between; font-size:12px; color:var(--dim); }
   #panel .note { font-size:12px; color:var(--dim); margin-top:6px; }
   #closeWheel { position:fixed; top:10px; right:14px; font-size:26px; background:none; border:0; color:var(--text); z-index:16; }
-  #newChat { display:block; margin:0 auto 14px; padding:8px 14px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; font-size:14px; }
   #login { position:fixed; inset:0; background:var(--bg); display:none; place-items:center; z-index:20; }
   #login form { display:grid; gap:10px; width:260px; } #login form[hidden], #login input[hidden] { display:none; } #login button.quiet { background:rgba(255,255,255,.12) !important; font-weight:500 !important; } #pinMsg { font-size:13px; min-height:18px; opacity:.85; text-align:center; }
   #login input, #login button { padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); font:inherit; }
@@ -149,7 +148,6 @@
   #panel .chip.sel { background:var(--grad); border-color:transparent; color:#fff; }
   #panel button.small { background:var(--grad); border-radius:999px; font-weight:700; padding:8px 16px; }
   #panel .actrow button { background:rgba(255,255,255,.14); border:0; }
-  #newChat { border-radius:999px; background:rgba(255,255,255,.14); }
   #login { background:linear-gradient(170deg,#1f1a4a,#6a3586); }
   #login input, #login button { background:rgba(255,255,255,.12); border-radius:999px; }
   #login button { background:var(--grad); border:0; font-weight:700; }
@@ -315,7 +313,6 @@
   #panel button.small:active { transform:translateY(3px); box-shadow:0 1px 0 rgba(0,0,0,.3); }
   #panel .row { gap:10px; align-items:center; margin-top:8px; }
   #panel .actrow button { width:38px; height:38px; padding:0; border-radius:50%; border:0; background:rgba(255,255,255,.14); box-shadow:none; }
-  #newChat { font-family:"Fredoka",sans-serif; font-weight:700; border:2px solid rgba(255,255,255,.5); padding:10px 20px; margin-top:16px; box-shadow:0 4px 0 rgba(0,0,0,.25); cursor:pointer; }
   #ring .seg b { font-family:"Fredoka",sans-serif; font-weight:700; font-size:13px; } #ring .seg small { font-family:"Patrick Hand",sans-serif; font-size:13.5px; }
   /* getting together: the visit button and its little menu, her invitation, and the first-person view once you are there */
   #visitBtn { position:absolute; left:-8px; top:-8px; width:32px; height:32px; border-radius:50%; border:0; background:#fff; color:#6a3aa8; font-size:16px; line-height:1; padding:0; cursor:pointer; z-index:4; box-shadow:0 3px 10px rgba(0,0,0,.3); }
@@ -463,7 +460,7 @@
     <input id="callType" type="text" placeholder="Type to talk" hidden>
   </div>
 </div>
-<div id="wheel"><div id="ringWrap"><button id="closeWheel" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"><path d="M6.500 6.500l11 11M17.500 6.500l-11 11"/></svg></button><div id="ring"></div></div><div id="panel"></div><button id="newChat">New conversation</button></div>
+<div id="wheel"><div id="ringWrap"><button id="closeWheel" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"><path d="M6.500 6.500l11 11M17.500 6.500l-11 11"/></svg></button><div id="ring"></div></div><div id="panel"></div></div>
 <div id="login">
   <form id="loginForm"><div>Password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button></form>
   <form id="pinForm" hidden><div id="pinTitle">Your PIN</div><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="4 to 8 digits">
@@ -992,8 +989,7 @@ $('bigBtn').onclick = () => { const big = document.body.classList.toggle('big');
 const DID = [[/\bpoke|\bprod|\bjab/i, 'poke'], [/\bboop/i, 'boop'], [/\bpat|\bpet\b|ruffl|\bhug|head ?pat/i, 'pat'], [/\bswat|\bsmack|\bbonk|\bflick/i, 'swat'], [/\bwave|high five/i, 'wave'], [/\blaugh|\bgrin|\bsmile/i, 'laugh'], [/\bstare|\bglare/i, 'stare'], [/\bhand(s)? her|\bgive(s)? her|\bslide(s)? .* to her|\boffer/i, 'gift']];
 function userDid(text) { for (const p of split(text, 'me')) if (p.a) for (const [re, kind] of DID) if (re.test(p.a)) return avatar.react(kind); }
 $('stageBack').onclick = () => document.body.classList.remove('big');
-{ const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('newChat').insertAdjacentElement('afterend', sw); }
-$('newChat').onclick = async () => { if (confirm('Start a new conversation? She keeps what she has learned about you.')) { await api('/api/reset', {}); closeWheel(); load(); } };
+{ const sw = el('button', { id: 'switchPlayer', textContent: 'Switch player (enter another PIN)' }); sw.style.cssText = 'display:block;margin:10px auto 0;border:0;background:none;color:inherit;opacity:.7;text-decoration:underline;font:inherit;font-size:13px;cursor:pointer'; sw.onclick = async () => { await fetch('/api/pin/out', { method: 'POST' }); location.reload(); }; $('panel').insertAdjacentElement('afterend', sw); }
 // Two doors: the site password, then your own PIN. The PIN picks your save; everyone's game is their own.
 function showLogin(pin) { $('login').style.display = 'grid'; $('loginForm').hidden = !!pin; $('pinForm').hidden = !pin; if (pin) $('pin').focus(); }
 let pinNew = false;
