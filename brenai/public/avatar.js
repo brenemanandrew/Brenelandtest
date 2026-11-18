@@ -303,7 +303,7 @@
       holdClip(name, s) { return R.holdClip ? R.holdClip(name, s) : false; }, emote, layout() { return R.layout ? R.layout() : null; }, lists() { return { clips: R.clips ? R.clips() : [], gestures: R.gestures ? R.gestures() : GEST.map(g => g[1]) }; },
       // the heart game: a passing face, a wriggle, the camera closing in on her heart, happy tears
       flash(face, ms) { show(face, ms || 1500); }, squirm(hard) { kick((Math.random() - 0.5) * 300, (Math.random() - 0.5) * 160, 60, hard ? -5 : -3); doGesture(Math.random() < 0.5 ? 'shift' : 'feet', 1.1); },
-      focus(k) { if (R.focus) R.focus(k); }, bonus(on) { if (R.bonus) R.bonus(on); }, bonusShot() { if (R.bonusShot) R.bonusShot(); }, bonusOrbit(dx, dy, dz) { if (R.bonusOrbit) R.bonusOrbit(dx, dy, dz); }, bonusHit(e) { return R.bonusHit ? R.bonusHit(e) : 0; }, tears(on) { if (R.tears) R.tears(on); },
+      focus(k) { if (R.focus) R.focus(k); }, heartPose(i) { if (R.heartPose) R.heartPose(i); }, heartStage(k) { if (R.heartStage) R.heartStage(k); }, bonus(on) { if (R.bonus) R.bonus(on); }, bonusShot() { if (R.bonusShot) R.bonusShot(); }, bonusOrbit(dx, dy, dz) { if (R.bonusOrbit) R.bonusOrbit(dx, dy, dz); }, bonusHit(e) { return R.bonusHit ? R.bonusHit(e) : 0; }, tears(on) { if (R.tears) R.tears(on); },
       snapshot(spec) { return R.snapshot ? R.snapshot(spec) : Promise.resolve(''); },
       // visiting in person (3D model only): 'dorm' or 'house' puts you in the room in first person, '' takes you home
       visit(name) { if (R.visit) R.visit(name || ''); return !!R.visit; }, canVisit() { return !!R.visit; },

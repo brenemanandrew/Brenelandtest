@@ -27,12 +27,14 @@ export async function create(url, opts = {}) {
   const sun = new THREE.DirectionalLight(0xffffff, Math.PI), amb = new THREE.AmbientLight(0xffffff, 0.4); sun.position.set(0.6, 1, 1.2); scene.add(sun, amb);
   // the room follows the clock on the device you are watching from: bright by day, warm in the evening, dim and blue at night
   let night = 0;
+  let stageK = null;   // the heart game's plain pink stage: null when the room is showing, else 0..1 for how deep the pink has gone
   function daylight() {
     const h = new Date().getHours() + new Date().getMinutes() / 60;
     const day = Math.max(0, Math.min(1, (h - 6) / 1.5)) * Math.max(0, Math.min(1, (20.5 - h) / 2)); night = 1 - day;
     const eve = Math.max(0, 1 - Math.abs(h - 19) / 2.5);
     sun.intensity = Math.PI * (0.62 + 0.38 * day); sun.color.setRGB(1 - 0.12 * night + 0.02 * eve, 1 - 0.14 * night - 0.08 * eve, 1 - 0.02 * night - 0.2 * eve);
     amb.intensity = 0.26 + 0.2 * day;
+    if (stageK !== null) return;
     el.style.background = `radial-gradient(circle at 50% 35%, hsl(${272 - 20 * night} ${45 - 10 * night}% ${54 - 26 * night}%), hsl(264 46% ${32 - 14 * night}%) 55%, hsl(258 48% ${20 - 9 * night}%) 100%)`;
   }
   daylight(); const dayTimer = setInterval(daylight, 60000);
@@ -375,6 +377,17 @@ export async function create(url, opts = {}) {
     if (!OVER[name] || rt.act === 'up' || rt.act === 'sitdown') return;
     rt.act = name; rt.until = now + (name === 'sip' ? 4200 : name === 'phone' ? 45000 + Math.random() * 60000 : 80000 + Math.random() * 120000);   // she settles into things
   }
+  // ---- the heart game's poses: every heart you pop puts her in another one (standing, sitting, lying), taken from the recorded clips
+  const HPOSE = [['idle', 2, 'stand'], ['female_sitting_pose', 0, 'sit'], ['female_laying_pose_1', 0, 'lie'], ['female_sitting_pose_2', 0, 'sit'], ['talking', 1.2, 'stand'], ['female_laying_pose', 0, 'lie'], ['female_sitting_pose_1', 0, 'sit'],
+    ['female_sitting_pose', 0, 'sit'], ['idle', 5.5, 'stand'], ['talking', 3.4, 'stand'], ['idle', 2, 'stand']];   // the last three are on her feet: the view is closing in on her heart by then
+  const hpose = { on: false, i: 0, wig: 0 };
+  function heartPose(i) { if (i === null || i === undefined) { if (hpose.on) { hpose.on = false; vrm.scene.rotation.set(0, 0, 0); for (const n of KEYS) { const q = POSE[n] || [0, 0, 0]; CUR[n][0] = q[0]; CUR[n][1] = q[1]; CUR[n][2] = q[2]; } Object.assign(rt, { act: rt.act === 'gone' ? 'gone' : 'sit', stand: 0, k: 0, leg: 0 }); if (vrm.springBoneManager) vrm.springBoneManager.reset(); } return; }
+    hpose.on = true; hpose.i = Math.max(0, i | 0); hpose.wig = 1; hpose.settle = 2; }   // (her hair is put at rest once the new pose is actually on her: see draw)
+  function heartStage(k) { // hide the room and put a plain background behind her: white-pink at the start, deep pink by the end
+    if (k === null || k === undefined) { if (stageK !== null) { stageK = null; setPlace(here); for (const o of [book, phone, mug]) o.visible = true; lampLight.visible = true; daylight(); } return; }
+    stageK = Math.max(0, Math.min(1, k)); for (const key in places.groups) places.groups[key].visible = false; room.visible = false; for (const o of [book, phone, mug]) o.visible = false; lampLight.visible = false;
+    el.style.background = `radial-gradient(circle at 50% 42%, hsl(338 100% ${97 - 27 * stageK}%), hsl(${334 - 6 * stageK} ${88 + 6 * stageK}% ${88 - 50 * stageK}%))`;
+  }
   // ---- scripted (the Studio's events): walk her to a spot, or hold a recorded clip for a while ----
   function walkTo(x, z, done) { // she gets up if she has to, goes there by her own path finding, and stays until told otherwise
     if (rt.act === 'gone' || rt.leaving || inCall) { if (done) done(false); return; }
@@ -398,6 +411,13 @@ export async function create(url, opts = {}) {
   const turnTo = (want, dt, rate) => { const d = Math.atan2(Math.sin(want - rt.yaw), Math.cos(want - rt.yaw)); rt.yaw += d * Math.min(1, dt * rate); rt.yaw = Math.atan2(Math.sin(rt.yaw), Math.cos(rt.yaw)); return Math.abs(d); }; // kept within half a turn either way, so "facing front" is always 0
   function routine(s) {
     clipHip = 0;
+    if (hpose.on) { // the heart game: no room, just her, in whatever pose the last heart left her in
+      for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
+      const pose = HPOSE[hpose.i % HPOSE.length], have = CLIPS[pose[0]]; if (have) playClip(pose[0], 1, pose[1]); else playClip('idle', 1, 2);
+      hpose.wig *= Math.exp(-s.dt * 3.2); const w = hpose.wig * Math.sin(s.t / 1000 * 22);                    // a squirm when the pose changes
+      vrm.scene.position.set(0.012 * w, floorY, 0); vrm.scene.rotation.set(0, 0.1 * w, 0.03 * w); rt.k = 1; rt.gazeProp = null; rt.zoom = 0;
+      return;
+    }
     if (window.WIZRA_CLIP) { for (const n of KEYS) set(n, ...standOf(n)); vrm.scene.position.set(0, floorY, hip.z + 0.4); playClip(window.WIZRA_CLIP, 1, window.WIZRA_CLIP_T != null ? window.WIZRA_CLIP_T : s.t / 1000); return; } // test hook: look at one clip
     if (rt.act === 'call') return callFrame(s);
     if (rt.act === 'gone') return;                                               // the chair is empty
@@ -695,7 +715,7 @@ export async function create(url, opts = {}) {
   // ---- the heart game's camera. While it is on you cannot move or look: the view goes straight in front of her, then drifts
   // slowly and cuts to a new angle with every heart (her face, a shoulder, her hand...), a little closer each time, until the
   // last one puts it right up against her heart. hc.b blends between the ordinary view and this one at the start and the end.
-  const HSHOT = [{ yaw: 0, up: 0.04, at: 'face' }, { yaw: 0.55, up: 0.1, at: 'face' }, { yaw: -0.5, up: 0.08, at: 'shoulder' }, { yaw: 0.3, up: 0.3, at: 'face' }, { yaw: -0.35, up: 0.32, at: 'hand' }, { yaw: 0.6, up: 0.16, at: 'shoulder' },
+  const HSHOT = [{ yaw: 0, up: 0.04, at: 'face' }, { yaw: 0.55, up: 0.1, at: 'face' }, { yaw: -0.5, up: 0.08, at: 'shoulder' }, { yaw: 0.3, up: 0.3, at: 'face' }, { yaw: -0.35, up: 0.14, at: 'face' }, { yaw: 0.6, up: 0.16, at: 'shoulder' },
     { yaw: -0.3, up: 0.1, at: 'face' }, { yaw: 0.4, up: 0.12, at: 'heart' }, { yaw: -0.45, up: 0.2, at: 'face' }, { yaw: 0.2, up: 0.1, at: 'heart' }, { yaw: 0.06, up: 0.06, at: 'heart' }];
   // her heart itself: a soft glowing heart over her chest that brightens and beats faster as the view closes in
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), gr = g.createRadialGradient(64, 60, 4, 64, 60, 62); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,120,180,.95)'); gr.addColorStop(1, 'rgba(255,60,150,0)'); g.fillStyle = gr;
@@ -707,13 +727,16 @@ export async function create(url, opts = {}) {
     if (hc.b < 0.004) { if (hc.fov) { camera.fov = hc.fov; hc.fov = 0; camera.updateProjectionMatrix(); } hc.shot = -1; heartGlow.visible = false; return; }
     if (!hc.fov) hc.fov = camera.fov;
     const n = Math.max(0, Math.min(10, Math.round(focusWant * 10))), shotN = on ? n : Math.max(0, hc.shot), shot = HSHOT[shotN], p = shotN / 10;
+    const kind = hpose.on ? HPOSE[hpose.i % HPOSE.length][2] : 'stand', lying = kind === 'lie', whole = kind !== 'stand';
     if (shotN !== hc.shot) { hc.shot = shotN; hc.since = t; }                                          // a pop: cut to the next angle
     chestNode.getWorldPosition(heartAt); const yw = vrm.scene.rotation.y, lx = Math.cos(yw), lz = -Math.sin(yw); heartAt.x += 0.04 * lx; heartAt.z += 0.04 * lz; heartAt.y += 0.07;
     if (shot.at === 'face') { head.getWorldPosition(hc.tgt); hc.tgt.y += 0.06; } else if (shot.at === 'hand') palmR.getWorldPosition(hc.tgt); else if (shot.at === 'shoulder') { hc.tgt.copy(heartAt); hc.tgt.x += 0.1 * lx; hc.tgt.z += 0.1 * lz; hc.tgt.y += 0.1; } else hc.tgt.copy(heartAt);
-    hc.tgt.lerp(heartAt, p * p * 0.85);                                                                // every shot leans a little more toward her heart
+    if (whole) { head.getWorldPosition(hc.tgt); hipsNode.getWorldPosition(hc.at); hc.tgt.lerp(hc.at, 0.5); }   // sitting or lying: all of her in the picture
+    else hc.tgt.lerp(heartAt, p * p * 0.85);                                                           // on her feet: every shot leans a little more toward her heart
     const age = (t - hc.since) / 1000, dist = (1.45 - 1.03 * Math.pow(p, 1.15)) * (1 - 0.035 * Math.min(age, 4)), wide = 0.35 + 0.65 * dist / 1.45;   // slow push in; angles narrow as it closes
-    const a = yw + shot.yaw * wide + 0.07 * age * (shotN % 2 ? 1 : -1) * wide, elev = shot.up * wide + 0.015 * age;
-    hc.pos.set(hc.tgt.x + Math.sin(a) * Math.cos(elev) * dist, hc.tgt.y + Math.sin(elev) * dist, hc.tgt.z + Math.cos(a) * Math.cos(elev) * dist);
+    const a = yw + shot.yaw * wide + 0.07 * age * (shotN % 2 ? 1 : -1) * wide, elev = shot.up * wide + 0.015 * age + (lying ? 0.8 : whole ? 0.14 : 0);   // look down at her when she is lying
+    const dd = lying ? Math.max(dist, 3.0) : whole ? Math.max(dist, 2.2) : dist;
+    hc.pos.set(hc.tgt.x + Math.sin(a) * Math.cos(elev) * dd, hc.tgt.y + Math.sin(elev) * dd, hc.tgt.z + Math.cos(a) * Math.cos(elev) * dd);
     const e = hc.b * hc.b * (3 - 2 * hc.b); hc.keepPos.copy(camera.position); hc.keepQ.copy(camera.quaternion);
     camera.position.copy(hc.pos); camera.lookAt(hc.tgt);
     if (e < 0.995) { hc.q.copy(camera.quaternion); camera.position.lerpVectors(hc.keepPos, hc.pos, e); camera.quaternion.slerpQuaternions(hc.keepQ, hc.q, e); }   // easing in from (or back out to) the ordinary view
@@ -817,6 +840,7 @@ export async function create(url, opts = {}) {
       if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
       return { x: 100 + (e.clientX - c.x) / k / UNIT, y: 100 + (e.clientY - c.y) / k / UNIT };
     },
+    heartPose, heartStage,
     bonus(on) { // true: time stops and the view holds a shot; 'orbit': the pose stays and you turn the view yourself; false: back to normal
       if (on === 'orbit') { const sh = BSHOT[bz.shot % BSHOT.length]; Object.assign(bz, { mode: 'orbit', yaw: sh.yaw, pitch: 0.14, dist: 1.1 }); return; }
       frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; Object.assign(bz, { mode: 'cut', shot: 0 }); if (!on) heartGlow.visible = false; },
@@ -830,7 +854,7 @@ export async function create(url, opts = {}) {
       if (key !== size && W && H) { size = key; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
       if (frozen) { bonusCamera(s.t); renderer.render(scene, camera); return; }   // time stands still: nothing about her moves, only the view
       routine(s);                               // where she is and what she is holding
-      applyGesture(s.gesture, s.faceName, s.dt); // body first: a gesture can also ask for a face (a yawn opens her mouth)
+      applyGesture(hpose.on ? null : s.gesture, s.faceName, s.dt); // body first: a gesture can also ask for a face (a yawn opens her mouth)
       // expressions ease toward the face the controller picked; blinking and talking are immediate
       const want = EXPR[s.faceName] || {};
       for (const n of NAMES) { const t = want[n] || 0; w[n] += (t - w[n]) * Math.min(1, s.dt * 12); }
@@ -858,7 +882,7 @@ export async function create(url, opts = {}) {
       // shoulders ride up with tension (unless a gesture is using them), hips bounce
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
-      vrm.update(s.dt); // spring bones: hair and clothes swing with the head
+      vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
       placeProps(); lampTick(s.dt); places.tick(night, s.t);
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();

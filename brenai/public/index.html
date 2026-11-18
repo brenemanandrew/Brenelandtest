@@ -604,7 +604,6 @@ const heartGame = (() => {
     const put = () => { h.style.left = x + 'px'; h.style.top = y + 'px'; }; put(); L.append(h); g.cur = h;
     const tick = t => { if (g.cur !== h) return; const dt = Math.min(0.05, (t - prev) / 1000); prev = t;
       if (sp) { x += vx * dt; y += vy * dt; if (x < 0 || x > W - size) { vx = -vx; x = Math.max(0, Math.min(W - size, x)); } if (y < 0 || y > H - size) { vy = -vy; y = Math.max(0, Math.min(H - size, y)); } put(); }
-      if (starter && t - born > 6000) { g.cur = null; h.classList.add('gone'); setTimeout(() => h.remove(), 260); return; }      // the first heart just goes away if you leave it
       g.raf = requestAnimationFrame(tick); };
     g.raf = requestAnimationFrame(tick);
     h.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (g.cur !== h) return; g.cur = null; cancelAnimationFrame(g.raf); sparkle(x + size / 2, y + size / 2); h.classList.add('gone'); setTimeout(() => h.remove(), 260); starter ? start() : pop(); });
@@ -615,12 +614,12 @@ const heartGame = (() => {
     if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
     const pad = el('div', { id: 'missPad' }); ensure().prepend(pad);                              // a tap that is not on the heart costs one of your three tries
     pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (!g.cur) return; const r = pad.getBoundingClientRect(), f = el('span', { className: 'pts p0', textContent: '✕' }); f.style.left = e.clientX - r.left + 'px'; f.style.top = e.clientY - r.top + 'px'; ensure().append(f); setTimeout(() => f.remove(), 800); missed(); });
-    vig().classList.remove('bad'); vig().classList.add('on'); $('heartHud').classList.add('on'); avatar.routine('sit'); avatar.flash('surprised', 900); avatar.focus(0.02); hud(); setTimeout(() => { if (g.on) pop(); }, 900);   // the view swings round in front of her first
+    vig().classList.remove('bad'); vig().classList.add('on'); $('heartHud').classList.add('on'); avatar.routine('sit'); avatar.flash('surprised', 900); avatar.heartStage(0); avatar.heartPose(0); avatar.focus(0.02); hud(); setTimeout(() => { if (g.on) pop(); }, 900);   // the view swings round in front of her first
   }
   function pop() {
     g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.squirm(g.n >= 7);
     if (g.n >= 4) avatar.flash(g.n >= 7 ? 'joy' : 'blush', 4000); if (g.n >= 4) avatar.emote(g.n >= 7 ? '💦' : '💗', 900); if (g.n >= 7) avatar.tears(true);
-    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.focus(g.n / 10); vig().style.setProperty('--deep', (g.n / 10).toFixed(2)); bubbles(g.n * 3); if (g.n >= 10) return win(); spawn(false); });   // hold, then cut
+    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.heartPose(g.n); avatar.heartStage(g.n / 10); avatar.focus(g.n / 10); vig().style.setProperty('--deep', (g.n / 10).toFixed(2)); bubbles(g.n * 3); if (g.n >= 10) return win(); spawn(false); });   // hold, then cut
   }
   function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= 3) { cancelAnimationFrame(g.raf); if (g.cur) g.cur.remove(); g.cur = null; lose(); } }
   async function score(result, bonusPts = 0) { // tell the server how it went; show what it was worth
@@ -629,7 +628,7 @@ const heartGame = (() => {
   }
   function close(after = 0) { // out of the game: the view, the edges of the screen and her face all go back to normal
     g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true;
-    setTimeout(() => { if (layer) layer.textContent = ''; avatar.bonus(false); avatar.focus(0); vig().classList.remove('on'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); avatar.tears(false); if (!g.wasBig) document.body.classList.remove('big'); }, after);
+    setTimeout(() => { if (layer) layer.textContent = ''; avatar.bonus(false); avatar.heartPose(null); avatar.heartStage(null); avatar.focus(0); vig().classList.remove('on'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); avatar.tears(false); if (!g.wasBig) document.body.classList.remove('big'); }, after);
   }
   function win() { const L = ensure(); const mp = $('missPad'); if (mp) mp.remove(); for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); WizraSound.fx('sparkle'); WizraSound.fx('bond'); avatar.emote('✨', 2200); avatar.flash('joy', 5000);
     const w = $('whiteOut'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); cancelAnimationFrame(g.raf); g.cur = null; setTimeout(bonus, 650); }
