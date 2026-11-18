@@ -108,7 +108,7 @@
     const want = wantTrack(), stale = performance.now() - trackSince > 170000;
     if (!track || !want.includes(track.name) || (stale && want.length > 1)) startTrack(pick(want.filter(n => n !== lastName).length ? want.filter(n => n !== lastName) : want));
     while (track.next < ctx.currentTime + 0.5) { const c = track.chords[track.bar % track.chords.length], n = track.chords[(track.bar + 1) % track.chords.length]; STYLE[track.style](track.gain, c, n, track.next, track.b, track.bar, track.mem); track.next += track.b * track.beats; track.bar++; }
-    const level = vol.music * (onCall ? 0 : duck() ? 0.35 : 1); musicBus.gain.setTargetAtTime(level * 0.9, ctx.currentTime, 0.25);
+    const level = vol.music * (onCall ? 0 : duck() ? 0.15 : 1); musicBus.gain.setTargetAtTime(level * 0.9, ctx.currentTime, 0.25);
     ambience();
   }
 

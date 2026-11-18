@@ -162,7 +162,7 @@
     const now = () => performance.now();
 
     let voice = null, state = ''; let gesture = null, idleAt = 0; // gesture: { name, t0, dur }
-    function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + (STATE[state] ? 5000 + Math.random() * 7000 : 9000 + Math.random() * 14000); if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
+    function doGesture(name, dur = 2.2) { gesture = { name, t0: now(), dur: dur * 1000 }; idleAt = now() + dur * 1000 + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); if (name === 'nod') kick(0, 0, 70); else if (name === 'shake') kick(0, 90); else if (name === 'wave') kick(90); else if (name === 'tilt') show('playful', dur * 1000); }
     function show(face, ms) { temp = face; tempUntil = now() + ms; }
     function emote(ch, ms = 1400) { em.textContent = ch; emoteUntil = now() + ms; if (opts.onEmote) opts.onEmote(ch); }
     function kick(rot = 0, tx = 0, ty = 0, sq = 0) { sp.rot.v += rot; sp.tx.v += tx; sp.ty.v += ty; sp.sq.v += sq; }
@@ -259,7 +259,8 @@
       const tx = sp.tx.x * 0.06, ty = sp.ty.x * 0.06 + (face.drop || 0) + breathe * 0.7, sq = 1 - Math.max(-0.12, Math.min(0.12, sp.sq.x * 0.02));
       // a gesture in progress: name, seconds since it began, and an ease in/out weight 0..1
       // left alone for a while, she moves on her own
-      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const pool = STATE[state] ? STATE[state][1] : IDLE; if (idleAt) doGesture(...pool[Math.random() * pool.length | 0]); idleAt = t + (STATE[state] ? 5000 + Math.random() * 7000 : 9000 + Math.random() * 14000); }
+      if (!gesture && !talking && !thinking && t > idleAt && !(R.activity && R.activity())) { const pool = STATE[state] ? STATE[state][1] : IDLE; if (idleAt) doGesture(...pool[Math.random() * pool.length | 0]); idleAt = t + (STATE[state] ? 14000 + Math.random() * 16000 : 28000 + Math.random() * 40000); }
+      if ((talking || thinking) && idleAt < t + 25000) idleAt = t + 25000;   // while you two are talking she is with you, not fidgeting
       let g = null;
       if (gesture) { const gt = t - gesture.t0; if (gt > gesture.dur) gesture = null; else g = { name: gesture.name, t: gt / 1000, w: Math.min(1, gt / 350, (gesture.dur - gt) / 450) }; }
       try { R.draw({ t, dt, face, faceName, lid, blink, mouth, talking, phase, voice: talking ? voice : null, look, rot, tx, ty, sq, breathe, gesture: g }); } catch (e) { if (!frame.warned) { frame.warned = true; console.error('avatar draw', e); } }
@@ -284,7 +285,7 @@
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) { const hit = ROUTINE.find(([re]) => re.test(m[1])); if (hit && R.doActivity) { R.doActivity(hit[1]); break; } }
         const found = [];
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) for (const [re, name, dur] of GEST) if (re.test(m[1])) { found.push([name, dur]); break; }
-        let wait = 0; for (const [name, dur] of found.slice(0, 3)) { setTimeout(() => doGesture(name, dur), wait); wait += dur * 1000 * 0.85; }
+        let wait = 0; for (const [name, dur] of found.slice(0, 2)) { setTimeout(() => doGesture(name, dur), wait); wait += dur * 1000 * 0.85; }
         return found.map(f => f[0]);
       },
       gesture: doGesture,
@@ -302,7 +303,7 @@
       holdClip(name, s) { return R.holdClip ? R.holdClip(name, s) : false; }, emote, layout() { return R.layout ? R.layout() : null; }, lists() { return { clips: R.clips ? R.clips() : [], gestures: R.gestures ? R.gestures() : GEST.map(g => g[1]) }; },
       // the heart game: a passing face, a wriggle, the camera closing in on her heart, happy tears
       flash(face, ms) { show(face, ms || 1500); }, squirm(hard) { kick((Math.random() - 0.5) * 300, (Math.random() - 0.5) * 160, 60, hard ? -5 : -3); doGesture(Math.random() < 0.5 ? 'shift' : 'feet', 1.1); },
-      focus(k) { if (R.focus) R.focus(k); }, tears(on) { if (R.tears) R.tears(on); },
+      focus(k) { if (R.focus) R.focus(k); }, bonus(on) { if (R.bonus) R.bonus(on); }, bonusHit(e) { return R.bonusHit ? R.bonusHit(e) : 0; }, tears(on) { if (R.tears) R.tears(on); },
       snapshot(spec) { return R.snapshot ? R.snapshot(spec) : Promise.resolve(''); },
       // visiting in person (3D model only): 'dorm' or 'house' puts you in the room in first person, '' takes you home
       visit(name) { if (R.visit) R.visit(name || ''); return !!R.visit; }, canVisit() { return !!R.visit; },

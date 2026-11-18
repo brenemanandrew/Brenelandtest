@@ -302,7 +302,7 @@ export async function create(url, opts = {}) {
   const WALK_ARM = { rightUpperArm: 1, rightLowerArm: 1, rightHand: 1 }, CLIP_GEST = { kiss: 'kiss', jump: 'jump' };
   const stride = c => (c.hips ? Math.abs(c.hips[c.hips.length - 1] - c.hips[2]) * hipY0 : 0) || 1.3;   // metres one loop of a walking clip covers, at her size
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
-  const rt = { act: 'sit', until: 0, nextAt: performance.now() + 15000 + Math.random() * 15000, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
+  const rt = { act: 'sit', until: 0, nextAt: performance.now() + 60000 + Math.random() * 60000, lastTalk: 0, self: false, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
     legs: 'up', lg: { crossed: 0, floor: 0, hair: 0, drape: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
   const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), stay = sec => ({ wait: sec, idle: true }), run = fn => ({ run: fn });
   // ---- finding her way: a grid of the room with the furniture (and you) blocked out, so she walks round things, not through them ----
@@ -373,7 +373,7 @@ export async function create(url, opts = {}) {
     if (name === 'returnbook' && rt.bookHome === 'shelf') return;
     if (ERRAND[name]) { if (rt.act !== 'up' && rt.act !== 'sitdown') { if (OVER[rt.act]) rt.act = 'sit'; ERRAND[name](); } return; }
     if (!OVER[name] || rt.act === 'up' || rt.act === 'sitdown') return;
-    rt.act = name; rt.until = now + (name === 'sip' ? 4200 : name === 'phone' ? 14000 + Math.random() * 12000 : 22000 + Math.random() * 22000);
+    rt.act = name; rt.until = now + (name === 'sip' ? 4200 : name === 'phone' ? 45000 + Math.random() * 60000 : 80000 + Math.random() * 120000);   // she settles into things
   }
   // ---- scripted (the Studio's events): walk her to a spot, or hold a recorded clip for a while ----
   function walkTo(x, z, done) { // she gets up if she has to, goes there by her own path finding, and stays until told otherwise
@@ -401,13 +401,17 @@ export async function create(url, opts = {}) {
     if (window.WIZRA_CLIP) { for (const n of KEYS) set(n, ...standOf(n)); vrm.scene.position.set(0, floorY, hip.z + 0.4); playClip(window.WIZRA_CLIP, 1, window.WIZRA_CLIP_T != null ? window.WIZRA_CLIP_T : s.t / 1000); return; } // test hook: look at one clip
     if (rt.act === 'call') return callFrame(s);
     if (rt.act === 'gone') return;                                               // the chair is empty
-    const now = performance.now(), dt = s.dt, attending = (s.talking || s.faceName === 'thinking') && !rt.leaving; rt.attending = attending;
+    const now = performance.now(), dt = s.dt, attending = (s.talking || s.faceName === 'thinking') && !rt.leaving; rt.attending = attending; if (attending) rt.lastTalk = now;
+    const inTalk = now - rt.lastTalk < 100000;                                    // you two are (or just were) talking: she stays with you
+    if (attending && rt.self && rt.act === 'up') { rt.self = false; rt.steps = wayHome(); rt.i = 0; rt.stepT = 0; rt.after = ''; rt.label = 'coming back to sit with you'; if (rt.carry === 'phone') rt.carry = null; }   // you spoke while she was off on a whim: she drops it and comes back
     // on her own schedule
     if (rt.act === 'sit' && !attending && now > rt.nextAt && !window.WIZRA_STILL) {
       const r = Math.random(), onTable = rt.bookHome === 'table';
-      startActivity(r > 0.94 && here === 'dorm' && CLIPS.female_laying_pose ? 'liedown' : r < 0.28 ? 'read' : r < 0.5 ? 'phone' : r < 0.66 ? 'sip' : r < 0.8 ? 'pace' : r < 0.92 ? 'fetchdrink' : onTable ? 'returnbook' : 'fetchbook');
+      if (inTalk) { rt.nextAt = now + 30000 + Math.random() * 30000; if (r < 0.25) startActivity('sip'); }       // mid-conversation: at most a sip, never wandering off
+      else { rt.self = true; // on her own: mostly things she does sitting down; getting up is the exception
+        startActivity(r < 0.36 ? (onTable ? 'read' : 'phone') : r < 0.66 ? 'phone' : r < 0.8 ? 'sip' : r < 0.86 ? 'pace' : r < 0.91 ? 'fetchdrink' : r < 0.95 && here === 'dorm' && CLIPS.female_laying_pose ? 'liedown' : onTable ? 'returnbook' : 'fetchbook'); }
     }
-    if (OVER[rt.act] && now > rt.until) { rt.act = 'sit'; rt.nextAt = now + 14000 + Math.random() * 24000; }
+    if (OVER[rt.act] && now > rt.until) { rt.act = 'sit'; rt.nextAt = now + 50000 + Math.random() * 90000; }
     // standing up / sitting down
     // two stages: first her feet come off the table and down to the floor and she sits up, then she rises onto them
     const up = rt.act === 'up' ? 1 : 0; rt.stand += Math.sign(up - rt.stand) * Math.min(Math.abs(up - rt.stand), dt * 0.62);
@@ -444,10 +448,10 @@ export async function create(url, opts = {}) {
     }
     if (rt.act === 'sitdown') { // turn to face front, lower into the chair, then get on with whatever she came back to do
       turnTo(0, dt, 5);
-      if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
+      if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.self = false; rt.nextAt = now + 70000 + Math.random() * 110000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
     }
     // how her legs are resting: she changes it now and then, and it only applies while she is properly sat
-    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', 'drape', ...Object.keys(SEATED).filter(n => CLIPS[SEATED[n]._clip])]; rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 50000 + Math.random() * 90000; }
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !inTalk && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', 'drape', ...Object.keys(SEATED).filter(n => CLIPS[SEATED[n]._clip])]; rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 150000 + Math.random() * 200000; }
     let scoot = 0, perch = 0, sideways = 0, slide = 0; const seatClips = [];
     for (const name in LEGS) {
       rt.lg[name] += ((rt.legs === name ? 1 : 0) - rt.lg[name]) * Math.min(1, dt * 2.2); const v = rt.lg[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
@@ -511,7 +515,7 @@ export async function create(url, opts = {}) {
     return hit ? { tag: hit.object.userData.tag, x: hit.point.x, z: hit.point.z } : null;
   }
   function direct(hit) { // returns what happened, in the words used for the silent note to her (or '' if nothing did)
-    const t = hit.tag; if (inCall || focusWant > 0) return '';
+    const t = hit.tag; if (inCall || focusWant > 0) return ''; rt.self = false;
     if (fp.on) { // you are in the room: the floor is where you walk, the seat is where you sit, the TV is yours to switch on
       if (fp.locked) return '';
       if (t === 'floor') { standUp(); fp.goal = [hit.x, hit.z]; return ''; }
@@ -716,6 +720,27 @@ export async function create(url, opts = {}) {
     camera.fov = hc.fov + (32 - hc.fov) * e; camera.updateProjectionMatrix();
     const beat = 1 + 0.12 * Math.abs(Math.sin(t / 1000 * (3 + 5 * p))); heartGlow.visible = true; heartGlow.position.copy(heartAt).addScaledVector(hc.pos.clone().sub(heartAt).normalize(), 0.09); heartGlow.scale.setScalar((0.07 + 0.1 * p) * beat); heartGlow.material.opacity = e * Math.min(1, 0.15 + p * 1.1);
   }
+  // ---- the bonus round after a win: time stands still (her pose and hair freeze) and the view cuts to another part of her every 3 s.
+  let frozen = false, frozeAt = 0; const BSHOT = [{ at: 'face', yaw: 0.15, up: 0.08, d: 0.8 }, { at: 'heart', yaw: -0.2, up: 0.12, d: 0.62 }, { at: 'hand', yaw: -0.3, up: 0.35, d: 0.6 }, { at: 'shoulder', yaw: 0.5, up: 0.16, d: 0.75 }];
+  const spot = (name, out) => { // a place on her, in the world
+    chestNode.getWorldPosition(heartAt); const yw = vrm.scene.rotation.y, lx = Math.cos(yw), lz = -Math.sin(yw); heartAt.x += 0.04 * lx; heartAt.z += 0.04 * lz; heartAt.y += 0.07;
+    if (name === 'face') { head.getWorldPosition(out); out.y += 0.06; } else if (name === 'hand') palmR.getWorldPosition(out); else if (name === 'handL') palmL.getWorldPosition(out); else if (name === 'shoulder' || name === 'shoulderR') { out.copy(heartAt); const sd = name === 'shoulder' ? 0.1 : -0.18; out.x += sd * lx; out.z += sd * lz; out.y += 0.1; } else out.copy(heartAt);
+    return out; };
+  function bonusCamera(t) {
+    const i = Math.floor((t - frozeAt) / 3000) % BSHOT.length, sh = BSHOT[i], age = ((t - frozeAt) % 3000) / 1000, yw = vrm.scene.rotation.y, a = yw + sh.yaw + 0.05 * age, elev = sh.up + 0.01 * age, d = sh.d * (1 - 0.03 * age);
+    spot(sh.at, hc.tgt); if (sh.at !== 'heart') hc.tgt.lerp(heartAt, 0.25);                              // keep her heart in the picture
+    camera.position.set(hc.tgt.x + Math.sin(a) * Math.cos(elev) * d, hc.tgt.y + Math.sin(elev) * d, hc.tgt.z + Math.cos(a) * Math.cos(elev) * d); camera.lookAt(hc.tgt);
+    spot('heart', hc.at); heartGlow.visible = true; heartGlow.position.copy(hc.at).addScaledVector(hc.pos.copy(camera.position).sub(hc.at).normalize(), 0.09); heartGlow.scale.setScalar(0.13 * (1 + 0.14 * Math.abs(Math.sin(t / 110)))); heartGlow.material.opacity = 1;
+  }
+  const HITS = [['heart', 0.05, 6], ['face', 0.115, 2], ['hand', 0.07, 1], ['handL', 0.07, 1], ['shoulder', 0.075, 1], ['shoulderR', 0.075, 1]];
+  function bonusHit(e) { // what a tap during the bonus round is worth: her heart 6, her face 2, hands and shoulders 1, anything else 0
+    const r = renderer.domElement.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, P3 = new THREE.Vector3(), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    for (const [name, rad, pts] of HITS) {
+      spot(name, P3); const c = P3.clone().project(camera); if (c.z > 1) continue; const edge = P3.clone().addScaledVector(up, rad).project(camera);
+      const cx = (c.x + 1) / 2 * r.width, cy = (1 - c.y) / 2 * r.height, rp = Math.abs((1 - edge.y) / 2 * r.height - cy); if (Math.hypot(px - cx, py - cy) <= rp) return pts;
+    }
+    return 0;
+  }
   placeCamera(1);
   const chestNode = B('upperChest') || B('chest') || B('spine');
   const target = new THREE.Object3D(); scene.add(target); if (vrm.lookAt) vrm.lookAt.target = target;
@@ -775,7 +800,7 @@ export async function create(url, opts = {}) {
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
     activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
     presence, glow(kind) { rt.glow = kind || ''; }, call,
-    doActivity(name) { startActivity(name); },
+    doActivity(name) { rt.self = false; startActivity(name); },   // asked for (by you, or by what she wrote): not a whim to drop when you speak
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,
     // visiting (see visit above): where you are, whether you are seeing through your own eyes, and turning your head
@@ -791,11 +816,13 @@ export async function create(url, opts = {}) {
       if (c.behind) return { x: -9999, y: -9999 };                                 // she is behind you
       return { x: 100 + (e.clientX - c.x) / k / UNIT, y: 100 + (e.clientY - c.y) / k / UNIT };
     },
+    bonus(on) { frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; if (!on) heartGlow.visible = false; }, bonusHit,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
       const W = el.clientWidth, H = el.clientHeight, key = W + 'x' + H;
       if (key !== size && W && H) { size = key; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
+      if (frozen) { bonusCamera(s.t); renderer.render(scene, camera); return; }   // time stands still: nothing about her moves, only the view
       routine(s);                               // where she is and what she is holding
       applyGesture(s.gesture, s.faceName, s.dt); // body first: a gesture can also ask for a face (a yawn opens her mouth)
       // expressions ease toward the face the controller picked; blinking and talking are immediate

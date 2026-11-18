@@ -386,7 +386,10 @@
   #vig .bub { position:absolute; border-radius:50%; background:radial-gradient(circle at 32% 28%, rgba(255,255,255,.95), rgba(255,170,210,.75) 38%, rgba(255,90,160,.55) 70%, rgba(190,40,120,.5)); box-shadow:inset -3px -5px 8px rgba(150,20,90,.35), 0 2px 8px rgba(120,10,70,.3); animation:bub var(--t, 6s) ease-in-out infinite alternate; }
   @keyframes bub { from { transform:translate(0, 0) scale(1); } to { transform:translate(var(--bx, 10px), var(--by, -18px)) scale(1.12); } }
   #heartHud { position:fixed; left:50%; top:10px; transform:translateX(-50%); z-index:46; display:none; gap:10px; align-items:center; padding:6px 14px; border-radius:999px; background:rgba(255,255,255,.92); color:#b81f74; font:400 20px "Bangers","Fredoka",sans-serif; letter-spacing:.05em; box-shadow:0 4px 14px rgba(120,10,70,.35); } #heartHud.on { display:flex; } #heartHud i { font-style:normal; color:#8a7aa8; font-size:15px; font-family:"Fredoka",sans-serif; }
+  #bonusPad { position:absolute; inset:0; pointer-events:auto; cursor:pointer; touch-action:none; } .pts { position:absolute; pointer-events:none; transform:translate(-50%,-50%); font:400 26px "Bangers","Fredoka",sans-serif; color:#fff; text-shadow:0 2px 0 #a8327a, 0 0 8px rgba(0,0,0,.5); animation:ptsUp .8s ease-out forwards; } .pts.p6 { font-size:44px; color:#ffe680; } .pts.p2 { font-size:32px; } .pts.p0 { opacity:.5; }
+  @keyframes ptsUp { to { transform:translate(-50%, -160%) scale(1.15); opacity:0; } }
   #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
+  #herWrap { display:none !important; }   /* her words are in the chat area and spoken: no balloon up top */
   /* pictures she sends */
   .chatpic { display:block; width:min(230px, 72%); aspect-ratio:4/5; object-fit:cover; margin:4px 0 8px; border-radius:16px; border:4px solid #fff; box-shadow:0 4px 14px rgba(20,8,50,.35); background:#d9d2e6; cursor:zoom-in; transform:rotate(-1.5deg); }
   .chatpic.wait { animation:picWait 1s ease-in-out infinite alternate; } @keyframes picWait { from { opacity:.45; } to { opacity:.9; } }
@@ -611,15 +614,25 @@ const heartGame = (() => {
     setTimeout(() => { if (g.on) spawn(false); }, 260);
   }
   function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= 3) return lose(); setTimeout(() => { if (g.on) spawn(false); }, 350); }
-  async function finish(result) {
+  async function finish(result, bonusPts = 0) {
     g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; setTimeout(() => { if (layer) layer.textContent = ''; }, 700);
     setTimeout(() => { avatar.focus(0); vig().classList.remove('on'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); avatar.tears(false); if (!g.wasBig) document.body.classList.remove('big'); }, result === 'win' ? 500 : 1400);
-    try { const r = await api('/api/hearts', { result }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+10 \uD83D\uDC97' : '-1 \uD83D\uDC97'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
+    try { const r = await api('/api/hearts', { result, bonus: bonusPts }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+' + (10 + bonusPts) + ' \uD83D\uDC97' : '-1 \uD83D\uDC97'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
   }
   function win() { const L = ensure(); for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); WizraSound.fx('sparkle'); WizraSound.fx('bond'); avatar.emote('\u2728', 2200); avatar.flash('joy', 5000);
-    const w = $('whiteOut'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); finish('win'); }
+    const w = $('whiteOut'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); cancelAnimationFrame(g.raf); g.cur = null; setTimeout(bonus, 650); }
+  // You won: time stops for ten seconds. Tap her as many times as you can: her heart is worth 6, her face 2, her hands and
+  // shoulders 1, anywhere else nothing. The view cuts to a different part of her every three seconds.
+  function bonus() {
+    const L = ensure(); L.textContent = ''; let total = 0; const until = performance.now() + 10000, pad = el('div', { id: 'bonusPad' }); L.append(pad); avatar.bonus(true); vig().style.setProperty('--deep', 1);
+    const show = () => { const left = Math.max(0, (until - performance.now()) / 1000); $('heartN').textContent = 'BONUS ' + left.toFixed(1) + 's'; $('heartMiss').textContent = '+' + total; };
+    pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); const pts = avatar.bonusHit(e), r = L.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top; total += pts;
+      const f = el('span', { className: 'pts p' + pts, textContent: pts ? '+' + pts : '\u00b7' }); f.style.left = x + 'px'; f.style.top = y + 'px'; L.append(f); setTimeout(() => f.remove(), 800);
+      if (pts) { sparkle(x, y, pts === 6 ? 10 : 4); WizraSound.fx(pts === 6 ? 'heart' : pts === 2 ? 'sparkle' : 'pop'); } show(); });
+    const timer = setInterval(() => { show(); if (performance.now() >= until) { clearInterval(timer); pad.remove(); avatar.bonus(false); finish('win', Math.min(60, total)); } }, 100);
+  }
   function lose() { vig().classList.add('bad'); avatar.flash('grumpy', 3500); avatar.gesture('cringe', 1.8); avatar.emote('\uD83D\uDCA2', 1800); WizraSound.fx('anger'); finish('lose'); }
-  return { offer() { if (g.on || g.cur || away || phoneCall.on || Date.now() - g.last < 50000 || !avatar.canVisit()) return; spawn(true); }, state: g, start };
+  return { bonus, offer() { if (g.on || g.cur || away || phoneCall.on || Date.now() - g.last < 50000 || !avatar.canVisit()) return; spawn(true); }, state: g, start };
 })();
 
 // ---------- the Studio's work (dev.html): where the page's pieces sit, scripted events, and the rooms ----------
@@ -731,7 +744,7 @@ setInterval(async () => { // keep time with the server: is she due back, has the
     if (phoneCall.on) return;
     if (d.depart === 'say') depart(); else if (d.away && d.away.due) comeBack(false); else if (!returning && !sendBtn.disabled) { if (!away) showPlan(d.plan); if (!!d.away !== !!away) setPresence(d.away, d.glow, true); else if ((d.glow && d.glow.kind) !== (glow && glow.kind)) { glow = d.glow; avatar.setState(glow ? glow.kind : ''); } setPlace(d); setRinging(!!(d.away && d.away.ringing)); }
     if (d.devRun && d.devRun.at > devRunSeen) { devRunSeen = d.devRun.at; await loadDev(); const ev = (dev.events || []).find(e => e.id === d.devRun.id); if (ev) runEvent(ev); }   // "run now" from the Studio
-    else if (d.devV && d.devV !== dev.v && !EV.busy && !sendBtn.disabled && !input.value && !new URLSearchParams(location.search).has('uiedit')) { const hadMaps = JSON.stringify(dev.maps); await loadDev(); if (JSON.stringify(dev.maps) !== hadMaps) location.reload(); }
+    else if (d.devV && d.devV !== dev.v && !EV.busy && !sendBtn.disabled && !input.value && !speaker.busy() && !new URLSearchParams(location.search).has('uiedit')) { const hadMaps = JSON.stringify(dev.maps); await loadDev(); if (JSON.stringify(dev.maps) !== hadMaps) location.reload(); }
     if (d.tail && d.tail.at > lastAuto) { lastAuto = d.tail.at; addLine('her', d.tail.text, d.tail.pic); bubble('her', d.tail.text); WizraSound.fx('pop'); }   // something she sent on her own, like a picture while she is out
   } catch {}
 }, 15000);
@@ -815,7 +828,7 @@ function typeOut(body, text) {
       if (si >= segs.length) { bubble('her', text); log.scrollTop = log.scrollHeight; return done(); }
       const seg = segs[si];
       if (!el) { el = document.createElement('div'); el.className = seg.cls; body.appendChild(el); }
-      ci = Math.min(seg.t.length, ci + per); el.textContent = seg.t.slice(0, ci); WizraSound.fx('type');
+      ci = Math.min(seg.t.length, ci + per); el.textContent = seg.t.slice(0, ci);
       if (seg.cls === 'say') { const b = $('herBubble'); b.textContent = (said + ' ' + el.textContent).trim(); $('herWrap').classList.add('show'); b.scrollTop = b.scrollHeight; clearTimeout(timers.her); }
       if (ci >= seg.t.length) { if (seg.cls === 'say') said = (said + ' ' + seg.t).trim(); si++; ci = 0; el = null; }
       log.scrollTop = log.scrollHeight;
@@ -860,7 +873,7 @@ async function send(quick, visit, lean) {
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
-  sendBtn.disabled = true; speaker.stop(); if (!away) { avatar.setThinking(true); userDid(text); }
+  sendBtn.disabled = true; speaker.stop(typeof quick === 'string' ? 'a button or an event sent a message for you' : 'you sent a message'); if (!away) { avatar.setThinking(true); userDid(text); }
   addLine('me', text); bubble('me', text); WizraSound.fx('send');
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
   try {
@@ -972,7 +985,8 @@ const voice = (() => {
     rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.continuous = true; rec.interimResults = true;
     rec.onresult = e => {
       if (held) return;                       // that is her voice coming out of the speaker, not you
-      if (speaker.speaking) speaker.stop();   // headphones mode: talking over her cuts her off
+      const heardNow = [...e.results].slice(e.resultIndex).map(r => r[0].transcript).join(' ').trim();
+      if (speaker.speaking && (heardNow.split(/\s+/).length >= 2 || heardNow.length >= 8)) speaker.stop('the mic heard you talk over her (headphones mode): "' + heardNow.slice(0, 40) + '"');   // a stray blip does not count
       interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
@@ -998,7 +1012,7 @@ const voice = (() => {
   v.reset = () => { clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; prefix = heard = interim = ''; };
   // typing by hand takes over: no auto-send of what you are typing; speech after it is added on
   v.typed = e => { if (e.key === 'Enter') return; clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; setTimeout(() => { prefix = input.value; heard = interim = ''; }, 0); };
-  mic.onclick = () => { if (speaker.speaking) return speaker.stop(); v.set({ on: !v.on }); };
+  mic.onclick = () => { if (speaker.speaking) return speaker.stop('you tapped the mic button'); v.set({ on: !v.on }); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
   v.start = start;
   show();
@@ -1074,8 +1088,9 @@ const speaker = (() => {
     v.waiting = false; end();
   };
   v.busy = () => v.speaking || !!v.waiting || pending > 0 || (v.supported && SS.speaking);
-  v.stop = () => { v.waiting = false; gen++; try { player.pause(); } catch {} pending = 0; if (v.supported) SS.cancel(); if (v.speaking) end(); };
-  v.set = patch => { Object.assign(v, patch); store(); if (!v.on) v.stop(); };
+  v.cut = JSON.parse(localStorage.getItem('brenai.cut') || 'null');   // why her voice was last cut short (shown under Voice, to track down a cut-off)
+  v.stop = why => { if (v.speaking || v.waiting) { v.cut = { why: why || 'unknown', at: Date.now() }; localStorage.setItem('brenai.cut', JSON.stringify(v.cut)); console.log('[voice] cut:', v.cut.why); } v.waiting = false; gen++; try { player.pause(); } catch {} pending = 0; if (v.supported) SS.cancel(); if (v.speaking) end(); };
+  v.set = patch => { Object.assign(v, patch); store(); if (!v.on) v.stop('her voice was switched off'); };
   // browsers only let a page speak after you have touched it once
   addEventListener('pointerdown', () => {
     try { if (v.supported) { SS.resume(); if (!SS.speaking) SS.speak(new SpeechSynthesisUtterance('')); } } catch {}
@@ -1131,7 +1146,7 @@ async function callSay(text) {
 }
 function endCall(who, wait = 1500) { // who hung up: 'me', 'she', or null when it never connected
   if (!phoneCall.on) return; phoneCall.on = false;
-  ringTone(false); clearInterval(phoneCall.timer); speaker.stop(); avatar.setThinking(false);
+  ringTone(false); clearInterval(phoneCall.timer); speaker.stop('a call ended'); avatar.setThinking(false);
   if (who) { callStatus('Call ended'); $('phone').classList.add('ended'); }
   const s = phoneCall.saved; if (s) { speaker.on = s.speak; voice.set({ on: s.mic }); }
   input.value = ''; voice.reset();
@@ -1358,7 +1373,8 @@ function buildPanel(k) {
       ...(pc ? [] : [el('label', { textContent: 'Pitch' }), pitch, el('div', { className: 'scale' }, el('span', { textContent: 'low' }), el('span', { textContent: 'high' }))]),
       el('label', {}, hp, ' I am on headphones (keep listening while she talks; talking over her cuts her off)'),
       el('label', { textContent: 'Try her voice' }), el('div', { className: 'row' }, sample, test),
-      el('div', { className: 'note', textContent: 'Sending a message or tapping the mic button stops her mid-sentence.' }));
+      el('div', { className: 'note', textContent: 'Sending a message or tapping the mic button stops her mid-sentence.' }),
+      el('div', { className: 'note', textContent: speaker.cut ? 'Last time her voice was cut short: ' + speaker.cut.why + ' (' + new Date(speaker.cut.at).toLocaleTimeString() + ').' : 'Her voice has not been cut short on this device yet.' }));
     const mv = el('input', { type: 'range', min: 0, max: 100, value: WizraSound.volume('music') * 100 }); mv.oninput = () => WizraSound.volume('music', mv.value / 100);
     const fv = el('input', { type: 'range', min: 0, max: 100, value: WizraSound.volume('fx') * 100 }); fv.oninput = () => WizraSound.volume('fx', fv.value / 100); fv.onchange = () => WizraSound.fx('pop');
     p.append(el('label', { textContent: 'Music' }), mv, el('div', { className: 'scale' }, el('span', { textContent: 'off' }), el('span', { textContent: 'loud' })), el('label', { textContent: 'Sound effects' }), fv, el('div', { className: 'scale' }, el('span', { textContent: 'off' }), el('span', { textContent: 'loud' })));

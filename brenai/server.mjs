@@ -651,9 +651,9 @@ const server = http.createServer(async (req, res) => {
       }
       // the heart game (rub her head, pop the hearts): ten pops is +10 romance, three misses is -1. Once a minute at most.
       if (url.pathname === '/api/hearts' && req.method === 'POST') {
-        const { result } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < 45000) return json(res, 429, { error: 'too soon', ...placeView() });
+        const { result, bonus } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < 45000) return json(res, 429, { error: 'too soon', ...placeView() });
         db.heartsAt = now; fixBond();
-        if (result === 'win') { addBond('romance', 10); touches.push({ kind: 'heartwin', at: now }); }
+        if (result === 'win') { addBond('romance', 10 + Math.max(0, Math.min(60, Math.round(+bonus || 0)))); touches.push({ kind: 'heartwin', at: now }); }
         else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - 1); fixBond(); touches.push({ kind: 'heartlose', at: now }); }
         save(); return json(res, 200, placeView());
       }
