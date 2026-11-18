@@ -359,6 +359,7 @@ $('whoSave').onclick = async () => {
 // ---------- start ----------
 (async () => {
   const r = await fetch('/api/dev'); if (r.status === 401) { location.href = '/'; return; } const d = await r.json();
+  const me = await (await fetch('/api/state')).json().catch(() => ({})); if (me.owner === false) { document.body.innerHTML = '<p style="font:18px Fredoka,sans-serif;padding:40px;text-align:center">The Studio belongs to the owner of this game.<br><a href="/">Back to the game</a></p>'; return; }
   dev = { ui: d.ui || {}, events: d.events || [], maps: d.maps || {}, layout: d.layout }; dev.maps.custom = dev.maps.custom || [];
   try { const a = await (await fetch('/api/anims')).json(); clips = Object.keys(a.clips || {}); } catch {}
   screen('phone'); drawEvents();

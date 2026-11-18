@@ -7,7 +7,7 @@
 //   places.bounds[name]          the walls, for first person   places.blocks[name]   boxes you cannot walk into
 //   places.spawn[name]           where you stand when you arrive, and places.seat[name] where you can sit
 //   places.tick(night, t)        outside light and the TV
-import { buildItem, footprint } from './mapkit.js';
+import { buildItem, footprint, perchOf } from './mapkit.js';
 // cel shading: light falls in three flat bands instead of a smooth ramp, and big shapes get a dark outline
 export function cel(THREE) {
   const ramp = new THREE.DataTexture(new Uint8Array([118, 118, 118, 255, 188, 188, 188, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
@@ -163,10 +163,10 @@ export function buildPlaces(THREE, A) {
   // and colours, plus whatever was placed in it.
   const maps = A.maps || {}, groups = { dorm, house }, names = { dorm: 'her dorm', house: 'your house' }, bounds = { dorm: D, house: Hh }, spawn = { dorm: [2.2, hip.z + 1.1], house: [-1.9, hip.z + 2.5] };
   const baseSolid = { dorm: solid.dorm.map(r => [...r]), house: solid.house.map(r => [...r]) };
-  const alive = {}, bare = {}, dark = {};   // alive: what moves in each room (flames, lights); bare: rooms without her dorm furniture
+  const alive = {}, bare = {}, dark = {}, perches = {};   // perches: the placed things she can go and sit or lie on   // alive: what moves in each room (flames, lights); bare: rooms without her dorm furniture
   function addItems(group, name, items) {
     const g = new THREE.Group(); g.position.y = floorY;
-    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
+    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); const pc = perchOf(it); if (pc && Math.hypot(it.x, it.z - hip.z) > 0.5) (perches[name] = perches[name] || []).push(pc); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
     group.add(g);
   }
   addItems(dorm, 'dorm', (maps.dorm || {}).items); addItems(house, 'house', (maps.house || {}).items);
@@ -203,7 +203,7 @@ export function buildPlaces(THREE, A) {
   return {
     groups, names, baseSolid, floorY,
     dorm, house, toon, outline, eyeH, solid,
-    bounds, blocks, spawn, bare, dark,
+    bounds, blocks, spawn, bare, dark, perches,
     live(name, t, night) { for (const f of alive[name] || []) f(t, night); },   // what moves in the room on screen
     seat: { dorm: { tag: 'bed', at: [bedX + 0.62, bedZ + 0.2], out: [bedX + 0.95, bedZ + 0.2], h: floorY + 1.12 }, house: { tag: 'chair', at: [-0.78, hip.z + 0.22], out: [-2.6, hip.z + 0.5], h: seatTop + 0.66 } },
     bed: { side: [bedX + 0.8, bedZ - 0.1], at: [bedX, bedZ - 0.1], top: floorY + 0.58 },

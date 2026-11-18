@@ -173,6 +173,7 @@ function save() {
 // The save from before there were players: the game-wide parts move to shared.json at once; the rest waits to be claimed with a PIN.
 const legacy = (() => { try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); } catch { return null; } })();
 if (legacy && !fs.existsSync(SHARED)) { for (const k of SHARED_KEYS) if (legacy[k] !== undefined) shared[k] = legacy[k]; const a = {}; for (const k of AVATAR_KEYS) if (legacy.settings && legacy.settings[k] !== undefined) a[k] = legacy.settings[k]; shared.avatar = a; write(SHARED, shared); }
+const isOwner = () => !shared.owner || shared.owner === cur().id;
 const legacyOpen = () => !!legacy && fs.existsSync(STORE);
 
 // ---------- auth (one shared password, signed cookie) ----------
@@ -437,6 +438,7 @@ function applySettings(body) {
   if (Array.isArray(s.acts)) S.acts = s.acts.filter(x => Array.isArray(x)).map(x => [String(x[0] || '').trim().slice(0, 20), String(x[1] || '').replace(/\*/g, '').trim().slice(0, 140), String(x[2] || '').trim().slice(0, 8)]).filter(x => x[0] && x[1]).slice(0, 18);
   for (const k of ['sfw', 'bleep', 'cussDevelop']) if (typeof s[k] === 'boolean') S[k] = s[k];
   if (typeof body.notes === 'string') db.profile = body.notes.slice(0, 6000);
+  if (!isOwner()) { body = { ...body }; delete body.rules; delete body.persona; }   // game rules and her core character are the owner's to set
   if (body.rules && typeof body.rules === 'object') { db.rules = db.rules || {}; for (const k in RULES) if (Number.isFinite(+body.rules[k])) db.rules[k] = Math.max(RULES[k][1], Math.min(RULES[k][2], Math.round(+body.rules[k]))); fixBond(); }
   if (typeof body.persona === 'string') db.persona = body.persona.trim().length > 40 ? body.persona.slice(0, 16000) : '';   // her core character text; empty puts the original back
   if (body.sheet && body.sheet.traits && typeof body.sheet.traits === 'object') { const t = {}; for (const [k, v] of Object.entries(body.sheet.traits).slice(0, 20)) { const name = String(k).toLowerCase().replace(/[^a-z0-9 '-]/g, '').trim().slice(0, 28); if (name && Number.isFinite(+v)) t[name] = Math.max(0, Math.min(100, Math.round(+v))); } db.sheet.traits = t; }
@@ -632,7 +634,7 @@ async function handle(req, res) {
         const { pin, create, name, claim } = await readBody(req); if (!/^\d{4,8}$/.test(String(pin || ''))) return json(res, 400, { error: 'A PIN is 4 to 8 digits.' });
         const id = pinId(String(pin)); let u = playerOf(id);
         if (!u && claim && legacyOpen()) { // the save from before PINs: whoever claims it first with a PIN owns it from then on
-          const mine = { ...legacy }; for (const k of SHARED_KEYS) delete mine[k]; u = playerOf(id, mine); als.run(u, save); fs.renameSync(STORE, STORE.replace(/\.json$/, '.claimed.json')); console.log('[players] the original save was claimed');
+          const mine = { ...legacy }; for (const k of SHARED_KEYS) delete mine[k]; u = playerOf(id, mine); if (!shared.owner) shared.owner = id; als.run(u, save); fs.renameSync(STORE, STORE.replace(/\.json$/, '.claimed.json')); console.log('[players] the original save was claimed');
         }
         if (!u && create) { const nm = String(name || '').replace(/[^\p{L}\p{N} '._-]/gu, '').trim().slice(0, 24); if (!nm) return json(res, 400, { error: 'What should she call you?' }); u = playerOf(id, { name: nm, intro: 'todo' }); als.run(u, save); console.log('[players] new player'); }
         if (!u) { fails.push(now); pinFails.set(ip, fails); return json(res, 404, { error: 'No save with that PIN.', canClaim: legacyOpen() }); }
@@ -642,7 +644,10 @@ async function handle(req, res) {
       if (url.pathname === '/api/pin/out' && req.method === 'POST') { res.writeHead(200, { 'set-cookie': 'brenai_u=; Path=/; Max-Age=0', 'content-type': 'application/json' }); return res.end('{"ok":true}'); }
       if (!als.getStore()) { const u = playerFrom(req); if (!u) return json(res, 401, { error: 'pin', canClaim: legacyOpen() }); wearModel(u); return als.run(u, () => handle(req, res)); }   // from here on, `db` is this player's save
 
-      if (url.pathname === '/api/state') return json(res, 200, { log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      // the Studio and everything else that changes the game for everybody belongs to one player, the owner
+      if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
+      if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
+      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
       // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"
       // and opens their first conversation herself.

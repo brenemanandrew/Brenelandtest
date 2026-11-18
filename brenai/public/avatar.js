@@ -136,6 +136,7 @@
     [/(drapes?|swings?|throws?|hooks?|kicks?) her legs over|sits? sideways|sideways in (her|the) (chair|seat|armchair)/i, 'drape'],
     [/cross(es|ed|ing)? her (legs|ankles|feet|boots)/i, 'crosslegs'], [/(puts?|sets?|plants?|drops?|swings?) her (feet|boots) (back )?(down|on(to)? the floor|off the table)|feet off the table/i, 'feetdown'], [/(puts?|props?|kicks?|swings?) her (feet|boots) (back )?up/i, 'feetup'],
     [/(lies?|lays?|flops?|sprawls?|stretches) (back |down |out )*(on|onto|across) (her|the) bed|climbs? (on|onto|into) (her|the) bed/i, 'liedown'],
+    [/(sits?|flops?|settles?|curls? up|plops?|drops?|sinks?|lies?|lays?|stretches?|sprawls?) (back |down |out )*(on|onto|in|into|across) (the|a|her|his|one of the) (bean ?bags?|log|camp chair|sofa|couch|picnic blanket|blanket|sleeping bag|blanket fort|fort|stool)/i, 'perch'],
     [/sits? (back )?down|flops? (back )?(down|into|onto)|(drops?|sinks?|settles?|plops?) (back )?(down )?(into|onto|in) (her|the) (chair|seat|armchair)|returns? to her (chair|seat)/i, 'sit'],
     [/gets? up|stands? up|gets? to her feet|rises? (from|to)|\bpac(es|ing)\b|walks? (around|over|off|away|across)|wanders?|strolls?/i, 'pace'],
     [/(puts?|sets?|tosses?|lays?) (down )?(her |the )?(book|phone)|closes? (her|the) book|pockets? her phone/i, 'sit'],

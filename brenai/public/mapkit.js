@@ -57,6 +57,14 @@ export function buildItem(THREE, toon, outline, item) {
   place(g, item); g.userData.item = item; return g;
 }
 export function place(g, item) { g.position.set(item.x, item.y || 0, item.z); g.rotation.y = item.rot || 0; g.scale.set(item.sx || 1, item.sy || 1, item.sz || 1); }
+// What she can settle on by herself: sit (seat height in metres) or lie (surface height). f: how far in front of the middle she sits.
+export const PERCH = { beanbag: { sit: 0.4, f: 0.05, name: 'the bean bag' }, campchair: { sit: 0.41, name: 'the camp chair' }, logseat: { sit: 0.41, name: 'the log' }, chair: { sit: 0.47, name: 'a chair' }, armchair: { sit: 0.52, f: 0.05, name: 'the armchair' }, sofa: { sit: 0.52, f: 0.08, name: 'the sofa' }, stool: { sit: 0.5, name: 'a stool' },
+  bed: { lie: 0.52, name: 'the bed' }, sleepingbag: { lie: 0.14, f: 0.15, name: 'the sleeping bag' }, picnic: { lie: 0.02, name: 'the picnic blanket' }, blanketfort: { lie: 0.08, name: 'the blanket fort' } };
+export function perchOf(item) {
+  const P = PERCH[item.kind]; if (!P || Math.abs((item.sy || 1) - 1) > 0.15 || (item.y || 0) > 0.05) return null;
+  const def = CATALOG[item.kind], r = item.rot || 0, fx = Math.sin(r), fz = Math.cos(r), f = P.f || 0, out = def.size[2] * (item.sz || 1) / 2 + 0.42, lie = P.lie !== undefined;
+  return { lie, name: P.name, top: lie ? P.lie : P.sit, yaw: r, at: [item.x + fx * f, item.z + fz * f], from: lie ? [item.x + Math.cos(r) * (def.size[0] * (item.sx || 1) / 2 + 0.4), item.z - Math.sin(r) * (def.size[0] * (item.sx || 1) / 2 + 0.4)] : [item.x + fx * out, item.z + fz * out] };
+}
 // the floor area a thing takes up, as a box along the room's axes: [x0, x1, z0, z1]
 export function footprint(item) {
   const def = CATALOG[item.kind] || CATALOG.box, w = def.size[0] * (item.sx || 1) / 2, d = def.size[2] * (item.sz || 1) / 2, c = Math.abs(Math.cos(item.rot || 0)), s = Math.abs(Math.sin(item.rot || 0)), ex = w * c + d * s, ez = w * s + d * c;

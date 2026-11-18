@@ -360,7 +360,11 @@ export async function create(url, opts = {}) {
   }
   const ERRAND = {
     pace: () => plan(CLIPS.texting_and_walking ? 'pacing around the room, texting' : 'up and pacing around the room', [run(() => { if (CLIPS.texting_and_walking) rt.carry = 'phone'; }), go(R_BACK), go(L_BACK), go(R_BACK), run(() => { if (rt.carry === 'phone') rt.carry = null; })]),
-    liedown: () => { if (here === 'dorm' && CLIPS.female_laying_pose) { rt.liePose = CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose'; plan('lying on her bed', [go(places.bed.side), { lie: 45 + Math.random() * 60 }]); } },
+    liedown: () => { if (here === 'dorm' && CLIPS.female_laying_pose) { rt.liePose = CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose'; rt.lieAt = null; plan('lying on her bed', [go(places.bed.side), { lie: 45 + Math.random() * 60 }]); } },
+    // one of the things placed in this room (a bean bag, the log by the fire, the picnic blanket): she goes over and settles on it for a while
+    perch: () => { if (window.WIZRA_PERCH != null) window.WIZRA_RT = rt; const list = (places.perches[here] || []).filter(p => CLIPS[p.lie ? 'female_laying_pose' : 'female_sitting_pose']); if (!list.length) return; const p = list[window.WIZRA_PERCH != null ? window.WIZRA_PERCH % list.length : Math.floor(Math.random() * list.length)];
+      const pose = p.lie ? (CLIPS.female_laying_pose_1 && Math.random() < 0.5 ? 'female_laying_pose_1' : 'female_laying_pose') : ['female_sitting_pose', 'female_sitting_pose_1', 'female_sitting_pose_2'].filter(n => CLIPS[n])[Math.floor(Math.random() * 3)] || 'female_sitting_pose';
+      plan((p.lie ? 'lying on ' : 'sitting on ') + p.name, [go(p.from), run(() => { rt.liePose = pose; rt.lieAt = { x: p.at[0], z: p.at[1], y: floorY + p.top - (p.lie ? 0 : 0.4), yaw: p.yaw + (p.lie ? Math.PI : 0) }; }), { lie: 60 + Math.random() * 90 }]); },
     fetchbook: () => plan('getting a book from the shelf', [go(AT_SHELF), face(Math.PI), wait(1.3), run(() => { rt.carry = 'book'; rt.bookHome = 'table'; }), wait(0.5)], Math.random() < 0.75 ? 'read' : ''),
     returnbook: () => plan('putting her book back on the shelf', [run(() => { rt.carry = 'book'; }), wait(0.6), go(AT_SHELF), face(Math.PI), wait(1.2), run(() => { rt.carry = null; rt.bookHome = 'shelf'; }), wait(0.5)]),
     fetchdrink: () => plan('getting herself a drink', [run(() => { rt.carry = 'mug'; }), wait(0.6), go(AT_COUNTER), face(Math.PI), run(() => snd('pour')), wait(2.2)], 'sip'),
@@ -430,7 +434,7 @@ export async function create(url, opts = {}) {
       const r = Math.random(), onTable = rt.bookHome === 'table';
       if (inTalk) { rt.nextAt = now + 30000 + Math.random() * 30000; if (r < 0.25) startActivity('sip'); }       // mid-conversation: at most a sip, never wandering off
       else { rt.self = true; // on her own: mostly things she does sitting down; getting up is the exception
-        startActivity(r < 0.36 ? (onTable ? 'read' : 'phone') : r < 0.66 ? 'phone' : r < 0.8 ? 'sip' : r < 0.86 ? 'pace' : r < 0.91 ? 'fetchdrink' : r < 0.95 && here === 'dorm' && CLIPS.female_laying_pose ? 'liedown' : onTable ? 'returnbook' : 'fetchbook'); }
+        startActivity(r < 0.36 ? (onTable ? 'read' : 'phone') : r < 0.66 ? 'phone' : r < 0.8 ? 'sip' : r < 0.86 ? 'pace' : r < 0.91 ? 'fetchdrink' : r < 0.95 && here === 'dorm' && CLIPS.female_laying_pose ? 'liedown' : r < (here === 'dorm' ? 0.97 : 0.99) && (places.perches[here] || []).length ? 'perch' : onTable ? 'returnbook' : 'fetchbook'); }
     }
     if (OVER[rt.act] && now > rt.until) { rt.act = 'sit'; rt.nextAt = now + 50000 + Math.random() * 90000; }
     // standing up / sitting down
@@ -522,7 +526,7 @@ export async function create(url, opts = {}) {
       if (rt.scriptClip) { if (now > rt.scriptUntil) rt.scriptClip = null; else playClip(rt.scriptClip, k * Math.min(1, (now - rt.scriptFrom) / 300, (rt.scriptUntil - now) / 300), (now - rt.scriptFrom) / 1000); }
       if (lie > 0.003) playClip(rt.liePose || 'female_laying_pose', lie, 0);
     }
-    const bob = walkClip ? 0 : 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, bed = places.bed, turn = Math.atan2(Math.sin(-Math.PI / 2 - rt.yaw), Math.cos(-Math.PI / 2 - rt.yaw));
+    const bob = walkClip ? 0 : 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, bed = rt.lieAt ? { at: [rt.lieAt.x, rt.lieAt.z], top: rt.lieAt.y } : places.bed, lieYaw = rt.lieAt ? rt.lieAt.yaw : -Math.PI / 2, turn = Math.atan2(Math.sin(lieYaw - rt.yaw), Math.cos(lieYaw - rt.yaw));
     vrm.scene.position.set(rt.x * k + slide + (bed.at[0] - rt.x) * lie, floorY * k + bob + perch + (bed.top - floorY) * lie, (ka - k) * 0.05 + rt.z * k + scoot + (bed.at[1] - rt.z) * lie);
     vrm.scene.rotation.y = (rt.yaw + turn * lie) * k + sideways;
     rt.zoom = 0.3 * k;
