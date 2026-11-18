@@ -200,7 +200,23 @@ export function buildPlaces(THREE, A) {
     solid[m.id] = [solid.dorm[0], solid.dorm[1], solid.dorm[2], solid.dorm[3], solid.dorm[5]].map(r => [...r]); blocks[m.id] = blocks.dorm.slice(0, 4).map(r => [...r]);
     addItems(g, m.id, m.items);
   }
+  // ---- weather you can see: rain and snow falling outside the windows (or all around, in a place under the open sky), and
+  // lightning in a storm. Each place has its own drops, in boxes: just beyond its window walls, or over the whole of an outdoor place.
+  const fx = {}, flake = paint(32, 32, (c, W) => { const g = c.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.55, 'rgba(255,255,255,.85)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, W); });   // a soft round flake
+  for (const name in groups) { const B = bounds[name], open = !!(maps.custom || []).find(m => m.id === name && m.open);
+    const zones = open ? [[B.x0 - 5, B.x1 + 5, B.z0 - 5, B.z1 + 5]] : [[B.x0 - 2.5, B.x1 + 0.5, B.z0 - 2.5, B.z0 - 0.12], [B.x0 - 2.5, B.x0 - 0.12, B.z0, B.z1]], top = open ? 6 : 3.4;
+    const nR = open ? 900 : 520, nS = open ? 700 : 380, seed = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+    const rp = new Float32Array(nR * 6), sp = new Float32Array(nS * 3), rg = new THREE.BufferGeometry(), sg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3)); sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+    const rain = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: '#c4dcff', transparent: true, opacity: 0.6, depthWrite: false })), snow = new THREE.Points(sg, new THREE.PointsMaterial({ color: '#ffffff', size: open ? 0.07 : 0.06, map: flake, transparent: true, opacity: 0.95, depthWrite: false }));
+    rain.frustumCulled = snow.frustumCulled = false; rain.visible = snow.visible = false; groups[name].add(rain, snow);
+    const at = (i, salt) => { const z = zones[i % zones.length]; return [z[0] + seed(i * 3 + salt) * (z[1] - z[0]), z[2] + seed(i * 7 + salt + 1) * (z[3] - z[2])]; };
+    fx[name] = { rain, snow, step(kind, t) { const T = t / 1000;
+        if (kind === 'rainy' || kind === 'stormy') { const sp1 = kind === 'stormy' ? 11 : 8, lean = kind === 'stormy' ? 0.35 : 0.1; for (let i = 0; i < nR; i++) { const [x, z] = at(i, 0), y = floorY + top - ((seed(i) * top + T * sp1 * (0.8 + 0.4 * seed(i + 9))) % top), o = i * 6; rp[o] = x + lean * (top - (y - floorY)) * 0.3; rp[o + 1] = y; rp[o + 2] = z; rp[o + 3] = rp[o] + lean * 0.09; rp[o + 4] = y - 0.26; rp[o + 5] = z; } rg.attributes.position.needsUpdate = true; }
+        if (kind === 'snowy') { for (let i = 0; i < nS; i++) { const [x, z] = at(i, 5), y = floorY + top - ((seed(i) * top + T * (0.55 + 0.5 * seed(i + 4))) % top), o = i * 3; sp[o] = x + 0.25 * Math.sin(T * 0.9 + i); sp[o + 1] = y; sp[o + 2] = z + 0.15 * Math.cos(T * 0.7 + i * 1.3); } sg.attributes.position.needsUpdate = true; }
+        rain.visible = kind === 'rainy' || kind === 'stormy'; snow.visible = kind === 'snowy'; } }; }
+  let flashAt = -1e9, nextFlash = 0;
   return {
+    sky: '', flash: 0,
     groups, names, baseSolid, floorY,
     dorm, house, toon, outline, eyeH, solid,
     bounds, blocks, spawn, bare, dark, perches,
@@ -211,7 +227,9 @@ export function buildPlaces(THREE, A) {
     tv: { screen: tvScreen, on: false, at: new THREE.Vector3(tvX, floorY + 1.02, tvZ) },
     tick(night, t) { // dusk and dark outside; the TV flickers when it is on
       const W = { cloudy: [0.78, 0.8, 0.84], rainy: [0.58, 0.62, 0.7], stormy: [0.42, 0.44, 0.55], foggy: [0.86, 0.86, 0.88], snowy: [0.92, 0.94, 1] }[this.sky] || [1, 1, 1];   // the player's real weather greys or brightens what is outside
-      const k = 1 - 0.72 * night; for (const m of worldMats) m.color.setRGB(k * W[0], (k * (1 - 0.05 * night) + 0.03 * night) * W[1], Math.min(1, (k + 0.12 * night) * W[2]));
+      if (this.sky === 'stormy') { if (t > nextFlash) { flashAt = t; nextFlash = t + 3500 + Math.random() * 9000; } const d = t - flashAt; this.flash = d < 90 ? 1 : d < 160 ? 0.25 : d < 260 ? 0.8 : d < 700 ? 0.8 * (1 - (d - 260) / 440) : 0; } else this.flash = 0;   // lightning: a double flicker
+      for (const n in fx) if (groups[n].visible) fx[n].step(this.sky, t);
+      const F = 1 + 1.4 * this.flash, k = (1 - 0.72 * night) * F; for (const m of worldMats) m.color.setRGB(k * W[0], (k * (1 - 0.05 * night) + 0.03 * night) * W[1], Math.min(1.6, (k + 0.12 * night) * W[2]));
       if (this.tv.on) this.tv.screen.material.color.setHSL((t / 9000) % 1, 0.55, 0.5 + 0.12 * Math.sin(t / 170)); else this.tv.screen.material.color.set('#101018');
     },
   };

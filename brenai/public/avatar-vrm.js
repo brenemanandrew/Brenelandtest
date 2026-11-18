@@ -24,7 +24,14 @@ export async function create(url, opts = {}) {
   renderer.domElement.style.cssText = 'width:100%;height:100%;display:block;touch-action:none';
   el.appendChild(renderer.domElement);
   const scene = new THREE.Scene();
-  const sun = new THREE.DirectionalLight(0xffffff, Math.PI), amb = new THREE.AmbientLight(0xffffff, 0.4); sun.position.set(0.6, 1, 1.2); scene.add(sun, amb);
+  const sun = new THREE.DirectionalLight(0xffffff, Math.PI), amb = new THREE.AmbientLight(0xffffff, 0.4); sun.position.set(0.6, 1, 1.2).multiplyScalar(9); scene.add(sun, amb);
+  // soft shadows from the one key light (things and her on the floor and walls), a cool rim light from behind for depth, and a
+  // light that only lightning uses. Phones get a smaller shadow map.
+  const coarse = matchMedia('(pointer:coarse)').matches; renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  sun.castShadow = true; sun.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048); Object.assign(sun.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 0.5, far: 40 }); sun.shadow.bias = -0.0012; sun.shadow.normalBias = 0.035; sun.shadow.radius = 5; sun.target.position.set(0, 0.4, 1); scene.add(sun.target);
+  const rim = new THREE.DirectionalLight('#c4a8ff', 0.9), bolt = new THREE.AmbientLight('#d4e2ff', 0); rim.position.set(-3, 4, -5); scene.add(rim, bolt);
+  // who throws a shadow and who catches one: flat panels (floors, walls, the view outside) only catch; solid things do both; glowing things neither
+  const shadeUp = root => root.traverse(o => { if (!o.isMesh || !o.material || o.material.isMeshBasicMaterial || o.material.transparent) return; const flatGeo = o.geometry && (o.geometry.type === 'PlaneGeometry' || o.geometry.type === 'CircleGeometry'); o.receiveShadow = true; o.castShadow = !flatGeo; });
   // the room follows the clock on the device you are watching from: bright by day, warm in the evening, dim and blue at night
   let night = 0, mood = 0;   // mood: how dark the place itself is (a camp at night), whatever the clock says
   let stageK = null;   // the heart game's plain pink stage: null when the room is showing, else 0..1 for how deep the pink has gone
@@ -303,7 +310,7 @@ export async function create(url, opts = {}) {
   let lampOn = null; // null = follows the hour; true/false once you have tapped it
   // the walls, windows and the rest of her dorm, and your house (see places.js)
   const places = buildPlaces(THREE, { maps: opts.maps, cel: kit, floorY, hip, feet, seatTop, tableTop, tableZ, backZ, SHELF, COUNTER, DOOR, tagged });
-  scene.add(...Object.values(places.groups));
+  scene.add(...Object.values(places.groups)); for (const g of Object.values(places.groups)) shadeUp(g); shadeUp(room); vrm.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
 
   // ---- props: they rest on the furniture and go to her hands when she uses them ----
   const group = (...kids) => { const g = new THREE.Group(); g.add(...kids); scene.add(g); return g; };
@@ -882,7 +889,7 @@ export async function create(url, opts = {}) {
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
     activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
-    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, weather(kind) { places.sky = kind || ''; },
+    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow, weather(kind) { places.sky = kind || ''; (el.closest('#stage') || el).dataset.weather = kind || ''; },
     doActivity(name) { rt.self = false; startActivity(name); },   // asked for (by you, or by what she wrote): not a whim to drop when you speak
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,
@@ -942,7 +949,7 @@ export async function create(url, opts = {}) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
-      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night);
+      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); bolt.intensity = places.flash * 1.5;
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();
       const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;
