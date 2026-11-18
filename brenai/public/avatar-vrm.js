@@ -34,6 +34,7 @@ export async function create(url, opts = {}) {
   const shadeUp = root => root.traverse(o => { if (!o.isMesh || !o.material || o.material.isMeshBasicMaterial || o.material.transparent) return; const flatGeo = o.geometry && (o.geometry.type === 'PlaneGeometry' || o.geometry.type === 'CircleGeometry'); o.receiveShadow = true; o.castShadow = !flatGeo; });
   // the room follows the clock on the device you are watching from: bright by day, warm in the evening, dim and blue at night
   let night = 0, mood = 0, gloom = 0;   // gloom: how much the weather (and a power cut) takes out of the light   // mood: how dark the place itself is (a camp at night), whatever the clock says
+  let relight = null; const FRONT = new THREE.Vector3(0.6, 1, 1.2).multiplyScalar(9);   // relight: set once the rooms exist (below). FRONT: a plain light from the viewer's side, for the picture backdrops and the heart game
   let stageK = null;   // the heart game's plain pink stage: null when the room is showing, else 0..1 for how deep the pink has gone
   function daylight() {
     const h = new Date().getHours() + new Date().getMinutes() / 60;
@@ -43,6 +44,7 @@ export async function create(url, opts = {}) {
     amb.intensity = 0.26 + 0.2 * day;
     if (gloom) { sun.intensity *= 1 - 0.85 * gloom; amb.intensity *= 1 - 0.62 * gloom; sun.color.setRGB(sun.color.r * (1 - 0.3 * gloom), sun.color.g * (1 - 0.2 * gloom), sun.color.b); }
     if (mood) { sun.intensity = Math.PI * (0.62 + 0.38 * day) * (1 - 0.72 * mood) * (1 - 0.6 * gloom); sun.color.setRGB(1 - 0.35 * mood, 1 - 0.25 * mood, 1); amb.intensity = (0.26 + 0.2 * day) * (1 - 0.3 * mood); }
+    if (relight) try { relight(day); } catch {}
     if (stageK !== null) return;
     el.style.background = `radial-gradient(circle at 50% 35%, hsl(${272 - 20 * night} ${45 - 10 * night}% ${54 - 26 * night}%), hsl(264 46% ${32 - 14 * night}%) 55%, hsl(258 48% ${20 - 9 * night}%) 100%)`;
   }
@@ -311,6 +313,24 @@ export async function create(url, opts = {}) {
   let lampOn = null; // null = follows the hour; true/false once you have tapped it
   // the walls, windows and the rest of her dorm, and your house (see places.js)
   const places = buildPlaces(THREE, { maps: opts.maps, cel: kit, floorY, hip, feet, seatTop, tableTop, tableZ, backZ, SHELF, COUNTER, DOOR, tagged });
+  // ---- where the light really comes from. By day: the sun, through the windows (the same slant as the light shafts). After dark or
+  // under heavy weather, indoors: the ceiling light, a bulb you can see, which is then also what throws the shadows. With the power
+  // out, or outdoors at night: the moon. Lamps, candles and fires are lights of their own, placed at their bulbs and flames.
+  const bulb = new THREE.Group(), bulbGlass = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), new THREE.MeshBasicMaterial({ color: '#fff1cf' })), bulbLight = new THREE.PointLight('#ffdcae', 0, 12, 1.5);
+  { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.08, 14), mat('#2b2433')); cap.position.y = 0.09; bulb.add(cap, bulbGlass, bulbLight); scene.add(bulb); }
+  const SUN_L = new THREE.Vector3(0.7, -0.8, 0.55).normalize(), MOON_L = new THREE.Vector3(0.35, -0.55, 0.76).normalize();   // the way sunlight and moonlight travel
+  relight = day => {
+    const b = places.bounds[here] || places.bounds.dorm, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, out = !!places.outdoor[here], staged = stageK !== null || inCall;
+    bulb.visible = !out && !staged; bulb.position.set(cx, floorY + (b.h || 2.5) - 0.1, cz);
+    if (staged) { sun.position.copy(FRONT); sun.target.position.set(0, 0.4, 1); bulbLight.intensity = 0; rim.intensity = 0.5; return; }
+    const dark = day < 0.45 || gloom > 0.5, lit = !out && places.power && dark && mood < 0.5;   // dark enough for the room light, and it has power
+    bulbGlass.material.color.set(lit ? '#fff1cf' : '#4a4458'); bulbLight.intensity = lit ? 2.6 : 0; sun.target.position.set(cx, floorY, cz);
+    if (lit) { sun.position.set(cx + 0.3, floorY + (b.h || 2.5) + 4, cz + 0.5); sun.color.set('#ffdcae'); sun.intensity = 1.5; amb.intensity = 0.2; }
+    else { sun.position.set(cx, floorY, cz).addScaledVector(day >= 0.45 ? SUN_L : MOON_L, -12);
+      if (day < 0.45) { sun.color.set('#9fb4ff'); sun.intensity = (out ? 0.6 : 0.3) * (1 - 0.8 * gloom) * (1 - 0.4 * mood); amb.intensity = out ? 0.2 : 0.1; }
+      else amb.intensity = (0.5 + 0.2 * day) * (1 - 0.55 * gloom) * (1 - 0.3 * mood); }                                  // by day the rest is light bouncing round the room
+    rim.intensity = (0.2 + 0.5 * day) * (1 - 0.7 * gloom);                                                              // sky light from the back windows
+  };
   scene.add(...Object.values(places.groups)); for (const g of Object.values(places.groups)) shadeUp(g); shadeUp(room); vrm.scene.traverse(o => { if (o.isMesh) o.castShadow = true; });
 
   // ---- props: they rest on the furniture and go to her hands when she uses them ----
@@ -433,6 +453,7 @@ export async function create(url, opts = {}) {
   function heartStage(k) { // hide the room and put a plain background behind her: white-pink at the start, deep pink by the end
     if (k === null || k === undefined) { if (stageK !== null) { stageK = null; setPlace(here); for (const o of [book, phone, mug]) o.visible = true; lampLight.visible = true; daylight(); } return; }
     stageK = Math.max(0, Math.min(1, k)); for (const key in places.groups) places.groups[key].visible = false; room.visible = false; for (const o of [book, phone, mug]) o.visible = false; lampLight.visible = false;
+    if (relight) relight(1 - night);
     el.style.background = `radial-gradient(circle at 50% 42%, hsl(338 100% ${97 - 27 * stageK}%), hsl(${334 - 6 * stageK} ${88 + 6 * stageK}% ${88 - 50 * stageK}%))`;
   }
   // ---- scripted (the Studio's events): walk her to a spot, or hold a recorded clip for a while ----
@@ -586,7 +607,7 @@ export async function create(url, opts = {}) {
     const fl = places.flash; if (fl >= 1 && storm.was < 1) { snd('thunder'); if (places.power && !inCall && !places.outdoor[here] && now > storm.next && Math.random() < 0.2) power(false); } storm.was = fl;
     if (!places.power && now > storm.until) power(true);
     if (fl > 0 && !inCall) { storm.flashing = true; sun.position.set(-3.5, 6, -7); sun.intensity = 0.4 + fl * 5.5; sun.color.set('#cfdcff'); }   // lightning: for an instant the light comes from the windows and throws long shadows at you
-    else if (storm.flashing) { storm.flashing = false; sun.position.set(0.6, 1, 1.2).multiplyScalar(9); daylight(); }
+    else if (storm.flashing) { storm.flashing = false; daylight(); }
     bolt.intensity = fl * 1.1;
   }
   function lampTick(dt) { const want = places.power && (lampOn === null ? night > 0.45 || gloom > 0.5 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
@@ -693,7 +714,7 @@ export async function create(url, opts = {}) {
       for (const n of KEYS) { const q = standOf(n); CUR[n][0] = q[0]; CUR[n][1] = q[1]; CUR[n][2] = q[2]; }
       Object.assign(rt, { act: 'call', stand: 0, k: 0, leg: 0, leaving: false, sneak: false, carry: null });
       vrm.scene.visible = true; vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; if (vrm.springBoneManager) vrm.springBoneManager.reset();
-      el.style.background = '#000'; camera.fov = 40; camera.updateProjectionMatrix();
+      daylight(); el.style.background = '#000'; camera.fov = 40; camera.updateProjectionMatrix();
     } else { camera.fov = 26; camera.updateProjectionMatrix(); daylight(); vanish(); }
   }
   function callFrame(s) { // on a call: standing, a little handheld sway; the light is the place she is in
@@ -722,7 +743,7 @@ export async function create(url, opts = {}) {
   const aim = new THREE.Vector3();
   // ---- visiting: you are in the room with her and see it through your own eyes. Drag to look, tap the floor (or WASD) to walk. ----
   const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 };
-  let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0;
+  let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0; daylight();
   const mugDorm = REST_AT.mug[0].clone();
   function setPlace(name) {
     here = places.groups[name] ? name : 'dorm'; for (const k in places.groups) places.groups[k].visible = k === here; room.visible = here !== 'house' && !places.bare[here]; lampLight.visible = room.visible || here === 'house'; mood = places.dark[here] || 0; daylight();   // (her own furniture is in every room but your house)
@@ -873,7 +894,7 @@ export async function create(url, opts = {}) {
     const custom = spec.scene === 'custom' && window.WIZRA_BG, inDorm = !custom && (spec.scene === 'dorm' || !BACKDROP[spec.scene]); vrm.scene.visible = true;
     for (const k in places.groups) places.groups[k].visible = inDorm && k === 'dorm'; room.visible = inDorm; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
     if (inDorm) { if (lying) { vrm.scene.position.set(places.bed.at[0], places.bed.top, places.bed.at[1]); vrm.scene.rotation.y = -Math.PI / 2; } else if (sitting) { vrm.scene.position.set(places.bed.at[0] + 0.32, places.bed.top - 0.4, places.bed.at[1] + 0.35); vrm.scene.rotation.y = Math.PI / 2 - 0.25; } else { vrm.scene.position.set(1.0, floorY, hip.z + 1.25); vrm.scene.rotation.y = 0.5; } }
-    else { vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; const c = bdCanvas.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.clearRect(0, 0, 384, 704); const l = custom ? (c.drawImage(window.WIZRA_BG, 0, 0, 384, 704), spec.light || [1, 1, 1]) : BACKDROP[spec.scene](c, 384, 704); bdTex.needsUpdate = true; sun.intensity = Math.PI * 0.9; sun.color.setRGB(l[0], l[1], l[2]); amb.intensity = 0.35; el.style.background = '#000'; }
+    else { vrm.scene.position.set(0, 0, 0); vrm.scene.rotation.y = 0; const c = bdCanvas.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.clearRect(0, 0, 384, 704); const l = custom ? (c.drawImage(window.WIZRA_BG, 0, 0, 384, 704), spec.light || [1, 1, 1]) : BACKDROP[spec.scene](c, 384, 704); bdTex.needsUpdate = true; sun.position.copy(FRONT); bulbLight.intensity = 0; sun.intensity = Math.PI * 0.9; sun.color.setRGB(l[0], l[1], l[2]); amb.intensity = 0.35; el.style.background = '#000'; }
     if (vrm.springBoneManager) vrm.springBoneManager.reset(); vrm.update(0); vrm.scene.updateMatrixWorld(true);
     head.getWorldPosition(tmpA); const yw = vrm.scene.rotation.y + (spec.turn || 0), fx = Math.sin(yw), fz = Math.cos(yw), full = spec.pose === 'full' || spec.cam === 'full', half = spec.cam === 'half';
     camera.fov = 40; camera.updateProjectionMatrix();

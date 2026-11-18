@@ -71,7 +71,8 @@ export function buildPlaces(THREE, A) {
       bar(h.w, 0.04, h.at, (h.y0 + h.y1) / 2); bar(h.y1 - h.y0, 0.04, h.at, (h.y0 + h.y1) / 2, true);
       const glass = new THREE.Mesh(new THREE.PlaneGeometry(h.w, h.y1 - h.y0), new THREE.MeshBasicMaterial({ color: '#cfeaff', transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false })); glass.position.set(alongX ? h.at : fixed, floorY + (h.y0 + h.y1) / 2, alongX ? fixed : h.at); glass.rotation.y = ry; into.add(glass);
       if (worldMat && (face === 'N' || face === 'W')) { // light through the window: a shaft slanting down into the room, a bright patch where it lands, dust in the beam
-        const d = face === 'N' ? [0.3, -0.8, 1] : [1, -0.8, 0.3], P = [[a, h.y0], [b, h.y0], [b, h.y1], [a, h.y1]].map(([c, y]) => new THREE.Vector3(alongX ? c : fixed, floorY + y, alongX ? fixed : c)), Q = P.map(v => { const k = (v.y - floorY - 0.012) / 0.8; return new THREE.Vector3(v.x + d[0] * k, floorY + 0.012, v.z + d[2] * k); });
+        const d = [0.7, -0.8, 0.55],   // the one way sunlight travels (the key light in avatar-vrm.js uses the same slant)
+        P = [[a, h.y0], [b, h.y0], [b, h.y1], [a, h.y1]].map(([c, y]) => new THREE.Vector3(alongX ? c : fixed, floorY + y, alongX ? fixed : c)), Q = P.map(v => { const k = (v.y - floorY - 0.012) / 0.8; return new THREE.Vector3(v.x + d[0] * k, floorY + 0.012, v.z + d[2] * k); });
         const pos = [], uv = [], quad = (A, B, C, D, ua, ub) => { for (const [v, u, w] of [[A, ua, 0], [B, ub, 0], [C, ub, 1], [A, ua, 0], [C, ub, 1], [D, ua, 1]]) { pos.push(v.x, v.y, v.z); uv.push(u, w); } };
         for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(P[i], P[j], Q[j], Q[i], i / 4, (i + 1) / 4); }
         const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));

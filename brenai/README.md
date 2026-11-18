@@ -187,3 +187,6 @@ She is told the actual time with every reply ("Right now it is 3:44 PM on Wednes
 
 ## Weather by town
 `POST /api/weather { lat, lon, label }` sets the town the weather comes from for the current player (`db.wx`); the owner can add `all: true` to set the game's default (`shared.wx`), which every player without their own gets. `{}` clears it. The page's weather button asks for a town ("Arden, NC"), looks it up with open-meteo's geocoder and saves it; an empty answer uses the device's location, "off" turns weather off. Coordinates are kept to one decimal.
+
+## Light from real sources
+`relight(day)` in `avatar-vrm.js` (run by `daylight()`): by day the shadow-casting key light is the sun, slanting in through the windows at the same angle as the light shafts, with the rest as bounce (ambient). When it is dark or the weather is heavy, indoors and with power, a ceiling bulb in the middle of the room (a mesh you can see, with a point light in it) is on and the key light comes straight down from it. With the power out, or outdoors at night, the key is moonlight. Lamps, candles, fires and string lights keep their own lights at their bulbs and flames. The rim light is sky light from the back windows and fades with the day. Picture backdrops, calls and the heart game use a plain front light (`FRONT`).
