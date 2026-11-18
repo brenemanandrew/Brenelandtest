@@ -60,10 +60,13 @@ export async function create(url) {
   // sitting upright on the edge of the seat, feet on the floor: the halfway pose for getting up and sitting down
   const SITUP = { hips: [0.06, 0, 0], spine: [0.1, 0, 0], chest: [0.04, 0, 0], neck: [0, 0, 0], leftUpperLeg: [-1.5, 0, 0.04], rightUpperLeg: [-1.5, 0, -0.04], leftLowerLeg: [1.5, 0, 0], rightLowerLeg: [1.5, 0, 0], leftFoot: [0, 0, 0], rightFoot: [0, 0, 0] };
   const STAND = { leftUpperArm: [0, 0, -1.3], rightUpperArm: [0, 0, 1.3], leftLowerArm: [0, -0.15, 0], rightLowerArm: [0, 0.15, 0] };
+  // fingers closed round something in her right hand: c how far the fingers curl, th how far the thumb comes in
+  const grip = (c, th) => { const o = {}; for (const f of ['Index', 'Middle', 'Ring', 'Little']) { o['right' + f + 'Proximal'] = [0, 0, c * 1.4]; o['right' + f + 'Intermediate'] = [0, 0, c * 1.65]; o['right' + f + 'Distal'] = [0, 0, c * 1.1]; } o.rightThumbMetacarpal = [0, -0.9 * th, 0]; o.rightThumbProximal = [0, -0.65 * th, 0]; return o; };
+  const GRIP_MUG = grip(0.5, 0.25);
   const OVER = window.WIZRA_OVER || {
     read: { leftUpperArm: [-0.55, 0.25, -1.1], leftLowerArm: [0, -1.6, 0], rightUpperArm: [-0.55, -0.25, 1.1], rightLowerArm: [0, 1.6, 0] },
-    phone: { rightUpperArm: [-0.6, -0.2, 1.1], rightLowerArm: [0, 1.9, 0] },
-    sip: { rightUpperArm: [-0.9, -0.3, 1.0], rightLowerArm: [0, 2.2, 0] },
+    phone: { rightUpperArm: [-0.6, -0.2, 1.1], rightLowerArm: [0, 1.9, 0], ...grip(0.28, 0.15) },
+    sip: { rightUpperArm: [-0.7, 0.2, 1.2], rightLowerArm: [0, 2.5, 0], ...GRIP_MUG },
   };
   // how her legs rest while she is seated, laid over the pose above: ankles crossed on the table, or feet down on the floor
   const LEGS = window.WIZRA_LEGS || {
@@ -71,12 +74,14 @@ export async function create(url) {
     floor: { _z: 0.17, hips: [-0.1, 0, 0], spine: [0.06, 0, 0], leftUpperLeg: [-1.36, 0, 0.06], rightUpperLeg: [-1.36, 0, -0.06], leftLowerLeg: [1.42, 0, 0], rightLowerLeg: [1.42, 0, 0], leftFoot: [0.02, 0, 0], rightFoot: [0.02, 0, 0] },
   };
   // whole-body ways of sitting taken from recorded poses (feet up on the seat): _clip is the pose, _y/_z nudge her onto the cushion
-  const SEATED = window.WIZRA_SEATED || { curl: { _clip: 'female_sitting_pose', _y: 0.02, _z: 0.07 }, hair: { _clip: 'female_sitting_pose_1', _y: 0.02, _z: 0.07 }, knee: { _clip: 'female_sitting_pose_2', _y: 0.02, _z: 0.07 } };
+  const SEATED = window.WIZRA_SEATED || { hair: { _clip: 'female_sitting_pose_1', _y: 0.02, _z: 0.07 } };
+  // sideways in the seat, back against one arm and her legs draped over the other (_yaw turns her, _x slides her across)
+  if (!window.WIZRA_LEGS) LEGS.drape = window.WIZRA_DRAPE || { _yaw: 1.4, _x: 0.15, _z: 0.02, _y: 0.03, hips: [-0.5, 0, 0], spine: [0.2, 0, 0], chest: [0.14, 0, 0], leftUpperLeg: [-1.66, 0, 0.05], rightUpperLeg: [-1.6, 0, -0.05], leftLowerLeg: [1.95, 0, 0], rightLowerLeg: [2.05, 0, 0], leftFoot: [0.3, 0, 0], rightFoot: [0.3, 0, 0] };
   if (!window.WIZRA_LEGS) Object.assign(LEGS, SEATED);
   const ARM = /Arm|Hand|Shoulder|Thumb|Index|Middle|Ring|Little/;
   const FINGER = /Proximal|Intermediate|Distal/;
   const KEYS = [...new Set([...Object.keys(POSE), ...Object.keys(STAND), ...Object.values(OVER).flatMap(o => Object.keys(o))])];
-  const standOf = n => STAND[n] || (FINGER.test(n) ? POSE[n] : [0, 0, 0]), situpOf = n => SITUP[n] || POSE[n] || [0, 0, 0];
+  const standOf = n => STAND[n] || (FINGER.test(n) && POSE[n]) || [0, 0, 0], situpOf = n => SITUP[n] || POSE[n] || [0, 0, 0];
   const CUR = {}; for (const n of KEYS) CUR[n] = [...(POSE[n] || [0, 0, 0])];
   for (const n in POSE) set(n, ...POSE[n]);
   // ---- gestures: bone targets blended over the resting pose while one plays. t = seconds in, for the moving parts. ----
@@ -275,7 +280,7 @@ export async function create(url) {
   const stride = c => (c.hips ? Math.abs(c.hips[c.hips.length - 1] - c.hips[2]) * hipY0 : 0) || 1.3;   // metres one loop of a walking clip covers, at her size
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
   const rt = { act: 'sit', until: 0, nextAt: performance.now() + 15000 + Math.random() * 15000, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
-    legs: 'up', lg: { crossed: 0, floor: 0, curl: 0, hair: 0, knee: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
+    legs: 'up', lg: { crossed: 0, floor: 0, hair: 0, drape: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
   const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), stay = sec => ({ wait: sec, idle: true }), run = fn => ({ run: fn });
   // ---- finding her way: a grid of the room with the furniture (and you) blocked out, so she walks round things, not through them ----
   const CELL = 0.1, PAD = 0.17, navs = {};
@@ -336,6 +341,8 @@ export async function create(url) {
   };
   function startActivity(name) {
     const now = performance.now(); if (rt.act === 'gone' || rt.leaving) return;   // not here, or on her way out
+    if (name === 'curl' || name === 'knee') name = 'drape';
+    if (name === 'drape') { rt.legs = 'drape'; rt.legsAt = now + 60000 + Math.random() * 60000; return; }
     if (SEATED[name]) { if (CLIPS[SEATED[name]._clip]) { rt.legs = name; rt.legsAt = now + 60000 + Math.random() * 60000; } return; }
     if (name === 'feetup' || name === 'crosslegs' || name === 'feetdown') { rt.legs = name === 'feetup' ? 'up' : name === 'crosslegs' ? 'crossed' : 'floor'; rt.legsAt = now + 60000 + Math.random() * 60000; return; }
     if (name === 'sit') { if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.after = ''; } else if (rt.act !== 'sitdown') rt.act = 'sit'; rt.nextAt = now + 20000 + Math.random() * 25000; return; }
@@ -409,12 +416,13 @@ export async function create(url) {
       if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.nextAt = now + 18000 + Math.random() * 25000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
     }
     // how her legs are resting: she changes it now and then, and it only applies while she is properly sat
-    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', ...Object.keys(SEATED).filter(n => CLIPS[SEATED[n]._clip])]; rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 50000 + Math.random() * 90000; }
-    let scoot = 0, perch = 0; const seatClips = [];
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', 'drape', ...Object.keys(SEATED).filter(n => CLIPS[SEATED[n]._clip])]; rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 50000 + Math.random() * 90000; }
+    let scoot = 0, perch = 0, sideways = 0, slide = 0; const seatClips = [];
     for (const name in LEGS) {
       rt.lg[name] += ((rt.legs === name ? 1 : 0) - rt.lg[name]) * Math.min(1, dt * 2.2); const v = rt.lg[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
       if (LEGS[name]._clip) { if (!CLIPS[LEGS[name]._clip]) continue; seatClips.push([LEGS[name]._clip, wgt]); perch += (floorY + LEGS[name]._y) * wgt; scoot += (hip.z + LEGS[name]._z) * wgt; continue; } // a recorded pose, feet up on the seat
       if (LEGS[name]._z) scoot += LEGS[name]._z * wgt;                              // sitting forward on the seat
+      if (LEGS[name]._yaw) { sideways += LEGS[name]._yaw * wgt; slide += LEGS[name]._x * wgt; perch += (LEGS[name]._y || 0) * wgt; }
       for (const n in LEGS[name]) { if (n[0] === '_') continue; const q = LEGS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; }
     }
     // what she is holding while seated
@@ -429,6 +437,7 @@ export async function create(url) {
     // her hand out: reaching for something, or carrying it
     rt.hold += (holdWant - rt.hold) * Math.min(1, dt * 4);
     if (rt.hold > 0.002) for (const n in OVER.phone) { const q = OVER.phone[n], c = CUR[n]; c[0] += (q[0] - c[0]) * rt.hold; c[1] += (q[1] - c[1]) * rt.hold; c[2] += (q[2] - c[2]) * rt.hold; }
+    if (rt.carryW.mug > 0.002) for (const n in GRIP_MUG) { const q = GRIP_MUG[n], c = CUR[n]; c[0] += (q[0] - c[0]) * rt.carryW.mug; c[1] += (q[1] - c[1]) * rt.carryW.mug; c[2] += (q[2] - c[2]) * rt.carryW.mug; }
     for (const key in rt.carryW) rt.carryW[key] += ((rt.carry === key ? 1 : 0) - rt.carryW[key]) * Math.min(1, dt * 4);
     rt.head[0] += (hp - rt.head[0]) * Math.min(1, dt * 4); rt.head[1] += (hy - rt.head[1]) * Math.min(1, dt * 4);
     rt.leg += ((moving ? 1 : 0) - rt.leg) * Math.min(1, dt * 6);
@@ -457,8 +466,8 @@ export async function create(url) {
       if (lie > 0.003) playClip(rt.liePose || 'female_laying_pose', lie, 0);
     }
     const bob = walkClip ? 0 : 0.026 * Math.abs(Math.cos(rt.phase)) * rt.leg * k, bed = places.bed, turn = Math.atan2(Math.sin(-Math.PI / 2 - rt.yaw), Math.cos(-Math.PI / 2 - rt.yaw));
-    vrm.scene.position.set(rt.x * k + (bed.at[0] - rt.x) * lie, floorY * k + bob + perch + (bed.top - floorY) * lie, (ka - k) * 0.05 + rt.z * k + scoot + (bed.at[1] - rt.z) * lie);
-    vrm.scene.rotation.y = (rt.yaw + turn * lie) * k;
+    vrm.scene.position.set(rt.x * k + slide + (bed.at[0] - rt.x) * lie, floorY * k + bob + perch + (bed.top - floorY) * lie, (ka - k) * 0.05 + rt.z * k + scoot + (bed.at[1] - rt.z) * lie);
+    vrm.scene.rotation.y = (rt.yaw + turn * lie) * k + sideways;
     rt.zoom = 0.3 * k;
   }
   function lampTick(dt) { const want = (lampOn === null ? night > 0.45 : lampOn) ? 1 : 0; lampLight.intensity += (want * 1.4 - lampLight.intensity) * Math.min(1, dt * 4); shade.material.color.setRGB(0.42 + 0.58 * lampLight.intensity / 1.4, 0.36 + 0.49 * lampLight.intensity / 1.4, 0.32 + 0.31 * lampLight.intensity / 1.4); }
@@ -494,11 +503,22 @@ export async function create(url) {
     }
     return '';
   }
+  // where a thing sits in her right hand, in the hand's own space (fingers run along -x, the palm faces -y, the thumb points +z): [offset, turn]
+  const basis = (x, y, z) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(...x), new THREE.Vector3(...y), new THREE.Vector3(...z)));
+  const ATTACH = window.WIZRA_ATTACH || { sip: [[-0.07, -0.052, 0.005], basis([0, -1, 0], [0, 0, 1], [-1, 0, 0])], phone: [[-0.085, -0.024, 0], basis([0, 0, 1], [-1, 0, 0], [0, -1, 0])] };
+  for (const k in ATTACH) if (Array.isArray(ATTACH[k][1])) ATTACH[k][1] = basis(...ATTACH[k][1]);
+  const handN = B('rightHand'), handRaw = raw('rightHand');
+  const tmpE = new THREE.Euler();
   function placeProps() { // after her bones are final for the frame: each prop is at rest, in her hands, or somewhere between
     head.getWorldPosition(headPos);
     for (const name in PROP) {
       const key = PROP_KEY[name], o = PROP[name], [rp, rr] = REST_AT[key === 'book' && rt.bookHome === 'shelf' ? 'bookShelf' : key];
       const held = Math.max(rt.ov[name] * 1.6, rt.carryW[key] || 0), wgt = Math.min(1, held), e = wgt * wgt * (3 - 2 * wgt), reading = name === 'read' && rt.ov.read > (rt.carryW.book || 0);
+      if (ATTACH[name] && handN && handRaw) { // held properly: fixed in the hand, turning with it
+        handN.getWorldQuaternion(tmpQ2); handRaw.getWorldPosition(tmpA); tmpA.add(tmpB.set(...ATTACH[name][0]).applyQuaternion(tmpQ2)); tmpQ2.multiply(ATTACH[name][1]);
+        if (name === 'sip') tmpQ2.setFromEuler(tmpE.set(-0.6 * Math.min(1, rt.ov.sip), vrm.scene.rotation.y, 0, 'YXZ'));   // a cup stays upright whatever her wrist does, and tips toward her when she drinks
+        o.position.lerpVectors(rp, tmpA, e); tmpQ.setFromEuler(rr); o.quaternion.copy(tmpQ).slerp(tmpQ2, e); continue;
+      }
       palmR.getWorldPosition(tmpA); if (reading) { palmL.getWorldPosition(tmpB); tmpA.add(tmpB).multiplyScalar(0.5); }
       tmpA.y += name === 'sip' ? 0.03 : 0.035;
       o.position.lerpVectors(rp, tmpA, e);
