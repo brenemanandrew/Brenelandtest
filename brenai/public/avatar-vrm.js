@@ -650,7 +650,9 @@ export async function create(url, opts = {}) {
       c.fillStyle = '#5f6b7a'; for (let y = 190; y < 520; y += 70) { c.fillRect(20, y, 40, 46); c.fillRect(86, y, 40, 46); c.fillRect(256, y - 40, 44, 50); c.fillRect(320, y - 40, 44, 50); } c.fillStyle = '#3d7a3f'; c.beginPath(); c.arc(190, 330, 46, 0, 7); c.fill(); c.fillStyle = '#5b4632'; c.fillRect(184, 360, 12, 200); c.fillStyle = '#8b8f96'; c.fillRect(0, 560, W, H); return [1, 1, 1, 0]; },
   };
   const callLight = [1, 1, 1, 0]; let roomObjs = null, inCall = false;
+  function callShow() { if (inCall) rt.panAt = performance.now(); }   // she turns the phone to show where she is
   function call(on, sceneName) {
+    rt.panAt = 0; bdTex.repeat.set(1, 1); bdTex.offset.set(0, 0);
     if (!roomObjs) roomObjs = scene.children.filter(o => o !== vrm.scene && o !== backdrop && o !== target && !o.isLight);
     inCall = !!on; for (const o of roomObjs) o.visible = !on; if (!on) setPlace(here); backdrop.visible = !!on; lampLight.visible = !on;
     if (on) {
@@ -667,11 +669,15 @@ export async function create(url, opts = {}) {
     rt.talkW += ((s.talking ? 1 : 0) - rt.talkW) * Math.min(1, s.dt * 3); playClip('idle', 1, s.t / 1000); playClip('talking', rt.talkW, s.t / 1000);   // standing naturally, hands moving when she talks
     const t = s.t / 1000, p = callLight[3] ? 0.5 + 0.5 * Math.sin(t * 2.3) : 0;
     sun.intensity = Math.PI * (callLight[3] ? 0.75 : 0.9); sun.color.setRGB(callLight[0] - 0.45 * p * callLight[3], callLight[1] + 0.25 * p * callLight[3], callLight[2]); amb.intensity = 0.35;
-    // framed like a phone held at arm's length: head to waist, a little off to one side, so the place behind her shows
-    const cx = eye.x + 0.12, cy = eye.y - 0.22;
-    backdrop.position.set(cx, cy, eye.z - 1.05);
-    camera.position.set(cx + 0.03 * Math.sin(t * 0.9) + 0.015 * Math.sin(t * 2.1), cy + 0.06 + 0.015 * Math.sin(t * 1.3), eye.z + 1.5);
-    camera.lookAt(cx, cy + 0.008 * Math.sin(t * 1.7), eye.z);
+    // She holds the phone the way people do: close, a little above her eyes, so her face fills the picture and not much of
+    // the place shows. When she shows you around (callShow) she turns the phone away from herself and sweeps it over the place.
+    const pan = rt.panAt ? Math.min(1, (performance.now() - rt.panAt) / 9000) : 1, w = pan < 1 ? Math.min(1, pan / 0.16, (1 - pan) / 0.16) : 0, e = w * w * (3 - 2 * w), sweep = pan < 1 ? Math.sin((pan - 0.16) / 0.68 * Math.PI * 2) * 0.5 : 0;
+    if (pan >= 1) rt.panAt = 0;
+    const sway = 0.012 * Math.sin(t * 0.9) + 0.006 * Math.sin(t * 2.1), fx = eye.x + 0.03, fy = eye.y - 0.045;
+    const lx = fx + e * 1.25, bx = lx + 0.1 * (1 - e);                             // where the phone points, and the middle of what is behind
+    backdrop.position.set(bx, fy - 0.1, eye.z - 1.05); bdTex.repeat.set(1 - 0.45 * e, 1 - 0.45 * e); bdTex.offset.set((0.225 + 0.2 * sweep) * e, 0.3 * e);
+    camera.position.set(fx + 0.05 + sway + e * 0.5, fy + 0.07 + 0.008 * Math.sin(t * 1.3), eye.z + 0.6 - e * 0.15);
+    camera.lookAt(lx + e * 0.05 * Math.sin(t * 0.7), fy + 0.004 * Math.sin(t * 1.7) - e * 0.05, eye.z - e * 1.05);
   }
 
   // camera: zoom 0 frames her face (the eye line is the centre of "puppet space", see avatar.js); zoom 1 swings round to
@@ -810,6 +816,14 @@ export async function create(url, opts = {}) {
     const keep = { vis: vrm.scene.visible, fov: camera.fov, room: room.visible, dorm: places.dorm.visible, house: places.house.visible, sun: sun.intensity, sunC: sun.color.clone(), amb: amb.intensity, bg: el.style.background };
     const props = [book, phone, mug], propVis = props.map(o => o.visible);
     renderer.setSize(480, 600, false); camera.aspect = 0.8;
+    if (spec.kind === 'view') { // a picture of something in her room, taken by her: the room as it is, without her in it
+      const bd = places.bed.at, V = { room: [[2.7, 1.9, hip.z + 2.8], [0, 0.7, hip.z]], shelf: [[-0.85, 1.3, hip.z + 0.9], [SHELF.x, 1.0, SHELF.z]], counter: [[1.15, 1.4, hip.z + 0.8], [COUNTER.x, 0.95, COUNTER.z]], bed: [[bd[0] + 1.9, 1.7, bd[1] + 0.9], [bd[0], 0.5, bd[1]]],
+        table: [[0.55, 1.2, hip.z + 1.9], [0, 0.3, hip.z + 0.8]], window: [[0.1, 1.5, hip.z + 0.7], [0.1, 1.55, hip.z - 1.6]], chair: [[1.2, 1.2, hip.z + 1.7], [0, 0.5, hip.z]] }[spec.target] || [[2.7, 1.9, hip.z + 2.8], [0, 0.7, hip.z]];
+      vrm.scene.visible = false; for (const k in places.groups) places.groups[k].visible = k === 'dorm'; room.visible = true; for (const o of props) o.visible = true; backdrop.visible = false;
+      camera.fov = 52; camera.updateProjectionMatrix(); camera.position.set(V[0][0], floorY + V[0][1], V[0][2]); camera.lookAt(V[1][0], floorY + V[1][1], V[1][2]); renderer.render(scene, camera);
+      let shot = ''; try { shot = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
+      setPlace(here); props.forEach((o, i) => { o.visible = propVis[i]; }); vrm.scene.visible = keep.vis; camera.fov = keep.fov; camera.updateProjectionMatrix(); return shot;
+    }
     // pose: standing naturally, then whatever her hand is doing
     for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'leftShoulder', 'rightShoulder', 'spine', 'hips']) set(n, 0, 0, 0);
     const home = spec.scene === 'dorm', LIE = { bed: 'female_laying_pose_1', bed2: 'female_laying_pose' }, SIT = { knees: ['female_sitting_pose', 0], knee: ['female_sitting_pose_2', 0], hair: ['female_sitting_pose_1', 0], kick: ['sitting_kicking_legs', 0.5] };
@@ -854,7 +868,7 @@ export async function create(url, opts = {}) {
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
     activity() { return rt.act === 'gone' ? 'out' : rt.act === 'up' || rt.act === 'sitdown' ? rt.label : (DOING[rt.act] || ''); },
-    presence, glow(kind) { rt.glow = kind || ''; }, call,
+    presence, glow(kind) { rt.glow = kind || ''; }, call, callShow,
     doActivity(name) { rt.self = false; startActivity(name); },   // asked for (by you, or by what she wrote): not a whim to drop when you speak
     // a tap that missed her: what in the room it landed on, and sending her to it
     pick, direct,

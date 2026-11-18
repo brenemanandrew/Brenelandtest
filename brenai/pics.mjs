@@ -21,6 +21,21 @@ export function thing(likes) {
   const fits = THINGS.filter(([re]) => (likes || []).some(l => re.test(l))), [, what, desc] = pick(fits.length ? fits : THINGS);
   return { id: id(), kind: 'thing', what, desc: 'a picture of ' + desc };
 }
+// He asked for a picture OF something. What can she actually photograph? -> a spec, 'self' (he means her: the usual selfie),
+// { none: subject } when she has nothing like it in front of her, or null when no subject was named.
+const VIEWS = [[/\b(whole |entire )?(room|dorm|place|space|apartment)\b/i, 'room', 'her dorm room, taken from the doorway'], [/book ?shel|\bshel(f|ves)\b|\bbooks\b|collection/i, 'shelf', 'her bookshelf'], [/\bbed\b|blanket|pillow/i, 'bed', 'her bed'], [/\bdesk\b|\btable\b|setup/i, 'table', 'her table with her things on it'],
+  [/window|\bview\b|outside|campus|weather|sky/i, 'window', 'the view out of her window'], [/kitchen|counter|kettle|\bmug\b|\bcup\b/i, 'counter', 'her little counter with the kettle'], [/\bchair\b|armchair|\bseat\b/i, 'chair', 'her armchair']];
+const SELF = /^(you|yourself|u|your (face|self|smile|eyes|hair|outfit|clothes|look|fit)|what you('re| are) wearing|you (right )?now)\b/i;
+export function requested(text, pack, ctx) {
+  const t = String(text).replace(/\*[^*]*\*/g, ' '), m = t.match(/\b(?:pic|pics|picture|photo|snap|shot)s?\s+of\s+((?:the |a |an |that |some |your |ur )?[a-z0-9' -]{2,40})/i) || t.match(/\b(?:show me|let me see|send me)\s+(your [a-z0-9' -]{2,40})/i);
+  if (!m) return null; const subject = m[1].trim().replace(/\s+(please|pls|plz|now|for me|real quick).*$/i, ''), bare = subject.replace(/^(the|a|an|that|some|your|ur)\s+/i, '');
+  if (SELF.test(subject) || SELF.test(bare)) return 'self';
+  if (ctx.home) { const v = VIEWS.find(([re]) => re.test(bare)); if (v) return { id: id(), kind: 'view', target: v[1], desc: 'a picture of ' + v[2] }; }
+  const th = THINGS.find(([re]) => re.test(bare)); if (th) return { id: id(), kind: 'thing', what: th[1], desc: 'a picture of ' + th[2] };
+  const words = bare.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3), hit = (pack || []).filter(p => p.theme !== 'selfie' && p.theme !== 'cute' && p.theme !== 'relationship' && (p.min || 0) <= ctx.close * 100 && words.some(w => p.desc.toLowerCase().includes(w.replace(/s$/, ''))));
+  if (hit.length) { const p = pick(hit); return { id: id(), kind: 'pack', file: p.file, theme: p.theme, desc: p.desc }; }
+  return { none: bare.slice(0, 40) };
+}
 // how often: rare with a stranger, fairly regular once they are close (and a bit more if it is romance)
 export const chatChance = (close, romance) => (0.008 + 0.06 * close * close) * (romance ? 1.6 : 1);
 export const awayChance = (close, romance) => (0.1 + 0.3 * close * close) * (romance ? 1.3 : 1);

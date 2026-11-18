@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
 import { detectLeave, detectPlan, outcome, glowNote, clock, sceneFor, picksUp, callNote, HANGUP, COMING, detectInvite } from './away.mjs';
-import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates } from './pics.mjs';
+import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, requested } from './pics.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
@@ -617,6 +617,7 @@ function matchBlurb(t) {
   const top = Object.keys(TRAIT_WORD).map(k => [k, t[k] - 50]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3).map(([k, d]) => TRAIT_WORD[k][d >= 0 ? 1 : 0]);
   return { name: 'Wizra', age: 22, tags: ['goth', 'plays D&D', 'college student', 'night owl'], line: `${top[0][0].toUpperCase() + top[0].slice(1)}, ${top[1]} and ${top[2]}.`, fit: 86 + Math.round((t.warmth + t.playfulness + t.nerdiness) % 12) };
 }
+const SHOW_ME = /show me (where|around|the (room|place|view|bar|class|library|store)|your (room|surroundings|view)|what'?s (around|behind))|let me see (where|around|the (room|place|view)|behind)|(turn|flip|move|pan|point) (the |your )?(camera|phone)|look around|what'?s behind you|where are you (right now|really)\??.*(show|see)|prove (it|you'?re)/i;
 async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   try {
@@ -924,7 +925,9 @@ async function handle(req, res) {
         let pic = null, picPre = '';
         if (!db.place && !askPre) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
-          if (wantsPic(msg)) { if (close * 100 >= rule('picAskMin') && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          const what = wantsPic(msg) ? requested(msg, pack, { home: true, close }) : null;   // a picture OF something: her room, her dice, the view...
+          if (what && what !== 'self') { if (what.none) picPre = `asks for a picture of ${what.none}; she has nothing like that in front of her to photograph right now and says so in her own way (no picture is sent)`; else if (close * 100 >= rule('picAskMin')) { pic = what; picPre = `asks for ${what.desc.replace(/^a picture of /, 'a picture of ')}; she takes it and sends it: ${what.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending pictures yet and says so in her own way'; }
+          else if (wantsPic(msg)) { if (close * 100 >= rule('picAskMin') && Math.random() < 0.55 + 0.45 * close) { pic = (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
         const pre = [takeTouches(), askPre, picPre, seen && !askPre ? 'sees that she is ' + seen : ''].filter(Boolean).join(', ');
@@ -989,14 +992,17 @@ async function handle(req, res) {
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'busy' });
         busy = true;
-        db.log.push({ who: 'me', text: msg, at: Date.now(), hidden: true });
+        // "show me where you are": if she is where she said, she turns the phone and shows him. If she is not, she will not, and that is a tell.
+        const asks = SHOW_ME.test(msg), hiding = asks && (!!(db.away.out && db.away.out.lying) || db.away.where === 'the bathroom'), show = asks && !hiding;
+        const pre = !asks ? '' : show ? `asks to see where she is; she turns her phone around and pans it slowly over the place so he can see it (${sceneFor(db.away)}), then turns it back to herself` : 'asks to see where she is; she does NOT turn the camera or show him anything around her: she keeps the phone close on her face and makes an excuse, deflects or changes the subject';
+        db.log.push({ who: 'me', text: msg, at: Date.now(), hidden: true, ...(pre ? { pre } : {}) });
         try {
           const full = await reply(msg, () => {});
           db.log.push({ who: 'her', text: full, at: Date.now(), hidden: true });
           const coming = COMING.test(full); if (coming) db.away.until = Math.min(db.away.until, Date.now() + (3 + Math.random() * 4) * 60000);
           save();
           prewarm(full);
-          return json(res, 200, { text: full, hangup: HANGUP.test(full), coming });
+          return json(res, 200, { text: full, hangup: HANGUP.test(full), coming, ...(asks ? { show } : {}) });
         } catch (e) { db.log.pop(); return json(res, 503, { error: e.message }); } finally { busy = false; }
       }
       if (url.pathname === '/api/call/end' && req.method === 'POST') {

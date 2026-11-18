@@ -554,7 +554,7 @@ const THING = {
     c.fillStyle = '#b3201c'; c.font = 'bold 60px serif'; c.fillText('W', 60, 150); c.fillStyle = '#2f4a7a'; c.fillRect(300, 330, 100, 130); c.fillStyle = '#d9b25a'; c.beginPath(); c.arc(350, 395, 30, 0, 7); c.fill(); },
 };
 async function drawPic(spec) { // -> an image URL ('' if it cannot be drawn on this device right now)
-  if (spec.kind === 'selfie') return await avatar.snapshot(spec);
+  if (spec.kind === 'selfie' || spec.kind === 'view') return await avatar.snapshot(spec);
   const c = el('canvas', { width: 480, height: 600 }); (THING[spec.what] || THING.dice)(c.getContext('2d'), 480, 600); return c.toDataURL('image/webp', 0.88);
 }
 function picEl(spec) {
@@ -1238,6 +1238,7 @@ async function callSay(text) {
     const r = await api('/api/call/say', { text }); const d = await r.json(); avatar.setThinking(false);
     if (!phoneCall.on) return;
     if (!r.ok) { if (r.status === 409 && /No call/.test(d.error || '')) endCall('she', 1500); return; }
+    if (d.show) avatar.callShow();   // she turns the phone to show you where she is
     await herLine(d.text, d.hangup);
   } catch { avatar.setThinking(false); } finally { phoneCall.busy = false; }
 }

@@ -299,6 +299,7 @@
       presence(mode, o) { if (R.presence) R.presence(mode, o || {}); },
       // a video call while she is out: she appears wherever she really is (scene = the backdrop), until call(false)
       call(on, scene) { if (R.call) R.call(on, scene); },
+      callShow() { if (R.callShow) R.callShow(); },                                  // on a video call: she turns the phone to show where she is
       // the after-effect that still shows for a while once she is back: '', tipsy, high, groggy, hyper, upset
       setState(kind) { state = STATE[kind] ? kind : ''; if (R.glow) R.glow(state); },
       // her routine (3D model only): what she is busy with right now, in words, and a way to start something
