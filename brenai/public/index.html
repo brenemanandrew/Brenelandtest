@@ -422,6 +422,7 @@
   #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
   #herWrap { display:none !important; }   /* her words are in the chat area and spoken: no balloon up top */
   /* pictures she sends */
+  .msg { position:relative; } .msg .unsend { position:absolute; right:2px; top:2px; width:24px; height:24px; border-radius:50%; border:0; background:rgba(60,40,90,.14); color:#6a5a8a; font-size:12px; line-height:1; cursor:pointer; } .msg .unsend:hover { background:#e0445a; color:#fff; }
   .msg .more { grid-column:2; justify-self:start; margin:4px 0 0; border:0; border-radius:999px; padding:2px 9px; font-size:12px; line-height:1.4; cursor:pointer; color:#fff; background:linear-gradient(135deg,#a855f7,#ec4899); opacity:.75; } .msg .more:hover { opacity:1; }
   .chatpic { display:block; width:min(230px, 72%); aspect-ratio:4/5; object-fit:cover; margin:4px 0 8px; border-radius:16px; border:4px solid #fff; box-shadow:0 4px 14px rgba(20,8,50,.35); background:#d9d2e6; cursor:zoom-in; transform:rotate(-1.5deg); }
   .chatpic.wait { animation:picWait 1s ease-in-out infinite alternate; } @keyframes picWait { from { opacity:.45; } to { opacity:.9; } }
@@ -755,6 +756,7 @@ async function load() {
   myName = s.name || 'You'; if ($('ownerBtn')) $('ownerBtn').hidden = !s.owner; if (s.wx !== undefined) { myWx = s.wx; const wbtn = $('weatherBtn'); if (wbtn) wbtn.textContent = myWx ? 'Weather: ' + myWx.label : localStorage.getItem('brenai.weather') ? 'Weather: this device\'s location' : 'Weather: set the town'; setTimeout(weatherTick, 1500); } if (s.extras) myExtras = s.extras; if (s.voiceMod) voiceMod = s.voiceMod; if (s.settings) settings = s.settings; drawActs(); avatar.setMood(settings.mood); visitInfo.outfit = s.outfit || null; visitInfo.level = s.level || 0; applyAvatar();
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
+  unsendMarks(s.log);
   if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
   setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); setPlace(s); if (s.depart === 'say') depart();
   if (s.intro && window.WizraIntro && !introOn) firstMeet(s);
@@ -765,6 +767,10 @@ async function firstMeet(s) {
   introOn = true; const text = await WizraIntro.run({ name: s.name, snapshot: spec => avatar.snapshot(spec), fx: n => { try { WizraSound.fx(n); } catch {} } });
   if (text) { const body = addLine('her', ''); avatar.act(text); speaker.say(speechOf(text, 'her')); await typeOut(body, text); }
 }
+// your own lines she has not answered yet (the ones after her last reply) can be taken back: a small x on each
+function unsendMarks(list) { for (const b of log.querySelectorAll('.unsend')) b.remove(); const mine = []; for (let i = list.length - 1; i >= 0 && list[i].who !== 'her'; i--) if (list[i].who === 'me') mine.unshift(list[i]);
+  const rows = [...log.querySelectorAll('.msg.me')].slice(-mine.length); if (!mine.length || rows.length !== mine.length) return;
+  rows.forEach((row, i) => { const x = el('button', { className: 'unsend', title: 'Take this line back', textContent: '\u2715' }); x.onclick = async () => { const r = await api('/api/unsend', { at: mine[i].at }); if (r.ok) row.remove(); else { const d = await r.json().catch(() => ({})); addSys(d.error || 'That line could not be taken back.'); } }; row.append(x); }); }
 function addSys(text) { const d = document.createElement('div'); d.className = 'line sys'; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; }
 
 // ---------- whether she is here ----------

@@ -1048,7 +1048,11 @@ async function handle(req, res) {
       // unsend: take back what the player said in the last N minutes (his own lines only; nothing else about the world changes).
       // The save is copied first. Lines she has already answered stay answered: her replies are not removed.
       if (url.pathname === '/api/unsend' && req.method === 'POST') {
-        const { minutes } = await readBody(req), m = Math.max(0.5, Math.min(24 * 60, +minutes || 0)); if (!(+minutes > 0)) return json(res, 400, { error: 'minutes?' }); if (busy) return json(res, 409, { error: 'busy' });
+        const ub = await readBody(req), { minutes } = ub;
+        if (Number.isFinite(+ub.at) && +ub.at > 0) { // one line of his, by its time: only one she has not answered yet (nothing of hers comes after it)
+          const i = db.log.findIndex(e => e.who === 'me' && !e.hidden && e.at === +ub.at); if (i < 0) return json(res, 404, { error: 'That line is not there any more.' }); if (db.log.slice(i + 1).some(e => e.who === 'her')) return json(res, 409, { error: 'She has already answered that one.' });
+          db.log.splice(i, 1); save(); return json(res, 200, { ok: true, removed: 1 }); }
+        const m = Math.max(0.5, Math.min(24 * 60, +minutes || 0)); if (!(+minutes > 0)) return json(res, 400, { error: 'minutes?' }); if (busy) return json(res, 409, { error: 'busy' });
         save(); const backup = cur().file.replace(/\.json$/, `.before-unsend-${Date.now()}.json`); try { fs.copyFileSync(cur().file, backup); } catch (e) { return json(res, 500, { error: 'could not back up: ' + e.message }); }
         const t = Date.now() - m * 60000, before = db.log.length; db.log = db.log.filter(e => !(e.who === 'me' && e.at >= t)); save();
         return json(res, 200, { ok: true, removed: before - db.log.length, kept: db.log.length, backup: path.basename(backup) });

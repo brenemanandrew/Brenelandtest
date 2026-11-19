@@ -204,3 +204,6 @@ The player plays the real film on their own screen; the game keeps a clock besid
 - Save: `POST /api/anims/clip { name, clip }` adds it to `/data/anims.json` (`{ remove: name }` deletes one; owner only). Download and load as JSON files.
 - In the game a saved clip can be played by a Studio event, and a Reaction can use `clip:name` as its pose (played with `holdClip`, on her feet). A posed photo can name any clip too.
 - Test hook: `window.mocapFeed(landmarks)` drives her from canned points.
+
+## Unsend
+`POST /api/unsend { at }` takes back one line of the player's own by its time, if she has not answered since (`{ minutes }` takes back all of his lines from the last N minutes, after copying the save). In the chat, each of your lines after her last reply has a small x that does this.
