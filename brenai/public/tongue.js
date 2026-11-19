@@ -4,6 +4,7 @@
 //   tongue.set(out, curl, side)                out 0..1 (0 hides it), curl -1 (down over her chin) .. 1 (up toward her nose),
 //                                              side -1 .. 1 (to her right .. to her left)
 //   tongue.set(out, curl, side, open)          open 0..1 is how far her mouth is open (her "aa"): the tongue rides down with her jaw
+//   tongue.set(out, curl, side, open, wide)    wide 0.6..1.5: narrower or broader than usual (1)
 //   tongue.update(dt)                          once a frame: it is soft. It springs to where it was told to go and overshoots a little,
 //                                              lags and wobbles when her head moves, and hangs toward the ground whichever way she tilts
 //   tongue.snap()                              jump straight to rest at the pose just set (for a still picture)
@@ -45,15 +46,16 @@ export function addTongue(THREE, vrm, o = {}) {
     map = new THREE.CanvasTexture(cv); map.flipY = true; if ('colorSpace' in map) map.colorSpace = THREE.SRGBColorSpace; } catch {}   /* (texture row 0 is the tip: v runs root to tip, and flipY puts the tip colour at the far end) */
   const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial(map ? { map, vertexColors: true, side: THREE.DoubleSide } : { color: o.color || '#ef5f7c', vertexColors: true, side: THREE.DoubleSide })); mesh.frustumCulled = false; mesh.visible = false; mesh.name = 'tongue'; holder.add(mesh);
   // ---- soft body: where it was told to be (tg), where it is (st), how fast it is moving (vl), and its sway from her head moving ----
-  const tg = { out: 0, curl: 0, side: 0, open: 0 }, st = { out: 0, curl: 0, side: 0, open: 0 }, vl = { out: 0, curl: 0, side: 0, open: 0 }, sway = { x: 0, y: 0, vx: 0, vy: 0 }, grav = V(0, -1, 0);
-  const K = { out: [190, 15], curl: [120, 9], side: [120, 9], open: [240, 26] }, wp = V(), pp = V(), pv = V(), acc = V(), wq2 = new THREE.Quaternion(); let first = true;
+  const tg = { out: 0, curl: 0, side: 0, open: 0, wide: 1 }, st = { out: 0, curl: 0, side: 0, open: 0, wide: 1 }, vl = { out: 0, curl: 0, side: 0, open: 0, wide: 0 }, sway = { x: 0, y: 0, vx: 0, vy: 0 }, grav = V(0, -1, 0);
+  const K = { out: [190, 15], curl: [120, 9], side: [120, 9], open: [240, 26], wide: [140, 13] }, wp = V(), pp = V(), pv = V(), acc = V(), wq2 = new THREE.Quaternion(); let first = true;
   const c = V(), t = V(), n = V(), x = V();
   function build() {
     const out = Math.max(0, Math.min(1.12, st.out)), curl = Math.max(-1.2, Math.min(1.2, st.curl)), sd = st.side; if (out < 0.03 && tg.out < 0.03) { mesh.visible = false; return; } mesh.visible = true;
     holder.position.copy(y0).addScaledVector(down, jaw * Math.max(0, st.open) * 0.8);
     const len = 0.019 + 0.035 * out, step = len / N, hang = 0.5 * out * (1 - Math.min(1, Math.abs(curl)) * 0.75), bend = (curl >= 0 ? curl * 1.3 : curl * 1.5) + grav.y * hang, yawBend = grav.x * hang * 0.8;
     /* it thins as it stretches and fattens as it pulls back; curled up, the tip comes to more of a point and the sides cup */
-    const W = 0.0128 * (1.12 - 0.26 * out), T = 0.0056 * (1.2 - 0.3 * out), point = 1 + 0.7 * Math.max(0, curl), cup = 0.1 + 0.28 * Math.max(0, curl) + 0.1 * Math.abs(sd);
+    const wd = Math.max(0.55, Math.min(1.6, st.wide)), W = 0.0128 * (1.12 - 0.26 * out) * wd, T = 0.0056 * (1.2 - 0.3 * out) / Math.sqrt(wd),   /* spread wide it also lies flatter; drawn narrow it bunches up thicker */
+       point = 1 + 0.7 * Math.max(0, curl), cup = 0.1 + 0.28 * Math.max(0, curl) + 0.1 * Math.abs(sd);
     let pitch = 0.05, yaw = sd * 0.5; c.set(sd * 0.003, -0.0015, -0.011);   /* the root sits back inside her mouth, so no end of it is ever seen */
     for (let i = 0; i <= N; i++) { const u = i / N, tipW = u * u;
       if (i) { pitch += (bend * (u < 0.3 ? 0.25 : 1.32) + sway.y * 2.4 * u) / N; yaw += (yawBend * 1.3 + sway.x * 2.4) * u / N + sd * 0.25 / N; }
@@ -66,7 +68,7 @@ export function addTongue(THREE, vrm, o = {}) {
         pos[k] = c.x + x.x * w * ca + n.x * y; pos[k + 1] = c.y + x.y * w * ca + n.y * y; pos[k + 2] = c.z + x.z * w * ca + n.z * y; } }
     geo.attributes.position.needsUpdate = true;
   }
-  function set(out = 0, curl = 0, side = 0, open = 0) { const cl = (v, a, b) => Math.max(a, Math.min(b, +v || 0)); tg.out = cl(out, 0, 1); tg.curl = cl(curl, -1, 1); tg.side = cl(side, -1, 1); tg.open = cl(open, 0, 1); }
+  function set(out = 0, curl = 0, side = 0, open = 0, wide = 1) { tg.wide = Math.max(0.6, Math.min(1.5, +wide || 1)); const cl = (v, a, b) => Math.max(a, Math.min(b, +v || 0)); tg.out = cl(out, 0, 1); tg.curl = cl(curl, -1, 1); tg.side = cl(side, -1, 1); tg.open = cl(open, 0, 1); }
   function snap() { for (const k in tg) { st[k] = tg[k]; vl[k] = 0; } sway.x = sway.y = sway.vx = sway.vy = 0; first = true; build(); }
   function update(dt) {
     if (!(dt > 0)) return snap(); if (tg.out < 0.03 && st.out < 0.03 && Math.abs(vl.out) < 0.05) { st.out = 0; if (mesh.visible) mesh.visible = false; first = true; return; }

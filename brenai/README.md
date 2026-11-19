@@ -246,3 +246,6 @@ The mocap page also reads your face (MediaPipe Face Landmarker, every other fram
 
 ## Motion capture: keeping her from flipping out
 Five guards in `public/mocap.js`: joint limits inside `solve` (`limit`: elbows, knees, shoulders, hips, spine and neck stay in a human range), a jump filter (a bone asked to swing further than a limb can in one frame is held until the tracker says so five frames running), a left/right swap guard on the landmarks, slower belief in depth than in the other two directions, and fades (a part out of sight settles to rest after about 1.5 s and eases in when it returns). `solve(lm, { loose: true })` turns the limits off.
+
+## Tongue: soft body, and its shape read from the camera
+`public/tongue.js` is a soft body (`set` gives the target, `update(dt)` springs toward it, sways with her head and hangs with gravity, `snap()` for stills) with a painted skin, and takes a width (`set(out, curl, side, open, wide)`). On the motion capture page `tongueShape` reads your tongue off the picture on a grid lined up with your face: how far below the lower lip it reaches (length and hang), how wide it is against your mouth, whether it sits to one side, curled up over the top lip, or poked out of a corner. Takes carry `tongueWide` next to the other tongue tracks. `window.mocapTongueProbe(canvas, facePoints)` is the test hook.
