@@ -855,8 +855,8 @@ export async function create(url, opts = {}) {
   // ---- one-on-one time: she stands facing you at arm's length. You can look about a little and lean round her, but not walk off.
   const hg = { on: false, yaw: 0, lookX: 0, lookY: 0, dist: 1.9, b: 0 };
   function hang(on) { on = !!on; if (on === hg.on) return; hg.on = on; hg.yaw = hg.lookX = hg.lookY = 0; hg.dist = 1.9;
-    if (on) { if (rt.act !== 'gone') plan('spending time with you, face to face', [go(STAND_AT), stay(3600)], '', true); }
     for (const ms of [900, 2200, 3600]) setTimeout(() => { if (vrm.springBoneManager) vrm.springBoneManager.reset(); }, ms);   // her hair and skirt are put at rest as the view cuts over, so nothing is caught mid-swing
+    if (on) { if (rt.act !== 'gone') plan('spending time with you, face to face', [go(STAND_AT), stay(3600)], '', true); }
     else if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.stepT = 0; rt.label = 'sitting back down'; } }
   function hangView(o) { if (o.yaw !== undefined) hg.yaw = Math.max(-1.1, Math.min(1.1, o.yaw)); if (o.dyaw) hg.yaw = Math.max(-1.1, Math.min(1.1, hg.yaw + o.dyaw)); if (o.dist) hg.dist = Math.max(1.2, Math.min(2.8, o.dist)); if (o.dx !== undefined) { hg.lookX = Math.max(-0.35, Math.min(0.35, hg.lookX + o.dx)); hg.lookY = Math.max(-0.3, Math.min(0.22, hg.lookY + o.dy)); } return { yaw: hg.yaw, dist: hg.dist }; }
   function hangCamera(dt) { hg.b += ((hg.on ? 1 : 0) - hg.b) * Math.min(1, dt * 3); if (hg.b < 0.004) return; if (hg.on) fp.locked = true;
