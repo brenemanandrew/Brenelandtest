@@ -7,7 +7,7 @@
   const $ = id => document.getElementById(id), el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids.filter(k => k != null)); return e; };
   const css = `
   body.hang #stageWrap { position:fixed !important; left:0 !important; top:0 !important; transform:none !important; width:100vw !important; height:100dvh !important; z-index:25; }
-  body.hang #stage { border-radius:0; box-shadow:none; } body.hang #visitBtn, body.hang #bigBtn, body.hang #brainBtn, body.hang #outSign, body.hang #movieBar { display:none !important; }
+  body.hang #stage { border-radius:0; box-shadow:none; } body.hang #dock, body.hang #outSign, body.hang #movieBar, body.hang #awayNote { display:none !important; }
   #hangLayer { position:fixed; inset:0; z-index:26; touch-action:none; display:none; } body.hang #hangLayer { display:block; }
   #hangBar { position:fixed; left:50%; bottom:calc(14px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:28; display:none; gap:8px; padding:8px 10px; border-radius:26px; background:rgba(255,255,255,.82); box-shadow:0 8px 26px rgba(120,20,80,.35); font-family:"Fredoka",system-ui,sans-serif; } body.hang #hangBar { display:flex; }
   #hangBar button { width:62px; border:0; background:none; border-radius:18px; padding:6px 0 4px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:1px; font:600 11.5px "Fredoka",sans-serif; color:#7a2a5c; } #hangBar button i { font-style:normal; font-size:28px; line-height:1.1; } #hangBar button.on { background:linear-gradient(135deg,#ff8fc0,#c084fc); color:#fff; box-shadow:0 4px 12px rgba(200,60,140,.45); }
@@ -70,7 +70,7 @@
 
   // ---- in and out ----
   async function start() {
-    if (G.on) return; if (typeof away !== 'undefined' && away) return addSys('She is not here right now.'); if (typeof phoneCall !== 'undefined' && phoneCall.on) return; if (document.body.classList.contains('fp')) return addSys('Head home first: one-on-one time happens in the chat room.');
+    if (G.on) return; if (typeof phoneCall !== 'undefined' && phoneCall.on) return; if (document.body.classList.contains('fp')) return addSys('Head home first: one-on-one time happens in the chat room.');
     const until = +localStorage.getItem('brenai.hangRest') || 0; if (Date.now() < until) return addSys('She wants a little space after last time. Try again in a few minutes.');
     Object.assign(G, { on: true, n: {}, strikes: 0, rubbed: {}, comfort: {}, t0: Date.now() }); try { const s = await (await api('/api/state')).json(); if (s.hang) Object.assign(G, s.hang); } catch {}
     document.body.classList.remove('big'); document.body.classList.add('hang'); $('meBox').classList.remove('fan'); avatar.hang(true); drawPoses(); setMode('stare'); drawHud(); fx('sparkle');

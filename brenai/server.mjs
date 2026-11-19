@@ -239,6 +239,7 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   yousit: ['sits down on the couch next to her', 'sits down on the couch next to her'], yousitbed: ['sits down on the edge of her bed', 'sits down on the edge of her bed'], tvon: ['turns the TV on', 'turns the TV on'], tvoff: ['turns the TV off', 'turns the TV off'],
   cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
   powerout: ['is there when the storm knocks the power out: every light and screen in the room just died and it is dark except for the lightning', ''], powerback: ['is there as the power comes back on and the lights flicker up again', ''],
+  wandered: ['is out on his own when she turns up there to join him, on a whim: she has just walked in', ''], sheasked: ['has just been asked by her to come and hang out (she sent him the invitation a moment ago)', ''],
   moviestart: ['dims the lights and starts the film; she settles in next to him on the couch', ''],
   planned: ['just put a plan with her on the calendar (see the plans in your notes); she can say how she feels about it', ''],
   heartwin: ['kept stroking her hair until she melted: squirming, blushing, happy tears in her eyes, and then a rush of warmth she cannot explain away', ''], heartlose: ['kept fussing with her hair clumsily until she got annoyed and ducked away', ''],
@@ -542,13 +543,19 @@ const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinit
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
 const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
-const placeView = () => ({ movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
+// He can go out on his own (db.solo): she is not with him, they text as usual. While he is out she may turn up; and when they are
+// both at home she now and then asks him somewhere herself. Both are checked whenever the page asks how things stand.
+function socialTick() { const now = Date.now(), dt = Math.min(10, (now - (db.socialAt || now)) / 60000); db.socialAt = now; if (dt <= 0 || db.away || db.call || busy || !canVisit()) return;
+  const close = (db.sheet.rapport | 0) / 100, hit = perMin => Math.random() < 1 - Math.pow(1 - perMin, dt);
+  if (db.place && db.solo) { if (process.env.WANDER_TEST ? now - (db.soloAt || now) > 12000 : now - (db.soloAt || now) > 90000 && hit(0.03 + 0.07 * close)) { db.solo = false; const nm = placeLabel(db.place); db.log.push({ who: 'sys', text: `Wizra showed up at ${nm}.`, at: now }); cur().touches.push({ kind: 'wandered', at: now }); remember('wander', 'The first time she turned up where you were, uninvited.'); save(); } return; }
+  if (!db.place && !inviteNow() && now - (db.askedAt || 0) > 3 * 3600000 && now - ((db.log[db.log.length - 1] || {}).at || 0) < 20 * 60000 && hit(0.004 + 0.01 * close)) { const made = devData().maps.custom.map(m => m.id), where = Math.random() < 0.4 || !made.length ? 'dorm' : made[Math.random() * made.length | 0]; db.invite = { place: where, at: now }; db.askedAt = now; db.log.push({ who: 'sys', text: `Wizra is asking you to come to ${placeLabel(where)}.`, at: now }); cur().touches.push({ kind: 'sheasked', at: now }); save(); } }
+const placeView = () => (socialTick(), { solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
 // ---- movie night: he plays the real film on his own screen; db.movie = { id, t0 (when minute zero was), paused (ms) or 0, said (last beat she reacted to), saidAt }
 const moviePos = () => { const m = db.movie; return m ? ((m.paused || Date.now()) - m.t0) / 60000 : 0; };
 const movieView = () => { const m = db.movie, M = m && MOVIES[m.id]; return M ? { id: m.id, title: M.title, minutes: M.minutes, pos: +moviePos().toFixed(2), paused: !!m.paused, tint: M.tint } : null; };
 function movieNote() { const m = db.movie, M = m && MOVIES[m.id]; if (!M || !db.place) return ''; const pos = Math.max(0, Math.min(M.minutes, moviePos()));
   return ` The two of you are watching ${M.title} together, side by side with the lights down${m.paused ? ' (it is paused right now)' : ''}. It is about ${Math.round(pos)} minutes in. On the screen about now: ${beatAt(M, pos).text}. You have seen it before and love it. Talk like someone watching a film with a date: short, low, in the moment, a reaction or a whisper or a tease; never narrate the plot, and never give away what happens later.`; }
-function placeNote() { const base = placeNote0(); return base && db.movie ? base + movieNote() : base; }
+function placeNote() { if (db.place && db.solo) return `Right now ${USER_NAME} is out at ${placeLabel(db.place)} on his own. You are not with him: you are at home, messaging him as usual. You could ask what he is up to, or decide to go and join him.`; const base = placeNote0(); return base && db.movie ? base + movieNote() : base; }
 function placeNote0() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
@@ -611,7 +618,7 @@ function dateDue() { const now = Date.now(), d = (db.dates || []).find(d => !d.d
 // the memory book: firsts and milestones, each kept once ({ key, at, text })
 function remember(key, text) { db.memories = db.memories || []; if (db.memories.some(m => m.key === key)) return; db.memories.push({ key, at: Date.now(), text }); if (db.memories.length > 200) db.memories.shift(); }
 const memoryView = () => ({ moments: (db.memories || []).slice().sort((a, b) => a.at - b.at), pics: db.log.filter(e => e.pic && !e.hidden).slice(-24).map(e => ({ at: e.at, pic: e.pic })), since: (db.log[0] || {}).at || 0 });
-function setPlace(place) { db.place = place || ''; db.invite = null; if (!place) db.movie = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; earn(5); remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
+function setPlace(place) { db.place = place || ''; db.invite = null; db.solo = false; if (!place) db.movie = null; if (place) for (const d of db.dates || []) if (!d.done && d.place === place && Math.abs(Date.now() - d.at) < 2 * 3600000) { d.done = true; earn(5); remember('date:' + d.id, `You kept your plan: ${d.title}.`); addBond(db.sheet.path || 'friend', 3); }
   if (place) remember('visit:' + place, place === 'house' ? 'She came over to your house for the first time.' : place === 'dorm' ? 'Your first visit to her dorm.' : `Your first time together at ${(customMap(place) || {}).name || 'a new place'}.`); }
 // ---- the Studio (public/dev.html): the page layout, scripted events and the rooms, as edited by hand. The game reads it at load.
 // things the player says that she reacts to on the spot (a pose and an emoji), before her words come: edited in the Studio
@@ -926,13 +933,15 @@ async function handle(req, res) {
 
       // taking up her invitation (place = what she offered), turning it down, or going home (place = '')
       if (url.pathname === '/api/visit' && req.method === 'POST') {
-        const { place, decline } = await readBody(req), now = Date.now();
+        const { place, decline, solo } = await readBody(req), now = Date.now();
         if (decline) { db.invite = null; save(); return json(res, 200, placeView()); }
         if (!place) {
           if (db.place === 'house' && (db.left || []).length < 3 && Math.random() < 0.35) { const k = ['bookstack', 'cushion', 'dice'][(db.left || []).length]; db.left = [...(db.left || []), { kind: k, at: now }]; db.log.push({ who: 'sys', text: `Wizra left ${k === 'bookstack' ? 'a couple of her books' : k === 'cushion' ? 'her favourite cushion' : 'a set of her dice'} at your place.`, at: now }); remember('left:' + k, 'She started leaving her things at your place.'); }
           if (db.place) { db.log.push({ who: 'sys', text: db.place === 'house' ? 'Wizra headed home.' : 'You headed home.', at: now }); cur().touches.push({ kind: db.place === 'house' ? 'homeHouse' : 'homeDorm', at: now }); setPlace(''); save(); }
           return json(res, 200, placeView());
         }
+        if (customMap(place) && solo && place !== inviteNow()) { // going somewhere on his own: she is not with him (she may turn up)
+          setPlace(place); db.solo = true; db.soloAt = now; db.log.push({ who: 'sys', text: `You went to ${customMap(place).name} on your own.`, at: now }); save(); return json(res, 200, placeView()); }
         if (customMap(place)) { // a place made in the Studio: you just go there together
           if (db.away) return json(res, 409, { error: 'She is out.', ...placeView() });
           setPlace(place); db.log.push({ who: 'sys', text: `You two went to ${customMap(place).name}.`, at: now }); save(); return json(res, 200, placeView());

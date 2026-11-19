@@ -216,3 +216,9 @@ When she is out or asleep the page stops listening (`voice.pause()` in `setPrese
 
 ## Before a commit
 `tools/check.sh` parses every script in the app (server files, everything in `public/`, the module scripts inside `dev.html` and `mocap.html`, and the main script inside `index.html`). Run it and only commit if it passes.
+
+## The dock, the house wheel, going out alone
+- The buttons that sat on the corners of the two pictures are gathered in `#dock` at the top right (house, one-on-one, mic and camera, bigger picture, settings), drawn as white line icons.
+- The house opens a wheel (`openFly` in `index.html`): invite her over or ask to come to hers (both go through the chat, and she decides), or go to any place made in the Studio on your own (`POST /api/visit { place, solo: true }`, `db.solo`). Her dorm opens only on her invitation.
+- Out alone, she is not there and you text as usual. `socialTick()` on the server gives her a chance each minute (more the closer you are) to turn up and join you, and, when you are both home and have been talking, a small chance to invite you somewhere herself (at most once in three hours). `WANDER_TEST=1` makes her turn up after twelve seconds.
+- One-on-one time can be opened while she is out (she is brought in for it), for trying things.

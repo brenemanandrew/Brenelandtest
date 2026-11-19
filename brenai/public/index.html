@@ -24,6 +24,17 @@
   #visitBtn { left:-9px !important; top:-9px !important; } #bigBtn { left:-9px !important; bottom:-9px !important; } #brainBtn { right:-9px !important; bottom:-9px !important; } #actBtn { left:-10px !important; top:-10px !important; }
   #senseBtn { position:absolute; right:-9px; bottom:-9px; z-index:3; } #senseBtn svg { width:100%; height:100%; display:block; } #camBtn, #mic { display:none !important; }
   body.fp #brainBtn { right:10px !important; top:10px !important; bottom:auto !important; }
+  #fly { position:fixed; inset:0; z-index:40; display:grid; place-items:center; background:rgba(20,10,44,.72); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); font-family:"Fredoka",system-ui,sans-serif; }
+  .flyRing { position:relative; } .flyHub { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:84px; height:84px; border-radius:50%; border:0; font-size:40px; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.35), 0 10px 30px rgba(0,0,0,.45); cursor:pointer; }
+  .flyItem { position:absolute; transform:translate(-50%,-50%); width:104px; border:0; background:none; color:#fff; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; font:600 12.5px "Fredoka",sans-serif; text-align:center; line-height:1.15; animation:flyIn .28s cubic-bezier(.2,1.4,.4,1) backwards; }
+  .flyItem i { font-style:normal; width:66px; height:66px; border-radius:50%; display:grid; place-items:center; font-size:32px; background:linear-gradient(135deg, hsl(var(--hue) 85% 66%), hsl(calc(var(--hue) + 40) 80% 58%)); box-shadow:0 0 0 2px rgba(255,255,255,.9), 0 0 16px rgba(255,255,255,.45), 0 6px 16px hsl(var(--hue) 80% 40% / .5); transition:transform .12s; } .flyItem:active i { transform:scale(.9); }
+  .flyItem.off { opacity:.55; cursor:default; } .flyItem.off i { background:rgba(255,255,255,.16); box-shadow:0 0 0 2px rgba(255,255,255,.4); } @keyframes flyIn { from { opacity:0; transform:translate(-50%,-50%) scale(.3); } }
+  body.solo #fpMoments { display:none !important; }
+  /* the buttons live together in one dock at the top right: white line drawings on dark rounds, easy to find and to hit */
+  #dock { position:fixed; right:10px; top:calc(8px + env(safe-area-inset-top)); z-index:12; display:flex; gap:6px; padding:5px; border-radius:999px; background:rgba(24,14,48,.62); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); box-shadow:0 4px 16px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.14); }
+  #dock button { position:static !important; width:40px !important; height:40px !important; border-radius:50% !important; background:rgba(255,255,255,.1) !important; color:#fff !important; opacity:1 !important; filter:none !important; padding:8px !important; font-size:0 !important; display:grid; place-items:center; transition:background .15s, transform .12s; }
+  #dock button:hover { background:rgba(255,255,255,.24) !important; } #dock button:active { transform:scale(.9); } #dock button svg { width:24px; height:24px; display:block; } #dock #senseBtn { padding:6px !important; } #dock #senseBtn svg { width:28px; height:28px; }
+  #dock button[hidden] { display:none !important; } body.calling #dock, body.intro #dock { display:none; } body.fp #dock { top:calc(8px + env(safe-area-inset-top)); }
   /* behind everything: the player's own room, out of focus */
   body.hasroom { background:none !important; }
   body::before { content:""; position:fixed; inset:-40px; z-index:-1; background:var(--roombg, none) center/cover no-repeat; filter:blur(16px) brightness(.5) saturate(1.25); pointer-events:none; }
@@ -845,15 +856,16 @@ setInterval(async () => { // keep time with the server: is she due back, has the
 // keeps where you both are; here the avatar's stage becomes the whole screen and you look through your own eyes.
 let visitInfo = { place: '', canVisit: false, rapport: 0, visitAt: 90, invite: '', bond: {}, path: '' }, shownPlace = '', hintTimer = 0, seeingOut = false;
 function syncPlace(arriving) {
-  const want = visitInfo.place && avatar.canVisit() && !away ? visitInfo.place : '';
-  if (want === shownPlace || seeingOut) return; shownPlace = want; $('fpChoices').hidden = true;
+  const want = visitInfo.place && avatar.canVisit() && (!away || visitInfo.solo) ? visitInfo.place : '';
+  if (want && want === shownPlace && syncPlace.solo !== visitInfo.solo) { syncPlace.solo = visitInfo.solo; if (!visitInfo.solo) { avatar.presence('return'); WizraSound.fx('door'); addSys('Wizra showed up.'); } else avatar.presence('gone'); document.body.classList.toggle('solo', visitInfo.solo); }   // she turned up where you are (or you are on your own again)
+  if (want === shownPlace || seeingOut) return; shownPlace = want; syncPlace.solo = visitInfo.solo; document.body.classList.toggle('solo', !!want && visitInfo.solo); $('fpChoices').hidden = true;
   document.body.classList.toggle('fp', !!want); document.body.classList.remove('fplog', 'big'); $('visitMenu').hidden = true;
-  avatar.visit(want); if (want === 'house' && arriving) avatar.presence('return'); WizraSound.scene(want === 'house' ? 'house' : want ? 'dorm' : 'chat'); if (want) setTimeout(() => eventsTick(true), 2500);
+  avatar.visit(want); if (want && visitInfo.solo) setTimeout(() => { if (visitInfo.solo && shownPlace === want) avatar.presence('gone'); }, 150); if (want === 'house' && arriving) avatar.presence('return'); WizraSound.scene(want === 'house' ? 'house' : want ? 'dorm' : 'chat'); if (want) setTimeout(() => eventsTick(true), 2500);
   if (want) { const h = $('fpHint'); h.textContent = 'Drag to look. Tap the floor to walk.' + (want === 'house' ? ' Tap the couch to sit, the TV to switch it on.' : want === 'dorm' ? ' Tap her bed to sit.' : ''); h.style.opacity = 1; clearTimeout(hintTimer); hintTimer = setTimeout(() => { h.style.opacity = 0; }, 9000); }
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
   if (was !== undefined && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
   setPlace.level = visitInfo.level;
   const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
@@ -872,23 +884,29 @@ function showInvite() {
     go.onclick = async () => { try { const r = await api('/api/visit', { place: due.place }); const d = await r.json(); if (r.ok) addSys('You two went to ' + due.where + '.'); setPlace(d, true); } catch {} }; return; }
   c.hidden = !inv; if (!inv || c.dataset.for === inv) { if (!inv) c.dataset.for = ''; return; }
   c.dataset.for = inv; c.textContent = '';
-  const yes = el('button', { textContent: inv === 'dorm' ? 'Go over' : 'Sure, come over' }), no = el('button', { className: 'no', textContent: 'Not now' });
-  c.append(el('b', { textContent: inv === 'dorm' ? 'She invited you over' : 'She wants to come over' }), inv === 'dorm' ? 'Wizra is asking you over to her dorm room.' : 'Wizra is asking to come hang out at your place.', el('div', {}, yes, no));
-  yes.onclick = async () => { try { const r = await api('/api/visit', { place: inv }); const d = await r.json(); if (r.ok) addSys(inv === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.'); setPlace(d, true); } catch {} };
+  const other = inv !== 'dorm' && inv !== 'house', yes = el('button', { textContent: inv === 'house' ? 'Sure, come over' : 'Go' }), no = el('button', { className: 'no', textContent: 'Not now' });
+  c.append(el('b', { textContent: inv === 'house' ? 'She wants to come over' : 'She invited you' }), inv === 'dorm' ? 'Wizra is asking you over to her dorm room.' : inv === 'house' ? 'Wizra is asking to come hang out at your place.' : `Wizra is asking you to come to ${visitInfo.inviteName || 'a place'}.`, el('div', {}, yes, no));
+  yes.onclick = async () => { try { const r = await api('/api/visit', { place: inv }); const d = await r.json(); if (r.ok && !other) addSys(inv === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.'); setPlace(d, true); } catch {} };
   no.onclick = async () => { c.hidden = true; try { const r = await api('/api/visit', { decline: true }); setPlace(await r.json()); } catch {} };
 }
-$('visitBtn').onclick = e => {
-  e.stopPropagation(); const m = $('visitMenu'); if (!m.hidden) { m.hidden = true; return; }
-  m.textContent = ''; m.hidden = false; const v = visitInfo;
-  if (!avatar.canVisit()) return m.append(el('b', { textContent: 'Get together' }), 'This needs her 3D model. Add it under her settings, Avatar.');
-  if (away) return m.append(el('b', { textContent: 'Get together' }), 'She is out right now.');
-  if (!v.canVisit) { const bar = el('div', { className: 'meter' }, el('i', {})); bar.firstChild.style.width = Math.min(100, v.rapport / v.visitAt * 100) + '%'; return m.append(el('b', { textContent: 'Not yet' }), `Hanging out in person opens up at ${v.visitAt} relationship points. You two are at ${v.rapport}.`, bar); }
-  const a = el('button', { textContent: 'Invite her over' }), b = el('button', { textContent: 'Go to her dorm' });
-  a.onclick = () => { m.hidden = true; send('Want to come over to my place?', 'house'); }; b.onclick = () => { m.hidden = true; send('Can I come over to yours?', 'dorm'); };
-  m.append(el('b', { textContent: 'Get together' }), 'Ask her. She may say no if she is not up for it.', el('div', {}, a, b));
-  const made = ((dev.maps || {}).custom || []).filter(x => x && x.id); // places built in the Studio: you just go
-  if (made.length) { const row = el('div', {}); for (const mp of made) { const c = el('button', { className: 'no', textContent: 'Go to ' + (mp.name || 'new place') }); c.onclick = async () => { m.hidden = true; try { const r = await api('/api/visit', { place: mp.id }); const d = await r.json(); if (r.ok) addSys('You two went to ' + (mp.name || 'a new place') + '.'); setPlace(d, true); } catch {} }; row.append(c); } m.append(row); }
-};
+// ---- the house button: a wheel of where you can go. Asking her over (or to her place) goes through the chat, like a text; a place of
+// its own you can simply go to by yourself. Her dorm only opens when she has invited you.
+const PLACE_ICON = [[/game|d&d|dice|den/i, '\ud83c\udfb2'], [/stud|librar|book/i, '\ud83d\udcda'], [/camp|star|tent|wood/i, '\u26fa'], [/fire|date|candle|romant/i, '\ud83d\udd25'], [/beach|sea|lake/i, '\ud83c\udf0a'], [/cafe|coffee/i, '\u2615'], [/park|garden/i, '\ud83c\udf33']];
+function openFly() {
+  const old = $('fly'); if (old) return old.remove(); const v = visitInfo, items = [], close = () => { const f = $('fly'); if (f) f.remove(); };
+  const go = async (id, name) => { close(); try { const r = await api('/api/visit', { place: id, solo: true }); const d = await r.json(); if (!r.ok) return addSys(d.error || 'You could not go there.'); setPlace(d, true); } catch {} };
+  if (!avatar.canVisit()) items.push(['\u2753', 'Needs her 3D model', null]);
+  else if (v.place) items.push(['\ud83c\udfe0', 'Head home', () => { close(); $('fpLeave').click(); }]);
+  else {
+    if (!v.canVisit) items.push(['\ud83d\udd12', `Opens at ${v.visitAt} points (you: ${v.rapport})`, null]);
+    else { items.push(['\ud83d\udcf1', away ? 'She is out: call her' : 'Invite her over', away ? () => { close(); const c = $('callBtn'); if (c) c.click(); } : () => { close(); send('Want to come over and hang out?', 'house'); }]);
+      items.push([v.invite === 'dorm' ? '\ud83d\udecf\ufe0f' : '\ud83d\udd12', v.invite === 'dorm' ? 'Her dorm: she invited you' : 'Her dorm: ask her', v.invite === 'dorm' ? async () => { close(); try { const r = await api('/api/visit', { place: 'dorm' }); setPlace(await r.json(), true); } catch {} } : away ? null : () => { close(); send('Can I come over to yours?', 'dorm'); }]);
+      for (const mp of ((dev.maps || {}).custom || []).filter(x => x && x.id)) items.push([(PLACE_ICON.find(([re]) => re.test(mp.name + ' ' + (mp.about || ''))) || [0, '\ud83d\udccd'])[1], (mp.name || 'A place').replace(/^the /i, ''), () => go(mp.id, mp.name)]); } }
+  const R = Math.min(150, innerWidth * 0.34), fly = el('div', { id: 'fly' }), ring = el('div', { className: 'flyRing' }), hub = el('button', { className: 'flyHub', title: 'Close', textContent: '\ud83c\udfe0' }); hub.onclick = close; ring.style.width = ring.style.height = (R * 2 + 110) + 'px'; ring.append(hub);
+  items.forEach(([icon, name, fn], i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / Math.max(items.length, 1), b = el('button', { className: 'flyItem' + (fn ? '' : ' off') }, el('i', { textContent: icon }), el('span', { textContent: name })); b.style.left = `calc(50% + ${Math.cos(a) * R}px)`; b.style.top = `calc(50% + ${Math.sin(a) * R}px)`; b.style.setProperty('--hue', (300 + i * 47) % 360); b.style.animationDelay = i * 35 + 'ms'; if (fn) b.onclick = e => { e.stopPropagation(); WizraSound.fx('click'); fn(); }; ring.append(b); });
+  fly.append(ring); fly.onclick = e => { if (e.target === fly) close(); }; document.body.append(fly); WizraSound.fx('pop');
+}
+$('visitBtn').onclick = e => { e.stopPropagation(); openFly(); };
 $('picView').onclick = () => { $('picView').hidden = true; };
 document.addEventListener('click', e => { if (!$('visitMenu').hidden && !$('visitMenu').contains(e.target)) $('visitMenu').hidden = true; });
 $('fpLog').onclick = () => { document.body.classList.toggle('fplog'); log.scrollTop = log.scrollHeight; };
@@ -1094,6 +1112,15 @@ async function camSet(on) {
 }
 $('camBtn').onclick = e => { e.stopPropagation(); if (!$('camBtn').classList.contains('wait')) camSet(!WizraCam.on); };
 $('meCam').onclick = () => camSet(false);
+// the dock: the buttons that used to sit on the corners of the two pictures, gathered in one place and drawn the same way
+{ const dock = el('div', { id: 'dock' }), ICO = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const set = (id, d, title) => { const b = $(id); b.innerHTML = ICO(d); b.title = title; dock.append(b); };
+  set('visitBtn', '<path d="M3.500 11.500L12 4l8.500 7.500"/><path d="M5.500 10v9.500h13V10"/><path d="M10 19.500v-5.500h4v5.500"/>', 'Go out, or invite her');
+  set('actBtn', '<path d="M12 20.500s-7.500-4.600-7.500-10.200A4.300 4.300 0 0 1 12 7.600a4.300 4.300 0 0 1 7.500 2.700c0 5.600-7.500 10.200-7.500 10.200z"/>', 'One-on-one time with her');
+  dock.append($('senseBtn'));
+  set('bigBtn', '<path d="M4 9.500V4h5.500M20 14.500V20h-5.500M4 4l6.500 6.500M20 20l-6.500-6.500"/>', 'Make her picture bigger or smaller');
+  set('brainBtn', '<path d="M4 7h9M17.500 7H20M4 12h3M11.500 12H20M4 17h11M19.500 17H20"/><circle cx="15.200" cy="7" r="2.100"/><circle cx="9.200" cy="12" r="2.100"/><circle cx="17.200" cy="17" r="2.100"/>', 'Settings');
+  document.body.append(dock); }
 // one button for what she can hear and see of you: the face on it says which. Tap to step through the four.
 const SENSE_FACE = (eyes, mouth, hood) => `<svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${hood ? '<path d="M4 29V15a12 12 0 0 1 24 0v14"/><path d="M9.500 28v-12a6.500 6.500 0 0 1 13 0v12" fill="rgba(255,255,255,.18)"/>' : '<circle cx="16" cy="16" r="12"/>' + (eyes ? '<circle cx="11.500" cy="13.500" r="1.300" fill="#fff"/><circle cx="20.500" cy="13.500" r="1.300" fill="#fff"/>' : '<path d="M4.500 11.500h23v4.500h-23z" fill="#fff"/><path d="M27.500 12l2.500-2M27.500 15.500l2.500 1.500"/>') + (mouth ? '<path d="M11 20.500a6 6 0 0 0 10 0z" fill="rgba(255,255,255,.25)"/>' : '<path d="M6 19.500h20v4.500h-20z" fill="#fff"/><circle cx="16" cy="21.800" r="1.600" fill="none" stroke="#3a2a5c" stroke-width="1.400"/>')}</svg>`;
 const SENSES = [['She can hear and see you', true, true], ['Camera off: she can hear you', false, true], ['Mic off: she can see you', true, false], ['Mic and camera off', false, false]];
