@@ -243,3 +243,6 @@ The mocap page also reads your face (MediaPipe Face Landmarker, every other fram
 ## Studio: outfit preview, and pasting into motion capture
 - Hovering a filled outfit slot in the Studio (or tapping it) opens a small turning 3D view of that model (`public/fitpip.js`).
 - On the motion capture page a picture or video can be pasted from the clipboard (Ctrl+V) or dropped on the view, as well as opened with the File button.
+
+## Motion capture: keeping her from flipping out
+Five guards in `public/mocap.js`: joint limits inside `solve` (`limit`: elbows, knees, shoulders, hips, spine and neck stay in a human range), a jump filter (a bone asked to swing further than a limb can in one frame is held until the tracker says so five frames running), a left/right swap guard on the landmarks, slower belief in depth than in the other two directions, and fades (a part out of sight settles to rest after about 1.5 s and eases in when it returns). `solve(lm, { loose: true })` turns the limits off.

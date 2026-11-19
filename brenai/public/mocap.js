@@ -23,6 +23,21 @@ const basis = (x, y) => { const X = x.clone().normalize(), Z = X.clone().cross(y
 
 // ---- landmarks -> a pose: { q: { bone: Quaternion }, hip: how high her hips are (1 = standing), legs: whether the legs were seen } ----
 // MediaPipe's world points: x to the picture's right, y down, z away from the camera. Hers: x to her left, y up, z toward the viewer.
+// ---- what a body can do. A limb's direction (in its parent's frame: x to her left, y up, z forward) is pulled back inside the
+// range a real joint allows, so one bad reading cannot fold an elbow backwards or put a leg through her hips. ----
+const coneClamp = (d, axis, max) => { if (d.angleTo(axis) <= max) return d; const perp = d.clone().addScaledVector(axis, -d.dot(axis)); if (perp.lengthSq() < 1e-8) perp.set(axis.y, axis.z, axis.x).addScaledVector(axis, -perp.dot(axis)); perp.normalize(); return d.copy(axis).multiplyScalar(Math.cos(max)).addScaledVector(perp, Math.sin(max)); };
+const clampAngle = (q, max) => { const a = 2 * Math.acos(Math.min(1, Math.abs(q.w))); return a > max ? Q().slerp(q, max / a) : q; };
+/* keep one component of a unit direction on the right side of a bound, sharing the rest out over the other two */
+const capAxis = (d, ax, bound, below, fb) => { if (below ? d[ax] >= bound : d[ax] <= bound) return d; const o = ['x', 'y', 'z'].filter(k => k !== ax), len = Math.hypot(d[o[0]], d[o[1]]), want = Math.sqrt(Math.max(0, 1 - bound * bound)); if (len < 1e-4) { d[o[0]] = fb[o[0]]; d[o[1]] = fb[o[1]]; const l2 = Math.hypot(d[o[0]], d[o[1]]) || 1; d[o[0]] *= want / l2; d[o[1]] *= want / l2; } else { d[o[0]] *= want / len; d[o[1]] *= want / len; } d[ax] = bound; return d; };
+export function limit(bone, d, rest) {
+  const left = bone.startsWith('left');
+  if (/UpperArm/.test(bone)) { capAxis(d, 'z', -0.7, true, { x: rest.x, y: -1 }); if (d.dot(rest) < -0.6) capAxis(d, 'x', -0.6 * rest.x, rest.x > 0, { y: -1, z: 1 }); }                 /* not far behind her back, not far across her own chest */
+  else if (/LowerArm/.test(bone)) coneClamp(d, rest, 2.6);                                                                                                                 /* an elbow folds about 150 degrees at most */
+  else if (/Hand/.test(bone)) coneClamp(d, rest, 1.3);
+  else if (/UpperLeg/.test(bone)) { const outw = d.x * (left ? 1 : -1), fwd = d.z, h = Math.hypot(outw, fwd); if (h > 1e-4) { const o = outw / h, f = fwd / h; coneClamp(d, rest, (f > 0 ? 2.1 : 0.6) * f * f + (o > 0 ? 1.1 : 0.45) * o * o); } }   /* high in front, a little behind, some out to the side, barely across */
+  else if (/LowerLeg/.test(bone)) { if (d.z > 0.2) d.set(d.x * 0.3, -1, 0.2).normalize(); coneClamp(d, rest, 2.5); }   /* (a shin read as folding forwards is straightened) */                                                                 /* a knee only folds backwards */
+  return d.normalize();
+}
 // A point the tracker places outside the picture is a guess, however sure it says it is: mark it unseen.
 export function framed(lm, norm) { if (!norm) return lm; return lm.map((p, i) => { const n = norm[i], inside = n && n.x > -0.02 && n.x < 1.02 && n.y > -0.02 && n.y < 1.02; return inside ? p : { ...p, visibility: 0 }; }); }
 export function solve(lm, o = {}) {
@@ -38,15 +53,15 @@ export function solve(lm, o = {}) {
   if (!legs) world.hips = Q();                                                    // sitting at a desk: her hips stay put and only the top half follows
   q.hips = legs ? world.hips.clone() : null;
   world.chest = shSeen ? basis(pt(11).clone().sub(pt(12)), up) : world.hips.clone(); const torso = world.hips.clone().invert().multiply(world.chest);
-  if (shSeen) { q.spine = Q().slerp(torso, 0.5); q.chest = q.spine.clone().invert().multiply(torso); } else { q.spine = null; q.chest = null; }   // the turn between hips and shoulders, shared by spine and chest
+  if (shSeen) { const tor = o.loose ? torso : clampAngle(torso, 1.3); q.spine = Q().slerp(tor, 0.5); torso.copy(tor); q.chest = q.spine.clone().invert().multiply(torso); } else { q.spine = null; q.chest = null; }   // the turn between hips and shoulders, shared by spine and chest
   // head: ears give its side-to-side line, the nose its front
   const ears = pt(7).clone().sub(pt(8)), nose = pt(0).clone().sub(mid(ix(7), ix(8))), hx = ears.clone().normalize(), hz = nose.clone().sub(hx.clone().multiplyScalar(nose.dot(hx))).normalize(), hy = hz.clone().cross(hx).normalize();
   const headW = Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hx, hy, hz)).multiply(Q().setFromAxisAngle(V(1, 0, 0), 0.32)), neck = world.chest.clone().invert().multiply(headW);   // (a level head has the nose a little below the ears)
-  if (Math.min(vis(0), vis(7), vis(8)) > SEEN) { q.neck = Q().slerp(neck, 0.4); q.head = q.neck.clone().invert().multiply(neck); } else { q.neck = null; q.head = null; } world.head = headW;
+  if (!o.loose) neck.copy(clampAngle(neck, 1.25)); if (Math.min(vis(0), vis(7), vis(8)) > SEEN) { q.neck = Q().slerp(neck, 0.4); q.head = q.neck.clone().invert().multiply(neck); } else { q.neck = null; q.head = null; } world.head = headW;
   for (const [bone, parent, a, b, rest] of LIMBS) {
     const isLeg = /Leg/.test(bone); if (isLeg && !legs) { q[bone] = Q(); world[bone] = (world[parent] || Q()).clone(); continue; }
     const dir = pt(b).clone().sub(pt(a)); if (dir.lengthSq() < 1e-8 || Math.min(vis(ix(a)), vis(ix(b))) < (isLeg ? LOW : SEEN) || (!isLeg && !shSeen)) { q[bone] = null; world[bone] = (world[parent] || Q()).clone(); continue; }   // a limb the camera cannot see is left alone
-    const local = dir.normalize().applyQuaternion(world[parent].clone().invert()); q[bone] = Q().setFromUnitVectors(rest, local); world[bone] = world[parent].clone().multiply(q[bone]);
+    const local = dir.normalize().applyQuaternion(world[parent].clone().invert()); if (!o.loose) limit(bone, local, rest); q[bone] = Q().setFromUnitVectors(rest, local); world[bone] = world[parent].clone().multiply(q[bone]);
   }
   const ank = (pt(27).y + pt(28).y) / 2, hipH = hipC.y - ank;                      // hip height off the ankles, for crouching and jumping
   return { q, legs, hipH: feet ? hipH : 0, chest: shSeen ? world.chest : null, neckFull: neck };
@@ -123,13 +138,28 @@ export async function start() {
   const video = $('cam'); let tracker = null, faceTracker = null, handTracker = null, stream = null, live = false, standH = 0, tick = 0; const opt = { mirror: true, upper: false, face: true, hands: true, solid: true, focus: true };
   // your face: her expression, and a truer turn of the head than the body tracker's ears and nose give
   window.mocapFace = (shapes, m) => { pose.f = faceOf(shapes, opt.mirror); if (m) { /* which way the face points, as the camera sees it; then measured against which way her chest points, so a turned body does not turn the head twice */ const hw = Q().setFromRotationMatrix(new THREE.Matrix4().fromArray(m)).normalize(); if (opt.mirror) { hw.y = -hw.y; hw.z = -hw.z; } hw.multiply(Q().setFromAxisAngle(V(1, 0, 0), -0.1));   /* the tracker reads a level face as tipped a little forward */
-    const rel = pose.chestW && performance.now() - pose.chestAt < 1500 ? pose.chestW.clone().invert().multiply(hw) : hw; pose.faceNeck = rel; pose.hwDbg = hw.clone(); const tn = Q().slerp(rel, 0.4), th = tn.clone().invert().multiply(rel); pose.q.neck.slerp(tn, Math.max(0.08, Math.min(0.5, pose.q.neck.angleTo(tn) / 0.3))); pose.q.head.slerp(th, Math.max(0.08, Math.min(0.5, pose.q.head.angleTo(th) / 0.3))); pose.faceHead = performance.now(); } return pose.f; };
-  let lmPrev = null; const calm = lm => { if (!lmPrev || lmPrev.length !== lm.length) { lmPrev = lm.map(p => ({ ...p })); return lmPrev; } for (let i = 0; i < lm.length; i++) { const a = lmPrev[i], b = lm[i], d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), k = Math.max(0.15, Math.min(0.8, d / 0.06)); a.x += (b.x - a.x) * k; a.y += (b.y - a.y) * k; a.z += (b.z - a.z) * k; a.visibility = b.visibility; } return lmPrev; };
+    const rel = pose.chestW && performance.now() - pose.chestAt < 1500 ? pose.chestW.clone().invert().multiply(hw) : hw; rel.copy(clampAngle(rel, 1.25)); pose.faceNeck = rel; pose.hwDbg = hw.clone(); const tn = Q().slerp(rel, 0.4), th = tn.clone().invert().multiply(rel); pose.q.neck.slerp(tn, Math.max(0.08, Math.min(0.5, pose.q.neck.angleTo(tn) / 0.3))); pose.q.head.slerp(th, Math.max(0.08, Math.min(0.5, pose.q.head.angleTo(th) / 0.3))); pose.faceHead = performance.now(); } return pose.f; };
+  let lmPrev = null; const calm = lm => { if (!lmPrev || lmPrev.length !== lm.length) { lmPrev = lm.map(p => ({ ...p })); return lmPrev; } for (let i = 0; i < lm.length; i++) { const a = lmPrev[i], b = lm[i], d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), k = Math.max(0.15, Math.min(0.8, d / 0.06)); a.x += (b.x - a.x) * k; a.y += (b.y - a.y) * k; a.z += (b.z - a.z) * k * 0.45;   /* towards and away from the camera is the tracker's weak direction: believed more slowly */ a.visibility = b.visibility; } return lmPrev; };
   const FRAMES = { all: [0.9, 4.2], waist: [1.12, 2.9], chest: [1.32, 1.9], face: [1.45, 1.15] }; let frameAs = 'all', frameHold = 0, frameMine = 0;   /* frameMine: until when your own drag or zoom is left alone */
   /* the view closes in on the part of her your camera can see: whole body, waist up, chest up or just the face */
   const seenPart = lm => { const v = i => (lm[i] && lm[i].visibility !== undefined ? lm[i].visibility : 1), low = opt.seen || 0.5, sh = Math.min(v(11), v(12)) > (opt.seen || 0.62), hp = Math.min(v(23), v(24)) > low, lg = hp && Math.max(v(25), v(26)) > low; return lg && !opt.upper ? 'all' : hp ? 'waist' : sh ? 'chest' : 'face'; };
-  window.mocapFeed = lm0 => { const part = seenPart(lm0); if (part !== frameAs) { if (++frameHold > 12) { frameAs = part; frameHold = 0; } } else frameHold = 0;
-    const lm = opt.snap ? lm0 : calm(lm0), s = solve(lm, opt); if (s.chest) { pose.chestW = s.chest.clone(); pose.chestAt = performance.now(); } pose.bodyNeck = s.neckFull; const faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.hipH) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n]; if (t) { const ang = pose.q[n].angleTo(t); pose.q[n].slerp(t, opt.snap ? 1 : Math.max(0.08, Math.min(0.55, ang / 0.5))); } } /* a small wobble is damped hard, a real move follows fast */ pose.hip = s.hipH && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
+  // left and right trading places in a single frame is the tracker losing track, not you: the frame is put back the right way round
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z), swapOf = i => (i >= 7 ? (i % 2 ? i + 1 : i - 1) : i >= 1 && i <= 3 ? i + 3 : i >= 4 && i <= 6 ? i - 3 : i); let swapRun = 0, armRun = 0;
+  function swapGuard(lm) { if (!lmPrev || opt.snap) return lm; const cost = (pairs, sw) => pairs.reduce((t, [l, r]) => t + dist(lm[l], lmPrev[sw ? r : l]) + dist(lm[r], lmPrev[sw ? l : r]), 0);
+    const body = [[11, 12], [23, 24]], keep = cost(body, false), swp = cost(body, true);
+    if (keep > 0.3 && swp < keep * 0.45) { if (++swapRun < 12) return lm.map((p, i) => lm[swapOf(i)] || p); lmPrev = null; swapRun = 0; return lm; } swapRun = 0;   /* (if it stays that way you really did turn round) */
+    const arms = [[15, 16]], k2 = cost(arms, false), s2 = cost(arms, true);
+    if (k2 > 0.35 && s2 < k2 * 0.4) { if (++armRun < 8) return lm.map((p, i) => (i >= 13 && i <= 22 ? lm[swapOf(i)] : p)); } armRun = 0; return lm; }
+  const REST = {}; for (const n of BONES) REST[n] = pose.q[n].clone(); const lost = {}, rej = {}, back = {}; let fedAt = 0;
+  window.mocapFeed = lm00 => { const lm0 = swapGuard(lm00), tNow = performance.now(), dtFeed = importing ? 1 / FPS : Math.min(0.5, (tNow - fedAt) / 1000 || 0.033); fedAt = tNow; const part = seenPart(lm0); if (part !== frameAs) { if (++frameHold > 12) { frameAs = part; frameHold = 0; } } else frameHold = 0;
+    const lm = opt.snap ? lm0 : calm(lm0), s = solve(lm, opt); if (s.chest) { pose.chestW = s.chest.clone(); pose.chestAt = performance.now(); } pose.bodyNeck = s.neckFull; const faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.hipH) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n];
+      if (!t) { lost[n] = (lost[n] || 0) + 1; if (!opt.snap && lost[n] > 45) pose.q[n].slerp(REST[n], 0.03); continue; }   /* out of sight for a while: it settles back to rest instead of hanging frozen */
+      const ang = pose.q[n].angleTo(t);
+      if (!opt.snap && ang > Math.max(1.4, 16 * dtFeed) && !(lost[n] > 5)) { /* further than a limb can swing in one frame: held until it has said so five frames running */
+        const r = rej[n]; if (r && r.q.angleTo(t) < 0.6) r.n++; else rej[n] = { q: t.clone(), n: 1 }; rej[n].q.copy(t); if (rej[n].n < 5) continue; }
+      rej[n] = null; let k = opt.snap ? 1 : Math.max(0.08, Math.min(0.55, ang / 0.5));
+      if (!opt.snap && lost[n] > 5) back[n] = 8; if (back[n] > 0) { k = Math.min(k, 0.18); back[n]--; } lost[n] = 0;   /* a part coming back into view eases in rather than snapping */
+      pose.q[n].slerp(t, k); } /* a small wobble is damped hard, a real move follows fast */ pose.hip = s.hipH && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
   const camRate = () => { const t = stream && stream.getVideoTracks()[0], r = t && t.getSettings && t.getSettings().frameRate; return r ? `Your camera is giving ${Math.round(r)} pictures a second; takes record at ${FPS}.` : `Takes record at ${FPS} frames a second.`; };
   $('fps60').onchange = async e => { FPS = e.target.checked ? 60 : 30; const t = stream && stream.getVideoTracks()[0]; if (t && t.applyConstraints) { try { await t.applyConstraints({ frameRate: { ideal: FPS } }); } catch {} } say(camRate()); };
   async function camOn() {
