@@ -9,6 +9,7 @@
   main { flex:1; min-height:0; display:flex; } #view { flex:1; min-width:0; position:relative; background:radial-gradient(circle at 50% 40%,#6a4fb0,#2a1d52); touch-action:none; } #view canvas { display:block; width:100%; height:100%; }
   #status { position:absolute; left:12px; top:12px; max-width:calc(100% - 240px); padding:7px 16px; border-radius:999px; background:rgba(20,12,45,.72); color:#fff; font-size:17px; font-weight:500; pointer-events:none; text-align:center; }
   #cam { position:absolute; right:12px; top:12px; width:min(30%,200px); border-radius:14px; border:3px solid #fff; background:#111; transform:scaleX(-1); }
+  #camPad { position:absolute; left:10px; top:50%; transform:translateY(-50%); display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:8px; border-radius:20px; background:rgba(255,255,255,.9); box-shadow:0 8px 22px rgba(0,0,0,.35); } #camPad button { width:46px; height:46px; padding:0; border-radius:50%; font-size:22px; line-height:1; touch-action:none; user-select:none; } #camPad button[data-act=home] { grid-column:1 / 3; width:auto; background:linear-gradient(135deg,#a855f7,#ec4899); }
   /* the big controls: round icons along the bottom of her picture */
   #big { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:8px; max-width:calc(100% - 16px); overflow-x:auto; padding:8px 12px; border-radius:28px; background:rgba(255,255,255,.92); box-shadow:0 10px 30px rgba(0,0,0,.4); }
   .ib { width:54px; border:0; background:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; font:600 13.5px "Fredoka",sans-serif; color:#5a3a8c; padding:0; position:relative; } .ib i { font-style:normal; width:52px; height:52px; border-radius:50%; display:grid; place-items:center; font-size:26px; background:#ece6f7; transition:transform .12s, background .15s; } .ib:active i { transform:scale(.9); }
@@ -26,6 +27,7 @@
 <header><h1>Brenai motion capture</h1><a href="/dev.html">Studio</a><a href="/">Back to the game</a></header>
 <main>
   <div id="view"><video id="cam" muted playsinline></video><div id="status">Starting...</div>
+    <div id="camPad"><button data-act="left" title="Turn the view left">&#8630;</button><button data-act="right" title="Turn the view right">&#8631;</button><button data-act="up" title="Raise the view">&#9650;</button><button data-act="down" title="Lower the view">&#9660;</button><button data-act="over" title="Look from higher">&#10548;</button><button data-act="under" title="Look from level">&#10549;</button><button data-act="in" title="Zoom in">&#65291;</button><button data-act="out" title="Zoom out">&#65293;</button><button data-act="home" title="Back to the automatic view">&#127919;</button></div>
     <div id="big">
       <button id="camBtn" class="ib" title="Turn your camera on or off"><i>&#128247;</i>Camera</button>
       <button id="vidBtn" class="ib" title="Make a take from a video of someone moving (up to a minute), or a pose from a picture"><i>&#127902;</i>File</button><input id="vidFile" type="file" accept="video/*,image/*" hidden>
@@ -35,6 +37,7 @@
       <label class="ib" title="Only her top half follows you; her legs stay still"><input id="upper" type="checkbox"><i>&#129485;</i>Top half</label>
       <label class="ib" title="Her arms and legs cannot pass through her own body"><input id="solid" type="checkbox" checked><i>&#129521;</i>Solid</label>
       <label class="ib" title="The view closes in on the part of you the camera can see"><input id="focus" type="checkbox" checked><i>&#127919;</i>Focus</label>
+      <label class="ib" title="Record at 60 frames a second instead of 30 (needs a camera that can)"><input id="fps60" type="checkbox"><i style="font:700 19px Fredoka,sans-serif">60</i>60 fps</label>
       <button id="recBtn" class="ib" title="Record a take (3 second countdown, up to a minute)"><i>&#9210;</i>Record</button>
     </div>
   </div>
