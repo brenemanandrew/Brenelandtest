@@ -210,3 +210,9 @@ The player plays the real film on their own screen; the game keeps a clock besid
 
 ## The mic while she is out
 When she is out or asleep the page stops listening (`voice.pause()` in `setPresence`, and `start()` refuses while `away`), so things said in the room are not left for her as messages. Typing still works. A video call listens as usual, and the mic comes back on by itself when she is back.
+
+## One-on-one time (the hand on your picture)
+`public/hang.js` + `hang()` / `hangView()` / `hangZone()` / `hangMouth()` in `avatar-vrm.js`. She stands facing you on the heart game's plain colour stage (it deepens as the time goes well); the camera stays at her eye level and can lean round her but not walk. Modes along the bottom: Stare (drag to lean round, wheel to move in and out, pose chips that unlock with the skill's level), Snack (flick a sweet or popcorn at her mouth; she opens it and chews if it lands), Poke (tap her; 0.5 romance each, ten count per visit), Rub (a hand per side of the screen, or Ctrl and Alt with a mouse; filling a spot's comfort is worth 2 romance), Exit. `ZONES` marks her chest, hips and thighs as off limits: she blocks, nothing is scored, and the third time ends the visit with five minutes before the next. `POST /api/hang` adds it up with caps (and nothing within two and a half minutes of the last one): romance, rapport, three coins, a note for her next reply, and the skill (`HANG_LV`, each level adds a tenth to what romance is earned). The old action shortcuts fan is no longer on this button.
+
+## Before a commit
+`tools/check.sh` parses every script in the app (server files, everything in `public/`, the module scripts inside `dev.html` and `mocap.html`, and the main script inside `index.html`). Run it and only commit if it passes.
