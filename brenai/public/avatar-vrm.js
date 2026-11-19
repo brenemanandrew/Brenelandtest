@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { buildPlaces, cel } from './places.js';
 import { bodyFix } from './bodyfix.js';
+import { addTongue } from './tongue.js';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
 const EXPR = {
@@ -201,6 +202,7 @@ export async function create(url, opts = {}) {
     crossarms: () => ({ leftUpperArm: [-0.08, -0.5, -1.25], rightUpperArm: [-0.16, 0.5, 1.25], leftLowerArm: [0, -1.8, 0], rightLowerArm: [0, 1.62, 0], leftHand: [0, 0, 0.2], rightHand: [0, 0, -0.2], leftShoulder: [0, 0, 0.08], rightShoulder: [0, 0, -0.08], _head: [0, 0, 0.08] }),
     hips: () => ({ leftUpperArm: [0.25, 0, -0.85], rightUpperArm: [0.25, 0, 0.85], leftLowerArm: [0, -1.5, 0], rightLowerArm: [0, 1.5, 0], leftHand: [0, 0, -0.5], rightHand: [0, 0, 0.5], _head: [0, 0, 0.08] }),
     cheer: t => ({ leftUpperArm: [0, 0, 1.1 + 0.1 * sin(t * 9)], rightUpperArm: [0, 0, -1.1 - 0.1 * sin(t * 9)], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], _hipY: 0.012 * abs(sin(t * 9)), _head: [-0.1, 0, 0], _face: { happy: 1 } }),
+    tongue: t => ({ _tongue: [1, -0.25, 0.4 * Math.sin(t * 9) * Math.exp(-t * 0.8)], _head: [-0.06, 0.12, 0.16], _face: { happy: 0.55, blink: 0.75 } }),   /* bleh: eyes squeezed, tongue out with a wiggle */
     pout: () => ({ leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _eyes: [2.2, -0.6], _head: [0.1, 0.3, -0.1], _face: { sad: 0.45, angry: 0.25, ou: 0.5 } }),
     handsup: t => ({ leftUpperArm: [0, 0, 1.38], rightUpperArm: [0, 0, -1.38], leftLowerArm: [0, -0.2, 0], rightLowerArm: [0, 0.2, 0], leftHand: [0, 0, 0.2], rightHand: [0, 0, -0.2], spine: plus('spine', -0.06), _head: [-0.05, 0, 0], _face: { surprised: 0.8 } }),
     eep: t => { const j = Math.exp(-t * 1.6); return { leftUpperArm: [-0.4, -0.35, -1.2], rightUpperArm: [-0.4, 0.35, 1.2], leftLowerArm: [0, -2.2, 0], rightLowerArm: [0, 2.2, 0], leftShoulder: [0, 0, 0.3], rightShoulder: [0, 0, -0.3], spine: plus('spine', -0.12 - 0.08 * j), _hipY: 0.03 * j * abs(sin(t * 14)), _head: [-0.08, 0.25 * sin(t * 6) * j, 0.06], _eyes: [1.5 * sin(t * 5), 0], _face: { surprised: 1 } }; },
@@ -214,7 +216,7 @@ export async function create(url, opts = {}) {
   const REST = n => CUR[n] || [0, 0, 0];
   const WIDE = { peace: 0.24, oksign: 0.24, fox: 0.24, fingerheart: 0.24, crossed: 0.24, flipoff: 0.24, fingerwave: 0.24, wave: 0.3, hi: 0.25, shrug: 0.25, stretch: 0.34, yawn: 0.3, clap: 0.2, handsup: 0.34, eep: 0.2, facepalm: 0.15, think: 0.15, crossarms: 0.15, hips: 0.2, cheer: 0.34, point: 0.32, lean: 0.3, bow: 0.3, dance: 0.4, feet: 0.95, shift: 0.1, laugh: 0.12, bounce: 0.15, slump: 0.12, situp: 0.2, leanback: 0.2, cringe: 0.15 }; // how far the camera backs off so you can see it
   let touchedBones = [], gestureZoom = 0;
-  const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0, eyes: [0, 0] };
+  const gx = { head: [0, 0, 0], hipY: 0, face: null, k: 0, eyes: [0, 0], tongue: [0, 0, 0] };
   const hipsNode = B('hips'), hipY0 = hipsNode ? hipsNode.position.y : 0;
   // Her mood also sits in her body, not just her face: [spine lean, head pitch, head yaw, head roll, shoulders up]
   const BODY = { tipsy: [0.02, 0.03, 0, 0.1, 0], high: [-0.05, -0.05, 0, 0.1, -0.05], sad: [0.1, 0.22, 0, 0.05, -0.06], grumpy: [-0.04, 0.08, 0.3, 0, 0.05], tired: [0.06, 0.2, 0, 0.14, -0.08], excited: [0.1, -0.06, 0, 0, 0.08], joy: [-0.03, -0.1, 0, 0.05, 0.06],
@@ -222,14 +224,14 @@ export async function create(url, opts = {}) {
     anxious: [0.03, 0.08, 0, 0.04, 0.2], chill: [-0.06, -0.04, 0, 0.06, -0.04], playful: [0.05, 0, 0, 0.12, 0.03], eyeroll: [-0.03, -0.14, 0.15, 0.08, 0], flinch: [-0.1, 0.05, 0, 0, 0.3], dizzy: [0, 0.1, 0, 0.2, 0], focused: [0.1, 0.06, 0, 0, 0], happy: [0.02, -0.04, 0, 0.04, 0.03] };
   const body = [0, 0, 0, 0, 0];
   function applyGesture(g, faceName, dt) {
-    for (const n of touchedBones) if (!CUR[n]) set(n, 0, 0, 0); touchedBones = []; gestureZoom = 0; gx.head = [0, 0, 0]; gx.hipY = 0; gx.face = null; gx.k = 0; gx.eyes[0] = gx.eyes[1] = 0;
+    for (const n of touchedBones) if (!CUR[n]) set(n, 0, 0, 0); touchedBones = []; gestureZoom = 0; gx.head = [0, 0, 0]; gx.hipY = 0; gx.face = null; gx.k = 0; gx.eyes[0] = gx.eyes[1] = 0; gx.tongue[0] = gx.tongue[1] = gx.tongue[2] = 0;
     const want = BODY[faceName] || [0, 0, 0, 0, 0]; for (let i = 0; i < 5; i++) body[i] += (want[i] - body[i]) * Math.min(1, dt * 5);
     if (!g || !GESTURE[g.name]) return;
     if (CLIP_GEST[g.name] && CLIPS[CLIP_GEST[g.name]] && rt.k > 0.9) { const c = CLIPS[CLIP_GEST[g.name]]; playClip(CLIP_GEST[g.name], g.w * g.w * (3 - 2 * g.w), Math.min(g.t, c.dur - 0.04)); return; } // a recorded one, when she is on her feet
     const tg = GESTURE[g.name](g.t), k0 = g.w * g.w * (3 - 2 * g.w), k = k0 * (1 + 0.13 * Math.exp(-5 * g.t) * Math.sin(17 * g.t)); gx.k = k0; // every gesture arrives a little past its mark and settles
     for (const n in tg) {
       const q = tg[n];
-      if (n === '_head') gx.head = [q[0] * k, q[1] * k, q[2] * k]; else if (n === '_hipY') gx.hipY = q * k; else if (n === '_face') gx.face = q; else if (n === '_eyes') { gx.eyes[0] = q[0] * k; gx.eyes[1] = q[1] * k; }
+      if (n === '_head') gx.head = [q[0] * k, q[1] * k, q[2] * k]; else if (n === '_hipY') gx.hipY = q * k; else if (n === '_face') gx.face = q; else if (n === '_eyes') { gx.eyes[0] = q[0] * k; gx.eyes[1] = q[1] * k; } else if (n === '_tongue') { gx.tongue[0] = q[0] * k0; gx.tongue[1] = q[1]; gx.tongue[2] = q[2]; }
       else { const r = REST(n); set(n, r[0] + (q[0] - r[0]) * k, r[1] + (q[1] - r[1]) * k, r[2] + (q[2] - r[2]) * k); touchedBones.push(n); }
     }
     gestureZoom = (WIDE[g.name] || 0) * k;
@@ -250,7 +252,7 @@ export async function create(url, opts = {}) {
       yoga_moon: pose(1, { leftUpperLeg: [0, 0, 0], rightUpperLeg: [0, 0, 0] }, { ...UP, leftLowerLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], spine: [0, 0, 0.22], chest: [0, 0, 0.2], head: [0, 0, 0.12] }),
       yoga_sit: pose(0.13, { leftUpperLeg: [-1.45, 0.08, 0], rightUpperLeg: [-1.45, -0.08, 0] }, { leftLowerLeg: [2.6, 0, 0], rightLowerLeg: [2.6, 0, 0], leftFoot: [0.6, 0, 0], rightFoot: [0.6, 0, 0], leftUpperArm: [-0.32, -0.3, -1.15], rightUpperArm: [-0.32, 0.3, 1.15], leftLowerArm: [0, -1.85, 0], rightLowerArm: [0, 1.85, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.08, 0, 0] }),   // kneeling, sitting back on her heels, palms together
     }); }
-  const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(), fixBody = bodyFix(THREE, vrm); let clipHip = 0, clipFace = null;
+  const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(), fixBody = bodyFix(THREE, vrm), tongue = addTongue(THREE, vrm); let clipHip = 0, clipFace = null;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
     const c = CLIPS[name]; if (!c || weight < 0.003) return false;
     const f = ((t % c.dur + c.dur) % c.dur) * c.fps, i0 = Math.min(c.n - 1, Math.floor(f)), i1 = Math.min(c.n - 1, i0 + 1), a = f - i0;
@@ -935,10 +937,11 @@ export async function create(url, opts = {}) {
     if (SIGN_OF[spec.pose]) { const tg = sign(SIGN_OF[spec.pose], 6, {}); for (const n in tg) if (n[0] !== '_' && n !== 'spine') set(n, ...tg[n]); set('head', 0, 0, -0.16); }
     else if (spec.pose === 'wave') { set('rightUpperArm', 0, 0, -0.7); set('rightLowerArm', 0, 0, -1.1); set('head', 0, 0, 0.1); }
     else if (!lying && !sitting) set('head', 0.04, 0, spec.pose === 'full' ? 0 : 0.08);
-    let gFace = null; if (spec.gest && GESTURE[spec.gest]) { // a pose she was asked for: any of her gestures, frozen a moment in
-      const tg = GESTURE[spec.gest](1.1); for (const n in tg) { if (n === '_head') set('head', ...tg[n]); else if (n === '_face') gFace = tg[n]; else if (n[0] !== '_' && n !== 'spine' && n !== 'hips') set(n, ...tg[n]); } }
+    let gFace = null, gTongue = null; if (spec.gest && GESTURE[spec.gest]) { // a pose she was asked for: any of her gestures, frozen a moment in
+      const tg = GESTURE[spec.gest](1.1); for (const n in tg) { if (n === '_head') set('head', ...tg[n]); else if (n === '_face') gFace = tg[n]; else if (n === '_tongue') gTongue = tg[n]; else if (n[0] !== '_' && n !== 'spine' && n !== 'hips') set(n, ...tg[n]); } }
     if (hipsNode) hipsNode.position.y = hipY0 + clipHip;
     const want = EXPR[spec.face] || EXPR.happy; if (em) for (const n of NAMES) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.3, want[n] || 0) : n === 'aa' || n === 'oh' ? 0 : (want[n] || 0)); if (em && spec.faceW) for (const n in spec.faceW) if (has(n)) em.setValue(n, spec.faceW[n]); if (em && gFace) for (const n in gFace) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.5, gFace[n]) : gFace[n]);   // a closed-mouth smile for the camera
+    if (gTongue) { tongue.set(gTongue[0], gTongue[1], 0.25); if (em && has('aa')) em.setValue('aa', 0.45); } else tongue.set(0);
     // where: her own room as it is, or a painted backdrop of wherever she is
     const custom = spec.scene === 'custom' && window.WIZRA_BG, inDorm = !custom && (spec.scene === 'dorm' || !BACKDROP[spec.scene]); vrm.scene.visible = true;
     for (const k in places.groups) places.groups[k].visible = inDorm && k === 'dorm'; room.visible = inDorm; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
@@ -1011,6 +1014,7 @@ export async function create(url, opts = {}) {
       const blink = s.blink ? 1 : w.blink, loud = s.voice, aa = !s.talking ? 0 : loud != null ? Math.min(1, loud * 1.15) : (s.phase === 1 ? 0.75 : s.phase === 2 ? 0.2 : 0.05), oh = !s.talking ? 0 : loud != null ? (loud > 0.25 && s.phase === 2 ? 0.3 : 0) : (s.phase === 2 ? 0.5 : 0);
       const gf = gx.face || {}, mix = (n, v) => Math.max(v, (gf[n] || 0) * gx.k);
       if (em) { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised']) if (has(n)) em.setValue(n, mix(n, w[n])); if (has('blink')) em.setValue('blink', mix('blink', blink)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh);
+        { const cf = clipFace || {}, to = Math.max(gx.tongue[0], cf.tongueOut || 0), fromClip = (cf.tongueOut || 0) > gx.tongue[0]; tongue.set(to, fromClip ? (cf.tongueCurl === undefined ? 0 : cf.tongueCurl * 2 - 1) : gx.tongue[1], fromClip ? (cf.tongueSide === undefined ? 0 : cf.tongueSide * 2 - 1) : gx.tongue[2]); if (to > 0.03 && has('aa')) em.setValue('aa', Math.max(mix('aa', aa), 0.18 + 0.3 * to)); }
         if (clipFace) { for (const k in clipFace) if (em.getExpression(k)) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);

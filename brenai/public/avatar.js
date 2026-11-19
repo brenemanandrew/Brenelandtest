@@ -116,7 +116,7 @@
   const GEST = [
     [/rolls? her eyes|eye[- ]?roll/i, 'eyeroll', 3.2], [/chuckl|snicker|soft laugh|laughs? (softly|quietly|under her breath)|huffs? a laugh/i, 'chuckle', 3.4], [/\bclap/i, 'clap', 4], [/face ?palm|buries her face in her hand|hand over her (face|eyes)|pinches the bridge of her nose/i, 'facepalm', 4.5],
     [/taps? her chin|strokes? her chin|hand (on|to) her chin|thinks? (about|for|it over)|ponders?|considers? (it|this|that|him|you)|mulls?|thoughtful/i, 'think', 5], [/cross(es|ed|ing)? her arms|folds? her arms|arms crossed|arms folded/i, 'crossarms', 6], [/hands? on her hips?|plants? her hands/i, 'hips', 5],
-    [/cheers?\b|throws? (up )?her (hands|arms)|fist pump|pumps? (a|her) fist|arms? in the air|whoops?/i, 'cheer', 3.6], [/pouts?|sulks?|puffs? (out )?her cheeks/i, 'pout', 5],
+    [/cheers?\b|throws? (up )?her (hands|arms)|fist pump|pumps? (a|her) fist|arms? in the air|whoops?/i, 'cheer', 3.6], [/pouts?|sulks?|puffs? (out )?her cheeks/i, 'pout', 5], [/sticks? (out )?her tongue|tongue (out|poking)|pokes? (out )?her tongue|blows? (him |you )?a raspberry|\bbleh\b|\bnyeh\b/i, 'tongue', 3.2],
     [/finger heart|heart with her (fingers|thumb)|(tiny|little|small) heart/i, 'fingerheart', 3.2], [/peace sign|throws? (up )?(a |the )?(peace|deuces)|\bv[- ]sign|victory sign/i, 'peace', 3], [/ok(ay)? (sign|gesture|hand)|\ba-ok\b/i, 'oksign', 2.8],
     [/fox (sign|hand|gesture|ears)|makes? a (little )?fox/i, 'fox', 3], [/cross(es|ed|ing)? her fingers|fingers crossed/i, 'crossed', 3], [/flips? (him|you|it|that) off|(gives?|shows?) (him|you) the (middle )?finger|middle finger|flips? the bird/i, 'flipoff', 2.6],
     [/(wiggl|waggl)(es|ing)? her fingers|finger wave|(little|tiny) wave/i, 'fingerwave', 3],

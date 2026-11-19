@@ -231,3 +231,8 @@ The mocap page also reads your face (MediaPipe Face Landmarker, every other fram
 - Where you walk in is checked: if things placed in the room box the usual spot in, you start from the most open floor nearby. A long thing set at an angle blocks a row of small squares along it (`footprints` in `mapkit.js`), not one big square.
 - `quality()` in `avatar-vrm.js` watches the frame time; if most frames in four seconds are slow it gives up, in turn: the flame's shadows, half the shadow picture, shadows altogether, then high pixel density.
 - The mocap page's round buttons sit over her picture; a drag only turns the view when it starts on the picture itself (the view was swallowing the buttons' clicks).
+
+## Motion capture: video files, auto framing, and her tongue
+- **Video** button on `/mocap.html`: pick a video file of one person moving (up to a minute). Every frame is read in turn with the same body, face and hand trackers the camera uses, and the result lands as a take to trim, smooth and save. Mirror is switched off for a video so she copies the person side for side.
+- **Focus** button: while the camera or a video is running the view closes in on the part of you the tracker can see (whole body, waist up, chest up, face). Zooming by hand takes over until what is seen changes.
+- **Tongue** (`public/tongue.js`): a small posable shape built when her model loads and hung on her head bone; the model file is not changed. Its place comes from the model's own "aa" mouth shape. Pose it with the Tongue, Curl and To side sliders; takes carry it in the face track as `tongueOut`, `tongueCurl`, `tongueSide` (curl and side use 0.5 as the middle). In the game the `tongue` gesture ("sticks her tongue out", "bleh") and the photo pose use it.

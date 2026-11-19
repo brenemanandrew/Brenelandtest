@@ -4,23 +4,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Bangers&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/addons/", "@pixiv/three-vrm": "/vendor/three-vrm.module.min.js" } }</script>
 <style>
-  * { box-sizing:border-box; } html, body { margin:0; height:100%; } body { font-family:"Fredoka",system-ui,sans-serif; color:#3a2a5c; background:#1c1438; display:flex; flex-direction:column; }
-  header { display:flex; align-items:center; gap:14px; padding:8px 16px; color:#fff; background:linear-gradient(100deg,#5b2a9c,#c22a80); } header h1 { margin:0; font:400 22px "Bangers","Fredoka",sans-serif; letter-spacing:.06em; } header a { color:#fff; margin-left:auto; font-size:13px; opacity:.9; } header a + a { margin-left:12px; }
+  * { box-sizing:border-box; } html, body { margin:0; height:100%; } body { font-family:"Fredoka",system-ui,sans-serif; font-size:16.5px; color:#2a1d4c; background:#1c1438; display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:14px; padding:8px 16px; color:#fff; background:linear-gradient(100deg,#5b2a9c,#c22a80); } header h1 { margin:0; font:400 26px "Bangers","Fredoka",sans-serif; letter-spacing:.06em; } header a { color:#fff; margin-left:auto; font-size:16px; opacity:.9; } header a + a { margin-left:12px; }
   main { flex:1; min-height:0; display:flex; } #view { flex:1; min-width:0; position:relative; background:radial-gradient(circle at 50% 40%,#6a4fb0,#2a1d52); touch-action:none; } #view canvas { display:block; width:100%; height:100%; }
-  #status { position:absolute; left:50%; top:12px; transform:translateX(-50%); max-width:calc(100% - 260px); padding:7px 16px; border-radius:999px; background:rgba(20,12,45,.72); color:#fff; font-size:13.5px; pointer-events:none; text-align:center; }
+  #status { position:absolute; left:12px; top:12px; max-width:calc(100% - 240px); padding:7px 16px; border-radius:999px; background:rgba(20,12,45,.72); color:#fff; font-size:17px; font-weight:500; pointer-events:none; text-align:center; }
   #cam { position:absolute; right:12px; top:12px; width:min(30%,200px); border-radius:14px; border:3px solid #fff; background:#111; transform:scaleX(-1); }
   /* the big controls: round icons along the bottom of her picture */
-  #big { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:10px; padding:8px 12px; border-radius:28px; background:rgba(255,255,255,.92); box-shadow:0 10px 30px rgba(0,0,0,.4); }
-  .ib { width:58px; border:0; background:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; font:600 11.5px "Fredoka",sans-serif; color:#5a3a8c; padding:0; position:relative; } .ib i { font-style:normal; width:52px; height:52px; border-radius:50%; display:grid; place-items:center; font-size:26px; background:#ece6f7; transition:transform .12s, background .15s; } .ib:active i { transform:scale(.9); }
+  #big { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); display:flex; gap:8px; max-width:calc(100% - 16px); overflow-x:auto; padding:8px 12px; border-radius:28px; background:rgba(255,255,255,.92); box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  .ib { width:54px; border:0; background:none; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; font:600 13.5px "Fredoka",sans-serif; color:#5a3a8c; padding:0; position:relative; } .ib i { font-style:normal; width:52px; height:52px; border-radius:50%; display:grid; place-items:center; font-size:26px; background:#ece6f7; transition:transform .12s, background .15s; } .ib:active i { transform:scale(.9); }
   .ib.on i, .ib:has(input:checked) i { background:linear-gradient(135deg,#a855f7,#ec4899); box-shadow:0 4px 12px rgba(200,60,160,.45); } .ib input { position:absolute; opacity:0; inset:0; cursor:pointer; } #recBtn i { background:#ffe1e6; color:#e0445a; } #recBtn.on i { background:#e0445a; color:#fff; animation:pulse 1s infinite; } @keyframes pulse { 50% { box-shadow:0 0 0 8px rgba(224,68,90,.25); } }
-  aside { width:330px; flex:none; overflow-y:auto; padding:10px; background:#f6f1fc; border-left:1px solid #ddd3ee; }
-  details { background:#fff; border-radius:16px; margin-bottom:8px; box-shadow:0 2px 8px rgba(60,30,110,.08); } summary { list-style:none; cursor:pointer; padding:11px 14px; display:flex; align-items:center; gap:10px; font:400 18px "Bangers","Fredoka",sans-serif; letter-spacing:.05em; color:#6a3aa8; } summary::-webkit-details-marker { display:none; } summary i { font-style:normal; font-size:22px; } summary::after { content:"\25B8"; margin-left:auto; color:#b9a8d8; } details[open] summary::after { content:"\25BE"; } details > div { padding:0 14px 12px; }
-  p.tip { margin:2px 0 8px; font-size:12px; color:#8a7aa8; }
-  .row { display:flex; gap:8px; align-items:center; margin:6px 0; flex-wrap:wrap; } label { font-size:13px; color:#6a5a8a; } .row > label:first-child { width:70px; flex:none; } input[type=range] { flex:1; min-width:90px; accent-color:#a855f7; }
-  button, .btn { font:inherit; font-weight:600; font-size:14px; border:0; border-radius:999px; padding:8px 14px; cursor:pointer; background:#ece6f7; color:#4a3a7c; } button.go { background:linear-gradient(135deg,#a855f7,#ec4899); color:#fff; } button:disabled { opacity:.45; cursor:default; }
-  .chip { padding:5px 11px; font-size:13px; } .mini { padding:3px 9px; font-size:12px; } input[type=text], input[type=number], select { font:inherit; font-size:14px; padding:6px 10px; border:1.5px solid #ddd3ee; border-radius:10px; min-width:0; } input[type=text] { flex:1; }
+  aside { width:390px; flex:none; overflow-y:auto; padding:10px; background:#f6f1fc; border-left:1px solid #ddd3ee; }
+  details { background:#fff; border-radius:16px; margin-bottom:8px; box-shadow:0 2px 8px rgba(60,30,110,.08); } summary { list-style:none; cursor:pointer; padding:11px 14px; display:flex; align-items:center; gap:10px; font:400 23px "Bangers","Fredoka",sans-serif; letter-spacing:.05em; color:#6a3aa8; } summary::-webkit-details-marker { display:none; } summary i { font-style:normal; font-size:22px; } summary::after { content:"\25B8"; margin-left:auto; color:#b9a8d8; } details[open] summary::after { content:"\25BE"; } details > div { padding:0 14px 12px; }
+  p.tip { margin:2px 0 8px; font-size:15px; color:#6a5a8a; }
+  .row { display:flex; gap:8px; align-items:center; margin:6px 0; flex-wrap:wrap; } label { font-size:16px; color:#4a3a6c; } .row > label:first-child { width:82px; flex:none; } input[type=range] { flex:1; min-width:90px; accent-color:#a855f7; }
+  button, .btn { font:inherit; font-weight:600; font-size:16.5px; border:0; border-radius:999px; padding:10px 16px; cursor:pointer; background:#ece6f7; color:#4a3a7c; } button.go { background:linear-gradient(135deg,#a855f7,#ec4899); color:#fff; } button:disabled { opacity:.45; cursor:default; }
+  .chip { padding:7px 13px; font-size:15.5px; } .mini { padding:5px 11px; font-size:14.5px; } input[type=text], input[type=number], select { font:inherit; font-size:16.5px; padding:6px 10px; border:1.5px solid #ddd3ee; border-radius:10px; min-width:0; } input[type=text] { flex:1; }
   #takeBox[hidden] { display:none; } #keys { display:flex; flex-wrap:wrap; gap:6px; } #playBtn.on { background:linear-gradient(135deg,#a855f7,#ec4899); color:#fff; }
-  @media (max-width:760px) { main { flex-direction:column; } aside { width:auto; border-left:0; max-height:46%; } .ib { width:54px; } .ib i { width:44px; height:44px; font-size:22px; } #status { max-width:calc(100% - 150px); left:12px; transform:none; } }
+  @media (max-width:760px) { main { flex-direction:column; } aside { width:auto; border-left:0; max-height:46%; } .ib { width:54px; } .ib i { width:44px; height:44px; font-size:22px; } #status { max-width:calc(100% - 150px); font-size:15px; } }
 </style></head>
 <body>
 <header><h1>Brenai motion capture</h1><a href="/dev.html">Studio</a><a href="/">Back to the game</a></header>
@@ -28,11 +28,13 @@
   <div id="view"><video id="cam" muted playsinline></video><div id="status">Starting...</div>
     <div id="big">
       <button id="camBtn" class="ib" title="Turn your camera on or off"><i>&#128247;</i>Camera</button>
+      <button id="vidBtn" class="ib" title="Make a take from a video file of someone moving (up to a minute)"><i>&#127902;</i>Video</button><input id="vidFile" type="file" accept="video/*" hidden>
       <label class="ib" title="She moves like your reflection"><input id="mirror" type="checkbox" checked><i>&#129694;</i>Mirror</label>
       <label class="ib" title="Capture your face too: her expression and the turn of her head"><input id="face" type="checkbox" checked><i>&#128578;</i>Face</label>
       <label class="ib" title="Capture your fingers too"><input id="handsOn" type="checkbox" checked><i>&#128400;</i>Fingers</label>
       <label class="ib" title="Only her top half follows you; her legs stay still"><input id="upper" type="checkbox"><i>&#129485;</i>Top half</label>
       <label class="ib" title="Her arms and legs cannot pass through her own body"><input id="solid" type="checkbox" checked><i>&#129521;</i>Solid</label>
+      <label class="ib" title="The view closes in on the part of you the camera can see"><input id="focus" type="checkbox" checked><i>&#127919;</i>Focus</label>
       <button id="recBtn" class="ib" title="Record a take (3 second countdown, up to a minute)"><i>&#9210;</i>Record</button>
     </div>
   </div>
@@ -56,6 +58,7 @@
       <div class="row"><label>Swing</label><input id="rz" type="range" min="-3.14" max="3.14" step="0.01"></div>
       <div class="row"><label>Fingers</label><select id="handSel"><option value="both">Both hands</option><option value="left">Her left</option><option value="right">Her right</option></select></div>
       <div class="row"><label>Thumb</label><input id="fThumb" type="range" min="0" max="1" step="0.01"></div><div class="row"><label>Index</label><input id="fIndex" type="range" min="0" max="1" step="0.01"></div><div class="row"><label>Middle</label><input id="fMiddle" type="range" min="0" max="1" step="0.01"></div><div class="row"><label>Ring</label><input id="fRing" type="range" min="0" max="1" step="0.01"></div><div class="row"><label>Little</label><input id="fLittle" type="range" min="0" max="1" step="0.01"></div>
+      <div class="row"><label>Tongue</label><input id="tOut" type="range" min="0" max="1" step="0.01" value="0"></div><div class="row"><label>Curl</label><input id="tCurl" type="range" min="-1" max="1" step="0.01" value="0"></div><div class="row"><label>To side</label><input id="tSide" type="range" min="-1" max="1" step="0.01" value="0"></div>
       <div class="row"><label>Hold (s)</label><input id="hold" type="number" min="0.1" max="10" step="0.1" value="0.6" style="width:70px"><button id="keyBtn">&#128204; Keep pose</button></div>
       <div id="keys"></div>
       <div class="row"><button id="keysBtn" class="go">&#127916; Make a take</button></div>
