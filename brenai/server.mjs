@@ -180,7 +180,7 @@ function save() {
 const legacy = (() => { try { return JSON.parse(fs.readFileSync(STORE, 'utf8')); } catch { return null; } })();
 if (legacy && !fs.existsSync(SHARED)) { for (const k of SHARED_KEYS) if (legacy[k] !== undefined) shared[k] = legacy[k]; const a = {}; for (const k of AVATAR_KEYS) if (legacy.settings && legacy.settings[k] !== undefined) a[k] = legacy.settings[k]; shared.avatar = a; write(SHARED, shared); }
 const wordKey = (name, word) => crypto.createHash('sha256').update('brenai-word:' + String(name || '').trim().toLowerCase() + '|' + String(word || '').trim().toLowerCase()).digest('hex').slice(0, 32);
-const isOwner = () => !shared.owner || shared.owner === cur().id;
+const isOwner = () => !shared.owner || shared.owner === cur().id || (shared.owners || []).includes(cur().id);   // the first owner, and any PIN an owner has added
 const legacyOpen = () => !!legacy && fs.existsSync(STORE);
 
 // ---------- auth (one shared password, signed cookie) ----------
@@ -765,7 +765,11 @@ async function handle(req, res) {
         shared.words = shared.words || {}; const k = wordKey(USER_NAME, w); if (shared.words[k] && shared.words[k] !== cur().id) return json(res, 409, { error: 'Pick a different word.' });
         for (const key in shared.words) if (shared.words[key] === cur().id) delete shared.words[key]; shared.words[k] = cur().id; db.word = true; save(); return json(res, 200, { ok: true });
       }
-      if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
+      if (url.pathname === '/api/owner' && req.method === 'POST') { const ob = await readBody(req).catch(() => ({}));
+        if (ob && ob.pin !== undefined) { // an owner gives another PIN (an existing player) owner rights too
+          if (!isOwner()) return json(res, 403, { error: 'Only an owner can do that.' }); const oid = /^\d{4,8}$/.test(String(ob.pin)) ? pinId(String(ob.pin)) : ''; if (!oid || !playerOf(oid)) return json(res, 404, { error: 'No game with that PIN.' });
+          shared.owners = [...new Set([...(shared.owners || []), oid])].slice(-8); save(); return json(res, 200, { ok: true, owners: 1 + shared.owners.length }); }
+        if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/anims/clip', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
       if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), extras: extrasView(), coins: db.coins | 0, wx: db.wx || shared.wx || null, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
