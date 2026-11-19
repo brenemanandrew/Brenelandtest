@@ -7,6 +7,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 const LIB = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14', MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
+const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 const $ = id => document.getElementById(id), FPS = 30;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z), Q = () => new THREE.Quaternion();
 // each bone that follows a body segment: [bone, its parent bone, from point, to point, the way it points at rest]
@@ -43,21 +44,30 @@ export function solve(lm, o = {}) {
   return { q, legs, hipH: legs ? hipH : 0 };
 }
 
+// ---- your face -> her expressions (VRM's own set) and the turn of her head ----
+export function faceOf(b, mirror) {
+  const avg = (a, c) => ((b[a] || 0) + (b[c] || 0)) / 2, cl = v => +Math.max(0, Math.min(1, v)).toFixed(3), L = mirror ? 'Right' : 'Left', R = mirror ? 'Left' : 'Right';
+  const smile = avg('mouthSmileLeft', 'mouthSmileRight'), jaw = b.jawOpen || 0, frown = avg('mouthFrownLeft', 'mouthFrownRight'), browDown = avg('browDownLeft', 'browDownRight'), browUp = Math.max(b.browInnerUp || 0, avg('browOuterUpLeft', 'browOuterUpRight')), wide = avg('eyeWideLeft', 'eyeWideRight');
+  return { happy: cl(smile * 1.25), angry: cl(browDown * 1.3 - smile), sad: cl(frown * 1.6 + (b.browInnerUp || 0) * 0.4 - smile), surprised: cl(wide * 1.2 + browUp * 0.5 - 0.15), aa: cl(jaw * 1.3 - (b.mouthFunnel || 0) * 0.5), oh: cl((b.mouthFunnel || 0) * 1.4), ou: cl((b.mouthPucker || 0) * 1.3), ih: cl(avg('mouthStretchLeft', 'mouthStretchRight') * 1.2), blinkLeft: cl((b['eyeBlink' + L] || 0) * 1.25), blinkRight: cl((b['eyeBlink' + R] || 0) * 1.25) };
+}
+const FACE_KEYS = ['happy', 'angry', 'sad', 'surprised', 'aa', 'oh', 'ou', 'ih', 'blinkLeft', 'blinkRight'];
 // ---- a take: frames of { q: { bone: [x,y,z,w] }, hip } -> the game's clip, with the clean-up applied ----
 const slerpArr = (a, b, t) => { const qa = Q().fromArray(a), qb = Q().fromArray(b); return qa.slerp(qb, t).toArray(); };
 export function toClip(frames, o = {}) {
   let f = frames.slice(Math.round((o.in || 0) * (frames.length - 1)), Math.round((o.out === undefined ? 1 : o.out) * (frames.length - 1)) + 1); if (f.length < 1) f = frames.slice(0, 1);
-  const names = Object.keys(f[0].q); let rows = names.map(n => f.map(fr => fr.q[n] || [0, 0, 0, 1])), hip = f.map(fr => fr.hip || 1);
-  if (o.speed && o.speed !== 1 && f.length > 1) { const n2 = Math.max(2, Math.round(f.length / o.speed)), pick = (arr, isQ) => Array.from({ length: n2 }, (_, i) => { const x = i / (n2 - 1) * (arr.length - 1), i0 = Math.floor(x), i1 = Math.min(arr.length - 1, i0 + 1); return isQ ? slerpArr(arr[i0], arr[i1], x - i0) : arr[i0] + (arr[i1] - arr[i0]) * (x - i0); }); rows = rows.map(r => pick(r, true)); hip = pick(hip, false); }
-  for (let pass = 0; pass < (o.smooth || 0); pass++) { rows = rows.map(r => r.map((q, i) => i === 0 || i === r.length - 1 ? q : slerpArr(slerpArr(r[i - 1], r[i + 1], 0.5), q, 0.5))); hip = hip.map((h, i) => i === 0 || i === hip.length - 1 ? h : (hip[i - 1] + 2 * h + hip[i + 1]) / 4); }
+  const names = Object.keys(f[0].q); let rows = names.map(n => f.map(fr => fr.q[n] || [0, 0, 0, 1])), hip = f.map(fr => fr.hip || 1), hasFace = f.some(fr => fr.f), face = hasFace ? FACE_KEYS.map(k => f.map(fr => (fr.f && fr.f[k]) || 0)) : [];
+  if (o.speed && o.speed !== 1 && f.length > 1) { const n2 = Math.max(2, Math.round(f.length / o.speed)), pick = (arr, isQ) => Array.from({ length: n2 }, (_, i) => { const x = i / (n2 - 1) * (arr.length - 1), i0 = Math.floor(x), i1 = Math.min(arr.length - 1, i0 + 1); return isQ ? slerpArr(arr[i0], arr[i1], x - i0) : arr[i0] + (arr[i1] - arr[i0]) * (x - i0); }); rows = rows.map(r => pick(r, true)); hip = pick(hip, false); face = face.map(r => pick(r, false)); }
+  for (let pass = 0; pass < (o.smooth || 0); pass++) { rows = rows.map(r => r.map((q, i) => i === 0 || i === r.length - 1 ? q : slerpArr(slerpArr(r[i - 1], r[i + 1], 0.5), q, 0.5))); hip = hip.map((h, i) => i === 0 || i === hip.length - 1 ? h : (hip[i - 1] + 2 * h + hip[i + 1]) / 4); if (pass < 2) face = face.map(r => r.map((v, i) => i === 0 || i === r.length - 1 ? v : (r[i - 1] + 2 * v + r[i + 1]) / 4)); }
   if (o.mirror) { const flip = q => [q[0], -q[1], -q[2], q[3]], other = n => n.startsWith('left') ? 'right' + n.slice(4) : n.startsWith('right') ? 'left' + n.slice(5) : n, by = {}; names.forEach((n, i) => { by[n] = rows[i]; }); rows = names.map(n => (by[other(n)] || by[n]).map(flip)); }
   const n = rows[0].length; if (o.loop && n > 12) { const k = Math.min(10, Math.floor(n / 3)); for (let i = 0; i < k; i++) { const t = (i + 1) / (k + 1); rows = rows.map(r => { r[n - k + i] = slerpArr(r[n - k + i], r[0], t); return r; }); hip[n - k + i] += (hip[0] - hip[n - k + i]) * t; } }
   const bones = {}; names.forEach((nm, i) => { bones[nm] = rows[i].flat().map(v => +v.toFixed(5)); });
-  return { dur: +(Math.max(1, n) / FPS).toFixed(4), fps: FPS, n, bones, hips: hip.flatMap(h => [0, +h.toFixed(4), 0]), made: 'mocap' };
+  const out = { dur: +(Math.max(1, n) / FPS).toFixed(4), fps: FPS, n, bones, hips: hip.flatMap(h => [0, +h.toFixed(4), 0]), made: 'mocap' };
+  if (hasFace) { out.face = {}; FACE_KEYS.forEach((k, i) => { out.face[k] = face[i].map(v => +(+v).toFixed(3)); }); }   // her expression, frame by frame
+  return out;
 }
 // poses held in turn, each for `hold` seconds with `ease` seconds between -> frames
 export function keysToFrames(keys) {
-  if (!keys.length) return []; const out = [], push = (a, b, t) => { const q = {}; for (const n in a.q) q[n] = b && b.q[n] ? slerpArr(a.q[n], b.q[n], t) : a.q[n]; out.push({ q, hip: b ? a.hip + (b.hip - a.hip) * t : a.hip }); };
+  if (!keys.length) return []; const out = [], push = (a, b, t) => { const q = {}; for (const n in a.q) q[n] = b && b.q[n] ? slerpArr(a.q[n], b.q[n], t) : a.q[n]; const fr = { q, hip: b ? a.hip + (b.hip - a.hip) * t : a.hip }; if (a.f) { fr.f = {}; for (const n in a.f) fr.f[n] = b && b.f ? a.f[n] + (b.f[n] - a.f[n]) * t : a.f[n]; } out.push(fr); };
   keys.forEach((k, i) => { for (let f = 0; f < Math.max(1, Math.round(k.hold * FPS)); f++) push(k); const nx = keys[i + 1]; if (nx) { const m = Math.max(1, Math.round((k.ease || 0.4) * FPS)); for (let f = 1; f <= m; f++) { const t = f / (m + 1); push(k, nx, t * t * (3 - 2 * t)); } } });
   return out;
 }
@@ -80,22 +90,25 @@ export async function start() {
   const size = () => { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); }; addEventListener('resize', size); size();
 
   // the pose she is in right now (what the camera, a key, the sliders or the take's playhead last said)
-  const pose = { q: {}, hip: 1 }; for (const n of BONES) pose.q[n] = Q(); const curl = { left: 0.15, right: 0.15 };
+  const pose = { q: {}, hip: 1, f: null }; for (const n of BONES) pose.q[n] = Q(); const curl = { left: 0.15, right: 0.15 }, em = vrm.expressionManager, hasX = n => em && em.getExpression(n);
   const rest = () => { for (const n of BONES) pose.q[n].identity(); pose.q.leftUpperArm.setFromAxisAngle(V(0, 0, 1), -1.25); pose.q.rightUpperArm.setFromAxisAngle(V(0, 0, 1), 1.25); pose.hip = 1; }; rest();
-  const snapshot = () => { const q = {}; for (const n of BONES) q[n] = pose.q[n].toArray(); for (const s of ['left', 'right']) for (const f of FINGERS) for (const j of JOINTS) q[s + f + j] = Q().setFromAxisAngle(V(0, 0, 1), (s === 'left' ? -1 : 1) * curl[s] * (j === 'Proximal' ? 1.4 : j === 'Intermediate' ? 1.6 : 1.1)).toArray(); return { q, hip: pose.hip }; };
-  const show = fr => { for (const n in fr.q) { const b = B(n); if (b) b.quaternion.fromArray(fr.q[n]); } hipsNode.position.y = hipY0 * (fr.hip || 1); };
+  const snapshot = () => { const q = {}; for (const n of BONES) q[n] = pose.q[n].toArray(); for (const s of ['left', 'right']) for (const f of FINGERS) for (const j of JOINTS) q[s + f + j] = Q().setFromAxisAngle(V(0, 0, 1), (s === 'left' ? -1 : 1) * curl[s] * (j === 'Proximal' ? 1.4 : j === 'Intermediate' ? 1.6 : 1.1)).toArray(); return { q, hip: pose.hip, ...(pose.f ? { f: { ...pose.f } } : {}) }; };
+  const show = fr => { for (const n in fr.q) { const b = B(n); if (b) b.quaternion.fromArray(fr.q[n]); } hipsNode.position.y = hipY0 * (fr.hip || 1); if (em) for (const k of FACE_KEYS) if (hasX(k)) em.setValue(k, fr.f ? fr.f[k] || 0 : 0); };
 
   // ---- camera and tracker ----
-  const video = $('cam'); let tracker = null, stream = null, live = false, standH = 0; const opt = { mirror: true, upper: false };
-  window.mocapFeed = lm => { const s = solve(lm, opt); if (s.legs) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { const t = s.q[n]; if (t) pose.q[n].slerp(t, opt.snap ? 1 : 0.55); } pose.hip = s.legs && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
+  const video = $('cam'); let tracker = null, faceTracker = null, stream = null, live = false, standH = 0, tick = 0; const opt = { mirror: true, upper: false, face: true };
+  // your face: her expression, and a truer turn of the head than the body tracker's ears and nose give
+  window.mocapFace = (shapes, m) => { pose.f = faceOf(shapes, opt.mirror); if (m) { const k = opt.mirror ? -1 : 1, yaw = Math.atan2(m[8], m[10]) * k, pitch = Math.asin(Math.max(-1, Math.min(1, -m[9]))), roll = Math.atan2(m[1], m[5]) * k, e = new THREE.Euler(); pose.q.neck.slerp(Q().setFromEuler(e.set(-pitch * 0.4, yaw * 0.4, -roll * 0.4)), 0.5); pose.q.head.slerp(Q().setFromEuler(e.set(-pitch * 0.6, yaw * 0.6, -roll * 0.6)), 0.5); pose.faceHead = performance.now(); } return pose.f; };
+  window.mocapFeed = lm => { const s = solve(lm, opt), faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.legs) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n]; if (t) pose.q[n].slerp(t, opt.snap ? 1 : 0.55); } pose.hip = s.legs && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
   async function camOn() {
     try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }); } catch { return say('The camera was not allowed or could not be opened.'); }
-    video.srcObject = stream; await video.play().catch(() => {}); $('camBtn').textContent = 'Turn the camera off'; say('Loading the body tracker (first time takes a moment)...');
+    video.srcObject = stream; await video.play().catch(() => {}); $('camBtn').classList.add('on'); say('Loading the body tracker (first time takes a moment)...');
     try { if (!tracker) { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); tracker = await vision.PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }); } } catch (e) { return say('The body tracker could not load: ' + (e.message || 'network')); }
-    live = true; standH = 0; say('Step back so the camera sees you. Stand straight for a second so it learns your height.');
+    live = true; standH = 0; say('Step back so the camera sees you. Stand straight for a second so it learns your height.'); loadFace();
   }
-  function camOff() { live = false; if (stream) for (const t of stream.getTracks()) t.stop(); stream = null; video.srcObject = null; $('camBtn').textContent = 'Turn the camera on'; say('Camera off.'); }
-  $('camBtn').onclick = () => (stream ? camOff() : camOn()); $('mirror').onchange = e => { opt.mirror = e.target.checked; video.style.transform = opt.mirror ? 'scaleX(-1)' : ''; }; $('upper').onchange = e => { opt.upper = e.target.checked; };
+  async function loadFace() { if (faceTracker || !opt.face) return; try { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); faceTracker = await vision.FaceLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true }); } catch {} }
+  function camOff() { live = false; if (stream) for (const t of stream.getTracks()) t.stop(); stream = null; video.srcObject = null; $('camBtn').classList.remove('on'); say('Camera off.'); }
+  $('camBtn').onclick = () => (stream ? camOff() : camOn()); $('mirror').onchange = e => { opt.mirror = e.target.checked; video.style.transform = opt.mirror ? 'scaleX(-1)' : ''; }; $('upper').onchange = e => { opt.upper = e.target.checked; }; $('face').onchange = e => { opt.face = e.target.checked; if (!opt.face) pose.f = null; else if (live) loadFace(); };
   for (const s of ['left', 'right']) $(s + 'Curl').oninput = e => { curl[s] = +e.target.value; };
 
   // ---- recording and the take ----
@@ -104,9 +117,9 @@ export async function start() {
   const built = () => (take ? toClip(take, clean()) : null);
   function takeInfo() { const c = built(); $('takeBox').hidden = !take; if (c) $('takeLen').textContent = `${c.n} frames, ${c.dur.toFixed(2)} s`; }
   $('recBtn').onclick = async () => {
-    if (rec) { take = rec.frames; rec = null; $('recBtn').textContent = '● Record'; $('recBtn').classList.remove('on'); play = { on: true, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); return say(`Take recorded: ${take.length} frames. It is playing on her now; clean it up below, then save.`); }
+    if (rec) { take = rec.frames; rec = null; $('recBtn').classList.remove('on'); play = { on: true, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); return say(`Take recorded: ${take.length} frames. It is playing on her now; clean it up below, then save.`); }
     for (let i = 3; i > 0; i--) { say('Recording in ' + i + '...'); await new Promise(r => setTimeout(r, 800)); }
-    rec = { frames: [], next: performance.now() }; play.on = false; $('recBtn').textContent = '■ Stop'; $('recBtn').classList.add('on'); say('Recording. Press Stop when you are done.');
+    rec = { frames: [], next: performance.now() }; play.on = false; $('recBtn').classList.add('on'); say('Recording. Press Stop when you are done.');
   };
   $('playBtn').onclick = () => { play.on = !play.on; }; $('scrub').oninput = e => { play.on = false; play.t = +e.target.value; };
   for (const id of ['trimIn', 'trimOut', 'smooth', 'speed', 'flip', 'loop']) $(id).oninput = takeInfo;
@@ -124,22 +137,23 @@ export async function start() {
   // ---- saving: into the game's clips, as a file, from a file ----
   async function listSaved() { try { saved = (await (await fetch('/api/anims')).json()).clips || {}; } catch { saved = {}; } const box = $('saved'); box.textContent = '';
     for (const name of Object.keys(saved).sort()) { const row = document.createElement('div'); row.className = 'row'; const a = document.createElement('button'); a.className = 'chip'; a.textContent = `${name} (${(saved[name].dur || 0).toFixed(1)} s)`; a.title = 'Play this clip on her';
-      a.onclick = () => { const c = saved[name]; take = Array.from({ length: c.n }, (_, i) => { const q = {}; for (const b in c.bones) q[b] = c.bones[b].slice(i * 4, i * 4 + 4); return { q, hip: c.hips ? c.hips[i * 3 + 1] : 1 }; }); play = { on: true, t: 0 }; $('name').value = name; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); say(`"${name}" is playing. You can clean it up and save it again, under this name or a new one.`); };
+      a.onclick = () => { const c = saved[name]; take = Array.from({ length: c.n }, (_, i) => { const q = {}; for (const b in c.bones) q[b] = c.bones[b].slice(i * 4, i * 4 + 4); return { q, hip: c.hips ? c.hips[i * 3 + 1] : 1, ...(c.face ? { f: Object.fromEntries(Object.keys(c.face).map(k => [k, c.face[k][i]])) } : {}) }; }); play = { on: true, t: 0 }; $('name').value = name; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); say(`"${name}" is playing. You can clean it up and save it again, under this name or a new one.`); };
       const x = document.createElement('button'); x.className = 'mini'; x.textContent = '✕'; x.title = 'Delete this clip from the game'; x.onclick = async () => { if (!confirm(`Delete the clip "${name}" from the game?`)) return; await fetch('/api/anims/clip', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ remove: name }) }); listSaved(); }; row.append(a, x); box.append(row); } }
   $('saveBtn').onclick = async () => { const c = built(), name = $('name').value.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 40); if (!c) return say('Record a take or make one from poses first.'); if (!name) return say('Give the take a name first.');
     if (saved[name] && !confirm(`There is already a clip called "${name}". Replace it?`)) return; const r = await fetch('/api/anims/clip', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, clip: c }) }), d = await r.json().catch(() => ({}));
     say(r.ok ? `Saved as "${name}". In the game: a Studio event can play it, and a Reaction can use it as clip:${name}.` : (d.error || 'It could not be saved.')); listSaved(); };
   $('dlBtn').onclick = () => { const c = built(); if (!c) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(c)], { type: 'application/json' })); a.download = ($('name').value.trim() || 'take') + '.json'; a.click(); };
-  $('upFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const c = JSON.parse(await f.text()); if (!c.bones || !c.n) throw 0; take = Array.from({ length: c.n }, (_, i) => { const q = {}; for (const b in c.bones) q[b] = c.bones[b].slice(i * 4, i * 4 + 4); return { q, hip: c.hips ? c.hips[i * 3 + 1] : 1 }; }); play = { on: true, t: 0 }; takeInfo(); say('Clip loaded from the file.'); } catch { say('That file is not a clip saved from here.'); } };
+  $('upFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const c = JSON.parse(await f.text()); if (!c.bones || !c.n) throw 0; take = Array.from({ length: c.n }, (_, i) => { const q = {}; for (const b in c.bones) q[b] = c.bones[b].slice(i * 4, i * 4 + 4); return { q, hip: c.hips ? c.hips[i * 3 + 1] : 1, ...(c.face ? { f: Object.fromEntries(Object.keys(c.face).map(k => [k, c.face[k][i]])) } : {}) }; }); play = { on: true, t: 0 }; takeInfo(); say('Clip loaded from the file.'); } catch { say('That file is not a clip saved from here.'); } };
   listSaved(); say('Ready. Turn the camera on, or pose her by hand.');
 
   // ---- every frame ----
   let last = performance.now();
   (function frame(now) {
     requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    if (live && tracker && video.readyState >= 2 && !(play.on && !rec)) { let r = null; try { r = tracker.detectForVideo(video, now); } catch {} const lm = r && r.worldLandmarks && r.worldLandmarks[0]; if (lm) { const s = window.mocapFeed(lm); if (!rec) say(s.legs ? 'Tracking your whole body.' : 'Tracking your top half (step back for legs).'); } else if (!rec) say('I cannot see you. Step into view.'); }
+    if (live && tracker && video.readyState >= 2 && !(play.on && !rec)) { let r = null; try { r = tracker.detectForVideo(video, now); } catch {} const lm = r && r.worldLandmarks && r.worldLandmarks[0]; if (lm) { const s = window.mocapFeed(lm); if (!rec) say((s.legs ? 'Tracking your whole body' : 'Tracking your top half (step back for legs)') + (pose.f ? ' and your face.' : '.')); } else if (!rec) say('I cannot see you. Step into view.');
+      if (opt.face && faceTracker && tick++ % 2 === 0) { let fr = null; try { fr = faceTracker.detectForVideo(video, now + 1); } catch {} const sh = fr && fr.faceBlendshapes && fr.faceBlendshapes[0]; if (sh) { const b = {}; for (const c of sh.categories) b[c.categoryName] = c.score; window.mocapFace(b, fr.facialTransformationMatrixes && fr.facialTransformationMatrixes[0] && fr.facialTransformationMatrixes[0].data); } else if (performance.now() - (pose.faceHead || 0) > 1500) pose.f = null; } }
     if (rec) while (now >= rec.next) { rec.frames.push(snapshot()); rec.next += 1000 / FPS; if (rec.frames.length >= 30 * 60) { $('recBtn').click(); break; } }
-    if (take && (play.on || !live) && !rec) { const c = built(), n = c.n; if (play.on) play.t = (play.t + dt / c.dur) % 1; const i = Math.min(n - 1, Math.floor(play.t * n)), fr = { q: {}, hip: c.hips[i * 3 + 1] }; for (const b in c.bones) fr.q[b] = c.bones[b].slice(i * 4, i * 4 + 4); if (play.on || document.activeElement === $('scrub')) { show(fr); $('scrub').value = play.t; } else show(snapshot()); $('playBtn').textContent = play.on ? '⏸ Pause' : '▶ Play'; }
+    if (take && (play.on || !live) && !rec) { const c = built(), n = c.n; if (play.on) play.t = (play.t + dt / c.dur) % 1; const i = Math.min(n - 1, Math.floor(play.t * n)), fr = { q: {}, hip: c.hips[i * 3 + 1] }; for (const b in c.bones) fr.q[b] = c.bones[b].slice(i * 4, i * 4 + 4); if (c.face) { fr.f = {}; for (const k in c.face) fr.f[k] = c.face[k][i]; } if (play.on || document.activeElement === $('scrub')) { show(fr); $('scrub').value = play.t; } else show(snapshot()); $('playBtn').classList.toggle('on', play.on); }
     else show(snapshot());
     vrm.update(dt); camera.position.set(Math.sin(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist, 0.95 + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist); camera.lookAt(0, 0.9, 0); renderer.render(scene, camera);
   })(last);

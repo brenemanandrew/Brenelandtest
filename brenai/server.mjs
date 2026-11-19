@@ -966,7 +966,7 @@ async function handle(req, res) {
         if (b.remove) delete all.clips[String(b.remove)];
         else { const name = String(b.name || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 40), c = b.clip; if (!name || !c || !(c.n >= 1 && c.n <= 3600) || typeof c.bones !== 'object') return json(res, 400, { error: 'That is not a clip.' });
           const bones = {}; for (const k of Object.keys(c.bones).slice(0, 80)) { const v = c.bones[k]; if (!/^[a-zA-Z]{3,30}$/.test(k) || !Array.isArray(v) || v.length !== c.n * 4 || v.some(x => typeof x !== 'number' || !Number.isFinite(x))) return json(res, 400, { error: 'The clip has a bad bone track: ' + k }); bones[k] = v; }
-          all.clips[name] = { name, dur: Math.max(0.03, +c.dur || c.n / 30), fps: +c.fps || 30, n: c.n, bones, ...(Array.isArray(c.hips) && c.hips.length === c.n * 3 ? { hips: c.hips.map(Number) } : {}), made: 'mocap' }; }
+          all.clips[name] = { name, dur: Math.max(0.03, +c.dur || c.n / 30), fps: +c.fps || 30, n: c.n, bones, ...(Array.isArray(c.hips) && c.hips.length === c.n * 3 ? { hips: c.hips.map(Number) } : {}), ...(c.face && typeof c.face === 'object' ? { face: Object.fromEntries(Object.entries(c.face).filter(([k, v]) => /^[a-zA-Z]{2,14}$/.test(k) && Array.isArray(v) && v.length === c.n).slice(0, 16).map(([k, v]) => [k, v.map(x => Math.max(0, Math.min(1, +x || 0)))])) } : {}), made: 'mocap' }; }
         all.v = Date.now(); fs.writeFileSync(ANIMS + '.tmp', JSON.stringify(all)); fs.renameSync(ANIMS + '.tmp', ANIMS); return json(res, 200, { ok: true, clips: Object.keys(all.clips) });
       }
       if (url.pathname === '/api/anims') {
