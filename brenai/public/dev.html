@@ -36,6 +36,10 @@
   #pipFrame { flex:1; border:0; width:100%; background:#000; }
   table.fits { border-collapse:separate; border-spacing:6px; } table.fits th { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:#8a7aa8; text-align:left; white-space:nowrap; } table.fits td { background:#f7f3fc; border-radius:12px; padding:8px 10px; min-width:150px; vertical-align:top; } .fitname { font-size:12.5px; color:#6a5a8a; margin-bottom:6px; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:#2a1d45; color:#fff; padding:9px 18px; border-radius:999px; font-size:14px; opacity:0; transition:opacity .25s; pointer-events:none; z-index:50; } #toast.on { opacity:1; }
+  html, body { max-width:100%; overflow-x:hidden; }
+  /* phones: the top bar wraps onto two rows, the tabs slide sideways, and nothing is wider than the screen */
+  @media (max-width:700px) { header { flex-wrap:wrap; gap:6px 10px; padding:8px 10px; } header h1 { font-size:20px; } header a { font-size:13px; margin-left:0 !important; } header a:first-of-type { margin-left:auto !important; } nav { order:3; width:100%; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; } nav button { flex:none; padding:8px 14px; font-size:14.5px; white-space:nowrap; }
+    .work { padding:8px; } .side, .side.right { padding:10px 12px; } .card { padding:12px; } #frameWrap { max-width:100%; } #pip { right:4px; bottom:4px; width:96vw; height:70vh; min-width:0; resize:none; } .cat { grid-template-columns:1fr 1fr; } table.fits td { min-width:128px; } #mapHint { display:none; } .step { flex-wrap:wrap; } }
   @media (max-width:900px) { main.on { flex-direction:column; } .side, .side.right { width:auto; max-height:38vh; border:0; border-bottom:1px solid #ddd3ee; } #mapView { position:relative; height:52vh; } }
 </style>
 </head>
@@ -104,7 +108,7 @@ const allPlaces = () => ['dorm', 'house', ...dev.maps.custom.map(m => m.id)];
 for (const b of document.querySelectorAll('nav button')) b.onclick = () => { for (const x of document.querySelectorAll('nav button')) x.classList.toggle('on', x === b); for (const m of document.querySelectorAll('main')) m.classList.toggle('on', m.id === 'tab-' + b.dataset.tab); if (b.dataset.tab === 'map') mapStart(); if (b.dataset.tab === 'who') whoStart(); if (b.dataset.tab === 'ev') drawEvents(); };
 
 // ---------- 1. layout ----------
-function screen(kind) { const w = kind === 'phone' ? 430 : 1100, h = kind === 'phone' ? 860 : 740; $('frameWrap').style.width = w + 'px'; $('frameWrap').style.height = h + 'px'; $('scrPhone').classList.toggle('go', kind === 'phone'); $('scrPc').classList.toggle('go', kind === 'pc'); $('frame').src = '/?uiedit=1&k=' + kind; }
+function screen(kind) { const small = innerWidth < 700, w = kind === 'phone' ? Math.min(430, small ? innerWidth - 16 : 430) : 1100, h = kind === 'phone' ? (small ? Math.max(520, Math.round(innerHeight * 0.82)) : 860) : 740;   /* on a phone the phone preview is the width of the screen */ $('frameWrap').style.width = w + 'px'; $('frameWrap').style.height = h + 'px'; $('scrPhone').classList.toggle('go', kind === 'phone'); $('scrPc').classList.toggle('go', kind === 'pc'); $('frame').src = '/?uiedit=1&k=' + kind; }
 $('scrPhone').onclick = () => screen('phone'); $('scrPc').onclick = () => screen('pc');
 addEventListener('message', e => { if (e.data && e.data.studio === 'saved') toast('Layout saved'); });
 
