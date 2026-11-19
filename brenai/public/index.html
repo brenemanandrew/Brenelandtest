@@ -1721,7 +1721,7 @@ async function brainStatus() {
     const b = await (await fetch('/api/brain')).json(); brainInfo = b;
     // a new version of the site went out: pick it up once nothing is in progress
     if (b.build) { if (!window.__build) window.__build = b.build; else if (b.build !== window.__build && !sendBtn.disabled && !phoneCall.on && !input.value && !$('wheel').classList.contains('open') && !speaker.busy()) return location.reload(); }
-    $('brainDot').textContent = b.online ? '\u25cf PC online' + (b.bridge < b.bridgeLatest ? ' (restart bridge to update)' : '') : b.fallback ? '\u25cf Claude' : '\u25cb offline';
+    $('brainDot').textContent = b.online ? (b.stuck ? '\u26a0 PC is on, but the model is not answering' : '\u25cf PC online' + (b.bridge < b.bridgeLatest ? ' (restart bridge to update)' : '')) : b.fallback ? '\u25cf Claude' : '\u25cb offline'; $('brainDot').title = b.stuck ? 'The last message got no reply from the model on your PC (' + (b.stuckWhy || 'no answer') + '). Check that the model is loaded and its local server is running.' : ''; $('brainDot').style.color = b.stuck ? '#ffb347' : '';
     $('brainDot').style.color = b.online ? '#7bd88f' : b.fallback ? '#d4b8ff' : '#ff9a9a';
   } catch {}
 }

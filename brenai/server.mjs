@@ -73,7 +73,7 @@ function brainJob({ stream, ...job }, onDelta) {
   return new Promise((resolve, reject) => {
     if (!brain.ws) return reject(new Error('offline'));
     const id = jobId++;
-    const timer = setTimeout(() => { jobs.delete(id); reject(new Error('Your PC took too long to answer.')); }, 180000);
+    const timer = setTimeout(() => { jobs.delete(id); brain.failed++; brain.badAt = Date.now(); brain.badWhy = 'no answer in three minutes'; reject(new Error('Your PC took too long to answer.')); }, 180000);
     jobs.set(id, { resolve, reject, onDelta, timer });
     brain.ws.send(JSON.stringify({ t: 'job', id, ...job, stream: !!stream }));
   });
@@ -81,7 +81,7 @@ function brainJob({ stream, ...job }, onDelta) {
 function endJob(id, err, text) {
   const j = jobs.get(id); if (!j) return;
   clearTimeout(j.timer); jobs.delete(id);
-  if (err) { brain.failed++; j.reject(new Error(err)); } else { brain.served++; j.resolve(text); }
+  if (err) { brain.failed++; brain.badAt = Date.now(); brain.badWhy = String(err).slice(0, 160); j.reject(new Error(err)); } else { brain.served++; brain.okAt = Date.now(); j.resolve(text); }
 }
 function onBrainSocket(ws) {
   let authed = false;
@@ -727,7 +727,7 @@ async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, build: BUILD, ttsMs: brain.ttsMs || 0, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, stuck: !!brain.ws && (brain.badAt || 0) > (brain.okAt || 0), stuckWhy: brain.ws && (brain.badAt || 0) > (brain.okAt || 0) ? brain.badWhy || '' : '', build: BUILD, ttsMs: brain.ttsMs || 0, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
