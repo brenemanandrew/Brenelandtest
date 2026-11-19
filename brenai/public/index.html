@@ -780,6 +780,7 @@ let lastAuto = 0;
 let away = null, glow = null, plan = null, returning = false, toldAway = false;
 function setPresence(a, g, instant) {
   const was = away; away = a || null; glow = g || null;
+  if (!!was !== !!away) { try { if (away && !phoneCall.on) { voice.reset(); voice.pause(); $('mic').title = 'The mic is off while she is out'; } else { $('mic').title = 'Mic mute / unmute'; voice.start(); } } catch {} }   // the mic follows her being here
   $('outSign').hidden = !away;
   if (away) { $('outBack').textContent = away.back; $('outSign').title = 'Out: ' + away.where; input.placeholder = 'She is out. Leave her a message'; }
   else { input.placeholder = 'Talk or type, *actions*'; toldAway = false; }
@@ -1182,7 +1183,8 @@ const voice = (() => {
     tick();
     timer = setTimeout(() => { heard = (heard + ' ' + interim).trim(); interim = ''; write(); send(); }, ms);
   }
-  function start() {
+  function start() { if (away && !phoneCall.on) { show(); return; }   // she is out or asleep: the mic does not listen, so stray talk in the room is not left for her (a call still listens)
+   
     if (!SR || !v.on || running || held) return;
     rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.continuous = true; rec.interimResults = true;
     rec.onresult = e => {
@@ -1216,7 +1218,7 @@ const voice = (() => {
   v.typed = e => { if (e.key === 'Enter') return; clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; setTimeout(() => { prefix = input.value; heard = interim = ''; }, 0); };
   mic.onclick = () => { if (speaker.speaking) return speaker.stop('you tapped the mic button'); v.set({ on: !v.on }); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) start(); });
-  v.start = start;
+  v.start = start; v.pause = stop;
   show();
   return v;
 })();
@@ -1348,7 +1350,7 @@ async function callSay(text) {
   } catch { avatar.setThinking(false); } finally { phoneCall.busy = false; }
 }
 function endCall(who, wait = 1500) { // who hung up: 'me', 'she', or null when it never connected
-  if (!phoneCall.on) return; phoneCall.on = false;
+  if (!phoneCall.on) return; phoneCall.on = false; if (away) setTimeout(() => { if (away && !phoneCall.on) voice.pause(); }, 1800);
   ringTone(false); clearInterval(phoneCall.timer); speaker.stop('a call ended'); avatar.setThinking(false);
   if (who) { callStatus('Call ended'); $('phone').classList.add('ended'); }
   const s = phoneCall.saved; if (s) { speaker.on = s.speak; voice.set({ on: s.mic }); }

@@ -207,3 +207,6 @@ The player plays the real film on their own screen; the game keeps a clock besid
 
 ## Unsend
 `POST /api/unsend { at }` takes back one line of the player's own by its time, if she has not answered since (`{ minutes }` takes back all of his lines from the last N minutes, after copying the save). In the chat, each of your lines after her last reply has a small x that does this.
+
+## The mic while she is out
+When she is out or asleep the page stops listening (`voice.pause()` in `setPresence`, and `start()` refuses while `away`), so things said in the room are not left for her as messages. Typing still works. A video call listens as usual, and the mic comes back on by itself when she is back.
