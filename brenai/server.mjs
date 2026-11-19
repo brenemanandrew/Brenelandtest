@@ -555,7 +555,7 @@ const moviePos = () => { const m = db.movie; return m ? ((m.paused || Date.now()
 const movieView = () => { const m = db.movie, M = m && MOVIES[m.id]; return M ? { id: m.id, title: M.title, minutes: M.minutes, pos: +moviePos().toFixed(2), paused: !!m.paused, tint: M.tint } : null; };
 function movieNote() { const m = db.movie, M = m && MOVIES[m.id]; if (!M || !db.place) return ''; const pos = Math.max(0, Math.min(M.minutes, moviePos()));
   return ` The two of you are watching ${M.title} together, side by side with the lights down${m.paused ? ' (it is paused right now)' : ''}. It is about ${Math.round(pos)} minutes in. On the screen about now: ${beatAt(M, pos).text}. You have seen it before and love it. Talk like someone watching a film with a date: short, low, in the moment, a reaction or a whisper or a tease; never narrate the plot, and never give away what happens later.`; }
-function placeNote() { if (db.place && db.solo) return `Right now ${USER_NAME} is out at ${placeLabel(db.place)} on his own. You are not with him: you are at home, messaging him as usual. You could ask what he is up to, or decide to go and join him.`; const base = placeNote0(); return base && db.movie ? base + movieNote() : base; }
+function placeNote() { if (db.place === 'house' && db.solo) return `Right now ${USER_NAME} is at home in his own room. You are not with him: you are at your place, messaging him as usual.`; if (db.place && db.solo) return `Right now ${USER_NAME} is out at ${placeLabel(db.place)} on his own. You are not with him: you are at home, messaging him as usual. You could ask what he is up to, or decide to go and join him.`; const base = placeNote0(); return base && db.movie ? base + movieNote() : base; }
 function placeNote0() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
   if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
@@ -936,10 +936,13 @@ async function handle(req, res) {
         const { place, decline, solo } = await readBody(req), now = Date.now();
         if (decline) { db.invite = null; save(); return json(res, 200, placeView()); }
         if (!place) {
+          if (db.place && db.solo && db.place === 'house') { db.log.push({ who: 'sys', text: 'You left your room.', at: now }); setPlace(''); save(); return json(res, 200, placeView()); }
           if (db.place === 'house' && (db.left || []).length < 3 && Math.random() < 0.35) { const k = ['bookstack', 'cushion', 'dice'][(db.left || []).length]; db.left = [...(db.left || []), { kind: k, at: now }]; db.log.push({ who: 'sys', text: `Wizra left ${k === 'bookstack' ? 'a couple of her books' : k === 'cushion' ? 'her favourite cushion' : 'a set of her dice'} at your place.`, at: now }); remember('left:' + k, 'She started leaving her things at your place.'); }
           if (db.place) { db.log.push({ who: 'sys', text: db.place === 'house' ? 'Wizra headed home.' : 'You headed home.', at: now }); cur().touches.push({ kind: db.place === 'house' ? 'homeHouse' : 'homeDorm', at: now }); setPlace(''); save(); }
           return json(res, 200, placeView());
         }
+        if (place === 'house' && solo && inviteNow() !== 'house') { /* his own room, on his own: always open, she is not there (she may come by) */
+          setPlace('house'); db.solo = true; db.soloAt = now; db.log.push({ who: 'sys', text: 'You went to your room.', at: now }); save(); return json(res, 200, placeView()); }
         if (customMap(place) && solo && place !== inviteNow()) { // going somewhere on his own: she is not with him (she may turn up)
           setPlace(place); db.solo = true; db.soloAt = now; db.log.push({ who: 'sys', text: `You went to ${customMap(place).name} on your own.`, at: now }); save(); return json(res, 200, placeView()); }
         if (customMap(place)) { // a place made in the Studio: you just go there together

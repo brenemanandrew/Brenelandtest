@@ -251,7 +251,8 @@
   #callBtn svg { width:100%; height:100%; display:block; }
   #awayNote.plan #callBtn { display:none; }
   #call { position:fixed; inset:0; display:none; place-items:center; background:rgba(10,6,24,.9); z-index:30; }
-  body.calling #call { display:grid; }
+  body.calling #call { display:grid; cursor:pointer; } #phone { cursor:default; }
+  #callX { display:none; position:fixed; right:calc(14px + env(safe-area-inset-right)); top:calc(14px + env(safe-area-inset-top)); z-index:40; width:48px; height:48px; border-radius:50%; border:2px solid #fff; background:rgba(224,68,90,.92); color:#fff; font-size:22px; font-weight:700; line-height:1; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.5); } body.calling #callX { display:block; }
   :root { --pw:min(84vw, 44dvh); --ph:calc(var(--pw) * 2.02); }
   #phone { position:relative; width:var(--pw); height:var(--ph); border-radius:38px; background:#0b0b10; box-shadow:0 0 0 3px #2a2a35, 0 0 0 9px #14141c, 0 30px 80px rgba(0,0,0,.7); }
   #phone::before { content:""; position:absolute; top:14px; left:50%; width:74px; height:20px; margin-left:-37px; border-radius:12px; background:#0b0b10; z-index:34; }
@@ -503,6 +504,7 @@
 <div id="movieBar" hidden><span id="movieClock"></span><button id="moviePause" title="Pause or resume"></button></div><div id="fpMoments"></div><div id="fpChoices" hidden></div><div id="bondPop"></div>
 <div id="fpBar"><button id="fpLeave">Head home</button><button id="fpLog" class="quiet">Chat log</button><span id="fpHint"></span></div>
 <!-- the video call: a phone on the screen with her on it. Nothing is written during a call; you talk, she answers out loud. -->
+<button id="callX" title="Hang up">&#10005;</button>
 <div id="call">
   <div id="phone">
     <div id="phoneTop"><span id="callName">Wizra</span><span id="callStatus">Calling...</span></div>
@@ -898,6 +900,7 @@ function openFly() {
   if (!avatar.canVisit()) items.push(['\u2753', 'Needs her 3D model', null]);
   else if (v.place) items.push(['\ud83c\udfe0', 'Head home', () => { close(); $('fpLeave').click(); }]);
   else {
+    items.push(['\ud83d\udecb\ufe0f', 'My room', () => go('house', 'your room')]);
     if (!v.canVisit) items.push(['\ud83d\udd12', `Opens at ${v.visitAt} points (you: ${v.rapport})`, null]);
     else { items.push(['\ud83d\udcf1', away ? 'She is out: call her' : 'Invite her over', away ? () => { close(); const c = $('callBtn'); if (c) c.click(); } : () => { close(); send('Want to come over and hang out?', 'house'); }]);
       items.push([v.invite === 'dorm' ? '\ud83d\udecf\ufe0f' : '\ud83d\udd12', v.invite === 'dorm' ? 'Her dorm: she invited you' : 'Her dorm: ask her', v.invite === 'dorm' ? async () => { close(); try { const r = await api('/api/visit', { place: 'dorm' }); setPlace(await r.json(), true); } catch {} } : away ? null : () => { close(); send('Can I come over to yours?', 'dorm'); }]);
@@ -1406,6 +1409,9 @@ function endCall(who, wait = 1500) { // who hung up: 'me', 'she', or null when i
 }
 $('callBtn').onclick = startCall;
 $('hangUp').onclick = () => endCall('me', 1400);
+// a way out of a call that always works: the X in the corner, a click on the dark around the phone, or Esc. If the call is stuck half way it is torn down anyway.
+function leaveCall() { if (phoneCall.on) endCall('me', 500); setTimeout(() => { if (!phoneCall.on && document.body.classList.contains('calling')) { ringTone(false); document.body.classList.remove('calling', 'ringing'); avatar.call(false); avatar.setState(''); if (away) avatar.presence('gone'); phoneCall.busy = false; } }, 900); }
+$('call').addEventListener('click', e => { if (e.target === $('call')) leaveCall(); }); $('callX').onclick = leaveCall; addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('calling')) leaveCall(); });
 $('callMic').onclick = () => { const on = !voice.on; voice.set({ on }); $('callMic').classList.toggle('off', !on); };
 $('callType').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { callSay(e.target.value.trim()); e.target.value = ''; } });
 
