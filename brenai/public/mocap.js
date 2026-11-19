@@ -198,7 +198,11 @@ export async function start() {
     if (!seen || frames.length < 2) return say('I could not find a person in that video. It works best with one person, whole body in view, steady camera.');
     take = frames; play = { on: true, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); say(`Video read: ${frames.length} frames, a person found in ${Math.round(seen / frames.length * 100)}% of them. It is playing on her now; clean it up, then save.`);
   }
-  $('vidBtn').onclick = () => { if (importing) importing.stop = true; else $('vidFile').click(); }; $('vidFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) (/^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name) ? importImage : importVideo)(f); }; window.mocapImage = importImage; window.mocapVideo = importVideo;
+  $('vidBtn').onclick = () => { if (importing) importing.stop = true; else $('vidFile').click(); }; $('vidFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) (/^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name) ? importImage : importVideo)(f); }; window.mocapImage = importImage;
+  /* a picture or video can also be pasted (Ctrl+V) or dropped onto her */
+  const takeFile = f => { if (!f) return false; const pic = /^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name || ''), vid = /^video\//.test(f.type); if (!pic && !vid) return false; (pic ? importImage : importVideo)(f); return true; };
+  addEventListener('paste', e => { if (/^(INPUT|TEXTAREA)$/.test((e.target && e.target.tagName) || '') && e.target.type !== 'range') return; const items = [...((e.clipboardData && e.clipboardData.items) || [])], it = items.find(i => i.kind === 'file' && /^(image|video)\//.test(i.type)); if (it && takeFile(it.getAsFile())) e.preventDefault(); else if (!it) say('There is no picture on the clipboard. Copy an image first (right click, Copy image), then press Ctrl+V here.'); });
+  view.addEventListener('dragover', e => e.preventDefault()); view.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (!takeFile(f)) say('Drop a picture or a video file.'); }); window.mocapVideo = importVideo;
   // each finger by hand: pick which hand, then a slider a finger
   const fingerSliders = () => { const side = $('handSel').value === 'right' ? 'right' : 'left'; for (const f of ['Thumb', ...FINGERS]) $('f' + f).value = curl[side][f]; };
   $('handSel').onchange = fingerSliders; for (const f of ['Thumb', ...FINGERS]) $('f' + f).oninput = e => { const sel = $('handSel').value; for (const side of sel === 'both' ? ['left', 'right'] : [sel]) curl[side][f] = +e.target.value; }; fingerSliders();
@@ -239,7 +243,7 @@ export async function start() {
     say(r.ok ? `Saved as "${name}". In the game: a Studio event can play it, and a Reaction can use it as clip:${name}.` : (d.error || 'It could not be saved.')); listSaved(); };
   $('dlBtn').onclick = () => { const c = built(); if (!c) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(c)], { type: 'application/json' })); a.download = ($('name').value.trim() || 'take') + '.json'; a.click(); };
   $('upFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const c = JSON.parse(await f.text()); if (!c.bones || !c.n) throw 0; take = Array.from({ length: c.n }, (_, i) => { const q = {}; for (const b in c.bones) q[b] = c.bones[b].slice(i * 4, i * 4 + 4); return { q, hip: c.hips ? c.hips[i * 3 + 1] : 1, ...(c.face ? { f: Object.fromEntries(Object.keys(c.face).map(k => [k, c.face[k][i]])) } : {}) }; }); play = { on: true, t: 0 }; takeInfo(); say('Clip loaded from the file.'); } catch { say('That file is not a clip saved from here.'); } };
-  listSaved(); say('Ready. Turn the camera on, or pose her by hand.');
+  listSaved(); say('Ready. Turn the camera on, open or paste a picture or video, or pose her by hand.');
 
   // ---- every frame ----
   let last = performance.now();

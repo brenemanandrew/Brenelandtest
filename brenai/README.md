@@ -239,3 +239,7 @@ The mocap page also reads your face (MediaPipe Face Landmarker, every other fram
 
 ## Motion capture: finer face
 `public/fineface.js` drives the model's mouth-only, brow-only and eye-only shapes (VRoid `Fcl_MTH_*`, `Fcl_BRW_*`, `Fcl_EYE_*`) straight from the face tracker, instead of the whole-face expressions. Takes carry them in the face track (`mFun`, `mJoy`, `mSor`, `mAng`, `mUp`, `mSmall`, `mLarge`, `bAng`, `bSor`, `bSur`, `eJoyL`, `eJoyR`, `eWide`, plus the vowel `ee`), and the game plays them back. A take recorded before this still plays the old way. The server now keeps up to 32 face tracks per clip.
+
+## Studio: outfit preview, and pasting into motion capture
+- Hovering a filled outfit slot in the Studio (or tapping it) opens a small turning 3D view of that model (`public/fitpip.js`).
+- On the motion capture page a picture or video can be pasted from the clipboard (Ctrl+V) or dropped on the view, as well as opened with the File button.

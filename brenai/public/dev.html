@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Brenai Studio</title>
-<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/addons/" } }</script>
+<script type="importmap">{ "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/addons/", "@pixiv/three-vrm": "/vendor/three-vrm.module.min.js" } }</script>
 <style>
   @font-face { font-family:"Bangers"; src:url(fonts/bangers-latin-400-normal.woff2) format("woff2"); }
   @font-face { font-family:"Fredoka"; font-weight:500; src:url(fonts/fredoka-latin-500-normal.woff2) format("woff2"); }
@@ -344,7 +344,7 @@ function drawWho() {
       for (let l = 0; l < o.levels; l++) { const tr = el('tr', {}, el('th', { textContent: 'Lv ' + l })); for (const sname of o.situations) { const key = l + '|' + sname, slot = o.slots[key], td = el('td', {});
         const file = el('input', { type: 'file', accept: '.vrm', hidden: true }), up = el('button', { className: 'btn sm' + (slot ? '' : ' go'), textContent: slot ? 'Replace' : 'Upload .vrm' }); up.onclick = () => file.click();
         file.onchange = async () => { const f = file.files[0]; if (!f) return; up.textContent = 'Uploading...'; up.disabled = true; const r = await fetch(`/api/outfit/slot?level=${l}&situation=${encodeURIComponent(sname)}`, { method: 'POST', headers: { 'x-name': encodeURIComponent(f.name) }, body: f }); if (!r.ok) toast((await r.json().catch(() => ({}))).error || 'Upload failed'); else toast('Model saved for Lv ' + l + ' ' + sname); load(); };
-        td.append(el('div', { className: 'fitname', textContent: slot ? slot.name + ' (' + slot.mb + ' MB)' : 'empty' }), up, file); if (slot) { const c = el('button', { className: 'mini', textContent: '\u2715', title: 'Clear' }); c.onclick = () => load({ clear: key }); td.append(c); } tr.append(td); }
+        td.append(el('div', { className: 'fitname', textContent: slot ? slot.name + ' (' + slot.mb + ' MB)' : 'empty' }), up, file); if (slot) { const c = el('button', { className: 'mini', textContent: '\u2715', title: 'Clear' }); c.onclick = () => load({ clear: key }); td.append(c); td.style.cursor = 'zoom-in'; import('./fitpip.js').then(m => { window.fitPip = m.pip; m.pip.attach(td, '/api/outfit/' + slot.file + '?v=' + slot.v, slot.name.replace(/\.vrm$/i, '') + ' (Lv ' + l + ' ' + sname + ')'); }).catch(() => {}); } tr.append(td); }
         tr.append(el('td', {})); tbl.append(tr); }
       box.append(el('div', { style: 'overflow-x:auto' }, tbl), el('p', { className: 'tip', textContent: 'An empty slot uses the same column from a lower level, then Daily, then her base model. School is worn when she is at class or studying, Going Out when she is out anywhere else, Nightly from 9pm to 6am, Weekend on Saturday and Sunday, Daily the rest of the time. A column you add is only worn when you pick it under "Which outfit". Outfits save as you go: no need to press Save.' })); };
     load();
