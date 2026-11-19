@@ -986,6 +986,8 @@ export async function create(url, opts = {}) {
     else { const side = SIGN_OF[spec.pose] || spec.pose === 'wave' ? -0.13 : 0; camera.position.set(tmpA.x + fx * 0.8 + fz * (0.1 + side), tmpA.y + 0.2, tmpA.z + fz * 0.8 - fx * (0.1 + side)); camera.lookAt(tmpA.x + fz * side, tmpA.y + 0.04, tmpA.z - fx * side); }   // her face, from arm's length and a little above
     if (spec.view && !lying) { const [vs, vu, vd, vl] = spec.view; camera.position.set(tmpA.x + fx * vd + fz * vs, tmpA.y + vu, tmpA.z + fz * vd - fx * vs); camera.lookAt(tmpA.x + fz * (spec.arm ? (spec.arm === 'R' ? -0.05 : 0.05) : 0), tmpA.y + (vl || 0), tmpA.z); }   /* her own camera spot: [to her side, above her eyes, how far, where on her it points] */
     if (!inDorm) { backdrop.position.set(tmpA.x, tmpA.y - (full ? 0.6 : half ? 0.35 : 0.3), tmpA.z - 1.05); backdrop.scale.set(full ? 2.4 : half ? 1.6 : 1.5, full ? 1.5 : half ? 1.15 : 1.2, 1); }
+    /* a picture is taken looking at whoever holds the camera: her eyes go to the lens */
+    if (!lying && spec.eyes !== false) { target.position.copy(camera.position); target.updateMatrixWorld(true); if (vrm.lookAt) { try { vrm.lookAt.update(0); } catch {} } vrm.scene.updateMatrixWorld(true); }
     blushMat.opacity = (spec.blush || 0) * 0.5;
     renderer.render(scene, camera); blushMat.opacity = blushNow;
     let url = ''; try { url = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
