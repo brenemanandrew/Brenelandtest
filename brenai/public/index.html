@@ -582,6 +582,8 @@ function split(text, who) {
   for (const line of text.split(/(?<=\n)/)) { const m = CAST.exec(line), own = m && /^(wizra|she)$/i.test(m[1]); if (m && !own) { if (cur) { piece(cur, ''); cur = ''; } piece(line.slice(m[0].length), m[1].trim()); } else cur += own ? line.slice(m[0].length) : line; }
   if (cur) piece(cur, ''); return out;
 }
+/* doing a voice: it is still her, pitched down or up and paced a little differently, the same every time for the same name */
+const castPitch = n => [0.8, 0.86, 0.92, 1.1, 1.17, 0.83, 1.13][castHue(n) % 7];
 const castHue = n => { let h = 0; for (const ch of n.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
 const castAct = (c, a) => { a = a.trim(); if (a.toLowerCase().startsWith(c.toLowerCase())) return a; const m = /^(he|she|they)\s+/i.exec(a); return c + ' ' + (m ? a.slice(m[0].length) : a.charAt(0).toLowerCase() + a.slice(1)); };
 /* what her voice reads, with each character's words marked so they can be given a voice of their own: \u27e6Name\u27e7 words \u27e6\u27e7 */
@@ -1380,9 +1382,9 @@ const speaker = (() => {
   }
   let env = null;
   const begin = () => { if (v.speaking) return; v.speaking = true; if (!v.headphones) voice.hold(true); clearInterval(tick); tick = setInterval(() => { const lvl = env && !player.paused ? env[Math.floor(player.currentTime / 0.04)] : undefined; avatar.talk(lvl); }, 40); };
-  const playBlob = blob => new Promise(async done => {
+  const playBlob = (blob, pitch = 1) => new Promise(async done => {
     env = await envelope(blob);
-    const url = URL.createObjectURL(blob); player.src = url; player.playbackRate = v.rate * voiceMod.rate;
+    const url = URL.createObjectURL(blob); player.src = url; player.preservesPitch = player.mozPreservesPitch = player.webkitPreservesPitch = pitch === 1; player.playbackRate = v.rate * voiceMod.rate * pitch;   /* played faster or slower with the pitch left to follow: that is the character voice (the PC made the clip slower or faster to match, so the pace stays natural) */
     player.onplaying = () => { begin(); if (v.onFirst) v.onFirst(); }; player.onended = player.onerror = () => { URL.revokeObjectURL(url); env = null; done(); };
     player.play().catch(() => done());
   });
@@ -1396,11 +1398,11 @@ const speaker = (() => {
     let go; v.ready = new Promise(ok => { go = ok; }); setTimeout(() => go(), 6000);
     v.onFirst = go;
     // ask for every line at once (the PC makes them in order), play them back to back
-    const clips = parts.map((line, i) => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(who[i] ? { text: line, cast: who[i] } : { text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
+    const clips = parts.map((line, i) => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(who[i] ? { text: line, cast: who[i], pitch: castPitch(who[i]) } : { text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
     for (let i = 0; i < clips.length; i++) {
       const blob = await clips[i]; if (gen !== my) return;
       if (!blob) { v.waiting = false; if (v.onFirst) v.onFirst(); deviceSay(parts.slice(i), who.slice(i)); return; } // the PC voice dropped out: finish on the device voice
-      v.waiting = false; await playBlob(blob); if (gen !== my) return;
+      v.waiting = false; await playBlob(blob, who[i] ? castPitch(who[i]) : 1); if (gen !== my) return;
     }
     v.waiting = false; end();
   };
