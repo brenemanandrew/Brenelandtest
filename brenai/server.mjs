@@ -31,10 +31,11 @@ const AVATAR = path.join(DATA_DIR, 'avatar.vrm');
 const ANIMS = path.join(DATA_DIR, 'anims.json');
 const PACK = path.join(DATA_DIR, 'pack');             // the ready-made picture pack (tools/picpack): manifest.json + images
 let pack = []; const loadPack = () => { try { pack = JSON.parse(fs.readFileSync(path.join(PACK, 'manifest.json'), 'utf8')); } catch { pack = []; } }; loadPack();
-const sent = () => (db.sentPics || []), noteSent = spec => { if (spec && spec.file) db.sentPics = [...sent(), spec.file].slice(-45); return spec; };
+const sent = () => (db.sentPics || []), noteSent = spec => { if (spec && spec.file) db.sentPics = [...sent(), spec.file].slice(-200); return spec; };
 // Which picture: the server finds a few that fit (where she is, how close they are, what they are to each other) and SHE picks,
 // in a short side question to her model with the last few lines of the conversation. No answer, or nonsense: the first one.
 async function choosePic(ctx) {
+  fixBond(); ctx = { ...ctx, lvl: db.sheet.romLevel };
   const opts = candidates(pack, { ...ctx, recent: sent() }); if (!opts.length) return null; if (opts.length === 1) return noteSent(opts[0]);
   let pickN = 0;
   try {
@@ -923,15 +924,18 @@ async function handle(req, res) {
       }
       // the picture pack: GET one image; POST the whole pack at once { manifest: [...], files: { name: base64 } }
       if (url.pathname.startsWith('/api/pack')) {
+        if (req.method === 'GET' && url.pathname === '/api/pack') { const by = {}; for (const p of pack) { const k = p.lvl === undefined ? 'any' : 'L' + p.lvl; by[k] = (by[k] || 0) + 1; } return json(res, 200, { pictures: pack.length, byLevel: by }); }
         if (req.method === 'GET') { const f = url.pathname.slice(10); if (!/^[a-z0-9_]+\.webp$/.test(f) || !fs.existsSync(path.join(PACK, f))) return json(res, 404, { error: 'no such picture' }); res.writeHead(200, { 'content-type': 'image/webp', 'cache-control': 'private, max-age=86400' }); return fs.createReadStream(path.join(PACK, f)).pipe(res); }
         if (req.method === 'POST') {
           const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 40e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
           let d; try { d = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
           if (!Array.isArray(d.manifest) || !d.files) return json(res, 400, { error: 'manifest and files needed' });
-          fs.rmSync(PACK, { recursive: true, force: true }); fs.mkdirSync(PACK, { recursive: true }); let n = 0;
+          /* a new pack replaces the old one, except pictures she has already sent somebody: those stay on disk so old chats still show them (they are no longer on the list, so she will not send them again) */
+          const used = new Set(); try { for (const f of fs.readdirSync(path.join(DATA_DIR, 'users'))) { const t = fs.readFileSync(path.join(DATA_DIR, 'users', f), 'utf8'); for (const m of t.matchAll(/"file":\s*"([a-z0-9_]+\.webp)"/g)) used.add(m[1]); } } catch {}
+          fs.mkdirSync(PACK, { recursive: true }); let n = 0, kept = 0; for (const f of fs.readdirSync(PACK)) { if (used.has(f) && !d.files[f]) kept++; else fs.rmSync(path.join(PACK, f), { force: true }); }
           for (const f in d.files) if (/^[a-z0-9_]+\.webp$/.test(f)) { fs.writeFileSync(path.join(PACK, f), Buffer.from(d.files[f], 'base64')); n++; }
           fs.writeFileSync(path.join(PACK, 'manifest.json'), JSON.stringify(d.manifest.filter(m => d.files[m.file]))); loadPack();
-          return json(res, 200, { ok: true, pictures: n, listed: pack.length });
+          return json(res, 200, { ok: true, pictures: n, listed: pack.length, keptFromBefore: kept });
         }
       }
       // a picture she sent: the first page to show it draws it and hands it back here, so it stays the same picture from then on
@@ -1143,7 +1147,7 @@ async function handle(req, res) {
         let pic = null, picPre = '';
         if (!db.place && !askPre) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
-          const what = wantsPic(msg) ? requested(msg, pack, { home: true, close }) : null;   // a picture OF something: her room, her dice, the view...
+          const what = wantsPic(msg) ? requested(msg, pack, { home: true, close, lvl: db.sheet.romLevel }) : null;   // a picture OF something: her room, her dice, the view...
           if (what && what !== 'self') { if (what.none) picPre = `asks for a picture of ${what.none}; she has nothing like that in front of her to photograph right now and says so in her own way (no picture is sent)`; else if (close * 100 >= rule('picAskMin')) { pic = what; picPre = `asks for ${what.desc.replace(/^a picture of /, 'a picture of ')}; she takes it and sends it: ${what.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending pictures yet and says so in her own way'; }
           else if (wantsPic(msg)) { const pz = posed(msg, devData().cues); if (close * 100 >= rule('picAskMin') && (pz || Math.random() < 0.55 + 0.45 * close)) { pic = pz ? { ...selfie('dorm', kind, close), pose: 'plain', face: 'happy', ...(pz.gest ? { gest: pz.gest } : { clip: pz.clip, t: 0 }), ...(pz.cam ? { cam: pz.cam } : {}), desc: `a picture of her ${pz.label}, in her dorm room` } : (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }

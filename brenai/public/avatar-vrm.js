@@ -964,9 +964,13 @@ export async function create(url, opts = {}) {
     else if (!lying && !sitting) set('head', 0.04, 0, spec.pose === 'full' ? 0 : 0.08);
     let gFace = null, gTongue = null; if (spec.gest && GESTURE[spec.gest]) { // a pose she was asked for: any of her gestures, frozen a moment in
       const tg = GESTURE[spec.gest](1.1); for (const n in tg) { if (n === '_head') set('head', ...tg[n]); else if (n === '_face') gFace = tg[n]; else if (n === '_tongue') gTongue = tg[n]; else if (n[0] !== '_' && n !== 'spine' && n !== 'hips') set(n, ...tg[n]); } }
+    /* a picture made for the pack can also say: which arm holds the phone (it reaches toward the camera and out of the frame), any bone directly, and her tongue */
+    if (spec.arm) { const R = spec.arm === 'R', s = R ? 1 : -1, side = R ? 'right' : 'left'; set(side + 'UpperArm', 0.25, s * 1.05, -s * 0.5); set(side + 'LowerArm', 0, s * 0.35, 0); set(side + 'Shoulder', 0, s * 0.12, -s * 0.1); }
+    if (spec.set) for (const n in spec.set) set(n, ...spec.set[n]);
     if (hipsNode) hipsNode.position.y = hipY0 + clipHip;
     const want = EXPR[spec.face] || EXPR.happy; if (em) for (const n of NAMES) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.3, want[n] || 0) : n === 'aa' || n === 'oh' ? 0 : (want[n] || 0)); if (em && spec.faceW) for (const n in spec.faceW) if (has(n)) em.setValue(n, spec.faceW[n]); if (em && gFace) for (const n in gFace) if (has(n)) em.setValue(n, n === 'blink' ? Math.min(0.5, gFace[n]) : gFace[n]);   // a closed-mouth smile for the camera
-    if (gTongue) { tongue.set(gTongue[0], gTongue[1], 0.25, 0.5); if (em && has('aa')) em.setValue('aa', 0.5); } else tongue.set(0); tongue.snap();
+    if (spec.tongue) gTongue = [spec.tongue[0], spec.tongue[1] || 0, spec.tongue[2] === undefined ? 0.25 : spec.tongue[2]];
+    if (gTongue) { tongue.set(gTongue[0], gTongue[1], gTongue[2] === undefined || !spec.tongue ? 0.25 : gTongue[2], 0.5); if (em && has('aa')) em.setValue('aa', Math.max(0.5, (spec.faceW && spec.faceW.aa) || 0)); } else tongue.set(0); tongue.snap();
     // where: her own room as it is, or a painted backdrop of wherever she is
     const custom = spec.scene === 'custom' && window.WIZRA_BG, inDorm = !custom && (spec.scene === 'dorm' || !BACKDROP[spec.scene]); vrm.scene.visible = true;
     for (const k in places.groups) places.groups[k].visible = inDorm && k === 'dorm'; room.visible = inDorm; for (const o of props) o.visible = inDorm; backdrop.visible = !inDorm;
@@ -980,6 +984,7 @@ export async function create(url, opts = {}) {
     else if (half) { camera.position.set(tmpA.x + fx * 1.55 + fz * 0.15, tmpA.y + 0.05, tmpA.z + fz * 1.55 - fx * 0.15); camera.lookAt(tmpA.x, tmpA.y - 0.3, tmpA.z); }                    // waist up
     else if (full) { camera.position.set(tmpA.x + fx * 3.0 + fz * 0.25, Math.max(floorY + 0.75, tmpA.y - 0.45), tmpA.z + fz * 3.0 - fx * 0.25); camera.lookAt(tmpA.x, Math.max(floorY + 0.35, tmpA.y - 0.72), tmpA.z); }
     else { const side = SIGN_OF[spec.pose] || spec.pose === 'wave' ? -0.13 : 0; camera.position.set(tmpA.x + fx * 0.8 + fz * (0.1 + side), tmpA.y + 0.2, tmpA.z + fz * 0.8 - fx * (0.1 + side)); camera.lookAt(tmpA.x + fz * side, tmpA.y + 0.04, tmpA.z - fx * side); }   // her face, from arm's length and a little above
+    if (spec.view && !lying) { const [vs, vu, vd, vl] = spec.view; camera.position.set(tmpA.x + fx * vd + fz * vs, tmpA.y + vu, tmpA.z + fz * vd - fx * vs); camera.lookAt(tmpA.x + fz * (spec.arm ? (spec.arm === 'R' ? -0.05 : 0.05) : 0), tmpA.y + (vl || 0), tmpA.z); }   /* her own camera spot: [to her side, above her eyes, how far, where on her it points] */
     if (!inDorm) { backdrop.position.set(tmpA.x, tmpA.y - (full ? 0.6 : half ? 0.35 : 0.3), tmpA.z - 1.05); backdrop.scale.set(full ? 2.4 : half ? 1.6 : 1.5, full ? 1.5 : half ? 1.15 : 1.2, 1); }
     blushMat.opacity = (spec.blush || 0) * 0.5;
     renderer.render(scene, camera); blushMat.opacity = blushNow;

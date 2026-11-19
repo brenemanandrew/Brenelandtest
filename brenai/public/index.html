@@ -1122,7 +1122,8 @@ let avatarShown = 'puppet', avatarNote = '', myExtras = { dorm: [], house: [], v
 // the rooms as this player has them: the shared maps plus their own gifts (in her dorm) and decor (in their house)
 const mapsNow = () => { const m = dev.maps || {}; return { ...m, dorm: { ...(m.dorm || {}), items: [...((m.dorm || {}).items || []), ...(myExtras.dorm || [])] }, house: { ...(m.house || {}), items: [...((m.house || {}).items || []), ...(myExtras.house || [])] } }; };
 async function applyAvatar() {
-  const fit = visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
+  const wearQ = /^o[a-z0-9]{6,10}\.vrm$/.exec(new URLSearchParams(location.search).get('wear') || '');   /* ?wear=<outfit file>: look at one outfit model (used to make her picture pack) */
+  const fit = wearQ ? { url: '/api/outfit/' + wearQ[0] } : visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
   const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + (fit ? fit.key : settings.avatarV) + ':' + (myExtras.v || '') : 'puppet';   // (your own gifts and decor are part of the rooms, so a new one rebuilds them)
   if (want === avatarShown) return; avatarShown = want; avatarNote = '';
   if (want === 'puppet') return avatar.setRenderer(null);

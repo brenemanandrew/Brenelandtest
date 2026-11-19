@@ -32,7 +32,7 @@ export function requested(text, pack, ctx) {
   if (SELF.test(subject) || SELF.test(bare)) return 'self';
   if (ctx.home) { const v = VIEWS.find(([re]) => re.test(bare)); if (v) return { id: id(), kind: 'view', target: v[1], desc: 'a picture of ' + v[2] }; }
   const th = THINGS.find(([re]) => re.test(bare)); if (th) return { id: id(), kind: 'thing', what: th[1], desc: 'a picture of ' + th[2] };
-  const words = bare.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3), hit = (pack || []).filter(p => p.theme !== 'selfie' && p.theme !== 'cute' && p.theme !== 'relationship' && (p.min || 0) <= ctx.close * 100 && words.some(w => p.desc.toLowerCase().includes(w.replace(/s$/, ''))));
+  const words = bare.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3), hit = (pack || []).filter(p => (p.lvl === undefined || p.lvl === (ctx.lvl | 0)) && p.theme !== 'selfie' && p.theme !== 'cute' && p.theme !== 'relationship' && (p.min || 0) <= ctx.close * 100 && words.some(w => p.desc.toLowerCase().includes(w.replace(/s$/, ''))));
   if (hit.length) { const p = pick(hit); return { id: id(), kind: 'pack', file: p.file, theme: p.theme, desc: p.desc }; }
   return { none: bare.slice(0, 40) };
 }
@@ -58,7 +58,8 @@ export const awayChance = (close, romance) => (0.1 + 0.3 * close * close) * (rom
 // ctx: { home, scene, close 0..1, path, slip, recent: [files], ask }  ->  a spec, or null if nothing fits
 export function fromPack(pack, ctx) {
   if (!pack || !pack.length) return null;
-  const ok = pack.filter(p => (p.min || 0) <= ctx.close * 100 && (!p.path || p.path === ctx.path) && !(ctx.recent || []).includes(p.file)
+  /* a picture belongs to one romance level (lvl): it is only ever sent while they are at that level, never before and never after */
+  const ok = pack.filter(p => (p.lvl === undefined || p.lvl === (ctx.lvl | 0)) && (p.min || 0) <= ctx.close * 100 && (!p.path || p.path === ctx.path) && !(ctx.recent || []).includes(p.file)
     && (ctx.home ? p.where !== 'out' : p.where === 'out' ? p.scene === ctx.scene : p.where === 'any')
     && (!ctx.slip || (p.where === 'out' && p.scene === ctx.scene))            // a picture that gives her away has to show where she really is
     && (!ctx.ask || p.theme === 'selfie' || p.theme === 'cute' || (p.theme === 'relationship' && /selfie|picture of her/.test(p.desc))));
