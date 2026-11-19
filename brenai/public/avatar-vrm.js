@@ -7,6 +7,7 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { buildPlaces, cel } from './places.js';
 import { bodyFix } from './bodyfix.js';
 import { addTongue } from './tongue.js';
+import { fineFace, WHOLE } from './fineface.js';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
 const EXPR = {
@@ -252,7 +253,7 @@ export async function create(url, opts = {}) {
       yoga_moon: pose(1, { leftUpperLeg: [0, 0, 0], rightUpperLeg: [0, 0, 0] }, { ...UP, leftLowerLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], spine: [0, 0, 0.22], chest: [0, 0, 0.2], head: [0, 0, 0.12] }),
       yoga_sit: pose(0.13, { leftUpperLeg: [-1.45, 0.08, 0], rightUpperLeg: [-1.45, -0.08, 0] }, { leftLowerLeg: [2.6, 0, 0], rightLowerLeg: [2.6, 0, 0], leftFoot: [0.6, 0, 0], rightFoot: [0.6, 0, 0], leftUpperArm: [-0.32, -0.3, -1.15], rightUpperArm: [-0.32, 0.3, 1.15], leftLowerArm: [0, -1.85, 0], rightLowerArm: [0, 1.85, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.08, 0, 0] }),   // kneeling, sitting back on her heels, palms together
     }); }
-  const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(), fixBody = bodyFix(THREE, vrm), tongue = addTongue(THREE, vrm); let clipHip = 0, clipFace = null;
+  const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(), fixBody = bodyFix(THREE, vrm), tongue = addTongue(THREE, vrm), fine = fineFace(vrm); let fineOn = false, clipHip = 0, clipFace = null;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
     const c = CLIPS[name]; if (!c || weight < 0.003) return false;
     const f = ((t % c.dur + c.dur) % c.dur) * c.fps, i0 = Math.min(c.n - 1, Math.floor(f)), i1 = Math.min(c.n - 1, i0 + 1), a = f - i0;
@@ -1015,7 +1016,8 @@ export async function create(url, opts = {}) {
       const gf = gx.face || {}, mix = (n, v) => Math.max(v, (gf[n] || 0) * gx.k);
       if (em) { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised']) if (has(n)) em.setValue(n, mix(n, w[n])); if (has('blink')) em.setValue('blink', mix('blink', blink)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh);
         { const cf = clipFace || {}, to = Math.max(gx.tongue[0], cf.tongueOut || 0), fromClip = (cf.tongueOut || 0) > gx.tongue[0]; tongue.set(to, fromClip ? (cf.tongueCurl === undefined ? 0 : cf.tongueCurl * 2 - 1) : gx.tongue[1], fromClip ? (cf.tongueSide === undefined ? 0 : cf.tongueSide * 2 - 1) : gx.tongue[2], to > 0.03 ? Math.max(mix('aa', aa), 0.3 + 0.3 * to) : 0); if (to > 0.03 && has('aa')) em.setValue('aa', Math.max(mix('aa', aa), 0.3 + 0.3 * to)); }
-        if (clipFace) { for (const k in clipFace) if (em.getExpression(k)) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
+        if (!clipFace && fineOn) { fine.set(null); fineOn = false; }
+        if (clipFace) { const useFine = fine.has && clipFace.mFun !== undefined; if (useFine) { fine.set(clipFace); fineOn = true; } for (const k in clipFace) if (em.getExpression(k) && !(useFine && WHOLE.includes(k))) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
       heartCamera(s.dt, s.t); hangCamera(s.dt);
