@@ -468,6 +468,9 @@
   .qb { width:62px; border:0; padding:0; background:none; color:#fff; font-size:0; display:flex; flex-direction:column; align-items:center; gap:5px; cursor:pointer; } .qb[hidden] { display:none; }
   .qb::before { content:var(--ic); font-size:24px; line-height:1; width:50px; height:50px; border-radius:50%; display:grid; place-items:center; background:rgba(255,255,255,.13); box-shadow:0 4px 12px rgba(0,0,0,.25); transition:transform .12s; } .qb:active::before { transform:scale(.9); } .qb.on::before { background:linear-gradient(135deg,#a855f7,#ec4899); }
   .qb::after { content:attr(data-l); font:600 12.5px "Fredoka",sans-serif; opacity:.9; white-space:nowrap; }
+  /* a character in a story she is telling: their own colour, their name on a chip, their actions under their name */
+  .msg .say.cast { margin:5px 0; padding-left:10px; border-left:3px solid hsl(var(--cast) 70% 62%); } .msg .say.cast::before { content:attr(data-c); display:inline-block; margin-right:8px; padding:0 9px; border-radius:999px; font:700 .78em "Fredoka",sans-serif; letter-spacing:.03em; color:#fff; background:hsl(var(--cast) 60% 48%); vertical-align:middle; }
+  .msg .act.cast, .msg.her .act.cast { color:hsl(var(--cast) 65% 34%); border-color:hsl(var(--cast) 60% 48%); background:hsl(var(--cast) 70% 92%); margin-left:10px; }
 </style>
 </head>
 <body>
@@ -559,19 +562,30 @@ let myName = 'You';
 // an asterisk that never closes (her reply is still streaming, or the model forgot), and for Wizra a sentence that
 // narrates her in third person without asterisks ("She crosses her arms.").
 const NARR = /^\s*(she|wizra)\s+[a-z']+(s|ed)\b/i;
+// A story she tells has other people in it. A line that starts with a name and a colon, then quotes or an asterisk, belongs to
+// that character:   Grum: "Who goes there?"   Grum: *lowers his axe*   Those pieces carry c: the character's name.
+const CAST = /^\s*([A-Z][A-Za-z'\- ]{1,22}?)\s*:\s*(?=["\u201c*])/;
 function split(text, who) {
-  const out = []; const re = /\*([^*]+)\*|\*([^*]*)$/g; let last = 0, m;
-  const say = t => {
-    if (who !== 'her') { if (t) out.push({ s: t }); return; }
-    for (const sent of t.match(/[^.!?\n]+[.!?]*["')]*\s*|\n+/g) || []) {
-      if (NARR.test(sent)) out.push({ a: sent.trim() });
-      else if (out.length && out[out.length - 1].s !== undefined) out[out.length - 1].s += sent; else out.push({ s: sent });
-    }
-  };
-  while ((m = re.exec(text))) { if (m.index > last) say(text.slice(last, m.index)); const a = (m[1] ?? m[2]).trim(); if (a) out.push({ a }); last = re.lastIndex; }
-  if (last < text.length) say(text.slice(last));
-  return out;
+  const out = []; let cur = '';
+  const piece = (text, c) => { const re = /\*([^*]+)\*|\*([^*]*)$/g; let last = 0, m;
+    const say = t => {
+      if (c) { if (t.trim()) out.push({ s: t, c }); return; }
+      if (who !== 'her') { if (t) out.push({ s: t }); return; }
+      for (const sent of t.match(/[^.!?\n]+[.!?]*["')]*\s*|\n+/g) || []) {
+        if (NARR.test(sent)) out.push({ a: sent.trim() });
+        else if (out.length && out[out.length - 1].s !== undefined && !out[out.length - 1].c) out[out.length - 1].s += sent; else out.push({ s: sent });
+      }
+    };
+    while ((m = re.exec(text))) { if (m.index > last) say(text.slice(last, m.index)); const a = (m[1] ?? m[2]).trim(); if (a) out.push(c ? { a, c } : { a }); last = re.lastIndex; }
+    if (last < text.length) say(text.slice(last)); };
+  if (who !== 'her' || !/:\s*["\u201c*]/.test(text)) { piece(text, ''); return out; }
+  for (const line of text.split(/(?<=\n)/)) { const m = CAST.exec(line), own = m && /^(wizra|she)$/i.test(m[1]); if (m && !own) { if (cur) { piece(cur, ''); cur = ''; } piece(line.slice(m[0].length), m[1].trim()); } else cur += own ? line.slice(m[0].length) : line; }
+  if (cur) piece(cur, ''); return out;
 }
+const castHue = n => { let h = 0; for (const ch of n.toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % 360; };
+const castAct = (c, a) => { a = a.trim(); if (a.toLowerCase().startsWith(c.toLowerCase())) return a; const m = /^(he|she|they)\s+/i.exec(a); return c + ' ' + (m ? a.slice(m[0].length) : a.charAt(0).toLowerCase() + a.slice(1)); };
+/* what her voice reads, with each character's words marked so they can be given a voice of their own: \u27e6Name\u27e7 words \u27e6\u27e7 */
+const voicedOf = text => split(text, 'her').filter(p => p.s).map(p => (p.c ? '\u27e6' + p.c + '\u27e7 ' + p.s + ' \u27e6\u27e7' : p.s)).join(' ').replace(/["“”]/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f\u{1f3fb}-\u{1f3ff}]/gu, ' ').replace(/\s+/g, ' ').trim();
 const speechOf = (text, who) => split(text, who).filter(p => p.s).map(p => p.s).join(' ').replace(/["“”]/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f\u{1f3fb}-\u{1f3ff}]/gu, ' ').replace(/\s+/g, ' ').trim();   /* (her voice does not read emoji out) */
 
 // Bleep filter (display only; what she actually said is kept). Covers common words and their -ing/-ed/-s forms.
@@ -589,8 +603,8 @@ function fill(el, text) {
   const who = el.dataset.who;
   el.textContent = '';
   for (const p of split(clean(text), who)) {
-    const t = (p.a ? actLine(who, p.a) : p.s.replace(/["\u201c\u201d]/g, '')).trim(); if (!t) continue;
-    const d = document.createElement('div'); d.className = p.a ? 'act' : 'say'; d.textContent = t; el.appendChild(d);
+    const t = (p.a ? (p.c ? castAct(p.c, p.a) : actLine(who, p.a)) : p.s.replace(/["\u201c\u201d]/g, '')).trim(); if (!t) continue;
+    const d = document.createElement('div'); d.className = (p.a ? 'act' : 'say') + (p.c ? ' cast' : ''); if (p.c) { d.dataset.c = p.c; d.style.setProperty('--cast', castHue(p.c)); } d.textContent = t; el.appendChild(d);
   }
 }
 // One message: a small round picture of who it is (a still image), what they said beside it, and each action in its own
@@ -768,8 +782,8 @@ async function runEvent(ev, preview) { // preview (the Studio's little window): 
       else if (st.type === 'face') { avatar.feel(st.name); avatar.setMood(st.name); await sleep(300); }
       else if (st.type === 'emote') { avatar.emote(st.ch || '\u2728', 1600); await sleep(600); }
       else if (st.type === 'sound') { WizraSound.fx(st.name); await sleep(300); }
-      else if (st.type === 'say' && st.text) { const d = preview ? { text: st.text } : await (await api('/api/event', { say: st.text })).json(); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
-      else if (st.type === 'react' && st.text) { avatar.setThinking(true); const r = await api('/api/event', { react: st.text, preview: !!preview }); const d = await r.json(); avatar.setThinking(false); if (d.text) { const body = addLine('her', ''); avatar.feel(d.text); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } }
+      else if (st.type === 'say' && st.text) { const d = preview ? { text: st.text } : await (await api('/api/event', { say: st.text })).json(); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(voicedOf(d.text)); await typeOut(body, d.text); } }
+      else if (st.type === 'react' && st.text) { avatar.setThinking(true); const r = await api('/api/event', { react: st.text, preview: !!preview }); const d = await r.json(); avatar.setThinking(false); if (d.text) { const body = addLine('her', ''); avatar.feel(d.text); avatar.act(d.text); speaker.say(voicedOf(d.text)); await typeOut(body, d.text); } }
       else if (st.type === 'home') { avatar.routine('sit'); await sleep(1500); }
     }
   } catch (e) { console.error('event', ev.name, e); } finally { EV.busy = false; avatar.setMood(settings.mood); }
@@ -809,7 +823,7 @@ async function load() {
 let introOn = false;
 async function firstMeet(s) {
   introOn = true; const text = await WizraIntro.run({ name: s.name, snapshot: spec => avatar.snapshot(spec), fx: n => { try { WizraSound.fx(n); } catch {} } });
-  if (text) { const body = addLine('her', ''); avatar.act(text); speaker.say(speechOf(text, 'her')); await typeOut(body, text); }
+  if (text) { const body = addLine('her', ''); avatar.act(text); speaker.say(voicedOf(text)); await typeOut(body, text); }
 }
 // your own lines she has not answered yet (the ones after her last reply) can be taken back: a small x on each
 function unsendMarks(list) { for (const b of log.querySelectorAll('.unsend')) b.remove(); const mine = []; for (let i = list.length - 1; i >= 0 && list[i].who !== 'her'; i--) if (list[i].who === 'me') mine.unshift(list[i]);
@@ -988,7 +1002,7 @@ function filmSync() { // called whenever the place info changes
   const bar = $('movieBar'); bar.hidden = !m0; avatar.movie(!!m0, m0 && m0.tint); clearInterval(film.tick); clearInterval(film.timer); if (!m0) return;
   const show = () => { const m = visitInfo.movie; if (!m) return; const p = Math.max(0, filmPos()), h = Math.floor(p / 60), mi = Math.floor(p % 60), s = Math.floor(p * 60 % 60); $('movieClock').textContent = `${m.title}  ${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}${m.paused ? '  (paused)' : ''}`; $('moviePause').textContent = m.paused ? '\u25B6' : '\u23F8'; };
   show(); film.tick = setInterval(() => { show(); if (cineWanted() !== cine.on) cineSet(cineWanted()); }, 1000);
-  film.timer = setInterval(async () => { const m = visitInfo.movie; if (!m || m.paused || sendBtn.disabled || speaker.busy() || input.value.trim()) return; sendBtn.disabled = true; try { const d = await filmDo({ react: true }); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); } } finally { sendBtn.disabled = false; } }, 45000);
+  film.timer = setInterval(async () => { const m = visitInfo.movie; if (!m || m.paused || sendBtn.disabled || speaker.busy() || input.value.trim()) return; sendBtn.disabled = true; try { const d = await filmDo({ react: true }); if (d.text) { const body = addLine('her', ''); avatar.act(d.text); speaker.say(voicedOf(d.text)); await typeOut(body, d.text); } } finally { sendBtn.disabled = false; } }, 45000);
 }
 $('moviePause').onclick = () => { const m = visitInfo.movie; if (m) filmDo(m.paused ? { resume: true } : { pause: true }); };
 function drawMoments() {
@@ -1008,17 +1022,17 @@ document.addEventListener('click', e => { if (!$('fpChoices').hidden && !$('fpCh
 
 // Her reply is decided first, then typed out: nothing is rearranged after it appears. Speech starts with the typing.
 function typeOut(body, text) {
-  const who = body.dataset.who, segs = split(clean(text), who).map(p => ({ cls: p.a ? 'act' : 'say', t: (p.a ? actLine(who, p.a) : p.s.replace(/["“”]/g, '')).trim() })).filter(x => x.t);
+  const who = body.dataset.who, segs = split(clean(text), who).map(p => ({ c: p.c || '', cls: (p.a ? 'act' : 'say') + (p.c ? ' cast' : ''), t: (p.a ? (p.c ? castAct(p.c, p.a) : actLine(who, p.a)) : p.s.replace(/["“”]/g, '')).trim() })).filter(x => x.t);
   body.textContent = '';
   return new Promise(done => {
     let si = 0, ci = 0, el = null, said = ''; const total = segs.reduce((n, x) => n + x.t.length, 0), per = Math.max(1, Math.round(total / 110)); // about two seconds for a long reply, quicker for a short one
     const tick = () => {
       if (si >= segs.length) { bubble('her', text); log.scrollTop = log.scrollHeight; return done(); }
       const seg = segs[si];
-      if (!el) { el = document.createElement('div'); el.className = seg.cls; body.appendChild(el); }
+      if (!el) { el = document.createElement('div'); el.className = seg.cls; if (seg.c) { el.dataset.c = seg.c; el.style.setProperty('--cast', castHue(seg.c)); } body.appendChild(el); }
       ci = Math.min(seg.t.length, ci + per); el.textContent = seg.t.slice(0, ci);
-      if (seg.cls === 'say') { const b = $('herBubble'); b.textContent = (said + ' ' + el.textContent).trim(); $('herWrap').classList.add('show'); b.scrollTop = b.scrollHeight; clearTimeout(timers.her); }
-      if (ci >= seg.t.length) { if (seg.cls === 'say') said = (said + ' ' + seg.t).trim(); si++; ci = 0; el = null; }
+      if (seg.cls.startsWith('say')) { const b = $('herBubble'); b.textContent = (said + ' ' + el.textContent).trim(); $('herWrap').classList.add('show'); b.scrollTop = b.scrollHeight; clearTimeout(timers.her); }
+      if (ci >= seg.t.length) { if (seg.cls.startsWith('say')) said = (said + ' ' + seg.t).trim(); si++; ci = 0; el = null; }
       log.scrollTop = log.scrollHeight;
       setTimeout(tick, 24);
     };
@@ -1044,7 +1058,7 @@ async function readReply(r, body, beforeType) {
       if (!ev.text) { if (ev.away) { addSys('Wizra left for ' + ev.away.where + '. Back around ' + ev.away.back + '.'); plan = null; setPresence(ev.away, null, false); } return; }
       if (!body) body = addLine('her', '');
       const full = ev.text; avatar.setThinking(false); avatar.feel(full); avatar.act(full);
-      const out = speechOf(full, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
+      const out = voicedOf(full); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
       await Promise.race([speaker.ready || Promise.resolve(), new Promise(ok => setTimeout(ok, 2200))]); // words and voice start together
       const flap = speaker.on ? null : setInterval(() => avatar.talk(), 120); // no voice: her mouth keeps time with the typing
       await typeOut(body, full); clearInterval(flap);
@@ -1067,7 +1081,7 @@ async function followUp(ask) {
   if (sendBtn.disabled || away || phoneCall.on) return; clearTimeout(followTimer); sendBtn.disabled = true; for (const b of log.querySelectorAll('.more')) b.remove();
   let body = null; if (ask) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; avatar.setThinking(true); }
   try { const d = await (await api('/api/followup', { ask: !!ask })).json();
-    if (d.text) { body = body || addLine('her', ''); avatar.setThinking(false); avatar.act(d.text); speaker.say(speechOf(d.text, 'her')); await typeOut(body, d.text); }
+    if (d.text) { body = body || addLine('her', ''); avatar.setThinking(false); avatar.act(d.text); speaker.say(voicedOf(d.text)); await typeOut(body, d.text); }
     else if (body) body.parentElement.remove();
   } catch { if (body && body.parentElement) body.parentElement.remove(); } finally { sendBtn.disabled = false; avatar.setThinking(false); moreArrow(); }
 }
@@ -1345,10 +1359,10 @@ const speaker = (() => {
     return out;
   }
   const sentences = text => { const c = speechChunks(text); return c.length ? c : [text]; };
-  function deviceSay(parts) {
-    if (!v.supported) return;
-    for (const part of parts) { // one sentence per utterance: some browsers cut a long one off
-      const u = new SpeechSynthesisUtterance(part); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate * voiceMod.rate; u.pitch = v.pitch * voiceMod.pitch;
+  function deviceSay(parts, who = []) {
+    if (!v.supported) return; let n = -1;
+    for (const part of parts) { n++; // one sentence per utterance: some browsers cut a long one off
+      const u = new SpeechSynthesisUtterance(part); const vc = pick(); if (vc) u.voice = vc; u.lang = vc ? vc.lang : 'en-US'; u.rate = v.rate * voiceMod.rate; u.pitch = v.pitch * voiceMod.pitch; if (who[n]) { const h = castHue(who[n]); u.pitch = Math.max(0.3, Math.min(2, u.pitch * (0.62 + (h % 7) * 0.13))); u.rate *= 0.9 + (h % 5) * 0.05; }   /* the device has one voice: a character gets its own pitch and pace */
       pending++; u.onstart = begin; u.onend = u.onerror = () => { if (--pending <= 0) { pending = 0; end(); } };
       SS.speak(u);
     }
@@ -1374,16 +1388,18 @@ const speaker = (() => {
   });
   v.say = async text => {
     if (!v.on || !text) return;
-    const parts = sentences(text), my = ++gen;
-    if (v.engine() !== 'pc') { v.ready = Promise.resolve(); return deviceSay(parts); }
+    /* a story: \u27e6Name\u27e7 marks whose words follow, \u27e6\u27e7 hands back to her own voice */
+    const lines = [], who = []; { let cast = ''; for (const bit of String(text).split(/(\u27e6[^\u27e7]*\u27e7)/)) { const m = /^\u27e6([^\u27e7]*)\u27e7$/.exec(bit); if (m) { cast = m[1]; continue; } if (!bit.trim()) continue; for (const line of sentences(bit.trim())) { lines.push(line); who.push(cast); } } }
+    const parts = lines, my = ++gen; if (!parts.length) return;
+    if (v.engine() !== 'pc') { v.ready = Promise.resolve(); return deviceSay(parts, who); }
     v.waiting = true;                                           // her PC voice is being made: she is about to speak
     let go; v.ready = new Promise(ok => { go = ok; }); setTimeout(() => go(), 6000);
     v.onFirst = go;
     // ask for every line at once (the PC makes them in order), play them back to back
-    const clips = parts.map(line => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
+    const clips = parts.map((line, i) => fetch('/api/tts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(who[i] ? { text: line, cast: who[i] } : { text: line }) }).then(r => r.ok ? r.blob() : null).catch(() => null));
     for (let i = 0; i < clips.length; i++) {
       const blob = await clips[i]; if (gen !== my) return;
-      if (!blob) { v.waiting = false; if (v.onFirst) v.onFirst(); deviceSay(parts.slice(i)); return; } // the PC voice dropped out: finish on the device voice
+      if (!blob) { v.waiting = false; if (v.onFirst) v.onFirst(); deviceSay(parts.slice(i), who.slice(i)); return; } // the PC voice dropped out: finish on the device voice
       v.waiting = false; await playBlob(blob); if (gen !== my) return;
     }
     v.waiting = false; end();
@@ -1432,7 +1448,7 @@ async function startCall(e) {
 }
 async function herLine(text, hangup) { // she says it out loud; nothing is written
   avatar.feel(text); avatar.act(text);
-  const out = speechOf(text, 'her'); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
+  const out = voicedOf(text); speaker.say(settings.bleep ? out.replace(CUSS, 'bleep') : out);
   await speechDone();
   if (hangup && phoneCall.on) endCall('she', 1700);
 }

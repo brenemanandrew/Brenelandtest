@@ -127,12 +127,14 @@ function ttsJob(text, voice, speed) {
 // it is complete in the model's stream, the rest the moment the reply is final; the page's requests then find them ready
 // (or already on the way). Keys ignore punctuation and case, so small differences in how the page cuts the text do not matter.
 const ttsCache = new Map(); const ttsKey = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-function voiced(line) {
-  const voice = db.settings.ttsVoice || 'af_heart', words = ttsKey(line); if (!words) return Promise.reject(new Error('empty'));
+// A character in a story she is telling gets a voice of their own: always the same one for the same name, never her own, and a touch faster or slower.
+function castVoice(name) { const mine = db.settings.ttsVoice || 'af_heart', pool = (brain.voices || []).filter(v => v.id !== mine); let h = 0; for (const ch of String(name).toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0; if (!pool.length) return { voice: mine, speed: 0.9 + (h % 5) * 0.05 }; return { voice: pool[h % pool.length].id, speed: 0.92 + ((h >>> 5) % 5) * 0.04 }; }
+function voiced(line, cast) {
+  const cv = cast ? castVoice(cast) : null, voice = cv ? cv.voice : db.settings.ttsVoice || 'af_heart', words = ttsKey(line); if (!words) return Promise.reject(new Error('empty'));
   const key = voice + '|' + words;                       // the same words in another voice are a different recording
   const hit = ttsCache.get(key); if (hit && Date.now() - hit.at < 90000) return hit.p;
   const t0 = Date.now();
-  const p = ttsJob(line, voice, 1).then(w => { const ms = Date.now() - t0; brain.ttsMs = brain.ttsMs ? Math.round(brain.ttsMs * 0.7 + ms * 0.3) : ms; return w; });
+  const p = ttsJob(line, voice, cv ? cv.speed : 1).then(w => { const ms = Date.now() - t0; brain.ttsMs = brain.ttsMs ? Math.round(brain.ttsMs * 0.7 + ms * 0.3) : ms; return w; });
   p.catch(() => ttsCache.delete(key));
   ttsCache.set(key, { p, at: Date.now() }); if (ttsCache.size > 24) ttsCache.delete(ttsCache.keys().next().value);
   return p;
@@ -1011,11 +1013,11 @@ async function handle(req, res) {
       }
 
       if (url.pathname === '/api/tts' && req.method === 'POST') {
-        const { text } = await readBody(req);
+        const { text, cast } = await readBody(req);
         const line = String(text || '').trim().slice(0, 800);
         if (!line) return json(res, 400, { error: 'empty' });
         try {
-          const wav = Buffer.from(await voiced(line), 'base64');
+          const wav = Buffer.from(await voiced(line, typeof cast === 'string' && cast.trim() ? cast.trim().slice(0, 30) : ''), 'base64');
           res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': wav.length, 'cache-control': 'no-store' });
           return res.end(wav);
         } catch (e) { return json(res, 503, { error: e.message }); }

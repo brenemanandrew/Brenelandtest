@@ -290,7 +290,7 @@
       feel(text) { text = String(text).slice(-140); for (const [re, face] of FEEL) if (re.test(text)) { show(face, 5000); return face; } return null; },
       react,
       // her finished reply: any action in it that is a gesture she can do gets done (the first one found)
-      act(text) {
+      act(text) { text = String(text).split('\n').filter(l => !/^\s*[A-Z][A-Za-z'\- ]{1,22}?\s*:\s*["\u201c*]/.test(l) || /^\s*(wizra|she)\s*:/i.test(l)).join('\n');   /* a story character's line is theirs, not hers */
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) { const hit = ROUTINE.find(([re]) => re.test(m[1])); if (hit && R.doActivity) { R.doActivity(hit[1]); break; } }
         const found = [];
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) for (const [re, name, dur] of GEST) if (re.test(m[1])) { found.push([name, dur]); break; }
