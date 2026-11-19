@@ -1,0 +1,28 @@
+# Grows the Brenai data volume on Fly (it holds her models, clips and saves). Run by hand from the Actions tab.
+# A volume can be grown but never shrunk. Needs the repo secret FLY_API_TOKEN, like the deploy.
+name: Brenai Volume
+on:
+  workflow_dispatch:
+    inputs:
+      size:
+        description: New size in GB
+        required: true
+        default: "3"
+jobs:
+  extend:
+    runs-on: ubuntu-latest
+    concurrency: brenai-deploy
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Extend the volume
+        run: |
+          flyctl volumes list --app brenai
+          id=$(flyctl volumes list --app brenai --json | python3 -c "import sys,json; v=[x for x in json.load(sys.stdin) if x.get('name')=='brenai_data']; print(v[0]['id'])")
+          echo "volume $id"
+          flyctl volumes extend "$id" --size "${{ inputs.size }}" --app brenai --yes || flyctl volumes extend "$id" --size "${{ inputs.size }}" --app brenai
+          flyctl volumes list --app brenai
+      - name: Restart so the bigger disk is seen
+        run: |
+          for m in $(flyctl machines list --app brenai --json | python3 -c "import sys,json; print(' '.join(x['id'] for x in json.load(sys.stdin)))"); do flyctl machine restart "$m" --app brenai || true; done
