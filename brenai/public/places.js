@@ -7,7 +7,7 @@
 //   places.bounds[name]          the walls, for first person   places.blocks[name]   boxes you cannot walk into
 //   places.spawn[name]           where you stand when you arrive, and places.seat[name] where you can sit
 //   places.tick(night, t)        outside light and the TV
-import { buildItem, footprint, perchOf } from './mapkit.js';
+import { buildItem, footprints, perchOf } from './mapkit.js';
 // cel shading: light falls in three flat bands instead of a smooth ramp, and big shapes get a dark outline
 export function cel(THREE) {
   const ramp = new THREE.DataTexture(new Uint8Array([118, 118, 118, 255, 188, 188, 188, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
@@ -184,7 +184,7 @@ export function buildPlaces(THREE, A) {
   const alive = {}, bare = {}, dark = {}, perches = {};   // perches: the placed things she can go and sit or lie on   // alive: what moves in each room (flames, lights); bare: rooms without her dorm furniture
   function addItems(group, name, items) {
     const g = new THREE.Group(); g.position.y = floorY; const flames = [];
-    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (FLAME[it.kind]) b.traverse(o => { if (o.isPointLight) flames.push([FLAME[it.kind], o]); }); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); if (ELECTRIC.has(it.kind)) { (electric[name] = electric[name] || []).push(b); if (b.userData.tick) { const run = alive[name].pop(); alive[name].push((t, n) => { if (powerOn) run(t, n); }); } } const pc = perchOf(it); if (pc && Math.hypot(it.x, it.z - hip.z) > 0.5) (perches[name] = perches[name] || []).push(pc); if (it.solid) { const f = footprint(it); solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
+    for (const it of items || []) { try { const b = buildItem(THREE, toon, outline, it); g.add(b); if (FLAME[it.kind]) b.traverse(o => { if (o.isPointLight) flames.push([FLAME[it.kind], o]); }); if (b.userData.tick) (alive[name] = alive[name] || []).push(b.userData.tick); if (ELECTRIC.has(it.kind)) { (electric[name] = electric[name] || []).push(b); if (b.userData.tick) { const run = alive[name].pop(); alive[name].push((t, n) => { if (powerOn) run(t, n); }); } } const pc = perchOf(it); if (pc && Math.hypot(it.x, it.z - hip.z) > 0.5) (perches[name] = perches[name] || []).push(pc); if (it.solid) for (const f of footprints(it)) { solid[name].push(f); blocks[name].push(f); } } catch (e) { console.warn('map item', e); } }
     // the strongest flame in the room throws real shadows of its own (one per room: each costs six small shadow pictures)
     const top = flames.sort((p, q) => q[0] - p[0])[0]; if (top && !flameOf[name]) { const l = top[1]; l.castShadow = true; l.shadow.mapSize.set(512, 512); l.shadow.bias = -0.006; l.shadow.normalBias = 0.03; l.shadow.radius = 3; l.shadow.camera.near = 0.08; l.shadow.camera.far = Math.max(4, l.distance || 8); flameOf[name] = l; const at = l.position.clone(); (alive[name] = alive[name] || []).push(t => { l.position.set(at.x + 0.035 * Math.sin(t / 130) * Math.sin(t / 410), at.y + 0.02 * Math.sin(t / 170), at.z + 0.03 * Math.cos(t / 150) * Math.sin(t / 370)); }); }   // the flame shifts, so the shadows breathe
     group.add(g);

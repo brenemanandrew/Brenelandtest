@@ -225,3 +225,9 @@ When she is out or asleep the page stops listening (`voice.pause()` in `setPrese
 
 ## Motion capture: face, and the new layout
 The mocap page also reads your face (MediaPipe Face Landmarker, every other frame): `faceOf()` turns its blendshapes into her VRM expressions (happy, angry, sad, surprised, the mouth shapes, each eye's blink) and the face's own rotation drives her head and neck. A take keeps the expression per frame as `clip.face`, and in the game a clip that has one shows it while it plays (`clipFace` in `avatar-vrm.js`). The page's main controls are five round buttons under her (Camera, Mirror, Face, Top half, Record); the take, posing by hand and the clip list are fold-out cards. Test hook: `window.mocapFace(blendshapes, matrix)`.
+
+## Moving about, and keeping it smooth
+- Your own walking uses the real clock (in small sub-steps), so a low frame rate no longer slows you to a crawl: the frame time step was capped at a twentieth of a second, which below twenty frames a second made everything, walking included, run slow.
+- Where you walk in is checked: if things placed in the room box the usual spot in, you start from the most open floor nearby. A long thing set at an angle blocks a row of small squares along it (`footprints` in `mapkit.js`), not one big square.
+- `quality()` in `avatar-vrm.js` watches the frame time; if most frames in four seconds are slow it gives up, in turn: the flame's shadows, half the shadow picture, shadows altogether, then high pixel density.
+- The mocap page's round buttons sit over her picture; a drag only turns the view when it starts on the picture itself (the view was swallowing the buttons' clicks).

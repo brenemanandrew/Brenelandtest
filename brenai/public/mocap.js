@@ -85,7 +85,7 @@ export async function start() {
   let vrm; try { vrm = (await loader.loadAsync('/api/avatar?v=' + ((me.settings || {}).avatarV || 1))).userData.vrm; } catch { say('Her 3D model could not be loaded. Upload one in the game first.'); return; }
   VRMUtils.rotateVRM0(vrm); scene.add(vrm.scene); const B = n => vrm.humanoid.getNormalizedBoneNode(n), hipsNode = B('hips'), hipY0 = hipsNode.position.y;
   const orbit = { yaw: 0.35, pitch: 0.08, dist: 4.2 }; let drag = null;
-  view.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, ...orbit }; view.setPointerCapture(e.pointerId); }); view.addEventListener('pointermove', e => { if (drag) { orbit.yaw = drag.yaw - (e.clientX - drag.x) * 0.008; orbit.pitch = Math.max(-0.4, Math.min(1.2, drag.pitch + (e.clientY - drag.y) * 0.006)); } });
+  view.addEventListener('pointerdown', e => { if (e.target !== renderer.domElement) return; drag = { x: e.clientX, y: e.clientY, ...orbit }; view.setPointerCapture(e.pointerId); });   // (only a drag on her picture turns the view: the buttons laid over it must get their own clicks) view.addEventListener('pointermove', e => { if (drag) { orbit.yaw = drag.yaw - (e.clientX - drag.x) * 0.008; orbit.pitch = Math.max(-0.4, Math.min(1.2, drag.pitch + (e.clientY - drag.y) * 0.006)); } });
   view.addEventListener('pointerup', () => { drag = null; }); view.addEventListener('wheel', e => { orbit.dist = Math.max(1.6, Math.min(8, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); e.preventDefault(); }, { passive: false });
   const size = () => { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); }; addEventListener('resize', size); size();
 

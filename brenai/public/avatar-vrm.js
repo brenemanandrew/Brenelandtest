@@ -363,7 +363,7 @@ export async function create(url, opts = {}) {
   // ---- her routine: what she is busy with when left alone, and the errands she can run ----
   // Seated she reads, checks her phone or sips. On her feet she follows a plan: a list of steps (go somewhere, turn, wait
   // with her hand out, do something), then walks back and sits down, optionally starting something once seated.
-  const standZ = Math.max(hip.z + 0.38, (hip.z + 0.3 + tableZ - 0.18) / 2), STAND_AT = [0, standZ]; window.WIZRA_DBG = { feet: feet.z - hip.z, stand: standZ - hip.z, table: tableZ - hip.z, live: { POSE, OVER, ARMS, get ATTACH() { return ATTACH; }, get rt() { return rt; } } };   // (live: for tuning poses from the console)                                               // she stands up in front of the chair, between it and the table
+  const standZ = Math.max(hip.z + 0.38, (hip.z + 0.3 + tableZ - 0.18) / 2), STAND_AT = [0, standZ]; window.WIZRA_DBG = { feet: feet.z - hip.z, stand: standZ - hip.z, table: tableZ - hip.z, live: { POSE, OVER, ARMS, get ATTACH() { return ATTACH; }, get rt() { return rt; }, get fp() { return fp; }, free: (x, z) => free(x, z) } };   // (live: for tuning poses from the console)                                               // she stands up in front of the chair, between it and the table
   const EXIT = [0.95, standZ];                                                // then steps out to the side past the armrest
   const R_BACK = [0.95, hip.z - 0.72], L_BACK = [-0.78, hip.z - 0.72];             // round the back of the chair
   const AT_SHELF = [SHELF.x + 0.12, SHELF.z + 0.5], AT_COUNTER = [COUNTER.x - 0.05, COUNTER.z + 0.52];
@@ -605,6 +605,16 @@ export async function create(url, opts = {}) {
     vrm.scene.rotation.y = (rt.yaw + turn * lie) * k + sideways;
     rt.zoom = 0.3 * k;
   }
+  // ---- keeping it smooth: if the picture runs slow for a few seconds, give up the costly extras one at a time (the flame's own
+  // shadows, then a smaller shadow picture, then shadows altogether, then a lower resolution). It does not climb back by itself.
+  const q = { last: 0, slow: 0, n: 0, level: 0, at: 0 };
+  function quality(now) { const ms = now - (q.last || now); q.last = now; if (ms <= 0 || ms > 1000 || document.hidden) return; q.n++; if (ms > 45) q.slow++;
+    if (now - q.at < 4000) return; const bad = q.n > 20 && q.slow / q.n > 0.6; q.at = now; q.n = q.slow = 0; if (!bad || q.level >= 4) return; q.level++;
+    if (q.level === 1) { for (const k in places.groups) places.groups[k].traverse(o => { if (o.isPointLight && o.castShadow) { o.castShadow = false; if (o.shadow && o.shadow.map) { o.shadow.map.dispose(); o.shadow.map = null; } } }); }
+    else if (q.level === 2) { sun.shadow.mapSize.set(512, 512); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+    else if (q.level === 3) { renderer.shadowMap.enabled = false; scene.traverse(o => { if (o.material) o.material.needsUpdate = true; }); }
+    else renderer.setPixelRatio(1);
+    window.dispatchEvent(new CustomEvent('wizra-quality', { detail: q.level })); }
   // ---- a storm is dark, and now and then it takes the power: every lamp and screen dies and only lightning, candles and fires are left
   const storm = { until: 0, next: 0, was: 0, flashing: false };
   const regloom = () => { gloom = !places.power ? 0.93 : ({ stormy: 0.7, rainy: 0.3, cloudy: 0.14, foggy: 0.12, snowy: 0.05 }[places.sky] || 0); daylight(); };
@@ -763,7 +773,11 @@ export async function create(url, opts = {}) {
     if (inCall) return;
     if (!name) { const was = here; fp.on = false; fp.keys.clear(); places.tv.on = false; setPlace('dorm'); if (was !== 'dorm') seatHer(); camera.fov = 26; camera.updateProjectionMatrix(); return; }
     if (name !== here) { const sameSeat = name !== 'house' && here !== 'house'; setPlace(name); if (!sameSeat) seatHer(); }
-    const [x, z] = places.spawn[here];
+    let [x, z] = places.spawn[here];
+    // where you walk in: the usual spot if there is room round it, else the most open floor nearby (things placed in a room can box the door in)
+    const open = (px, pz) => { if (!free(px, pz)) return -1; let n = 0; for (let i = 0; i < 16; i++) { const rr = i < 8 ? 0.6 : 1.2, a = i * Math.PI / 4 + (i < 8 ? 0 : 0.39); if (free(px + Math.cos(a) * rr, pz + Math.sin(a) * rr)) n++; } return n; };
+    if (open(x, z) < 15) { const b = places.bounds[here], sx = x, sz = z; let best = open(x, z) - 0.001;
+      for (let gx = b.x0 + 0.4; gx <= b.x1 - 0.4; gx += 0.35) for (let gz = b.z0 + 0.4; gz <= b.z1 - 0.4; gz += 0.35) { const sc = open(gx, gz); if (sc < 0) continue; const v = sc - 0.9 * Math.hypot(gx - sx, gz - sz) - (Math.hypot(gx - rt.x, gz - rt.z) < 1 ? 6 : 0); if (v > best) { best = v; x = gx; z = gz; } } }
     Object.assign(fp, { on: true, x, z, cx: x, cz: z, ch: places.eyeH, goal: null, sit: null, pitch: -0.06, yaw: Math.atan2(-x, hip.z + 0.3 - z) });
     camera.fov = 62; camera.updateProjectionMatrix();
   }
@@ -779,6 +793,7 @@ export async function create(url, opts = {}) {
   const keyUp = e => fp.keys.delete(String(e.key).toLowerCase()), keysOff = () => fp.keys.clear();
   window.addEventListener('keydown', keyDown); window.addEventListener('keyup', keyUp); window.addEventListener('blur', keysOff);
   function walkYou(dt) {
+    { const nowT = performance.now(); dt = Math.min(0.3, (nowT - (fp.t || nowT)) / 1000) || dt; fp.t = nowT; }   // your own walking goes by the real clock: on a slow frame rate you take bigger steps, not slower ones
     if (window.WIZRA_YOU) { fp.x = hip.x + window.WIZRA_YOU[0]; fp.z = hip.z + window.WIZRA_YOU[1]; } // test hook: stand you somewhere, measured from her seat
     if (fp.locked) { fp.keys.clear(); fp.goal = null; }                            // the heart game holds you still
     const K = fp.keys, f = (K.has('w') || K.has('arrowup') ? 1 : 0) - (K.has('s') || K.has('arrowdown') ? 1 : 0), sd = (K.has('d') ? 1 : 0) - (K.has('a') ? 1 : 0);
@@ -788,8 +803,8 @@ export async function create(url, opts = {}) {
     else if (fp.goal) { const dx = fp.goal[0] - fp.x, dz = fp.goal[1] - fp.z, d = Math.hypot(dx, dz); if (d < 0.08) fp.goal = null; else { mx = dx / d; mz = dz / d; } }
     const len = Math.hypot(mx, mz);
     if (len > 0.01) {
-      const st = 1.45 * dt / len, nx = fp.x + mx * st, nz = fp.z + mz * st;
-      if (free(nx, nz)) { fp.x = nx; fp.z = nz; } else if (free(nx, fp.z) && Math.abs(mx) > 0.2 * len) fp.x = nx; else if (free(fp.x, nz) && Math.abs(mz) > 0.2 * len) fp.z = nz; else fp.goal = null;
+      for (let n = Math.ceil(dt / 0.04), i = 0; i < n; i++) { const st = 1.45 * dt / n / len, nx = fp.x + mx * st, nz = fp.z + mz * st;   // in small steps, so a big one cannot jump through a wall
+        if (free(nx, nz)) { fp.x = nx; fp.z = nz; } else if (free(nx, fp.z) && Math.abs(mx) > 0.2 * len) fp.x = nx; else if (free(fp.x, nz) && Math.abs(mz) > 0.2 * len) fp.z = nz; else { fp.goal = null; break; } }
       const was = Math.floor(fp.bob / Math.PI); fp.bob += dt * 9; if (Math.floor(fp.bob / Math.PI) !== was) snd('step');
     }
     const k = Math.min(1, dt * (fp.sit ? 4 : 10)); fp.cx += (fp.x - fp.cx) * k; fp.cz += (fp.z - fp.cz) * k;
@@ -1018,7 +1033,7 @@ export async function create(url, opts = {}) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
-      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now());
+      placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now()); quality(performance.now());
       if (cinema && places.power) { const f = 0.5 + 0.5 * Math.sin(s.t / 140) * Math.sin(s.t / 370); screenLight.color.set(cinema); screenLight.intensity = 1.2 + 1.3 * f; if (here === 'house') screenLight.position.copy(places.tv.at).add(tmpB.set(0, 0, 0.35)); else screenLight.position.set(0.2, floorY + 1.25, hip.z + 2.4); } else screenLight.intensity = 0;
       // flushed cheeks, only from the front
       rawHead.getWorldDirection(fwd); toCam.copy(camera.position).sub(headPos).normalize();

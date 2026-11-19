@@ -70,3 +70,12 @@ export function footprint(item) {
   const def = CATALOG[item.kind] || CATALOG.box, w = def.size[0] * (item.sx || 1) / 2, d = def.size[2] * (item.sz || 1) / 2, c = Math.abs(Math.cos(item.rot || 0)), s = Math.abs(Math.sin(item.rot || 0)), ex = w * c + d * s, ez = w * s + d * c;
   return [item.x - ex, item.x + ex, item.z - ez, item.z + ez];
 }
+// the same, but true to a thing that is turned: a long thing at an angle is covered by a row of small squares along it,
+// not by one big square round the whole of it (which walled off far more floor than the thing takes up)
+export function footprints(item) {
+  const def = CATALOG[item.kind] || CATALOG.box, w = def.size[0] * (item.sx || 1), d = def.size[2] * (item.sz || 1), r = item.rot || 0, c = Math.cos(r), s = Math.sin(r);
+  if (Math.abs(s) < 0.2 || Math.abs(c) < 0.2 || Math.max(w, d) / Math.min(w, d) < 1.35) { if (Math.abs(s) >= 0.2 && Math.abs(c) >= 0.2) { const h = (w + d) / 4 * 1.1; return [[item.x - h, item.x + h, item.z - h, item.z + h]]; } return [footprint(item)]; }
+  const long = Math.max(w, d), short = Math.min(w, d), n = Math.max(2, Math.ceil(long / short)), ax = w >= d ? [c, -s] : [s, c], h = short / 2 * 1.05, out = [];
+  for (let i = 0; i < n; i++) { const t = (i + 0.5) / n - 0.5, x = item.x + ax[0] * t * long, z = item.z + ax[1] * t * long; out.push([x - h, x + h, z - h, z + h]); }
+  return out;
+}

@@ -32,8 +32,8 @@
   body.solo #fpMoments { display:none !important; }
   /* the buttons live together in one dock at the top right: white line drawings on dark rounds, easy to find and to hit */
   #dock { position:fixed; right:10px; top:calc(8px + env(safe-area-inset-top)); z-index:12; display:flex; gap:6px; padding:5px; border-radius:999px; background:rgba(24,14,48,.62); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); box-shadow:0 4px 16px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.14); }
-  #dock button { position:static !important; width:40px !important; height:40px !important; border-radius:50% !important; background:rgba(255,255,255,.1) !important; color:#fff !important; opacity:1 !important; filter:none !important; padding:8px !important; font-size:0 !important; display:grid; place-items:center; transition:background .15s, transform .12s; }
-  #dock button:hover { background:rgba(255,255,255,.24) !important; } #dock button:active { transform:scale(.9); } #dock button svg { width:24px; height:24px; display:block; } #dock #senseBtn { padding:6px !important; } #dock #senseBtn svg { width:28px; height:28px; }
+  #dock button { position:static !important; width:42px !important; height:42px !important; border-radius:50% !important; background:rgba(255,255,255,.12) !important; color:#fff !important; opacity:1 !important; filter:none !important; padding:0 !important; font-size:25px !important; line-height:1 !important; display:grid; place-items:center; transition:background .15s, transform .12s; }
+  #dock button:hover { background:rgba(255,255,255,.24) !important; } #dock button:active { transform:scale(.9); } #dock button svg { width:24px; height:24px; display:block; } 
   #dock button[hidden] { display:none !important; } body.calling #dock, body.intro #dock { display:none; } body.fp #dock { top:calc(8px + env(safe-area-inset-top)); }
   /* behind everything: the player's own room, out of focus */
   body.hasroom { background:none !important; }
@@ -1113,19 +1113,15 @@ async function camSet(on) {
 $('camBtn').onclick = e => { e.stopPropagation(); if (!$('camBtn').classList.contains('wait')) camSet(!WizraCam.on); };
 $('meCam').onclick = () => camSet(false);
 // the dock: the buttons that used to sit on the corners of the two pictures, gathered in one place and drawn the same way
-{ const dock = el('div', { id: 'dock' }), ICO = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-  const set = (id, d, title) => { const b = $(id); b.innerHTML = ICO(d); b.title = title; dock.append(b); };
-  set('visitBtn', '<path d="M3.500 11.500L12 4l8.500 7.500"/><path d="M5.500 10v9.500h13V10"/><path d="M10 19.500v-5.500h4v5.500"/>', 'Go out, or invite her');
-  set('actBtn', '<path d="M12 20.500s-7.500-4.600-7.500-10.200A4.300 4.300 0 0 1 12 7.600a4.300 4.300 0 0 1 7.500 2.700c0 5.600-7.500 10.200-7.500 10.200z"/>', 'One-on-one time with her');
-  dock.append($('senseBtn'));
-  set('bigBtn', '<path d="M4 9.500V4h5.500M20 14.500V20h-5.500M4 4l6.500 6.500M20 20l-6.500-6.500"/>', 'Make her picture bigger or smaller');
-  set('brainBtn', '<path d="M4 7h9M17.500 7H20M4 12h3M11.500 12H20M4 17h11M19.500 17H20"/><circle cx="15.200" cy="7" r="2.100"/><circle cx="9.200" cy="12" r="2.100"/><circle cx="17.200" cy="17" r="2.100"/>', 'Settings');
+{ const dock = el('div', { id: 'dock' }), set = (id, icon, title) => { const b = $(id); b.textContent = icon; b.title = title; dock.append(b); };
+  set('visitBtn', '\ud83c\udfe0', 'Go out, or invite her'); set('actBtn', '\u270b', 'One-on-one time with her'); dock.append($('senseBtn')); set('bigBtn', '\ud83d\udd0d', 'Make her picture bigger or smaller'); set('brainBtn', '\ud83e\udde0', 'Settings');
   document.body.append(dock); }
 // one button for what she can hear and see of you: the face on it says which. Tap to step through the four.
 const SENSE_FACE = (eyes, mouth, hood) => `<svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${hood ? '<path d="M4 29V15a12 12 0 0 1 24 0v14"/><path d="M9.500 28v-12a6.500 6.500 0 0 1 13 0v12" fill="rgba(255,255,255,.18)"/>' : '<circle cx="16" cy="16" r="12"/>' + (eyes ? '<circle cx="11.500" cy="13.500" r="1.300" fill="#fff"/><circle cx="20.500" cy="13.500" r="1.300" fill="#fff"/>' : '<path d="M4.500 11.500h23v4.500h-23z" fill="#fff"/><path d="M27.500 12l2.500-2M27.500 15.500l2.500 1.500"/>') + (mouth ? '<path d="M11 20.500a6 6 0 0 0 10 0z" fill="rgba(255,255,255,.25)"/>' : '<path d="M6 19.500h20v4.500h-20z" fill="#fff"/><circle cx="16" cy="21.800" r="1.600" fill="none" stroke="#3a2a5c" stroke-width="1.400"/>')}</svg>`;
 const SENSES = [['She can hear and see you', true, true], ['Camera off: she can hear you', false, true], ['Mic off: she can see you', true, false], ['Mic and camera off', false, false]];
 const senseNow = () => (WizraCam.on ? 0 : 1) + (voice.on ? 0 : 2) === 3 ? 3 : !WizraCam.on && voice.on ? 1 : WizraCam.on && !voice.on ? 2 : 0;
-function drawSense() { const i = senseNow(), [t, eyes, mouth] = SENSES[i]; if (drawSense.i === i) return; drawSense.i = i; $('senseBtn').innerHTML = SENSE_FACE(eyes, mouth, i === 3); $('senseBtn').title = t + ' (tap to change)'; }
+const SENSE_ICON = ['\ud83d\ude00', '\ud83d\ude48', '\ud83e\udd10', '\ud83e\udd77'];   // hears and sees you / eyes covered (camera off) / mouth zipped (mic off) / hooded (both off)
+function drawSense() { const i = senseNow(), [t] = SENSES[i]; if (drawSense.i === i) return; drawSense.i = i; $('senseBtn').textContent = SENSE_ICON[i]; $('senseBtn').title = t + ' (tap to change)'; }
 $('senseBtn').onclick = async e => { e.stopPropagation(); const n = (senseNow() + 1) % 4, [, cam, mic] = SENSES[n]; if (voice.on !== mic) voice.set({ on: mic }); if (WizraCam.on !== cam) await camSet(cam); drawSense(); };
 setInterval(drawSense, 700); setTimeout(drawSense, 50);
 // the page's backdrop is the player's own living room, out of focus: a picture of it is taken once her model (and the rooms) are up
