@@ -27,7 +27,8 @@ export function solve(lm, o = {}) {
   const P = lm.map(p => V(o.mirror ? -p.x : p.x, -p.y, -p.z)), vis = i => (lm[i].visibility === undefined ? 1 : lm[i].visibility), mid = (a, b) => P[a].clone().add(P[b]).multiplyScalar(0.5);
   const L = o.mirror ? { 11: 12, 12: 11, 13: 14, 14: 13, 15: 16, 16: 15, 19: 20, 20: 19, 23: 24, 24: 23, 25: 26, 26: 25, 27: 28, 28: 27, 7: 8, 8: 7 } : null, ix = i => (L && L[i] !== undefined ? L[i] : i);
   const pt = i => P[ix(i)], hipC = pt(23).clone().add(pt(24)).multiplyScalar(0.5), shC = pt(11).clone().add(pt(12)).multiplyScalar(0.5), up = shC.clone().sub(hipC);
-  const SEEN = 0.62, hipsSeen = Math.min(vis(23), vis(24)) > SEEN, shSeen = Math.min(vis(11), vis(12)) > SEEN, legs = hipsSeen && Math.min(vis(25), vis(26), vis(27), vis(28)) > SEEN && !o.upper, world = {}, q = {};
+  /* o.seen: how sure the tracker must be of a point (a file is read with a lower bar than the live camera, where a twitching guess shows). Her lower body follows once the hips and at least one knee are seen; each leg bone is then judged on its own. */
+  const SEEN = o.seen || 0.62, LOW = o.seen || 0.5, hipsSeen = Math.min(vis(23), vis(24)) > LOW, shSeen = Math.min(vis(11), vis(12)) > SEEN, legs = hipsSeen && Math.max(vis(25), vis(26)) > LOW && !o.upper, feet = legs && Math.min(vis(27), vis(28)) > LOW, world = {}, q = {};
   if (!hipsSeen) up.set(0, 1, 0);   // hips out of the picture (sitting at a desk): the tracker only guesses where they are, so her body stays upright and just turns with your shoulders
   world.hips = legs ? basis(pt(23).clone().sub(pt(24)), up) : basis(V(pt(23).x - pt(24).x, 0, pt(23).z - pt(24).z).lengthSq() > 1e-6 && !o.upper ? pt(23).clone().sub(pt(24)) : V(1, 0, 0), legs ? up : V(0, 1, 0));
   if (!legs) world.hips = Q();                                                    // sitting at a desk: her hips stay put and only the top half follows
@@ -40,11 +41,11 @@ export function solve(lm, o = {}) {
   if (Math.min(vis(0), vis(7), vis(8)) > SEEN) { q.neck = Q().slerp(neck, 0.4); q.head = q.neck.clone().invert().multiply(neck); } else { q.neck = null; q.head = null; } world.head = headW;
   for (const [bone, parent, a, b, rest] of LIMBS) {
     const isLeg = /Leg/.test(bone); if (isLeg && !legs) { q[bone] = Q(); world[bone] = (world[parent] || Q()).clone(); continue; }
-    const dir = pt(b).clone().sub(pt(a)); if (dir.lengthSq() < 1e-8 || Math.min(vis(ix(a)), vis(ix(b))) < SEEN || (!isLeg && !shSeen)) { q[bone] = null; world[bone] = (world[parent] || Q()).clone(); continue; }   // a limb the camera cannot see is left alone
+    const dir = pt(b).clone().sub(pt(a)); if (dir.lengthSq() < 1e-8 || Math.min(vis(ix(a)), vis(ix(b))) < (isLeg ? LOW : SEEN) || (!isLeg && !shSeen)) { q[bone] = null; world[bone] = (world[parent] || Q()).clone(); continue; }   // a limb the camera cannot see is left alone
     const local = dir.normalize().applyQuaternion(world[parent].clone().invert()); q[bone] = Q().setFromUnitVectors(rest, local); world[bone] = world[parent].clone().multiply(q[bone]);
   }
   const ank = (pt(27).y + pt(28).y) / 2, hipH = hipC.y - ank;                      // hip height off the ankles, for crouching and jumping
-  return { q, legs, hipH: legs ? hipH : 0 };
+  return { q, legs, hipH: feet ? hipH : 0 };
 }
 
 // ---- a hand's 21 points -> how far each finger joint is bent (radians): { Thumb: [a, b, c], Index: [...], ... } ----
@@ -116,9 +117,9 @@ export async function start() {
   let lmPrev = null; const calm = lm => { if (!lmPrev || lmPrev.length !== lm.length) { lmPrev = lm.map(p => ({ ...p })); return lmPrev; } for (let i = 0; i < lm.length; i++) { const a = lmPrev[i], b = lm[i], d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), k = Math.max(0.15, Math.min(0.8, d / 0.06)); a.x += (b.x - a.x) * k; a.y += (b.y - a.y) * k; a.z += (b.z - a.z) * k; a.visibility = b.visibility; } return lmPrev; };
   const FRAMES = { all: [0.9, 4.2], waist: [1.12, 2.9], chest: [1.32, 1.9], face: [1.45, 1.15] }; let frameAs = 'all', frameHold = 0, frameMine = 0;   /* frameMine: until when your own drag or zoom is left alone */
   /* the view closes in on the part of her your camera can see: whole body, waist up, chest up or just the face */
-  const seenPart = lm => { const v = i => (lm[i] && lm[i].visibility !== undefined ? lm[i].visibility : 1), sh = Math.min(v(11), v(12)) > 0.62, hp = Math.min(v(23), v(24)) > 0.62, lg = hp && Math.min(v(25), v(26), v(27), v(28)) > 0.62; return lg && !opt.upper ? 'all' : hp ? 'waist' : sh ? 'chest' : 'face'; };
+  const seenPart = lm => { const v = i => (lm[i] && lm[i].visibility !== undefined ? lm[i].visibility : 1), low = opt.seen || 0.5, sh = Math.min(v(11), v(12)) > (opt.seen || 0.62), hp = Math.min(v(23), v(24)) > low, lg = hp && Math.max(v(25), v(26)) > low; return lg && !opt.upper ? 'all' : hp ? 'waist' : sh ? 'chest' : 'face'; };
   window.mocapFeed = lm0 => { const part = seenPart(lm0); if (part !== frameAs) { if (++frameHold > 12) { frameAs = part; frameHold = 0; frameMine = 0; } } else frameHold = 0;
-    const lm = opt.snap ? lm0 : calm(lm0), s = solve(lm, opt), faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.legs) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n]; if (t) { const ang = pose.q[n].angleTo(t); pose.q[n].slerp(t, opt.snap ? 1 : Math.max(0.08, Math.min(0.55, ang / 0.5))); } } /* a small wobble is damped hard, a real move follows fast */ pose.hip = s.legs && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
+    const lm = opt.snap ? lm0 : calm(lm0), s = solve(lm, opt), faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.hipH) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n]; if (t) { const ang = pose.q[n].angleTo(t); pose.q[n].slerp(t, opt.snap ? 1 : Math.max(0.08, Math.min(0.55, ang / 0.5))); } } /* a small wobble is damped hard, a real move follows fast */ pose.hip = s.hipH && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
   async function camOn() {
     try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }); } catch { return say('The camera was not allowed or could not be opened.'); }
     video.srcObject = stream; await video.play().catch(() => {}); $('camBtn').classList.add('on'); say('Loading the body tracker (first time takes a moment)...');
@@ -150,13 +151,13 @@ export async function start() {
     if ($('mirror').checked) { $('mirror').checked = false; $('mirror').onchange({ target: $('mirror') }); }
     say('Loading the body tracker (first time takes a moment)...');
     try { if (!tracker) { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); tracker = await vision.PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }); } } catch (e) { return say('The body tracker could not load: ' + (e.message || 'network')); }
-    await loadFace(); await loadHands(); importing = { stop: false }; lmPrev = null; standH = 0; pose.f = null; rest(); picSrc = cv; let seen = 0, s = null; const was = opt.snap; opt.snap = true;
+    await loadFace(); await loadHands(); importing = { stop: false }; lmPrev = null; standH = 0; pose.f = null; rest(); picSrc = cv; opt.seen = 0.3; let seen = 0, s = null; const was = opt.snap; opt.snap = true;
     /* the trackers settle over a few looks at the same picture */
     for (let i = 0; i < 6; i++) { const ts = performance.now(); let r = null; try { r = tracker.detectForVideo(cv, ts); } catch {} const lm = r && r.worldLandmarks && r.worldLandmarks[0]; if (lm) { for (let j = 0; j < 14; j++) window.mocapFeed(lm); s = window.mocapFeed(lm); seen++; }
       if (opt.hands && handTracker) { let hr = null; try { hr = handTracker.detectForVideo(cv, ts + 1); } catch {} if (hr && hr.worldLandmarks && hr.worldLandmarks.length) window.mocapHands(hr.worldLandmarks.map((points, n) => ({ points, label: ((hr.handedness || hr.handednesses || [])[n] || [{}])[0].categoryName || 'Right' }))); }
       if (opt.face && faceTracker) { let fr = null; try { fr = faceTracker.detectForVideo(cv, ts + 2); } catch {} const sh = fr && fr.faceBlendshapes && fr.faceBlendshapes[0]; if (sh) { const b = {}; for (const c of sh.categories) b[c.categoryName] = c.score; for (let j = 0; j < 8; j++) { window.mocapFace(b, fr.facialTransformationMatrixes && fr.facialTransformationMatrixes[0] && fr.facialTransformationMatrixes[0].data); window.mocapTongue(fr.faceLandmarks && fr.faceLandmarks[0], b.jawOpen || 0); } } }
       await new Promise(res => setTimeout(res, 40)); }
-    opt.snap = was; picSrc = null; importing = null; pose.hip = 1; if (!seen) { rest(); return say('I could not find a person in that picture. It works best with one person, clearly lit, most of the body in view.'); }
+    opt.snap = was; delete opt.seen; picSrc = null; importing = null; pose.hip = 1; if (!seen) { rest(); return say('I could not find a person in that picture. It works best with one person, clearly lit, most of the body in view.'); }
     const one = snapshot(); one.hip = 1; take = [one]; play = { on: false, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); toSliders();
     say('Pose read from the picture' + (s && s.legs ? '' : ' (top half only: her legs were not in view)') + '. Adjust it by hand if you like, then save it or keep it as a pose.');
   }
@@ -168,17 +169,17 @@ export async function start() {
     say('Loading the body tracker (first time takes a moment)...');
     try { if (!tracker) { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); tracker = await vision.PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }); } } catch (e) { return say('The body tracker could not load: ' + (e.message || 'network')); }
     await loadFace(); await loadHands();
-    const dur = Math.min(60, video.duration || 0), n = Math.max(1, Math.floor(dur * FPS)), frames = [], heights = []; importing = { stop: false }; $('vidBtn').classList.add('on'); lmPrev = null; standH = 0; pose.f = null; rest(); let seen = 0;
+    const dur = Math.min(60, video.duration || 0), n = Math.max(1, Math.floor(dur * FPS)), frames = [], heights = []; importing = { stop: false }; $('vidBtn').classList.add('on'); lmPrev = null; standH = 0; pose.f = null; rest(); opt.seen = 0.3; let seen = 0;
     for (let i = 0; i < n && !importing.stop; i++) {
       await seek(Math.min(dur - 0.001, i / FPS)); const ts = performance.now(); let r = null; try { r = tracker.detectForVideo(video, ts); } catch {}
       const lm = r && r.worldLandmarks && r.worldLandmarks[0]; let s = null; if (lm) { s = window.mocapFeed(lm); seen++; }
       if (opt.hands && handTracker) { let hr = null; try { hr = handTracker.detectForVideo(video, ts + 1); } catch {} if (hr && hr.worldLandmarks && hr.worldLandmarks.length) window.mocapHands(hr.worldLandmarks.map((points, k) => ({ points, label: ((hr.handedness || hr.handednesses || [])[k] || [{}])[0].categoryName || 'Right' }))); }
       if (opt.face && faceTracker) { let fr = null; try { fr = faceTracker.detectForVideo(video, ts + 2); } catch {} const sh = fr && fr.faceBlendshapes && fr.faceBlendshapes[0]; if (sh) { const b = {}; for (const c of sh.categories) b[c.categoryName] = c.score; window.mocapFace(b, fr.facialTransformationMatrixes && fr.facialTransformationMatrixes[0] && fr.facialTransformationMatrixes[0].data); window.mocapTongue(fr.faceLandmarks && fr.faceLandmarks[0], b.jawOpen || 0); } else pose.f = null; }
-      frames.push(snapshot()); heights.push(s && s.legs ? s.hipH : 0); if (i % 5 === 0) say(`Reading the video: ${Math.round(i / n * 100)}%  (tap File to stop)`);
+      frames.push(snapshot()); heights.push(s ? s.hipH : 0); if (i % 5 === 0) say(`Reading the video: ${Math.round(i / n * 100)}%  (tap File to stop)`);
     }
     /* how low her hips sit is judged against the tallest the person stood anywhere in the film, not only so far */
     const tall = Math.max(...heights, 0); frames.forEach((f, i) => { f.hip = tall && heights[i] ? Math.max(0.3, Math.min(1.25, heights[i] / tall)) : 1; });
-    importing = null; $('vidBtn').classList.remove('on'); URL.revokeObjectURL(video.src); video.removeAttribute('src'); video.load(); rest(); pose.f = null; hands.left = hands.right = null;
+    importing = null; delete opt.seen; $('vidBtn').classList.remove('on'); URL.revokeObjectURL(video.src); video.removeAttribute('src'); video.load(); rest(); pose.f = null; hands.left = hands.right = null;
     if (!seen || frames.length < 2) return say('I could not find a person in that video. It works best with one person, whole body in view, steady camera.');
     take = frames; play = { on: true, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); say(`Video read: ${frames.length} frames, a person found in ${Math.round(seen / frames.length * 100)}% of them. It is playing on her now; clean it up, then save.`);
   }
