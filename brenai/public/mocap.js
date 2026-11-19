@@ -286,6 +286,7 @@ export async function start() {
     if (importing) { show(snapshot()); } else if (take && (play.on || !live) && !rec) { const c = built(), n = c.n; if (play.on) play.t = (play.t + dt / c.dur) % 1; const i = Math.min(n - 1, Math.floor(play.t * n)), fr = { q: {}, hip: c.hips[i * 3 + 1] }; for (const b in c.bones) fr.q[b] = c.bones[b].slice(i * 4, i * 4 + 4); if (c.face) { fr.f = {}; for (const k in c.face) fr.f[k] = c.face[k][i]; } if (play.on || document.activeElement === $('scrub')) { show(fr); $('scrub').value = play.t; } else show(snapshot()); $('playBtn').classList.toggle('on', play.on); }
     else show(snapshot());
     if ((live || importing) && opt.focus && now > frameMine && !drag) { const f = FRAMES[frameAs], k = Math.min(1, dt * 2.5), wide = Math.max(1, 0.9 / camera.aspect); orbit.yaw += (0 - orbit.yaw) * k; orbit.pitch += (0.04 - orbit.pitch) * k;   /* always from the front, on the part of you in the picture */ orbit.y += (f[0] - orbit.y) * k; orbit.dist += (f[1] * wide - orbit.dist) * k; }
+    tongue.update(dt);
     if (opt.solid) fix(1);   // her arms and legs keep out of her own body
     vrm.update(dt); camera.position.set(Math.sin(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist, orbit.y + 0.05 + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist); camera.lookAt(0, orbit.y, 0); renderer.render(scene, camera);
   })(last);
