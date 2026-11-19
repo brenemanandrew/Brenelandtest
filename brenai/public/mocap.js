@@ -131,8 +131,8 @@ export async function start() {
   $('camBtn').onclick = () => (stream ? camOff() : camOn()); $('mirror').onchange = e => { opt.mirror = e.target.checked; video.style.transform = opt.mirror ? 'scaleX(-1)' : ''; }; $('upper').onchange = e => { opt.upper = e.target.checked; }; $('face').onchange = e => { opt.face = e.target.checked; if (!opt.face) pose.f = null; else if (live) loadFace(); }; $('handsOn').onchange = e => { opt.hands = e.target.checked; if (!opt.hands) hands.left = hands.right = null; else if (live) loadHands(); }; $('solid').onchange = e => { opt.solid = e.target.checked; }; $('focus').onchange = e => { opt.focus = e.target.checked; frameMine = 0; if (!opt.focus) { orbit.y = 0.9; orbit.dist = 4.2; } };
   // ---- your tongue, by colour. The face tracker's own tongue reading hardly moves, so the picture is looked at directly: the
   // patch just under your lower lip and the gap between your lips are compared with your cheeks. A tongue is much redder than skin.
-  const tcv = document.createElement('canvas'); tcv.width = tcv.height = 6; const tcx = tcv.getContext('2d', { willReadFrequently: true }); let tSm = 0, tCurlSm = 0, tSideSm = 0;
-  const red = (x, y, r) => { const w = video.videoWidth, h = video.videoHeight; if (!w) return 0; try { tcx.drawImage(video, Math.max(0, (x - r) * w), Math.max(0, (y - r) * h), Math.max(2, 2 * r * w), Math.max(2, 2 * r * h), 0, 0, 6, 6); const d = tcx.getImageData(0, 0, 6, 6).data; let R = 0, G = 0, Bl = 0; for (let i = 0; i < d.length; i += 4) { R += d[i]; G += d[i + 1]; Bl += d[i + 2]; } return (R - G) / Math.max(1, R + G + Bl); } catch { return 0; } };
+  const tcv = document.createElement('canvas'); tcv.width = tcv.height = 6; const tcx = tcv.getContext('2d', { willReadFrequently: true }); let tSm = 0, tCurlSm = 0, tSideSm = 0, picSrc = null;   /* picSrc: a still picture being read instead of the video */
+  const red = (x, y, r) => { const from = picSrc || video, w = from.videoWidth || from.width, h = from.videoHeight || from.height; if (!w) return 0; try { tcx.drawImage(from, Math.max(0, (x - r) * w), Math.max(0, (y - r) * h), Math.max(2, 2 * r * w), Math.max(2, 2 * r * h), 0, 0, 6, 6); const d = tcx.getImageData(0, 0, 6, 6).data; let R = 0, G = 0, Bl = 0; for (let i = 0; i < d.length; i += 4) { R += d[i]; G += d[i + 1]; Bl += d[i + 2]; } return (R - G) / Math.max(1, R + G + Bl); } catch { return 0; } };
   function tongueSeen(pts, jaw) { if (!pts || pts.length < 400) return null; const P = i => pts[i], mid = (a, b, t) => ({ x: P(a).x + (P(b).x - P(a).x) * t, y: P(a).y + (P(b).y - P(a).y) * t }), size = Math.hypot(P(234).x - P(454).x, P(234).y - P(454).y) || 0.2, r = size * 0.035;
     const skin = (red(mid(234, 61, 0.55).x, mid(234, 61, 0.55).y, r) + red(mid(454, 291, 0.55).x, mid(454, 291, 0.55).y, r)) / 2, under = mid(17, 152, 0.3), gap = mid(13, 14, 0.5), gapOpen = Math.hypot(P(13).x - P(14).x, P(13).y - P(14).y) / size;
     const below = red(under.x, under.y, r) - skin, inside = gapOpen > 0.035 ? red(gap.x, gap.y, r) - skin : 0, lft = red(mid(14, 61, 0.55).x, mid(14, 61, 0.55).y + size * 0.03, r) - skin, rgt = red(mid(14, 291, 0.55).x, mid(14, 291, 0.55).y + size * 0.03, r) - skin;
@@ -142,6 +142,24 @@ export async function start() {
   // ---- a video file instead of the camera: every frame of it is read in turn (not in real time, so a slow device loses nothing) ----
   let importing = null;
   const seek = t => new Promise(res => { const done = () => { video.removeEventListener('seeked', done); res(); }; video.addEventListener('seeked', done); video.currentTime = t; setTimeout(done, 2500); });
+  // a still picture: the pose in it is put on her and kept as a one-frame take (a pose clip), ready to save or to keep as a key
+  async function importImage(file) {
+    if (rec || importing) return; if (stream) camOff(); live = false; play.on = false; take = null; takeInfo(); say('Opening the picture...');
+    let bmp; try { bmp = await createImageBitmap(file); } catch { return say('That picture could not be opened. Try a JPG or PNG.'); }
+    const k = Math.min(1, 1280 / Math.max(bmp.width, bmp.height)), cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k); cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    if ($('mirror').checked) { $('mirror').checked = false; $('mirror').onchange({ target: $('mirror') }); }
+    say('Loading the body tracker (first time takes a moment)...');
+    try { if (!tracker) { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); tracker = await vision.PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }); } } catch (e) { return say('The body tracker could not load: ' + (e.message || 'network')); }
+    await loadFace(); await loadHands(); importing = { stop: false }; lmPrev = null; standH = 0; pose.f = null; rest(); picSrc = cv; let seen = 0, s = null; const was = opt.snap; opt.snap = true;
+    /* the trackers settle over a few looks at the same picture */
+    for (let i = 0; i < 6; i++) { const ts = performance.now(); let r = null; try { r = tracker.detectForVideo(cv, ts); } catch {} const lm = r && r.worldLandmarks && r.worldLandmarks[0]; if (lm) { for (let j = 0; j < 14; j++) window.mocapFeed(lm); s = window.mocapFeed(lm); seen++; }
+      if (opt.hands && handTracker) { let hr = null; try { hr = handTracker.detectForVideo(cv, ts + 1); } catch {} if (hr && hr.worldLandmarks && hr.worldLandmarks.length) window.mocapHands(hr.worldLandmarks.map((points, n) => ({ points, label: ((hr.handedness || hr.handednesses || [])[n] || [{}])[0].categoryName || 'Right' }))); }
+      if (opt.face && faceTracker) { let fr = null; try { fr = faceTracker.detectForVideo(cv, ts + 2); } catch {} const sh = fr && fr.faceBlendshapes && fr.faceBlendshapes[0]; if (sh) { const b = {}; for (const c of sh.categories) b[c.categoryName] = c.score; for (let j = 0; j < 8; j++) { window.mocapFace(b, fr.facialTransformationMatrixes && fr.facialTransformationMatrixes[0] && fr.facialTransformationMatrixes[0].data); window.mocapTongue(fr.faceLandmarks && fr.faceLandmarks[0], b.jawOpen || 0); } } }
+      await new Promise(res => setTimeout(res, 40)); }
+    opt.snap = was; picSrc = null; importing = null; pose.hip = 1; if (!seen) { rest(); return say('I could not find a person in that picture. It works best with one person, clearly lit, most of the body in view.'); }
+    const one = snapshot(); one.hip = 1; take = [one]; play = { on: false, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); toSliders();
+    say('Pose read from the picture' + (s && s.legs ? '' : ' (top half only: her legs were not in view)') + '. Adjust it by hand if you like, then save it or keep it as a pose.');
+  }
   async function importVideo(file) {
     if (rec || importing) return; if (stream) camOff(); live = false; play.on = false; take = null; takeInfo();
     if ($('mirror').checked) { $('mirror').checked = false; $('mirror').onchange({ target: $('mirror') }); }   /* she copies the person in the film side for side, not as a reflection */
@@ -156,7 +174,7 @@ export async function start() {
       const lm = r && r.worldLandmarks && r.worldLandmarks[0]; let s = null; if (lm) { s = window.mocapFeed(lm); seen++; }
       if (opt.hands && handTracker) { let hr = null; try { hr = handTracker.detectForVideo(video, ts + 1); } catch {} if (hr && hr.worldLandmarks && hr.worldLandmarks.length) window.mocapHands(hr.worldLandmarks.map((points, k) => ({ points, label: ((hr.handedness || hr.handednesses || [])[k] || [{}])[0].categoryName || 'Right' }))); }
       if (opt.face && faceTracker) { let fr = null; try { fr = faceTracker.detectForVideo(video, ts + 2); } catch {} const sh = fr && fr.faceBlendshapes && fr.faceBlendshapes[0]; if (sh) { const b = {}; for (const c of sh.categories) b[c.categoryName] = c.score; window.mocapFace(b, fr.facialTransformationMatrixes && fr.facialTransformationMatrixes[0] && fr.facialTransformationMatrixes[0].data); window.mocapTongue(fr.faceLandmarks && fr.faceLandmarks[0], b.jawOpen || 0); } else pose.f = null; }
-      frames.push(snapshot()); heights.push(s && s.legs ? s.hipH : 0); if (i % 5 === 0) say(`Reading the video: ${Math.round(i / n * 100)}%  (tap Video to stop)`);
+      frames.push(snapshot()); heights.push(s && s.legs ? s.hipH : 0); if (i % 5 === 0) say(`Reading the video: ${Math.round(i / n * 100)}%  (tap File to stop)`);
     }
     /* how low her hips sit is judged against the tallest the person stood anywhere in the film, not only so far */
     const tall = Math.max(...heights, 0); frames.forEach((f, i) => { f.hip = tall && heights[i] ? Math.max(0.3, Math.min(1.25, heights[i] / tall)) : 1; });
@@ -164,7 +182,7 @@ export async function start() {
     if (!seen || frames.length < 2) return say('I could not find a person in that video. It works best with one person, whole body in view, steady camera.');
     take = frames; play = { on: true, t: 0 }; $('trimIn').value = 0; $('trimOut').value = 1; takeInfo(); say(`Video read: ${frames.length} frames, a person found in ${Math.round(seen / frames.length * 100)}% of them. It is playing on her now; clean it up, then save.`);
   }
-  $('vidBtn').onclick = () => { if (importing) importing.stop = true; else $('vidFile').click(); }; $('vidFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) importVideo(f); }; window.mocapVideo = importVideo;
+  $('vidBtn').onclick = () => { if (importing) importing.stop = true; else $('vidFile').click(); }; $('vidFile').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) (/^image\//.test(f.type) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(f.name) ? importImage : importVideo)(f); }; window.mocapImage = importImage; window.mocapVideo = importVideo;
   // each finger by hand: pick which hand, then a slider a finger
   const fingerSliders = () => { const side = $('handSel').value === 'right' ? 'right' : 'left'; for (const f of ['Thumb', ...FINGERS]) $('f' + f).value = curl[side][f]; };
   $('handSel').onchange = fingerSliders; for (const f of ['Thumb', ...FINGERS]) $('f' + f).oninput = e => { const sel = $('handSel').value; for (const side of sel === 'both' ? ['left', 'right'] : [sel]) curl[side][f] = +e.target.value; }; fingerSliders();
