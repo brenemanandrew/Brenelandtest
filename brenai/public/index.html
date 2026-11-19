@@ -18,10 +18,11 @@
   #stageWrap { position:relative; width:var(--av); height:var(--av); }
   #stage { width:100%; height:100%; border:3px solid var(--line); border-radius:16px; overflow:hidden; background:#000; cursor:pointer; touch-action:none; position:relative; }
   /* icons round the two pictures: no bubbles, bigger, drawn in white with a soft glow round them */
-  #visitBtn, #bigBtn, #brainBtn, #actBtn, #senseBtn { background:none !important; border:0 !important; box-shadow:none !important; width:46px !important; height:46px !important; font-size:30px !important; line-height:1 !important; padding:0 !important; color:#fff !important; cursor:pointer; filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 8px rgba(255,255,255,.8)); transition:transform .15s; }
+  #visitBtn, #bigBtn, #brainBtn, #actBtn, #senseBtn { background:none !important; border:0 !important; box-shadow:none !important; width:32px !important; height:32px !important; font-size:20px !important; line-height:1 !important; padding:0 !important; color:#fff !important; cursor:pointer; opacity:.82; filter:drop-shadow(0 0 1px rgba(255,255,255,.95)) drop-shadow(0 0 4px rgba(255,255,255,.45)); transition:transform .15s, opacity .15s; }
+  #visitBtn:hover, #bigBtn:hover, #brainBtn:hover, #actBtn:hover, #senseBtn:hover { opacity:1; }
   #visitBtn:active, #bigBtn:active, #brainBtn:active, #actBtn:active, #senseBtn:active { transform:scale(.9); }
-  #visitBtn { left:-16px !important; top:-16px !important; } #bigBtn { left:-16px !important; bottom:-16px !important; } #brainBtn { right:-16px !important; bottom:-16px !important; } #actBtn { left:-18px !important; top:-18px !important; }
-  #senseBtn { position:absolute; right:-16px; bottom:-16px; z-index:3; } #senseBtn svg { width:100%; height:100%; display:block; } #camBtn, #mic { display:none !important; }
+  #visitBtn { left:-9px !important; top:-9px !important; } #bigBtn { left:-9px !important; bottom:-9px !important; } #brainBtn { right:-9px !important; bottom:-9px !important; } #actBtn { left:-10px !important; top:-10px !important; }
+  #senseBtn { position:absolute; right:-9px; bottom:-9px; z-index:3; } #senseBtn svg { width:100%; height:100%; display:block; } #camBtn, #mic { display:none !important; }
   body.fp #brainBtn { right:10px !important; top:10px !important; bottom:auto !important; }
   /* behind everything: the player's own room, out of focus */
   body.hasroom { background:none !important; }

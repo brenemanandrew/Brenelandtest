@@ -203,6 +203,10 @@ export async function create(url, opts = {}) {
     pout: () => ({ leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _eyes: [2.2, -0.6], _head: [0.1, 0.3, -0.1], _face: { sad: 0.45, angry: 0.25, ou: 0.5 } }),
     handsup: t => ({ leftUpperArm: [0, 0, 1.38], rightUpperArm: [0, 0, -1.38], leftLowerArm: [0, -0.2, 0], rightLowerArm: [0, 0.2, 0], leftHand: [0, 0, 0.2], rightHand: [0, 0, -0.2], spine: plus('spine', -0.06), _head: [-0.05, 0, 0], _face: { surprised: 0.8 } }),
     eep: t => { const j = Math.exp(-t * 1.6); return { leftUpperArm: [-0.4, -0.35, -1.2], rightUpperArm: [-0.4, 0.35, 1.2], leftLowerArm: [0, -2.2, 0], rightLowerArm: [0, 2.2, 0], leftShoulder: [0, 0, 0.3], rightShoulder: [0, 0, -0.3], spine: plus('spine', -0.12 - 0.08 * j), _hipY: 0.03 * j * abs(sin(t * 14)), _head: [-0.08, 0.25 * sin(t * 6) * j, 0.06], _eyes: [1.5 * sin(t * 5), 0], _face: { surprised: 1 } }; },
+    ahh: t => ({ _head: [-0.2, 0, 0], _face: { aa: 1, happy: 0.3 } }),                                              // mouth open, waiting for the snack
+    chew: t => ({ _head: [0.05 + 0.03 * sin(t * 11), 0, 0.04], _face: { aa: 0.18 + 0.18 * abs(sin(t * 11)), happy: 0.9, blink: 0.4 } }),
+    blocked: t => ({ leftUpperArm: [-0.08, -0.5, -1.25], rightUpperArm: [-0.16, 0.5, 1.25], leftLowerArm: [0, -1.8, 0], rightLowerArm: [0, 1.62, 0], spine: plus('spine', -0.06), _head: [0.02, 0.22, -0.06], _face: { angry: 0.7 } }),   // arms across herself: not there
+    petted: t => ({ leftShoulder: [0, 0, -0.06], rightShoulder: [0, 0, 0.06], _head: [0.1, 0, 0.1 * sin(t * 1.6)], _face: { relaxed: 1, blink: 1, happy: 0.4 } }),
     test: () => window.WIZRA_GEST || {},                                           // test hook: try a pose from the console
     jolt: t => ({ spine: plus('spine', -0.14 * Math.exp(-t * 2.5)), leftShoulder: [0, 0, 0.25 * Math.exp(-t * 2.5)], rightShoulder: [0, 0, -0.25 * Math.exp(-t * 2.5)], _head: [-0.12 * Math.exp(-t * 2.5), 0, 0] }),
   };
@@ -533,7 +537,7 @@ export async function create(url, opts = {}) {
         }
       }
       else if (st.face !== undefined) { if (turnTo(st.face, dt, 5) < 0.1) rt.i++; }
-      else if (st.wait) { holdWant = st.idle ? holdWant : 1; if (st.idle) turnTo(Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z), dt, 4); rt.stepT += dt; if (rt.stepT >= st.wait) { rt.stepT = 0; rt.i++; } }
+      else if (st.wait) { holdWant = st.idle ? holdWant : 1; if (st.idle && !(hg.on && Math.abs(hg.yaw) > 0.02)) turnTo(Math.atan2(camera.position.x - rt.x, camera.position.z - rt.z), dt, 4); rt.stepT += dt; if (rt.stepT >= st.wait) { rt.stepT = 0; rt.i++; } }
       else if (st.run) { st.run(); rt.i++; }
     }
     if (rt.act === 'sitdown') { // turn to face front, lower into the chair, then get on with whatever she came back to do
@@ -848,6 +852,28 @@ export async function create(url, opts = {}) {
     camera.position.set(hc.tgt.x + Math.sin(a) * Math.cos(elev) * d, hc.tgt.y + Math.sin(elev) * d, hc.tgt.z + Math.cos(a) * Math.cos(elev) * d); camera.lookAt(hc.tgt);
     spot('heart', hc.at); heartGlow.visible = true; heartGlow.position.copy(hc.at).addScaledVector(hc.pos.copy(camera.position).sub(hc.at).normalize(), 0.09); heartGlow.scale.setScalar(0.13 * (1 + 0.14 * Math.abs(Math.sin(t / 110)))); heartGlow.material.opacity = 1;
   }
+  // ---- one-on-one time: she stands facing you at arm's length. You can look about a little and lean round her, but not walk off.
+  const hg = { on: false, yaw: 0, lookX: 0, lookY: 0, dist: 1.9, b: 0 };
+  function hang(on) { on = !!on; if (on === hg.on) return; hg.on = on; hg.yaw = hg.lookX = hg.lookY = 0; hg.dist = 1.9;
+    if (on) { if (rt.act !== 'gone') plan('spending time with you, face to face', [go(STAND_AT), stay(3600)], '', true); }
+    else if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.stepT = 0; rt.label = 'sitting back down'; } }
+  function hangView(o) { if (o.yaw !== undefined) hg.yaw = Math.max(-1.1, Math.min(1.1, o.yaw)); if (o.dyaw) hg.yaw = Math.max(-1.1, Math.min(1.1, hg.yaw + o.dyaw)); if (o.dist) hg.dist = Math.max(1.2, Math.min(2.8, o.dist)); if (o.dx !== undefined) { hg.lookX = Math.max(-0.35, Math.min(0.35, hg.lookX + o.dx)); hg.lookY = Math.max(-0.3, Math.min(0.22, hg.lookY + o.dy)); } return { yaw: hg.yaw, dist: hg.dist }; }
+  function hangCamera(dt) { hg.b += ((hg.on ? 1 : 0) - hg.b) * Math.min(1, dt * 3); if (hg.b < 0.004) return; if (hg.on) fp.locked = true;
+    head.getWorldPosition(tmpA); const yw = vrm.scene.rotation.y + hg.yaw, d = hg.dist; hc.pos.set(tmpA.x + Math.sin(yw) * d, tmpA.y + 0.02, tmpA.z + Math.cos(yw) * d);   // always at her eye level: never from below
+    hc.tgt.set(tmpA.x + Math.cos(yw) * hg.lookX, tmpA.y - 0.26 + hg.lookY, tmpA.z - Math.sin(yw) * hg.lookX);
+    const e = hg.b * hg.b * (3 - 2 * hg.b); hc.keepPos.copy(camera.position); hc.keepQ.copy(camera.quaternion); camera.position.copy(hc.pos); camera.lookAt(hc.tgt);
+    if (e < 0.995) { hc.q.copy(camera.quaternion); camera.position.lerpVectors(hc.keepPos, hc.pos, e); camera.quaternion.slerpQuaternions(hc.keepQ, hc.q, e); } }
+  // where on her a point of the screen lands: { zone, ok }. ok false = somewhere she does not want poked or touched.
+  const ZONES = [['hair', () => head.getWorldPosition(tmpB).setY(tmpB.y + 0.15), 0.1, true], ['face', () => head.getWorldPosition(tmpB).setY(tmpB.y + 0.04), 0.085, true], ['chest', () => spot('heart', tmpB), 0.115, false],
+    ['shoulderL', () => B('leftUpperArm').getWorldPosition(tmpB), 0.07, true], ['shoulderR', () => B('rightUpperArm').getWorldPosition(tmpB), 0.07, true], ['armL', () => B('leftLowerArm').getWorldPosition(tmpB), 0.065, true], ['armR', () => B('rightLowerArm').getWorldPosition(tmpB), 0.065, true],
+    ['handL', () => palmL.getWorldPosition(tmpB), 0.075, true], ['handR', () => palmR.getWorldPosition(tmpB), 0.075, true], ['hips', () => hipsNode.getWorldPosition(tmpB), 0.15, false], ['belly', () => B('spine').getWorldPosition(tmpB).setY(tmpB.y + 0.05), 0.09, true],
+    ['thighL', () => B('leftUpperLeg').getWorldPosition(tmpB).setY(tmpB.y - 0.16), 0.1, false], ['thighR', () => B('rightUpperLeg').getWorldPosition(tmpB).setY(tmpB.y - 0.16), 0.1, false], ['kneeL', () => B('leftLowerLeg').getWorldPosition(tmpB), 0.08, true], ['kneeR', () => B('rightLowerLeg').getWorldPosition(tmpB), 0.08, true]];
+  function hangZone(e) { const r = renderer.domElement.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1); let best = null;
+    for (const [zone, at, rad, ok] of ZONES) { const P3 = at().clone(), c = P3.clone().project(camera); if (c.z > 1) continue; const edge = P3.clone().addScaledVector(up, rad).project(camera), cx = (c.x + 1) / 2 * r.width, cy = (1 - c.y) / 2 * r.height, rp = Math.abs((1 - edge.y) / 2 * r.height - cy), k = Math.hypot(px - cx, py - cy) / Math.max(1, rp);
+      if (k <= 1 && (!best || (!ok && best.ok) || (ok === best.ok && k < best.k))) best = { zone, ok, k }; }   // where zones overlap, the off-limits one wins
+    return best ? { zone: best.zone, ok: best.ok } : null; }
+  function hangMouth() { const r = renderer.domElement.getBoundingClientRect(), yw = vrm.scene.rotation.y; head.getWorldPosition(tmpB); tmpB.y -= 0.035; tmpB.x += Math.sin(yw) * 0.09; tmpB.z += Math.cos(yw) * 0.09; const c = tmpB.clone().project(camera), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1), e2 = tmpB.clone().addScaledVector(up, 0.045).project(camera);
+    return { x: r.left + (c.x + 1) / 2 * r.width, y: r.top + (1 - c.y) / 2 * r.height, r: Math.abs((e2.y - c.y) / 2 * r.height) }; }
   const HITS = [['heart', 0.05, 6], ['face', 0.115, 2], ['hand', 0.07, 1], ['handL', 0.07, 1], ['shoulder', 0.075, 1], ['shoulderR', 0.075, 1]];
   function bonusHit(e) { // what a tap during the bonus round is worth: her heart 6, her face 2, hands and shoulders 1, anything else 0
     const r = renderer.domElement.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, P3 = new THREE.Vector3(), up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
@@ -950,7 +976,7 @@ export async function create(url, opts = {}) {
       frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; Object.assign(bz, { mode: 'cut', shot: 0 }); if (!on) heartGlow.visible = false; },
     bonusShot() { bz.shot++; frozeAt = performance.now(); },
     bonusOrbit(dx, dy, dz) { bz.yaw -= dx * 0.008; bz.pitch = Math.max(-0.05, Math.min(1.25, bz.pitch + dy * 0.006)); bz.dist = Math.max(0.5, Math.min(2.8, bz.dist * (1 + dz))); },
-    bonusHit,
+    bonusHit, hang, hangView, hangZone, hangMouth,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
@@ -967,7 +993,7 @@ export async function create(url, opts = {}) {
       if (em) { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised']) if (has(n)) em.setValue(n, mix(n, w[n])); if (has('blink')) em.setValue('blink', mix('blink', blink)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh); }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
-      heartCamera(s.dt, s.t);
+      heartCamera(s.dt, s.t); hangCamera(s.dt);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking

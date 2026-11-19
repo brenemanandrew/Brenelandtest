@@ -301,6 +301,7 @@
       // a video call while she is out: she appears wherever she really is (scene = the backdrop), until call(false)
       call(on, scene) { if (R.call) R.call(on, scene); },
       callShow() { if (R.callShow) R.callShow(); },
+      hang(on) { if (R.hang) R.hang(on); }, hangView(o) { return R.hangView ? R.hangView(o) : {}; }, hangZone(e) { return R.hangZone ? R.hangZone(e) : null; }, hangMouth() { return R.hangMouth ? R.hangMouth() : null; },   // one-on-one time (hang.js)
       weather(kind) { if (R.weather) R.weather(kind); },
       movie(on, tint) { if (R.movie) R.movie(on, tint); },                            // movie night: lights down, the screen lights the room
       power(on, ms) { if (R.power) R.power(on, ms); },                               // cut or restore the power (a storm does this by itself now and then)                              // the sky outside follows the player's real weather                                  // on a video call: she turns the phone to show where she is
