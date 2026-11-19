@@ -996,7 +996,7 @@ async function send(quick, visit, lean) {
   sendBtn.disabled = true; speaker.stop(typeof quick === 'string' ? 'a button or an event sent a message for you' : 'you sent a message'); if (!away) { avatar.setThinking(true); userDid(text); }
   addLine('me', text); bubble('me', text); WizraSound.fx('send');
   let body = null; if (!away) { body = addLine('her', ''); body.innerHTML = '<span class="typing">typing...</span>'; }
-  const cue = away ? null : cueFor(text); if (cue) { if (cue.gesture) avatar.gesture(cue.gesture, cue.hold || 3.5); if (cue.emote) avatar.emote(cue.emote, 2000); }   // something you said that she reacts to on the spot (the Studio's Reactions)
+  const cue = away ? null : cueFor(text); if (cue) { if (/^clip:/.test(cue.gesture || '')) avatar.holdClip(cue.gesture.slice(5), cue.hold || 3.5); else if (cue.gesture) avatar.gesture(cue.gesture, cue.hold || 3.5); if (cue.emote) avatar.emote(cue.emote, 2000); }   // something you said that she reacts to on the spot (the Studio's Reactions)
   try {
     const r = await api('/api/chat', { text, ...(cue ? { cue: cue.label } : {}), ...(WizraCam.on && WizraCam.recent() ? { face: WizraCam.recent() } : {}), ...(weatherNow ? { weather: weatherNow } : {}), doing: avatar.activity(), voice: speaker.on && speaker.engine() === 'pc', ...(visit ? { visit } : {}), ...(lean ? { lean } : {}) });
     if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }

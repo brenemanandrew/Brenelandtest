@@ -627,7 +627,7 @@ const CUES_DEFAULT = [
   { label: 'yawns', words: 'bedtime, getting late, so sleepy, time for bed', gesture: 'yawn', emote: '\ud83e\udd71' },
   { label: 'makes a little heart', words: 'love you, i adore you, you are the best, youre the best', gesture: 'fingerheart', emote: '\ud83d\udc96' },
 ];
-const cleanCues = list => list.slice(0, 80).map(c => ({ label: String(c.label || '').slice(0, 60), words: String(c.words || '').slice(0, 200), gesture: String(c.gesture || '').replace(/[^a-z]/gi, '').slice(0, 20), emote: String(c.emote || '').slice(0, 8), hold: Math.max(1, Math.min(12, +c.hold || 3.5)) })).filter(c => c.words.trim() && (c.gesture || c.emote));
+const cleanCues = list => list.slice(0, 80).map(c => ({ label: String(c.label || '').slice(0, 60), words: String(c.words || '').slice(0, 200), gesture: String(c.gesture || '').replace(/[^a-z0-9_:]/gi, '').slice(0, 46), emote: String(c.emote || '').slice(0, 8), hold: Math.max(1, Math.min(12, +c.hold || 3.5)) })).filter(c => c.words.trim() && (c.gesture || c.emote));
 const devData = () => { const d = db.dev || (db.dev = {}); if (!Array.isArray(d.cues)) d.cues = cleanCues(CUES_DEFAULT); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
 const customMap = id => devData().maps.custom.find(m => m.id === id);
 function leaveNow(leave, since = Date.now()) {
@@ -766,7 +766,7 @@ async function handle(req, res) {
         for (const key in shared.words) if (shared.words[key] === cur().id) delete shared.words[key]; shared.words[k] = cur().id; db.word = true; save(); return json(res, 200, { ok: true });
       }
       if (url.pathname === '/api/owner' && req.method === 'POST') { if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
-      if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
+      if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/anims/clip', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
       if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), extras: extrasView(), coins: db.coins | 0, wx: db.wx || shared.wx || null, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
@@ -930,6 +930,17 @@ async function handle(req, res) {
       }
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
+      // one clip in or out of the game's set (the motion capture page): { name, clip } or { remove: name }
+      if (url.pathname === '/api/anims/clip' && req.method === 'POST') {
+        const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 12e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+        let b; try { b = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
+        let all = { clips: {} }; try { all = JSON.parse(fs.readFileSync(ANIMS, 'utf8')); } catch {}
+        if (b.remove) delete all.clips[String(b.remove)];
+        else { const name = String(b.name || '').toLowerCase().replace(/[^a-z0-9_]+/g, '_').slice(0, 40), c = b.clip; if (!name || !c || !(c.n >= 1 && c.n <= 3600) || typeof c.bones !== 'object') return json(res, 400, { error: 'That is not a clip.' });
+          const bones = {}; for (const k of Object.keys(c.bones).slice(0, 80)) { const v = c.bones[k]; if (!/^[a-zA-Z]{3,30}$/.test(k) || !Array.isArray(v) || v.length !== c.n * 4 || v.some(x => typeof x !== 'number' || !Number.isFinite(x))) return json(res, 400, { error: 'The clip has a bad bone track: ' + k }); bones[k] = v; }
+          all.clips[name] = { name, dur: Math.max(0.03, +c.dur || c.n / 30), fps: +c.fps || 30, n: c.n, bones, ...(Array.isArray(c.hips) && c.hips.length === c.n * 3 ? { hips: c.hips.map(Number) } : {}), made: 'mocap' }; }
+        all.v = Date.now(); fs.writeFileSync(ANIMS + '.tmp', JSON.stringify(all)); fs.renameSync(ANIMS + '.tmp', ANIMS); return json(res, 200, { ok: true, clips: Object.keys(all.clips) });
+      }
       if (url.pathname === '/api/anims') {
         if (req.method === 'GET') {
           if (!fs.existsSync(ANIMS)) return json(res, 200, { clips: {} });

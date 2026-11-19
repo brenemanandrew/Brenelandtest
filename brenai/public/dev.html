@@ -42,7 +42,7 @@
 <body>
 <header><h1>BRENAI STUDIO</h1>
   <nav><button data-tab="ui" class="on">Layout</button><button data-tab="ev">Events</button><button data-tab="map">Maps</button><button data-tab="who">Character and rules</button></nav>
-  <a href="/">Back to the game</a></header>
+  <a href="/mocap.html" style="margin-left:auto">Motion capture</a><a href="/" style="margin-left:14px">Back to the game</a></header>
 
 <!-- 1. Layout: the real game page, with every piece draggable -->
 <main id="tab-ui" class="on">
@@ -309,7 +309,7 @@ function drawWho() {
     const list = dev.cues = dev.cues || [], saveB = el('button', { className: 'btn go', textContent: 'Save reactions' }), mark = () => { saveB.textContent = 'Save reactions *'; };
     saveB.onclick = async () => { const r = await fetch('/api/dev', { method: 'POST', body: JSON.stringify({ cues: list }) }); if (r.ok) { dev.cues = (await r.json()).cues; toast('Reactions saved'); drawWho(); } else toast('Could not save'); };
     list.forEach((c, i) => { const f = (key, ph, cls) => { const inp = el('input', { type: 'text', value: c[key] || '', placeholder: ph, className: cls || 'grow' }); inp.oninput = () => { c[key] = inp.value; mark(); }; return inp; };
-      const sel = el('select', {}, ...POSES.map(p => el('option', { value: p, textContent: p || '(no pose)', selected: p === (c.gesture || '') }))); sel.onchange = () => { c.gesture = sel.value; mark(); };
+      const sel = el('select', {}, ...[...POSES, ...clips.filter(n => !/^yoga_/.test(n)).map(n => 'clip:' + n)].map(p => el('option', { value: p, textContent: p || '(no pose)', selected: p === (c.gesture || '') })));   // (clip:name plays a recorded clip, such as one from the motion capture page; she does those on her feet) sel.onchange = () => { c.gesture = sel.value; mark(); };
       const em = f('emote', 'emoji'); em.className = ''; em.style.width = '64px'; const hold = el('input', { type: 'number', min: 1, max: 12, step: 0.5, value: c.hold || 3.5, title: 'Seconds she holds it' }); hold.style.width = '64px'; hold.oninput = () => { c.hold = +hold.value; mark(); };
       const del = el('button', { className: 'mini', textContent: '\u2715', title: 'Remove' }); del.onclick = () => { list.splice(i, 1); mark(); drawWho(); };
       card(el('div', { className: 'row' }, f('label', 'What she does, in words (she is told this), e.g. yelps and flinches'), del), el('div', { className: 'row' }, f('words', 'Phrases that set it off, separated by commas')), el('div', { className: 'row' }, el('label', { textContent: 'Pose' }), sel, el('label', { textContent: 'Emoji' }), em, el('label', { textContent: 'Hold (s)' }), hold)); });

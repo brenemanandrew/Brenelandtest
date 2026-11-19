@@ -196,3 +196,11 @@ In each room the strongest flame among the placed things (`FLAME` in `places.js`
 
 ## Movie night
 The player plays the real film on their own screen; the game keeps a clock beside it. `movies.mjs` holds the films (`MOVIES`: title, minutes, the colour the screen throws, and plot beats by minute in our own words). On a visit the clapperboard button starts one (`POST /api/movie { start }`, also `pause`, `resume`, `nudge` seconds, `stop`). While it runs: the ceiling light and lamp go off and a flickering light in the film's colour comes from the TV (`avatar.movie`), a clock bar shows at the top, her instructions say where the film is and to talk like someone watching with a date, and every 45 seconds the page asks (`{ react: true }`) whether the film has reached a new beat; if so she says a line (at least two and a half minutes apart). At the end the credits line, a memory, five points on the path and eight coins. To add a film, add an entry to `MOVIES`.
+
+## Motion capture (`/mocap.html`, owner only)
+`public/mocap.js` + `mocap.html`, linked from the Studio's header. The camera is read on the device by MediaPipe's pose tracker (library from jsdelivr, model from Google's model store); `solve(landmarks)` turns the 33 body points into turns of her humanoid bones (hips from the hip and shoulder lines, spine and chest sharing the twist, head from ears and nose, each limb pointed along its segment inside its parent's frame). Legs follow only when they are seen; otherwise the top half only. Mirror is on by default.
+- A take is recorded at 30 frames a second (after a three second countdown, up to a minute) and kept in the game's clip shape. Clean-up when it plays and saves: trim, smoothing passes, speed, swap left and right, blend the end into the start.
+- By hand: pick a bone, turn it with three sliders, keep poses with a hold time, and make a take from the kept poses (eased between). Finger curl per hand.
+- Save: `POST /api/anims/clip { name, clip }` adds it to `/data/anims.json` (`{ remove: name }` deletes one; owner only). Download and load as JSON files.
+- In the game a saved clip can be played by a Studio event, and a Reaction can use `clip:name` as its pose (played with `holdClip`, on her feet). A posed photo can name any clip too.
+- Test hook: `window.mocapFeed(landmarks)` drives her from canned points.
