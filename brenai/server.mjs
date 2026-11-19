@@ -411,7 +411,7 @@ async function learn() {
 const BOND = ['romance', 'friend', 'mentor'];
 // Romance has levels on top: 0 to 3. The romance score fills up to what the next level costs (100, then 500, then 700), the
 // level goes up and the score starts again from what was left over. At level 3 it fills to 1000 and stops.
-const ROM_MAX = 3;
+const ROM_MAX = 4;
 const romNeed = lvl => lvl >= ROM_MAX ? rule('lvlCap') : rule('lvl' + (lvl + 1));
 function fixBond() {
   const sh = db.sheet; if (!sh.bond || typeof sh.bond !== 'object') sh.bond = {}; sh.romLevel = Math.max(0, Math.min(ROM_MAX, Math.round(+sh.romLevel || 0)));
@@ -437,7 +437,12 @@ const outfitData = () => { const o = db.outfits || (db.outfits = {}); o.situatio
 function situationNow() { // what kind of moment it is for her, from where she is and the clock (Eastern, like everything else)
   const o = outfitData(); if (o.force && o.situations.includes(o.force)) return o.force;
   const a = db.away, d = new Date(), tz = { timeZone: TZ }, hour = Number(d.toLocaleString('en-US', { ...tz, hour: 'numeric', hour12: false })) % 24, day = d.toLocaleString('en-US', { ...tz, weekday: 'short' });
-  if (a) { if (/class|study/.test(a.where)) return 'School'; if (a.where !== 'bed' && a.where !== 'the bathroom') return 'Going Out'; return 'Nightly'; }
+  const has = s => o.situations.includes(s), pick = (...names) => names.find(has);
+  if (a) { if (/d&d|dnd|campaign|dungeon/i.test(a.where) && has('DnD Night')) return 'DnD Night'; if (/class|study/.test(a.where)) return 'School'; if (a.where !== 'bed' && a.where !== 'the bathroom') return 'Going Out'; return 'Nightly'; }
+  /* together somewhere: the place, a film, or a date on the calendar decides what she wore for it */
+  if (db.place && !db.solo) { const m = customMap(db.place), words = m ? `${m.name || ''} ${m.about || ''}` : '', dated = (db.dates || []).some(d => d.place === db.place && Math.abs(Date.now() - d.at) < 4 * 3600e3); let s = '';
+    if (/beach|sea\b|lake|shore/i.test(words)) s = pick('Beach'); else if (/camp|tent|\bstars?\b|woods/i.test(words)) s = pick('Camping'); else if (/d&d|dnd|dice|game night|tabletop/i.test(words)) s = pick('DnD Night'); else if (/dinner|candle|romant|fireside|restaurant/i.test(words)) s = pick('Romantic Dinner', 'Date Night');
+    if (!s && (db.movie || dated) && (db.place === 'house' || db.place === 'dorm')) s = pick('Date Night In'); if (!s && dated) s = pick('Date Night'); if (s) return s; }
   if (hour >= 21 || hour < 6) return 'Nightly'; if (day === 'Sat' || day === 'Sun') return 'Weekend'; return 'Daily';
 }
 function outfitNow() {
@@ -542,7 +547,7 @@ const RULES = {
   picAskMin: [25, 0, 100, 'Rapport needed before she sends a picture when asked'],
   followRate: [30, 0, 100, 'How often she adds a second message on her own after a reply (percent of replies; she can still decide she has nothing to add)'],
   callRate: [100, 0, 500, 'How often she calls you while she is out (percent of normal)'],
-  lvl1: [100, 1, 100000, 'Romance points to reach level 1'], lvl2: [500, 1, 100000, 'Romance points to go from level 1 to 2'], lvl3: [700, 1, 100000, 'Romance points to go from level 2 to 3'], lvlCap: [1000, 1, 100000, 'Romance points level 3 fills to'],
+  lvl1: [100, 1, 100000, 'Romance points to reach level 1'], lvl2: [500, 1, 100000, 'Romance points to go from level 1 to 2'], lvl3: [700, 1, 100000, 'Romance points to go from level 2 to 3'], lvl4: [850, 1, 100000, 'Romance points to go from level 3 to 4'], lvlCap: [1000, 1, 100000, 'Romance points level 3 fills to'],
 };
 const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinite(+db.rules[k]) ? +db.rules[k] : d; return Math.max(lo, Math.min(hi, v)); };
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
@@ -743,7 +748,10 @@ async function handle(req, res) {
     }
 
     if (url.pathname.startsWith('/api/')) {
-      if (!authed(req)) return json(res, 401, { error: 'login' });
+      /* the PC that runs her brain may also load her outfit models: it proves itself with the brain token instead of a login, and acts as the owner, for the outfit routes only */
+      const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk'].includes(url.pathname);
+      if (byToken && !als.getStore()) { const u = shared.owner && playerOf(shared.owner); if (!u) return json(res, 409, { error: 'This game has no owner yet.' }); return als.run(u, () => handle(req, res)); }
+      if (!byToken && !authed(req)) return json(res, 401, { error: 'login' });
       // which player: a PIN opens your own save. A new PIN makes a new one (only when asked to: a typo should not).
       if (url.pathname === '/api/pin' && req.method === 'POST') {
         const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || ''), now = Date.now(), fails = (pinFails.get(ip) || []).filter(t => now - t < 600000);
@@ -887,6 +895,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
 
       // outfits: GET the set-up, POST changes to it ({ situations }, { force }, { clear: slot }); a model for a slot is uploaded to /api/outfit/slot
+      if (url.pathname === '/api/disk') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); let free = 0, total = 0, used = 0; try { const st = fs.statfsSync(DATA_DIR); free = st.bavail * st.bsize; total = st.blocks * st.bsize; } catch {} try { for (const f of fs.readdirSync(OUTFITS)) used += fs.statSync(path.join(OUTFITS, f)).size; } catch {} return json(res, 200, { freeMB: Math.round(free / 1e6), totalMB: Math.round(total / 1e6), outfitsMB: Math.round(used / 1e6) }); }
       if (url.pathname === '/api/outfits') {
         const o = outfitData();
         if (req.method === 'POST') { const b = await readBody(req);
