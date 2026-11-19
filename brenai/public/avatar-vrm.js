@@ -874,7 +874,8 @@ export async function create(url, opts = {}) {
     if (spec.kind === 'view') { // a picture of something in her room, taken by her: the room as it is, without her in it
       const bd = places.bed.at, V = { room: [[2.7, 1.9, hip.z + 2.8], [0, 0.7, hip.z]], shelf: [[-0.85, 1.3, hip.z + 0.9], [SHELF.x, 1.0, SHELF.z]], counter: [[1.15, 1.4, hip.z + 0.8], [COUNTER.x, 0.95, COUNTER.z]], bed: [[bd[0] + 1.9, 1.7, bd[1] + 0.9], [bd[0], 0.5, bd[1]]],
         table: [[0.55, 1.2, hip.z + 1.9], [0, 0.3, hip.z + 0.8]], window: [[0.1, 1.5, hip.z + 0.7], [0.1, 1.55, hip.z - 1.6]], chair: [[1.2, 1.2, hip.z + 1.7], [0, 0.5, hip.z]] }[spec.target] || [[2.7, 1.9, hip.z + 2.8], [0, 0.7, hip.z]];
-      vrm.scene.visible = false; for (const k in places.groups) places.groups[k].visible = k === 'dorm'; room.visible = true; for (const o of props) o.visible = true; backdrop.visible = false;
+      const inHouse = spec.place === 'house'; if (inHouse) { V[0] = [2.7, 1.75, hip.z + 4.3]; V[1] = [-1.2, 0.8, hip.z + 0.9]; }   // (the player's own living room, for the page's backdrop)
+      vrm.scene.visible = false; for (const k in places.groups) places.groups[k].visible = k === (inHouse ? 'house' : 'dorm'); room.visible = !inHouse; for (const o of props) o.visible = !inHouse; backdrop.visible = false;
       camera.fov = 52; camera.updateProjectionMatrix(); camera.position.set(V[0][0], floorY + V[0][1], V[0][2]); camera.lookAt(V[1][0], floorY + V[1][1], V[1][2]); renderer.render(scene, camera);
       let shot = ''; try { shot = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
       setPlace(here); props.forEach((o, i) => { o.visible = propVis[i]; }); vrm.scene.visible = keep.vis; camera.fov = keep.fov; camera.updateProjectionMatrix(); return shot;

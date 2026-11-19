@@ -17,6 +17,15 @@
   #stageSlot { width:var(--av); height:var(--av); }
   #stageWrap { position:relative; width:var(--av); height:var(--av); }
   #stage { width:100%; height:100%; border:3px solid var(--line); border-radius:16px; overflow:hidden; background:#000; cursor:pointer; touch-action:none; position:relative; }
+  /* icons round the two pictures: no bubbles, bigger, drawn in white with a soft glow round them */
+  #visitBtn, #bigBtn, #brainBtn, #actBtn, #senseBtn { background:none !important; border:0 !important; box-shadow:none !important; width:46px !important; height:46px !important; font-size:30px !important; line-height:1 !important; padding:0 !important; color:#fff !important; cursor:pointer; filter:drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 8px rgba(255,255,255,.8)); transition:transform .15s; }
+  #visitBtn:active, #bigBtn:active, #brainBtn:active, #actBtn:active, #senseBtn:active { transform:scale(.9); }
+  #visitBtn { left:-16px !important; top:-16px !important; } #bigBtn { left:-16px !important; bottom:-16px !important; } #brainBtn { right:-16px !important; bottom:-16px !important; } #actBtn { left:-18px !important; top:-18px !important; }
+  #senseBtn { position:absolute; right:-16px; bottom:-16px; z-index:3; } #senseBtn svg { width:100%; height:100%; display:block; } #camBtn, #mic { display:none !important; }
+  body.fp #brainBtn { right:10px !important; top:10px !important; bottom:auto !important; }
+  /* behind everything: the player's own room, out of focus */
+  body.hasroom { background:none !important; }
+  body::before { content:""; position:fixed; inset:-40px; z-index:-1; background:var(--roombg, none) center/cover no-repeat; filter:blur(16px) brightness(.5) saturate(1.25); pointer-events:none; }
   /* the look of the picture: richer colour, a warm light leak from the top corner, soft dark edges; weather lays its own mood over it */
   #stage canvas { filter:saturate(1.22) contrast(1.07) brightness(1.02); }
   #stage::before, #stage::after { content:""; position:absolute; inset:0; pointer-events:none; z-index:1; }
@@ -461,6 +470,7 @@
       <img id="meIcon" src="me.svg" alt="You" title="Tap to choose your picture">
       <video id="meCam" muted playsinline hidden></video><span id="camRead" hidden></span>
       <button id="camBtn" title="Camera: let her see your face (it stays on this device)">&#128247;</button>
+      <button id="senseBtn" title="Mic and camera"></button>
       <input id="mePick" type="file" accept="image/*" hidden>
       <button id="actBtn" title="Do something">&#9995;</button>
       <div id="actFan"></div>
@@ -474,7 +484,7 @@
   </div>
 </div>
 <div id="stageBack"></div>
-<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 10</span><i id="heartMiss"></i></div><button id="rom30" title="Set the romance score to 30">♥ 30</button><div id="whiteOut"></div><button id="heartExit" hidden>Exit</button>
+<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 10</span><i id="heartMiss"></i></div><div id="whiteOut"></div><button id="heartExit" hidden>Exit</button>
 <div id="picView" hidden><img alt="Picture from Wizra"></div>
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
@@ -691,7 +701,7 @@ const heartGame = (() => {
   }
   function lose() { vig().classList.add('bad'); avatar.flash('grumpy', 3500); avatar.gesture('cringe', 1.8); avatar.emote('💢', 1800); WizraSound.fx('anger'); score('lose'); close(1400); }
   $('heartExit').onclick = () => close(0);
-  $('rom30').onclick = async () => { try { const r = await api('/api/settings', { sheet: { bond: { romance: 30 } } }); if (!r.ok) throw 0; if (sheet) (sheet.bond = sheet.bond || {}).romance = 30; const d = await (await fetch('/api/away')).json(); setPlace(d); addSys('Romance set to 30.'); } catch { addError('Could not set romance.'); } };
+  ($('rom30') || {}).onclick = async () => { try { const r = await api('/api/settings', { sheet: { bond: { romance: 30 } } }); if (!r.ok) throw 0; if (sheet) (sheet.bond = sheet.bond || {}).romance = 30; const d = await (await fetch('/api/away')).json(); setPlace(d); addSys('Romance set to 30.'); } catch { addError('Could not set romance.'); } };
   return { bonus, offer() { if (g.on || g.cur || away || phoneCall.on || Date.now() - g.last < 50000 || !avatar.canVisit()) return; spawn(true); }, state: g, start };
 })();
 
@@ -757,7 +767,7 @@ async function load() {
   log.textContent = '';
   for (const e of s.log) { e.who === 'sys' ? addSys(e.text) : addLine(e.who, e.text, e.pic); if (e.auto) lastAuto = Math.max(lastAuto, e.at); }
   unsendMarks(s.log);
-  if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; $('rom30').hidden = true; $('visitBtn').hidden = true; return; }
+  if (SANDBOX) { log.textContent = ''; addSys('Preview: nothing here touches your real chat.'); setPresence(null, null, true); input.disabled = true; input.placeholder = 'Preview only'; sendBtn.disabled = true; ($('rom30') || {}).hidden = true; $('visitBtn').hidden = true; return; }
   setMeThumb(s.me); plan = s.plan || null; setPresence(s.away, s.glow, true); setPlace(s); if (s.depart === 'say') depart();
   if (s.intro && window.WizraIntro && !introOn) firstMeet(s);
 }
@@ -1082,6 +1092,17 @@ async function camSet(on) {
 }
 $('camBtn').onclick = e => { e.stopPropagation(); if (!$('camBtn').classList.contains('wait')) camSet(!WizraCam.on); };
 $('meCam').onclick = () => camSet(false);
+// one button for what she can hear and see of you: the face on it says which. Tap to step through the four.
+const SENSE_FACE = (eyes, mouth, hood) => `<svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${hood ? '<path d="M4 29V15a12 12 0 0 1 24 0v14"/><path d="M9.500 28v-12a6.500 6.500 0 0 1 13 0v12" fill="rgba(255,255,255,.18)"/>' : '<circle cx="16" cy="16" r="12"/>' + (eyes ? '<circle cx="11.500" cy="13.500" r="1.300" fill="#fff"/><circle cx="20.500" cy="13.500" r="1.300" fill="#fff"/>' : '<path d="M4.500 11.500h23v4.500h-23z" fill="#fff"/><path d="M27.500 12l2.500-2M27.500 15.500l2.500 1.500"/>') + (mouth ? '<path d="M11 20.500a6 6 0 0 0 10 0z" fill="rgba(255,255,255,.25)"/>' : '<path d="M6 19.500h20v4.500h-20z" fill="#fff"/><circle cx="16" cy="21.800" r="1.600" fill="none" stroke="#3a2a5c" stroke-width="1.400"/>')}</svg>`;
+const SENSES = [['She can hear and see you', true, true], ['Camera off: she can hear you', false, true], ['Mic off: she can see you', true, false], ['Mic and camera off', false, false]];
+const senseNow = () => (WizraCam.on ? 0 : 1) + (voice.on ? 0 : 2) === 3 ? 3 : !WizraCam.on && voice.on ? 1 : WizraCam.on && !voice.on ? 2 : 0;
+function drawSense() { const i = senseNow(), [t, eyes, mouth] = SENSES[i]; if (drawSense.i === i) return; drawSense.i = i; $('senseBtn').innerHTML = SENSE_FACE(eyes, mouth, i === 3); $('senseBtn').title = t + ' (tap to change)'; }
+$('senseBtn').onclick = async e => { e.stopPropagation(); const n = (senseNow() + 1) % 4, [, cam, mic] = SENSES[n]; if (voice.on !== mic) voice.set({ on: mic }); if (WizraCam.on !== cam) await camSet(cam); drawSense(); };
+setInterval(drawSense, 700); setTimeout(drawSense, 50);
+// the page's backdrop is the player's own living room, out of focus: a picture of it is taken once her model (and the rooms) are up
+function roomBackdrop() { const old = localStorage.getItem('brenai.roombg'); if (old) { document.body.style.setProperty('--roombg', `url(${old})`); document.body.classList.add('hasroom'); }
+  let tries = 0; const go = async () => { try { const u = await avatar.snapshot({ kind: 'view', place: 'house' }); if (u && u.length > 2000) { document.body.style.setProperty('--roombg', `url(${u})`); document.body.classList.add('hasroom'); try { localStorage.setItem('brenai.roombg', u); } catch {} return; } } catch {} if (tries++ < 12) setTimeout(go, 3000); }; setTimeout(go, 5000); }
+roomBackdrop();
 if (localStorage.getItem('brenai.cam') && !new URLSearchParams(location.search).has('pip')) setTimeout(() => { if ($('login').style.display !== 'grid') camSet(true); }, 4000);
 $('mePick').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
