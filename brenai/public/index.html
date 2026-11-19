@@ -551,7 +551,7 @@ function split(text, who) {
   if (last < text.length) say(text.slice(last));
   return out;
 }
-const speechOf = (text, who) => split(text, who).filter(p => p.s).map(p => p.s).join(' ').replace(/["“”]/g, '').replace(/\s+/g, ' ').trim();
+const speechOf = (text, who) => split(text, who).filter(p => p.s).map(p => p.s).join(' ').replace(/["“”]/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f\u{1f3fb}-\u{1f3ff}]/gu, ' ').replace(/\s+/g, ' ').trim();   /* (her voice does not read emoji out) */
 
 // Bleep filter (display only; what she actually said is kept). Covers common words and their -ing/-ed/-s forms.
 const CUSS = /\b(f+u+c+k\w*|motherf\w*|sh[i1]t\w*|bullshit\w*|bitch\w*|bastard\w*|ass(hole|holes|hat|es)?|dumbass\w*|jackass\w*|damn\w*|goddamn\w*|hell|crap\w*|piss\w*|dick\w*|cock\w*|prick\w*|cunt\w*|twat\w*|wtf|stfu|lmfao)\b/gi;

@@ -113,6 +113,8 @@
 
   // ---- the controller: moods, passing expressions, touch, her reserve, the springs. The same for every renderer. ----
   // things she physically does, read from the actions in her reply: [pattern, gesture, seconds]
+  /* an emoji in her reply is her doing the thing: she sends an eye roll, she rolls her eyes */
+  const EMOJI_GEST = [[/\u{1F644}/u, 'eyeroll', 3.2], [/[\u{1F61B}-\u{1F61D}\u{1F92A}]/u, 'tongue', 3.2], [/\u{1F926}/u, 'facepalm', 4.5], [/\u{1F937}/u, 'shrug', 1.8], [/\u{1F44F}/u, 'clap', 4], [/\u{1F44B}/u, 'wave', 2.6], [/\u270C/u, 'peace', 3], [/\u{1FAF0}/u, 'fingerheart', 3.2], [/\u{1F44C}/u, 'oksign', 2.8], [/\u{1F91E}/u, 'crossed', 3], [/\u{1F595}/u, 'flipoff', 2.5], [/\u{1F971}/u, 'yawn', 3], [/[\u{1F618}\u{1F48B}]/u, 'kiss', 2.5], [/\u{1F64C}/u, 'cheer', 3.6], [/\u{1F914}/u, 'think', 5], [/\u{1F97A}/u, 'pout', 5], [/[\u{1F602}\u{1F923}]/u, 'laugh', 2.5], [/\u{1F92D}/u, 'chuckle', 3.4], [/\u{1F631}/u, 'eep', 3], [/\u{1F647}/u, 'bow', 2], [/\u{1F645}/u, 'crossarms', 5], [/\u{1F483}/u, 'dance', 4]];
   const GEST = [
     [/rolls? her eyes|eye[- ]?roll/i, 'eyeroll', 3.2], [/chuckl|snicker|soft laugh|laughs? (softly|quietly|under her breath)|huffs? a laugh/i, 'chuckle', 3.4], [/\bclap/i, 'clap', 4], [/face ?palm|buries her face in her hand|hand over her (face|eyes)|pinches the bridge of her nose/i, 'facepalm', 4.5],
     [/taps? her chin|strokes? her chin|hand (on|to) her chin|thinks? (about|for|it over)|ponders?|considers? (it|this|that|him|you)|mulls?|thoughtful/i, 'think', 5], [/cross(es|ed|ing)? her arms|folds? her arms|arms crossed|arms folded/i, 'crossarms', 6], [/hands? on her hips?|plants? her hands/i, 'hips', 5],
@@ -292,6 +294,7 @@
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) { const hit = ROUTINE.find(([re]) => re.test(m[1])); if (hit && R.doActivity) { R.doActivity(hit[1]); break; } }
         const found = [];
         for (const m of String(text).matchAll(/\*([^*]+)\*/g)) for (const [re, name, dur] of GEST) if (re.test(m[1])) { found.push([name, dur]); break; }
+        for (const [re, name, dur] of EMOJI_GEST) if (re.test(String(text)) && !found.some(f => f[0] === name)) found.push([name, dur]);
         let wait = 0; for (const [name, dur] of found.slice(0, 2)) { const hold = dur * (QUICK.has(name) ? 1 : 1.5); setTimeout(() => doGesture(name, hold), wait); wait += hold * 1000 + 1200; }   // each pose is held, then a breath before the next
         return found.map(f => f[0]);
       },

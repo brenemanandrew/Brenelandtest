@@ -303,7 +303,7 @@ function dropTags(text) {
 // be good with"), or the model trails off on its own ("You must be good with..."). If she has already said something whole,
 // the dangling end is dropped; if the fragment is all there is, it is closed with a full stop rather than left hanging.
 function dropDangling(text) {
-  const us = units(text), spoken = i => us[i].trim() && !us[i].trim().startsWith('*'), whole = u => /[.!?]["')\]]*$/.test(u.trim()) && !/(\.\.\.|\u2026)["')\]]*$/.test(u.trim());
+  const us = units(text), spoken = i => us[i].trim() && !us[i].trim().startsWith('*'), whole = u => /[\p{Extended_Pictographic}\u200d\ufe0f\u{1f3fb}-\u{1f3ff}]$/u.test(u.trim()) || (/[.!?]["')\]]*$/.test(u.trim()) && !/(\.\.\.|\u2026)["')\]]*$/.test(u.trim()));   /* (an emoji ends a thought as well as a full stop does: a lone eye roll is a whole reply) */
   let last = us.length - 1; while (last >= 0 && !us[last].trim()) last--;
   if (last < 0 || !spoken(last) || whole(us[last])) return text;
   const trailing = /(\.\.\.|\u2026)["')\]]*$/.test(us[last].trim()), short = us[last].trim().split(/\s+/).length <= 9;
