@@ -1045,6 +1045,14 @@ async function handle(req, res) {
       }
       // Rewind: undo everything said from a moment onward and put the world back to "she is home, nothing pending".
       // Works by timestamp only and answers with counts, never with the messages. The file as it was is kept beside it first.
+      // unsend: take back what the player said in the last N minutes (his own lines only; nothing else about the world changes).
+      // The save is copied first. Lines she has already answered stay answered: her replies are not removed.
+      if (url.pathname === '/api/unsend' && req.method === 'POST') {
+        const { minutes } = await readBody(req), m = Math.max(0.5, Math.min(24 * 60, +minutes || 0)); if (!(+minutes > 0)) return json(res, 400, { error: 'minutes?' }); if (busy) return json(res, 409, { error: 'busy' });
+        save(); const backup = cur().file.replace(/\.json$/, `.before-unsend-${Date.now()}.json`); try { fs.copyFileSync(cur().file, backup); } catch (e) { return json(res, 500, { error: 'could not back up: ' + e.message }); }
+        const t = Date.now() - m * 60000, before = db.log.length; db.log = db.log.filter(e => !(e.who === 'me' && e.at >= t)); save();
+        return json(res, 200, { ok: true, removed: before - db.log.length, kept: db.log.length, backup: path.basename(backup) });
+      }
       if (url.pathname === '/api/rewind' && req.method === 'POST') {
         const { to, rapport } = await readBody(req), t = Number(to);
         if (!Number.isFinite(t) || t < Date.now() - 7 * 86400000 || t > Date.now()) return json(res, 400, { error: 'to must be a time in the last week (ms)' });
