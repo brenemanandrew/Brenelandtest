@@ -873,6 +873,30 @@ export async function create(url, opts = {}) {
     spot('heart', hc.at); heartGlow.visible = true; heartGlow.position.copy(hc.at).addScaledVector(hc.pos.copy(camera.position).sub(hc.at).normalize(), 0.09); heartGlow.scale.setScalar(0.13 * (1 + 0.14 * Math.abs(Math.sin(t / 110)))); heartGlow.material.opacity = 1;
   }
   // ---- one-on-one time: she stands facing you at arm's length. You can look about a little and lean round her, but not walk off.
+  // ---- movie night as a film is shot: fixed cameras that cut from one to the next. You cannot walk; you can only glance around.
+  //   'couch'  from behind the couch: the backs of two heads, the TV past them, the couch heavy and dark in front
+  //   'side'   from your seat, turned to watch her watch the film
+  //   'toss'   from your seat, leaning round to face her: the popcorn game
+  // Line weight does the depth: every box in the room gets a dark shell whose thickness depends on how near the camera it is.
+  const mv = { on: false, view: 'couch', lx: 0, ly: 0, b: 0, cutAt: 0, pose: 0 }, mvPos = new THREE.Vector3(), mvTgt = new THREE.Vector3(), shellMat = new THREE.MeshBasicMaterial({ color: '#1a1226', side: THREE.BackSide }), shells = [];
+  // you, seen from behind: a plain stand-in until a real model of the player is added
+  const man = new THREE.Group(); { const skin = kit.toon ? kit.toon('#e8b991') : new THREE.MeshToonMaterial({ color: '#e8b991' }), hair = new THREE.MeshToonMaterial({ color: '#3a2a20' }), tee = new THREE.MeshToonMaterial({ color: '#5b6b8a' }), add = (g, m, x, y, z, sx = 1, sy = 1, sz = 1) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); man.add(o); const sh = new THREE.Mesh(g, shellMat); sh.scale.setScalar(1.09); o.add(sh); return o; };
+    add(new THREE.SphereGeometry(0.108, 20, 16), skin, 0, 0, 0, 1, 1.12, 1.02); add(new THREE.SphereGeometry(0.116, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), hair, 0, 0.012, -0.012, 1.02, 1.12, 1.06); add(new THREE.SphereGeometry(0.03, 10, 8), skin, -0.112, -0.01, 0.0, 0.6, 1, 0.8); add(new THREE.SphereGeometry(0.03, 10, 8), skin, 0.112, -0.01, 0.0, 0.6, 1, 0.8);
+    add(new THREE.CylinderGeometry(0.05, 0.058, 0.12, 14), skin, 0, -0.15, -0.005); add(new THREE.CapsuleGeometry(0.105, 0.3, 6, 14), tee, 0, -0.29, -0.01, 1, 1, 0.8).rotation.z = Math.PI / 2; add(new THREE.CylinderGeometry(0.2, 0.18, 0.42, 16), tee, 0, -0.5, -0.01, 1, 1, 0.62);
+    man.visible = false; scene.add(man); }
+  function movieShells() { for (const o of tagged) { if (o.userData.place !== 'house' || !o.geometry || o.geometry.type !== 'BoxGeometry') continue; let sh = o.userData.shell; if (!mv.on) { if (sh) sh.visible = false; continue; }
+      if (!sh) { sh = o.userData.shell = new THREE.Mesh(o.geometry, shellMat); o.add(sh); shells.push(sh); } const p = o.geometry.parameters, d = o.getWorldPosition(tmpA).distanceTo(mvPos), w = d < 1.7 ? 0.03 : d < 3.2 ? 0.014 : 0.006;   /* near: a heavy line; across the room: a hair */
+      sh.scale.set(1 + 2 * w / Math.max(0.02, p.width), 1 + 2 * w / Math.max(0.02, p.height), 1 + 2 * w / Math.max(0.02, p.depth)); sh.visible = true; } }
+  function movieSpot(view) { const seat = places.seat.house, tall = Math.max(1, 0.75 / camera.aspect); head.getWorldPosition(tmpB);
+    if (view === 'side') { mvPos.set(seat.at[0] - 0.05, seat.h, seat.at[1] + 0.32); mvTgt.set(tmpB.x, tmpB.y - 0.06, tmpB.z + 0.12); }
+    else if (view === 'toss') { mvPos.set(seat.at[0] - 0.12, seat.h, seat.at[1] + 0.5 * tall); mvTgt.set(tmpB.x, tmpB.y - 0.08, tmpB.z); }
+    else { const b = places.bounds && places.bounds.house, back = seat.at[1] - 1.5 * tall; mvPos.set((tmpB.x + seat.at[0]) / 2, seat.h + 0.95, b ? Math.max(b.z0 + 0.12, back) : back); mvTgt.copy(places.tv.at); mvTgt.y -= 0.75;   /* high enough to see both heads over the couch back, tipped down so the TV sits above them */ mvTgt.x = (mvTgt.x + mvPos.x) / 2; } }
+  function movieMode(on, view) { on = !!on && here === 'house'; if (view && ['couch', 'side', 'toss'].includes(view) && view !== mv.view) { mv.view = view; mv.lx = mv.ly = 0; mv.cutAt = performance.now(); } if (on === mv.on) { if (on) { movieSpot(mv.view); movieShells(); } return mv.on; }
+    mv.on = on; mv.lx = mv.ly = 0; if (on) { mv.cutAt = performance.now(); movieSpot(mv.view); } movieShells(); if (!on) man.visible = false; return mv.on; }
+  function movieLook(dx, dy) { if (!mv.on) return; mv.lx = Math.max(-0.7, Math.min(0.7, mv.lx - dx * 0.004)); mv.ly = Math.max(-0.4, Math.min(0.4, mv.ly - dy * 0.003)); }
+  function movieCamera(dt) { mv.pose += ((mv.on && rt.act === 'sit' ? 1 : 0) - mv.pose) * Math.min(1, dt * 2); if (!mv.on) return; if (here !== 'house') { movieMode(false); return; } fp.locked = true; movieSpot(mv.view);
+    const seat = places.seat.house; man.visible = mv.view === 'couch'; man.position.set(seat.at[0], seat.h + 0.05, seat.at[1] - 0.16); man.rotation.y = 0.08;
+    camera.position.copy(mvPos); camera.lookAt(mvTgt); camera.rotateY(mv.lx); camera.rotateX(mv.ly); }
   const hg = { on: false, yaw: 0, lookX: 0, lookY: 0, dist: 1.9, b: 0 };
   function hang(on) { on = !!on; if (on === hg.on) return; hg.on = on; hg.yaw = hg.lookX = hg.lookY = 0; hg.dist = 1.9;
     for (const ms of [900, 2200, 3600]) setTimeout(() => { if (vrm.springBoneManager) vrm.springBoneManager.reset(); }, ms);   // her hair and skirt are put at rest as the view cuts over, so nothing is caught mid-swing
@@ -986,7 +1010,7 @@ export async function create(url, opts = {}) {
     walkTo, holdClip, where: () => [rt.k > 0.5 ? rt.x : 0, rt.k > 0.5 ? rt.z : hip.z], clips: () => Object.keys(CLIPS), gestures: () => Object.keys(GESTURE).filter(n => n !== 'test'),
     // what the Studio needs to draw the rooms without her model: floor height, each room's walls and the built-in furniture's footprints
     layout: () => ({ floorY, hipZ: hip.z, bounds: { dorm: places.bounds.dorm, house: places.bounds.house }, solid: places.baseSolid, anchors: { seat: [0, hip.z], stand: STAND_AT, shelf: AT_SHELF, counter: AT_COUNTER, door: DOOR, bed: places.bed.side } }),
-    look(dx, dy) { if (!fp.on || fp.locked) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
+    look(dx, dy) { if (mv.on) return movieLook(dx, dy); if (!fp.on || fp.locked) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
     zoom(d) { if (focusWant > 0) return true; if (inCall || !document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
     locate(e) { // screen -> puppet space, measured from her eye line
@@ -1000,7 +1024,7 @@ export async function create(url, opts = {}) {
       frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; Object.assign(bz, { mode: 'cut', shot: 0 }); if (!on) heartGlow.visible = false; },
     bonusShot() { bz.shot++; frozeAt = performance.now(); },
     bonusOrbit(dx, dy, dz) { bz.yaw -= dx * 0.008; bz.pitch = Math.max(-0.05, Math.min(1.25, bz.pitch + dy * 0.006)); bz.dist = Math.max(0.5, Math.min(2.8, bz.dist * (1 + dz))); },
-    bonusHit, hang, hangView, hangZone, hangMouth,
+    bonusHit, hang, hangView, hangZone, hangMouth, movieMode, movieLook,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
@@ -1020,10 +1044,10 @@ export async function create(url, opts = {}) {
         if (clipFace) { const useFine = fine.has && clipFace.mFun !== undefined; if (useFine) { fine.set(clipFace); fineOn = true; } for (const k in clipFace) if (em.getExpression(k) && !(useFine && WHOLE.includes(k))) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
-      heartCamera(s.dt, s.t); hangCamera(s.dt);
+      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
-      const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp;   // the TV is on and nobody is talking
+      const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp && !(mv.on && mv.view === 'toss');   // the TV is on and nobody is talking
       if (rt.gazeProp) target.position.copy(rt.gazeProp.position); else if (watching) target.position.copy(places.tv.at); else { target.position.copy(camera.position); target.position.x += s.look.x * 0.22; target.position.y -= s.look.y * 0.16; if (gx.eyes[0] || gx.eyes[1]) { const yw = vrm.scene.rotation.y; target.position.x -= Math.cos(yw) * gx.eyes[0]; target.position.z += Math.sin(yw) * gx.eyes[0]; target.position.y += gx.eyes[1]; } }
       let facing = rt.stand > 0.5 ? 0 : camYaw * 0.55, tip = 0; // seated she turns her head to you; on her feet her whole body does
       { // wherever you are watching from (your seat across from her, or anywhere in the room on a visit) and however she is sitting or standing, her head turns to you as far as a neck goes, and tips up if you are standing over her
