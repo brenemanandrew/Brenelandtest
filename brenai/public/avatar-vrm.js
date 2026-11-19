@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { buildPlaces, cel } from './places.js';
+import { bodyFix } from './bodyfix.js';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
 const EXPR = {
@@ -249,7 +250,7 @@ export async function create(url, opts = {}) {
       yoga_moon: pose(1, { leftUpperLeg: [0, 0, 0], rightUpperLeg: [0, 0, 0] }, { ...UP, leftLowerLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], spine: [0, 0, 0.22], chest: [0, 0, 0.2], head: [0, 0, 0.12] }),
       yoga_sit: pose(0.13, { leftUpperLeg: [-1.45, 0.08, 0], rightUpperLeg: [-1.45, -0.08, 0] }, { leftLowerLeg: [2.6, 0, 0], rightLowerLeg: [2.6, 0, 0], leftFoot: [0.6, 0, 0], rightFoot: [0.6, 0, 0], leftUpperArm: [-0.32, -0.3, -1.15], rightUpperArm: [-0.32, 0.3, 1.15], leftLowerArm: [0, -1.85, 0], rightLowerArm: [0, 1.85, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.08, 0, 0] }),   // kneeling, sitting back on her heels, palms together
     }); }
-  const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(); let clipHip = 0, clipFace = null;
+  const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(), fixBody = bodyFix(THREE, vrm); let clipHip = 0, clipFace = null;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
     const c = CLIPS[name]; if (!c || weight < 0.003) return false;
     const f = ((t % c.dur + c.dur) % c.dur) * c.fps, i0 = Math.min(c.n - 1, Math.floor(f)), i1 = Math.min(c.n - 1, i0 + 1), a = f - i0;
@@ -1032,6 +1033,7 @@ export async function create(url, opts = {}) {
       // shoulders ride up with tension (unless a gesture is using them), hips bounce
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
+      if (window.WIZRA_FIX) { let soft = Math.max(rt.lie || 0, hpose.on ? 1 : 0); for (const n in SEATED) soft = Math.max(soft, rt.lg[n] || 0); fixBody(1 - Math.min(1, soft)); }   // her arms and legs keep out of her own body (not in the recorded curled-up and lying poses, which fold her on purpose)
       vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
       placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now()); quality(performance.now());
       if (cinema && places.power) { const f = 0.5 + 0.5 * Math.sin(s.t / 140) * Math.sin(s.t / 370); screenLight.color.set(cinema); screenLight.intensity = 1.2 + 1.3 * f; if (here === 'house') screenLight.position.copy(places.tv.at).add(tmpB.set(0, 0, 0.35)); else screenLight.position.set(0.2, floorY + 1.25, hip.z + 2.4); } else screenLight.intensity = 0;

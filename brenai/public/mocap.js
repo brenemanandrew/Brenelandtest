@@ -5,9 +5,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { bodyFix } from './bodyfix.js';
 
 const LIB = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14', MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 const FACE_MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const HAND_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 const $ = id => document.getElementById(id), FPS = 30;
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z), Q = () => new THREE.Quaternion();
 // each bone that follows a body segment: [bone, its parent bone, from point, to point, the way it points at rest]
@@ -25,25 +27,37 @@ export function solve(lm, o = {}) {
   const P = lm.map(p => V(o.mirror ? -p.x : p.x, -p.y, -p.z)), vis = i => (lm[i].visibility === undefined ? 1 : lm[i].visibility), mid = (a, b) => P[a].clone().add(P[b]).multiplyScalar(0.5);
   const L = o.mirror ? { 11: 12, 12: 11, 13: 14, 14: 13, 15: 16, 16: 15, 19: 20, 20: 19, 23: 24, 24: 23, 25: 26, 26: 25, 27: 28, 28: 27, 7: 8, 8: 7 } : null, ix = i => (L && L[i] !== undefined ? L[i] : i);
   const pt = i => P[ix(i)], hipC = pt(23).clone().add(pt(24)).multiplyScalar(0.5), shC = pt(11).clone().add(pt(12)).multiplyScalar(0.5), up = shC.clone().sub(hipC);
-  const legs = Math.min(vis(25), vis(26), vis(27), vis(28)) > 0.55 && !o.upper, world = {}, q = {};
+  const SEEN = 0.62, hipsSeen = Math.min(vis(23), vis(24)) > SEEN, shSeen = Math.min(vis(11), vis(12)) > SEEN, legs = hipsSeen && Math.min(vis(25), vis(26), vis(27), vis(28)) > SEEN && !o.upper, world = {}, q = {};
+  if (!hipsSeen) up.set(0, 1, 0);   // hips out of the picture (sitting at a desk): the tracker only guesses where they are, so her body stays upright and just turns with your shoulders
   world.hips = legs ? basis(pt(23).clone().sub(pt(24)), up) : basis(V(pt(23).x - pt(24).x, 0, pt(23).z - pt(24).z).lengthSq() > 1e-6 && !o.upper ? pt(23).clone().sub(pt(24)) : V(1, 0, 0), legs ? up : V(0, 1, 0));
   if (!legs) world.hips = Q();                                                    // sitting at a desk: her hips stay put and only the top half follows
-  q.hips = world.hips.clone();
-  world.chest = basis(pt(11).clone().sub(pt(12)), up); const torso = world.hips.clone().invert().multiply(world.chest);
-  q.spine = Q().slerp(torso, 0.5); q.chest = q.spine.clone().invert().multiply(torso);   // the turn between hips and shoulders, shared by spine and chest
+  q.hips = legs ? world.hips.clone() : null;
+  world.chest = shSeen ? basis(pt(11).clone().sub(pt(12)), up) : world.hips.clone(); const torso = world.hips.clone().invert().multiply(world.chest);
+  if (shSeen) { q.spine = Q().slerp(torso, 0.5); q.chest = q.spine.clone().invert().multiply(torso); } else { q.spine = null; q.chest = null; }   // the turn between hips and shoulders, shared by spine and chest
   // head: ears give its side-to-side line, the nose its front
   const ears = pt(7).clone().sub(pt(8)), nose = pt(0).clone().sub(mid(ix(7), ix(8))), hx = ears.clone().normalize(), hz = nose.clone().sub(hx.clone().multiplyScalar(nose.dot(hx))).normalize(), hy = hz.clone().cross(hx).normalize();
   const headW = Q().setFromRotationMatrix(new THREE.Matrix4().makeBasis(hx, hy, hz)).multiply(Q().setFromAxisAngle(V(1, 0, 0), 0.32)), neck = world.chest.clone().invert().multiply(headW);   // (a level head has the nose a little below the ears)
-  q.neck = Q().slerp(neck, 0.4); q.head = q.neck.clone().invert().multiply(neck); world.head = headW;
+  if (Math.min(vis(0), vis(7), vis(8)) > SEEN) { q.neck = Q().slerp(neck, 0.4); q.head = q.neck.clone().invert().multiply(neck); } else { q.neck = null; q.head = null; } world.head = headW;
   for (const [bone, parent, a, b, rest] of LIMBS) {
     const isLeg = /Leg/.test(bone); if (isLeg && !legs) { q[bone] = Q(); world[bone] = (world[parent] || Q()).clone(); continue; }
-    const dir = pt(b).clone().sub(pt(a)); if (dir.lengthSq() < 1e-8 || Math.min(vis(ix(a)), vis(ix(b))) < 0.3) { q[bone] = null; world[bone] = (world[parent] || Q()).clone(); continue; }
+    const dir = pt(b).clone().sub(pt(a)); if (dir.lengthSq() < 1e-8 || Math.min(vis(ix(a)), vis(ix(b))) < SEEN || (!isLeg && !shSeen)) { q[bone] = null; world[bone] = (world[parent] || Q()).clone(); continue; }   // a limb the camera cannot see is left alone
     const local = dir.normalize().applyQuaternion(world[parent].clone().invert()); q[bone] = Q().setFromUnitVectors(rest, local); world[bone] = world[parent].clone().multiply(q[bone]);
   }
   const ank = (pt(27).y + pt(28).y) / 2, hipH = hipC.y - ank;                      // hip height off the ankles, for crouching and jumping
   return { q, legs, hipH: legs ? hipH : 0 };
 }
 
+// ---- a hand's 21 points -> how far each finger joint is bent (radians): { Thumb: [a, b, c], Index: [...], ... } ----
+export function fingersOf(lm) {
+  const P = lm.map(p => V(p.x, p.y, p.z)), ang = (i, j, k) => { const u = P[j].clone().sub(P[i]), w = P[k].clone().sub(P[j]); return u.lengthSq() < 1e-10 || w.lengthSq() < 1e-10 ? 0 : u.angleTo(w); }, out = {};
+  [['Thumb', 1], ['Index', 5], ['Middle', 9], ['Ring', 13], ['Little', 17]].forEach(([name, i]) => { out[name] = name === 'Thumb' ? [ang(0, 1, 2) * 0.5, ang(1, 2, 3), ang(2, 3, 4)] : [ang(0, i, i + 1), ang(i, i + 1, i + 2), ang(i + 1, i + 2, i + 3)]; });
+  return out;
+}
+// finger bends -> her finger bones (the thumb folds across the palm, the others curl)
+const fingerBones = (side, bends) => { const k = side === 'left' ? -1 : 1, q = {}; for (const f in bends) { const [a, b, c] = bends[f];
+    if (f === 'Thumb') { q[side + 'ThumbMetacarpal'] = Q().setFromAxisAngle(V(0, 1, 0), -k * a).toArray(); q[side + 'ThumbProximal'] = Q().setFromAxisAngle(V(0, 1, 0), -k * b).toArray(); q[side + 'ThumbDistal'] = Q().setFromAxisAngle(V(0, 1, 0), -k * c).toArray(); }
+    else { q[side + f + 'Proximal'] = Q().setFromAxisAngle(V(0, 0, 1), k * a).toArray(); q[side + f + 'Intermediate'] = Q().setFromAxisAngle(V(0, 0, 1), k * b).toArray(); q[side + f + 'Distal'] = Q().setFromAxisAngle(V(0, 0, 1), k * c).toArray(); } } return q; };
+const curled = v => ({ Thumb: [v * 0.5, v * 0.7, v * 0.6], Index: [v * 1.4, v * 1.6, v * 1.1], Middle: [v * 1.4, v * 1.6, v * 1.1], Ring: [v * 1.4, v * 1.6, v * 1.1], Little: [v * 1.4, v * 1.6, v * 1.1] });
 // ---- your face -> her expressions (VRM's own set) and the turn of her head ----
 export function faceOf(b, mirror) {
   const avg = (a, c) => ((b[a] || 0) + (b[c] || 0)) / 2, cl = v => +Math.max(0, Math.min(1, v)).toFixed(3), L = mirror ? 'Right' : 'Left', R = mirror ? 'Left' : 'Right';
@@ -90,26 +104,32 @@ export async function start() {
   const size = () => { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); }; addEventListener('resize', size); size();
 
   // the pose she is in right now (what the camera, a key, the sliders or the take's playhead last said)
-  const pose = { q: {}, hip: 1, f: null }; for (const n of BONES) pose.q[n] = Q(); const curl = { left: 0.15, right: 0.15 }, em = vrm.expressionManager, hasX = n => em && em.getExpression(n);
+  const pose = { q: {}, hip: 1, f: null }; for (const n of BONES) pose.q[n] = Q(); const F5 = () => ({ Thumb: 0.15, Index: 0.15, Middle: 0.15, Ring: 0.15, Little: 0.15 }), curl = { left: F5(), right: F5() }, hands = { left: null, right: null }, fix = bodyFix(THREE, vrm), em = vrm.expressionManager, hasX = n => em && em.getExpression(n);
   const rest = () => { for (const n of BONES) pose.q[n].identity(); pose.q.leftUpperArm.setFromAxisAngle(V(0, 0, 1), -1.25); pose.q.rightUpperArm.setFromAxisAngle(V(0, 0, 1), 1.25); pose.hip = 1; }; rest();
-  const snapshot = () => { const q = {}; for (const n of BONES) q[n] = pose.q[n].toArray(); for (const s of ['left', 'right']) for (const f of FINGERS) for (const j of JOINTS) q[s + f + j] = Q().setFromAxisAngle(V(0, 0, 1), (s === 'left' ? -1 : 1) * curl[s] * (j === 'Proximal' ? 1.4 : j === 'Intermediate' ? 1.6 : 1.1)).toArray(); return { q, hip: pose.hip, ...(pose.f ? { f: { ...pose.f } } : {}) }; };
+  const snapshot = () => { const q = {}; for (const n of BONES) q[n] = pose.q[n].toArray(); for (const side of ['left', 'right']) { const seen = hands[side] && performance.now() - hands[side].at < 700, bends = seen ? hands[side].bends : Object.fromEntries(Object.entries(curl[side]).map(([f, v]) => [f, curled(v)[f]])); Object.assign(q, fingerBones(side, bends)); } return { q, hip: pose.hip, ...(pose.f ? { f: { ...pose.f } } : {}) }; };
   const show = fr => { for (const n in fr.q) { const b = B(n); if (b) b.quaternion.fromArray(fr.q[n]); } hipsNode.position.y = hipY0 * (fr.hip || 1); if (em) for (const k of FACE_KEYS) if (hasX(k)) em.setValue(k, fr.f ? fr.f[k] || 0 : 0); };
 
   // ---- camera and tracker ----
-  const video = $('cam'); let tracker = null, faceTracker = null, stream = null, live = false, standH = 0, tick = 0; const opt = { mirror: true, upper: false, face: true };
+  const video = $('cam'); let tracker = null, faceTracker = null, handTracker = null, stream = null, live = false, standH = 0, tick = 0; const opt = { mirror: true, upper: false, face: true, hands: true, solid: true };
   // your face: her expression, and a truer turn of the head than the body tracker's ears and nose give
-  window.mocapFace = (shapes, m) => { pose.f = faceOf(shapes, opt.mirror); if (m) { const k = opt.mirror ? -1 : 1, yaw = Math.atan2(m[8], m[10]) * k, pitch = Math.asin(Math.max(-1, Math.min(1, -m[9]))), roll = Math.atan2(m[1], m[5]) * k, e = new THREE.Euler(); pose.q.neck.slerp(Q().setFromEuler(e.set(-pitch * 0.4, yaw * 0.4, -roll * 0.4)), 0.5); pose.q.head.slerp(Q().setFromEuler(e.set(-pitch * 0.6, yaw * 0.6, -roll * 0.6)), 0.5); pose.faceHead = performance.now(); } return pose.f; };
-  window.mocapFeed = lm => { const s = solve(lm, opt), faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.legs) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n]; if (t) pose.q[n].slerp(t, opt.snap ? 1 : 0.55); } pose.hip = s.legs && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
+  window.mocapFace = (shapes, m) => { pose.f = faceOf(shapes, opt.mirror); if (m) { const k = opt.mirror ? -1 : 1, yaw = Math.atan2(m[8], m[10]) * k, pitch = Math.asin(Math.max(-1, Math.min(1, -m[9]))), roll = Math.atan2(m[1], m[5]) * k, e = new THREE.Euler(); const tn = Q().setFromEuler(e.set(-pitch * 0.4, yaw * 0.4, -roll * 0.4)), th = Q().setFromEuler(e.set(-pitch * 0.6, yaw * 0.6, -roll * 0.6)); pose.q.neck.slerp(tn, Math.max(0.08, Math.min(0.5, pose.q.neck.angleTo(tn) / 0.3))); pose.q.head.slerp(th, Math.max(0.08, Math.min(0.5, pose.q.head.angleTo(th) / 0.3))); pose.faceHead = performance.now(); } return pose.f; };
+  let lmPrev = null; const calm = lm => { if (!lmPrev || lmPrev.length !== lm.length) { lmPrev = lm.map(p => ({ ...p })); return lmPrev; } for (let i = 0; i < lm.length; i++) { const a = lmPrev[i], b = lm[i], d = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), k = Math.max(0.15, Math.min(0.8, d / 0.06)); a.x += (b.x - a.x) * k; a.y += (b.y - a.y) * k; a.z += (b.z - a.z) * k; a.visibility = b.visibility; } return lmPrev; };
+  window.mocapFeed = lm0 => { const lm = opt.snap ? lm0 : calm(lm0), s = solve(lm, opt), faceHead = performance.now() - (pose.faceHead || 0) < 600; if (s.legs) { standH = Math.max(standH, s.hipH); } for (const n of BONES) { if (faceHead && (n === 'head' || n === 'neck')) continue; const t = s.q[n]; if (t) { const ang = pose.q[n].angleTo(t); pose.q[n].slerp(t, opt.snap ? 1 : Math.max(0.08, Math.min(0.55, ang / 0.5))); } } /* a small wobble is damped hard, a real move follows fast */ pose.hip = s.legs && standH ? Math.max(0.3, Math.min(1.25, s.hipH / standH)) : 1; return s; };   // (also the test hook: canned landmarks)
   async function camOn() {
     try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }); } catch { return say('The camera was not allowed or could not be opened.'); }
     video.srcObject = stream; await video.play().catch(() => {}); $('camBtn').classList.add('on'); say('Loading the body tracker (first time takes a moment)...');
     try { if (!tracker) { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); tracker = await vision.PoseLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numPoses: 1 }); } } catch (e) { return say('The body tracker could not load: ' + (e.message || 'network')); }
-    live = true; standH = 0; say('Step back so the camera sees you. Stand straight for a second so it learns your height.'); loadFace();
+    live = true; standH = 0; say('Step back so the camera sees you. Stand straight for a second so it learns your height.'); loadFace(); loadHands();
   }
+  async function loadHands() { if (handTracker || !opt.hands) return; try { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); handTracker = await vision.HandLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: HAND_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2 }); } catch {} }
   async function loadFace() { if (faceTracker || !opt.face) return; try { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm'); faceTracker = await vision.FaceLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: FACE_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true }); } catch {} }
   function camOff() { live = false; if (stream) for (const t of stream.getTracks()) t.stop(); stream = null; video.srcObject = null; $('camBtn').classList.remove('on'); say('Camera off.'); }
-  $('camBtn').onclick = () => (stream ? camOff() : camOn()); $('mirror').onchange = e => { opt.mirror = e.target.checked; video.style.transform = opt.mirror ? 'scaleX(-1)' : ''; }; $('upper').onchange = e => { opt.upper = e.target.checked; }; $('face').onchange = e => { opt.face = e.target.checked; if (!opt.face) pose.f = null; else if (live) loadFace(); };
-  for (const s of ['left', 'right']) $(s + 'Curl').oninput = e => { curl[s] = +e.target.value; };
+  $('camBtn').onclick = () => (stream ? camOff() : camOn()); $('mirror').onchange = e => { opt.mirror = e.target.checked; video.style.transform = opt.mirror ? 'scaleX(-1)' : ''; }; $('upper').onchange = e => { opt.upper = e.target.checked; }; $('face').onchange = e => { opt.face = e.target.checked; if (!opt.face) pose.f = null; else if (live) loadFace(); }; $('handsOn').onchange = e => { opt.hands = e.target.checked; if (!opt.hands) hands.left = hands.right = null; else if (live) loadHands(); }; $('solid').onchange = e => { opt.solid = e.target.checked; };
+  // each finger by hand: pick which hand, then a slider a finger
+  const fingerSliders = () => { const side = $('handSel').value === 'right' ? 'right' : 'left'; for (const f of ['Thumb', ...FINGERS]) $('f' + f).value = curl[side][f]; };
+  $('handSel').onchange = fingerSliders; for (const f of ['Thumb', ...FINGERS]) $('f' + f).oninput = e => { const sel = $('handSel').value; for (const side of sel === 'both' ? ['left', 'right'] : [sel]) curl[side][f] = +e.target.value; }; fingerSliders();
+  // your hands seen by the camera: which of hers each one drives depends on the mirror
+  window.mocapHands = list => { for (const h of list) { const mine = h.label === 'Left' ? 'right' : 'left', side = opt.mirror ? (mine === 'left' ? 'right' : 'left') : mine; hands[side] = { bends: fingersOf(h.points), at: performance.now() }; } };
 
   // ---- recording and the take ----
   let rec = null, take = null, play = { on: false, t: 0 }, saved = {};
@@ -151,10 +171,12 @@ export async function start() {
   (function frame(now) {
     requestAnimationFrame(frame); const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (live && tracker && video.readyState >= 2 && !(play.on && !rec)) { let r = null; try { r = tracker.detectForVideo(video, now); } catch {} const lm = r && r.worldLandmarks && r.worldLandmarks[0]; if (lm) { const s = window.mocapFeed(lm); if (!rec) say((s.legs ? 'Tracking your whole body' : 'Tracking your top half (step back for legs)') + (pose.f ? ' and your face.' : '.')); } else if (!rec) say('I cannot see you. Step into view.');
+      if (opt.hands && handTracker && tick % 2 === 1) { let hr = null; try { hr = handTracker.detectForVideo(video, now + 2); } catch {} if (hr && hr.worldLandmarks && hr.worldLandmarks.length) window.mocapHands(hr.worldLandmarks.map((points, i) => ({ points, label: ((hr.handedness || hr.handednesses || [])[i] || [{}])[0].categoryName || 'Right' }))); }
       if (opt.face && faceTracker && tick++ % 2 === 0) { let fr = null; try { fr = faceTracker.detectForVideo(video, now + 1); } catch {} const sh = fr && fr.faceBlendshapes && fr.faceBlendshapes[0]; if (sh) { const b = {}; for (const c of sh.categories) b[c.categoryName] = c.score; window.mocapFace(b, fr.facialTransformationMatrixes && fr.facialTransformationMatrixes[0] && fr.facialTransformationMatrixes[0].data); } else if (performance.now() - (pose.faceHead || 0) > 1500) pose.f = null; } }
     if (rec) while (now >= rec.next) { rec.frames.push(snapshot()); rec.next += 1000 / FPS; if (rec.frames.length >= 30 * 60) { $('recBtn').click(); break; } }
     if (take && (play.on || !live) && !rec) { const c = built(), n = c.n; if (play.on) play.t = (play.t + dt / c.dur) % 1; const i = Math.min(n - 1, Math.floor(play.t * n)), fr = { q: {}, hip: c.hips[i * 3 + 1] }; for (const b in c.bones) fr.q[b] = c.bones[b].slice(i * 4, i * 4 + 4); if (c.face) { fr.f = {}; for (const k in c.face) fr.f[k] = c.face[k][i]; } if (play.on || document.activeElement === $('scrub')) { show(fr); $('scrub').value = play.t; } else show(snapshot()); $('playBtn').classList.toggle('on', play.on); }
     else show(snapshot());
+    if (opt.solid) fix(1);   // her arms and legs keep out of her own body
     vrm.update(dt); camera.position.set(Math.sin(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist, 0.95 + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * Math.cos(orbit.pitch) * orbit.dist); camera.lookAt(0, 0.9, 0); renderer.render(scene, camera);
   })(last);
   window.mocapDbg = { pose, keys, get take() { return take; }, built, solve };
