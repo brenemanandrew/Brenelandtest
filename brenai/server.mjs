@@ -579,6 +579,8 @@ const SHOP = {
 const SPOTS = { gift: [[2.65, 2.55, -0.8], [1.9, 1.45, -0.5], [-1.6, 0.15, 0.6], [2.7, -1.2, -0.4], [1.65, 2.95, 3.14], [2.3, 0.0, -1.2], [-0.45, 1.35, 0.3], [2.75, 1.5, -1.57]],
   decor: [[1.5, 2.0, -0.6], [2.3, 1.0, -1.2], [-3.3, 0.6, 1.2], [-0.4, 2.7, 0.2], [1.1, 3.7, 3.14], [-3.1, 2.1, 1.4], [0.9, 0.9, 0], [2.6, 2.9, -2.2]] };
 const WALL = { picture: 1.4, stringlights: 1.95 };   // these hang: against the back wall, at this height
+const HANG_LV = [40, 110, 220, 380, 600];   // xp for each level of the one-on-one skill
+const hangView = () => { const xp = db.hangXp | 0, lvl = HANG_LV.filter(v => xp >= v).length, base = lvl ? HANG_LV[lvl - 1] : 0; return { lvl, xp: xp - base, need: (HANG_LV[lvl] || HANG_LV[HANG_LV.length - 1] + 400) - base }; };
 const earn = n => { db.coins = Math.max(0, (db.coins | 0) + n); };
 const shopView = () => ({ coins: db.coins | 0, gift: SHOP.gift.map(([id, name, price]) => ({ id, name, price, have: (db.gifts || []).filter(g => g.kind === id).length })), decor: SHOP.decor.map(([id, name, price]) => ({ id, name, price, have: (db.decor || []).filter(g => g.kind === id).length })), room: { gift: SPOTS.gift.length - (db.gifts || []).length, decor: SPOTS.decor.length - (db.decor || []).length } });
 // what this player's own things add to the rooms (the page lays them over the shared maps)
@@ -772,7 +774,7 @@ async function handle(req, res) {
         if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/anims/clip', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
-      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), extras: extrasView(), coins: db.coins | 0, wx: db.wx || shared.wx || null, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
+      if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), hang: hangView(), extras: extrasView(), coins: db.coins | 0, wx: db.wx || shared.wx || null, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
       // a new player's first minutes: a few picture questions set her temperament for them (theirs alone), then she is "matched"
       // and opens their first conversation herself.
@@ -845,6 +847,19 @@ async function handle(req, res) {
             db.log.push({ who: 'her', text, at: Date.now() }); save(); return json(res, 200, { ...placeView(), text, over });
           } catch (e) { db.log.pop(); return json(res, 200, { ...placeView(), text: '' }); } finally { busy = false; } }
         save(); return json(res, 200, placeView());
+      }
+      // one-on-one time is over: what he did is added up here, with caps, so the page cannot simply claim points
+      if (url.pathname === '/api/hang' && req.method === 'POST') {
+        const b = await readBody(req), n = (v, max) => Math.max(0, Math.min(max, Math.round(+v || 0))), poke = n(b.poke, 10), snack = n(b.snack, 20), pose = n(b.pose, 10), strikes = n(b.strikes, 3), rub = (Array.isArray(b.rub) ? b.rub : []).map(x => String(x).replace(/[^a-z ]/gi, '').slice(0, 30)).filter(Boolean).slice(0, 4);
+        const h = hangView(), now = Date.now(), quick = now - (db.hangAt || 0) < 150000, mult = quick ? 0 : 1 + 0.1 * h.lvl;   // (back again within a couple of minutes: nothing more to earn yet)
+        const romance = (poke * 0.5 + snack * 0.2 + rub.length * 2) * mult, xp = quick ? 0 : Math.min(120, poke + snack * 3 + rub.length * 5 + pose);
+        db.hangFrac = (db.hangFrac || 0) + romance; const whole = Math.floor(db.hangFrac); db.hangFrac -= whole; if (whole > 0) addBond('romance', whole);
+        db.sheet.rapport = Math.max(0, Math.min(100, db.sheet.rapport + (quick ? 0 : Math.min(2, rub.length)) - (strikes >= 3 ? 3 : strikes)));
+        db.hangXp = (db.hangXp || 0) + xp; if (!quick && (poke || snack || rub.length)) { db.hangAt = now; earn(3); remember('hang', 'Your first one-on-one time with her.'); }
+        const did = [snack ? `tossed snacks for her to catch (she caught ${snack})` : '', poke ? 'poked her playfully' : '', ...new Set(rub), pose ? 'asked her to strike a pose or two' : ''].filter(Boolean);
+        if (did.length || strikes) db.giftNote = `just spent a few minutes face to face with her: ${did.join(', ') || 'not much'}${strikes >= 3 ? '; he kept reaching where she did not want to be touched, she blocked him each time and ended it, annoyed' : strikes ? '; once or twice he reached where she did not want to be touched and she blocked him' : ''}`;
+        const h2 = hangView(), up = h2.lvl > h.lvl; save();
+        return json(res, 200, { ...placeView(), said: quick ? 'One-on-one time. (Nothing more to earn so soon after the last one.)' : `One-on-one time: +${romance.toFixed(1)} romance${up ? `. Your one-on-one skill is now level ${h2.lvl}!` : `, skill level ${h2.lvl}`}.` });
       }
       if (url.pathname === '/api/shop' && req.method === 'POST') {
         const { buy, id } = await readBody(req), row = (SHOP[buy] || []).find(r => r[0] === id), key = buy === 'gift' ? 'gifts' : 'decor'; if (!row) return json(res, 400, { error: 'No such thing in the shop.' });

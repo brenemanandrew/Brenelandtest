@@ -514,6 +514,7 @@
 <script src="sound.js"></script>
 <script src="intro.js"></script>
 <script src="facecam.js"></script>
+<script src="hang.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -1115,7 +1116,7 @@ $('mePick').onchange = async e => {
     if (r.ok) setMeThumb(d.me); else addError(d.error || 'That picture could not be used.');
   } catch { addError('That picture could not be opened.'); }
 };
-$('actBtn').onclick = ev => { ev.stopPropagation(); $('meBox').classList.toggle('fan'); };
+$('actBtn').onclick = ev => { ev.stopPropagation(); WizraHang.start(); };   // the hand: one-on-one time with her (hang.js)
 addEventListener('pointerdown', ev => { if (!ev.target.closest('#meBox')) $('meBox').classList.remove('fan'); });
 
 // The avatar: tap to expand to a big view, tap again (or outside) to shrink.

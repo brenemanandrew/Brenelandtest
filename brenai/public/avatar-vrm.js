@@ -856,11 +856,12 @@ export async function create(url, opts = {}) {
   const hg = { on: false, yaw: 0, lookX: 0, lookY: 0, dist: 1.9, b: 0 };
   function hang(on) { on = !!on; if (on === hg.on) return; hg.on = on; hg.yaw = hg.lookX = hg.lookY = 0; hg.dist = 1.9;
     if (on) { if (rt.act !== 'gone') plan('spending time with you, face to face', [go(STAND_AT), stay(3600)], '', true); }
+    for (const ms of [900, 2200, 3600]) setTimeout(() => { if (vrm.springBoneManager) vrm.springBoneManager.reset(); }, ms);   // her hair and skirt are put at rest as the view cuts over, so nothing is caught mid-swing
     else if (rt.act === 'up') { rt.steps = wayHome(); rt.i = 0; rt.stepT = 0; rt.label = 'sitting back down'; } }
   function hangView(o) { if (o.yaw !== undefined) hg.yaw = Math.max(-1.1, Math.min(1.1, o.yaw)); if (o.dyaw) hg.yaw = Math.max(-1.1, Math.min(1.1, hg.yaw + o.dyaw)); if (o.dist) hg.dist = Math.max(1.2, Math.min(2.8, o.dist)); if (o.dx !== undefined) { hg.lookX = Math.max(-0.35, Math.min(0.35, hg.lookX + o.dx)); hg.lookY = Math.max(-0.3, Math.min(0.22, hg.lookY + o.dy)); } return { yaw: hg.yaw, dist: hg.dist }; }
   function hangCamera(dt) { hg.b += ((hg.on ? 1 : 0) - hg.b) * Math.min(1, dt * 3); if (hg.b < 0.004) return; if (hg.on) fp.locked = true;
-    head.getWorldPosition(tmpA); const yw = vrm.scene.rotation.y + hg.yaw, d = hg.dist; hc.pos.set(tmpA.x + Math.sin(yw) * d, tmpA.y + 0.02, tmpA.z + Math.cos(yw) * d);   // always at her eye level: never from below
-    hc.tgt.set(tmpA.x + Math.cos(yw) * hg.lookX, tmpA.y - 0.26 + hg.lookY, tmpA.z - Math.sin(yw) * hg.lookX);
+    head.getWorldPosition(tmpA); const tall = Math.max(1, 0.8 / camera.aspect), yw = vrm.scene.rotation.y + hg.yaw, d = hg.dist * tall; hc.pos.set(tmpA.x + Math.sin(yw) * d, tmpA.y + 0.02, tmpA.z + Math.cos(yw) * d);   // always at her eye level, never from below; further back on a tall narrow screen so her shoulders fit
+    hc.tgt.set(tmpA.x + Math.cos(yw) * hg.lookX, tmpA.y - 0.1 - 0.13 * tall + hg.lookY, tmpA.z - Math.sin(yw) * hg.lookX);
     const e = hg.b * hg.b * (3 - 2 * hg.b); hc.keepPos.copy(camera.position); hc.keepQ.copy(camera.quaternion); camera.position.copy(hc.pos); camera.lookAt(hc.tgt);
     if (e < 0.995) { hc.q.copy(camera.quaternion); camera.position.lerpVectors(hc.keepPos, hc.pos, e); camera.quaternion.slerpQuaternions(hc.keepQ, hc.q, e); } }
   // where on her a point of the screen lands: { zone, ok }. ok false = somewhere she does not want poked or touched.
