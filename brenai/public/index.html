@@ -1269,7 +1269,7 @@ const voice = (() => {
     const t0 = performance.now(), ms = v.wait * 1000;
     const tick = () => { const f = Math.min(1, (performance.now() - t0) / ms); bar.style.transform = `scaleX(${f})`; if (f < 1) barT = requestAnimationFrame(tick); };
     tick();
-    timer = setTimeout(() => { heard = (heard + ' ' + interim).trim(); interim = ''; write(); send(); }, ms);
+    timer = setTimeout(() => { if (away && !phoneCall.on) { heard = interim = ''; return; } heard = (heard + ' ' + interim).trim(); interim = ''; write(); send(); }, ms);
   }
   function start() { if (away && !phoneCall.on) { show(); return; }   // she is out or asleep: the mic does not listen, so stray talk in the room is not left for her (a call still listens)
    
@@ -1277,6 +1277,7 @@ const voice = (() => {
     rec = new SR(); rec.lang = navigator.language || 'en-US'; rec.continuous = true; rec.interimResults = true;
     rec.onresult = e => {
       if (held) return;                       // that is her voice coming out of the speaker, not you
+      if (away && !phoneCall.on) { heard = interim = ''; clearTimeout(timer); cancelAnimationFrame(barT); bar.style.transform = 'scaleX(0)'; try { rec.stop(); } catch {} return; }   /* she is out: whatever started the mic, nothing it hears is written down or sent */
       const heardNow = [...e.results].slice(e.resultIndex).map(r => r[0].transcript).join(' ').trim();
       if (speaker.speaking && (heardNow.split(/\s+/).length >= 2 || heardNow.length >= 8)) speaker.stop('the mic heard you talk over her (headphones mode): "' + heardNow.slice(0, 40) + '"');   // a stray blip does not count
       interim = '';
