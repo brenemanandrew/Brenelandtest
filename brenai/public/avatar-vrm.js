@@ -312,7 +312,7 @@ export async function create(url, opts = {}) {
   const cheeks = [-1, 1].map(sx => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.014, 20), blushMat); m.scale.set(1.45, 0.8, 1); m.position.set(sx * 0.047, eyeOff.y - 0.04, eyeOff.z + 0.062); m.renderOrder = 20; rawHead.add(m); return m; });
   // happy tears at the corners of her eyes (the heart game), and how far the camera has closed in on her heart (0..1)
   const tearMat = new THREE.MeshBasicMaterial({ color: '#a8dcff', transparent: true, opacity: 0, depthTest: false });
-  [-1, 1].forEach(sx => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 12, 10), tearMat); m.scale.set(1, 1.5, 0.6); m.position.set(sx * 0.04, eyeOff.y - 0.02, eyeOff.z + 0.066); m.renderOrder = 21; rawHead.add(m); });
+  [-1, 1].forEach(sx => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.0062, 12, 10), tearMat); m.scale.set(0.42, 0.8, 0.3); m.position.set(sx * 0.049, eyeOff.y - 0.024, eyeOff.z + 0.064);   /* a small tear at the outer corner of each eye (they were big enough to read as a second pair of eyes) */ m.renderOrder = 21; rawHead.add(m); });
   let tearsWant = 0, focusWant = 0, focusNow = 0; const heartAt = new THREE.Vector3(), heartCam = new THREE.Vector3();
   const fwd = new THREE.Vector3(), toCam = new THREE.Vector3();
   let blushNow = 0;
@@ -1096,7 +1096,7 @@ export async function create(url, opts = {}) {
         if (!clipFace && fineOn) { fine.set(null); fineOn = false; }
         if (clipFace) { const useFine = fine.has && clipFace.mFun !== undefined; if (useFine) { fine.set(clipFace); fineOn = true; } for (const k in clipFace) if (em.getExpression(k) && !(useFine && WHOLE.includes(k))) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
-      focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
+      focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.7 - tearMat.opacity) * Math.min(1, s.dt * 4);
       heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt); dndCamera(s.dt, s.t);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
