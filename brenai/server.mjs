@@ -20,7 +20,7 @@ import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, r
 import { AsyncLocalStorage } from 'node:async_hooks';
 import webpush from 'web-push';
 import { MOVIES, beatAt } from './movies.mjs';
-import { CHARS as DND_CHARS, newGame as dndNew, view as dndView, declare as dndDeclare, roll as dndRoll, sceneOf as dndScene, PROMPT as DND, ADVENTURE as DND_ADV } from './dnd.mjs';
+import { skillOf as dndSkill, CHARS as DND_CHARS, newGame as dndNew, view as dndView, declare as dndDeclare, roll as dndRoll, sceneOf as dndScene, PROMPT as DND, ADVENTURE as DND_ADV } from './dnd.mjs';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
@@ -896,7 +896,8 @@ async function handle(req, res) {
           if (r.over) { g.on = false; remember('dnd:' + DND_ADV.id, `You played "${DND_ADV.title}" together, start to finish.`); addBond(db.sheet.path || 'friend', 5); earn(10); cur().touches.push({ kind: 'dndend', at: Date.now() }); } else if (g.step === 'scene') g.step = 'ask';
           save(); return json(res, 200, { ...placeView(), text, roll: r, over: r.over }); }
         const said = String(b.say || '').trim().slice(0, 400); if (!said) return json(res, 400, { error: 'say?' }); if (g.step === 'roll') return json(res, 200, { ...placeView(), text: '' });
-        if ((/\?\s*$/.test(said) && !/\bi\b/i.test(said)) || /^\s*\(/.test(said)) { const text = await word(DND.talk(g, USER_NAME, said), '(table talk)', said); save(); return json(res, 200, { ...placeView(), text: text === '(table talk)' ? '' : text }); }
+        /* an action is something his character does ("I sneak past", "we bribe them", or a plain "attack"); anything else is just talk at the table and nobody rolls */
+        if (!(dndSkill(said) || /^\s*(i|we|my|let'?s|lets)\b/i.test(said)) || /^\s*\(/.test(said)) { const text = await word(DND.talk(g, USER_NAME, said), '(table talk)', said); save(); return json(res, 200, { ...placeView(), text: text === '(table talk)' ? '' : text }); }
         const c = dndDeclare(g, said); save(); const text = await word(DND.declare(g, USER_NAME, said, c), dm('All right. Roll for it.'), said); save(); return json(res, 200, { ...placeView(), text });
       }
       if (url.pathname === '/api/agree' && req.method === 'POST') { const b = await readBody(req); if (!db.agree && !atCamp()) return json(res, 409, { error: 'That switch is at the campsite.', ...placeView() }); db.agree = b.on === undefined ? !db.agree : !!b.on; save(); return json(res, 200, placeView()); }   /* the campsite switch: on, or off again */
