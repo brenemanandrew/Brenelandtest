@@ -711,7 +711,7 @@ function readBody(req) {
 }
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
-let busy = false; const inbox = { code: '', until: 0 };
+let busy = false; const INBOX_FILE = path.join(DATA_DIR, 'inbox.json'), inbox = { code: '', until: 0 }; try { Object.assign(inbox, JSON.parse(fs.readFileSync(INBOX_FILE, 'utf8'))); } catch {} const inboxSave = () => { try { fs.writeFileSync(INBOX_FILE, JSON.stringify(inbox)); } catch {} };   /* (kept on disk, so a deploy does not close an open inbox) */
 // the match questions (the page shows them as picture cards, in this order): what each answer does to her temperament
 const MATCH = [
   [{ playfulness: -15, patience: 25, confidence: -5 }, { playfulness: 30, sarcasm: 10 }, { confidence: 25, patience: -15, bluntness: 5 }],                 // her energy: calm / playful / fiery
@@ -909,7 +909,7 @@ async function handle(req, res) {
 
       // outfits: GET the set-up, POST changes to it ({ situations }, { force }, { clear: slot }); a model for a slot is uploaded to /api/outfit/slot
       if (url.pathname.startsWith('/api/inbox')) { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const dir = path.join(DATA_DIR, 'inbox');
-        if (req.method === 'POST') { const b = await readBody(req); if (b.open) { inbox.code = crypto.randomBytes(12).toString('hex'); inbox.until = Date.now() + 48 * 3600e3; return json(res, 200, { code: inbox.code, until: inbox.until }); } if (b.close) { inbox.code = ''; } if (b.clear) fs.rmSync(dir, { recursive: true, force: true }); return json(res, 200, { ok: true }); }
+        if (req.method === 'POST') { const b = await readBody(req); if (b.open) { inbox.code = crypto.randomBytes(12).toString('hex'); inbox.until = Date.now() + 48 * 3600e3; inboxSave(); return json(res, 200, { code: inbox.code, until: inbox.until }); } if (b.close) { inbox.code = ''; inboxSave(); } if (b.clear) fs.rmSync(dir, { recursive: true, force: true }); return json(res, 200, { ok: true }); }
         const f = url.pathname.slice(11); if (f) { if (!/^[a-z0-9_]+\.fbx$/.test(f) || !fs.existsSync(path.join(dir, f))) return json(res, 404, { error: 'no such file' }); res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': fs.statSync(path.join(dir, f)).size }); return fs.createReadStream(path.join(dir, f)).pipe(res); }
         let files = []; try { files = fs.readdirSync(dir).map(n => ({ name: n, kb: Math.round(fs.statSync(path.join(dir, n)).size / 1000) })); } catch {} return json(res, 200, { open: !!inbox.code && Date.now() < inbox.until, files }); }
       if (url.pathname === '/api/disk') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); let free = 0, total = 0, used = 0; try { const st = fs.statfsSync(DATA_DIR); free = st.bavail * st.bsize; total = st.blocks * st.bsize; } catch {} try { for (const f of fs.readdirSync(OUTFITS)) used += fs.statSync(path.join(OUTFITS, f)).size; } catch {} return json(res, 200, { freeMB: Math.round(free / 1e6), totalMB: Math.round(total / 1e6), outfitsMB: Math.round(used / 1e6) }); }
