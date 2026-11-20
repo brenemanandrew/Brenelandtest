@@ -6,7 +6,7 @@ You are taking over the code of Brenai, a companion game at https://brenai.fly.d
 ## 0. Non-negotiable rules
 1. **Run `brenai/tools/check.sh` before every commit, chained with `&&`.** Example: `./brenai/tools/check.sh && git add -A && git commit -m "..." && git push origin HEAD:main`. Never use `;` between the check and the commit.
 2. **Never append a `//` comment to a line that has more code after it.** Lines are long, and the comment swallows the rest of the line; `node --check` often still passes. Use `/* ... */`, or put the comment on its own line.
-3. **No em dashes** (U+2014) anywhere: code, comments, docs, commit messages, replies. Check: `grep -c $'—' <files>` prints 0.
+3. **No em dashes** (U+2014) anywhere: code, comments, docs, commit messages, replies. Check: `grep -c "$(printf '\342\200\224')" <files>` prints 0 for each file.
 4. **No secrets in the repo or in chat:** no passwords, PINs, tokens. Ask the owner when one is needed.
 5. **Licensed assets never go into git:** her model, outfit models, motion clips, the picture pack. They live on the server volume only.
 6. **Do not read the owner's chat text or her notes about him.** When you must inspect a save, print counts, timestamps and `who`, never `text`.
