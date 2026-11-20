@@ -993,10 +993,13 @@ export async function create(url, opts = {}) {
     if (!inDorm) { backdrop.position.set(tmpA.x, tmpA.y - (full ? 0.6 : half ? 0.35 : 0.3), tmpA.z - 1.05); backdrop.scale.set(full ? 2.4 : half ? 1.6 : 1.5, full ? 1.5 : half ? 1.15 : 1.2, 1); }
     if (!inDorm && spec.arm) { backdrop.scale.set(3.4, 2.5, 1); backdrop.position.y = tmpA.y - 0.15; }
     if (!inDorm) { /* the painted backdrop stands straight behind her as the camera sees her, wherever the camera went, and is big enough to fill the frame */ const dx = tmpA.x - camera.position.x, dz = tmpA.z - camera.position.z, dl = Math.hypot(dx, dz) || 1; backdrop.position.x = tmpA.x + dx / dl * 1.05; backdrop.position.z = tmpA.z + dz / dl * 1.05; backdrop.rotation.y = Math.atan2(-dx, -dz); backdrop.scale.multiplyScalar(spec.turn ? 1.5 : 1.15); }   /* the wide selfie camera, off to one side, sees more of what is behind her */
+    /* cheats for a still picture only, undone straight after: a tilted camera, a lens of its own, and parts of her taken out of the shot (a hand or arm that would only be in the way of a close-up) */
+    if (spec.fov) { camera.fov = spec.fov; camera.updateProjectionMatrix(); } if (spec.roll) camera.rotateZ(spec.roll);
+    const hidden = []; for (const n of spec.hide || []) { const rb = vrm.humanoid.getRawBoneNode(n); if (rb) { hidden.push([rb, rb.scale.clone()]); rb.scale.setScalar(0.0001); } } if (hidden.length) vrm.scene.updateMatrixWorld(true);
     /* a picture is taken looking at whoever holds the camera: her eyes go to the lens */
     if (!lying && spec.eyes !== false) { target.position.copy(camera.position); target.updateMatrixWorld(true); if (vrm.lookAt) { try { vrm.lookAt.update(0); } catch {} } vrm.scene.updateMatrixWorld(true); }
     blushMat.opacity = (spec.blush || 0) * 0.5;
-    renderer.render(scene, camera); blushMat.opacity = blushNow;
+    renderer.render(scene, camera); blushMat.opacity = blushNow; for (const [rb, sc] of hidden) rb.scale.copy(sc);
     let url = ''; try { url = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
     // and put everything back for the live view (the pose and camera are rebuilt every frame anyway)
     backdrop.visible = false; backdrop.scale.set(1, 1, 1); backdrop.rotation.y = 0; setPlace(here); props.forEach((o, i) => { o.visible = propVis[i]; });
