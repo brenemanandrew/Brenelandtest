@@ -475,7 +475,8 @@
   #gameRow { position:fixed; left:50%; top:calc(58px + env(safe-area-inset-top)); transform:translateX(-50%); z-index:24; display:flex; flex-wrap:wrap; justify-content:center; gap:8px; max-width:94vw; padding:10px 12px; border-radius:22px; background:rgba(30,18,58,.88); box-shadow:0 10px 30px rgba(0,0,0,.45); backdrop-filter:blur(6px); } #gameRow[hidden] { display:none; }
   #gameRow button { width:84px; border:0; background:rgba(255,255,255,.1); border-radius:16px; padding:8px 4px 6px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; color:#fff; font:600 12.5px "Fredoka",sans-serif; } #gameRow button i { font-style:normal; font-size:30px; line-height:1.1; } #gameRow button:active { transform:scale(.94); } body.calling #gameRow, body.cine #gameRow, body.hang #gameRow { display:none; }
   /* the campsite switch */
-  #agreeBtn { position:fixed; right:calc(12px + env(safe-area-inset-right)); top:38%; z-index:7; width:54px; height:54px; border-radius:50%; border:2px solid rgba(255,255,255,.7); background:rgba(20,12,45,.6); font-size:26px; line-height:1; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.4); transition:transform .12s, background .2s, box-shadow .2s; } #agreeBtn[hidden] { display:none; } #agreeBtn:active { transform:scale(.9); } #agreeBtn.on { background:linear-gradient(135deg,#f59e0b,#ec4899); border-color:#fff; box-shadow:0 0 22px rgba(255,170,90,.85); } body.cine #agreeBtn, body.dnd #agreeBtn, body.hang #agreeBtn, body.calling #agreeBtn { display:none; }
+  #agreeBtn { position:fixed; right:calc(12px + env(safe-area-inset-right)); top:38%; z-index:7; width:54px; height:54px; border-radius:50%; border:2px solid rgba(255,255,255,.7); background:rgba(20,12,45,.6); font-size:26px; line-height:1; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.4); transition:transform .12s, background .2s, box-shadow .2s; } #agreeBtn[hidden] { display:none; } #agreeBtn:active { transform:scale(.9); } #agreeBtn.on { background:linear-gradient(135deg,#f59e0b,#ec4899); border-color:#fff; box-shadow:0 0 22px rgba(255,170,90,.85); } body.cine #agreeBtn, body.dnd #agreeBtn, body.hang #agreeBtn, body.calling #agreeBtn, body.cine #keyLv, body.dnd #keyLv, body.hang #keyLv, body.calling #keyLv { display:none; }
+  #keyLv { position:fixed; right:calc(12px + env(safe-area-inset-right)); top:calc(38% + 62px); z-index:7; display:flex; flex-direction:column; gap:5px; width:54px; align-items:center; } #keyLv[hidden] { display:none; } #keyLv button { width:44px; height:34px; border-radius:12px; border:1px solid rgba(255,255,255,.5); background:rgba(20,12,45,.7); color:#fff; font-size:14px; font-weight:700; cursor:pointer; } #keyLv button.on { background:linear-gradient(135deg,#f59e0b,#ec4899); border-color:#fff; }
 </style>
 </head>
 <body>
@@ -528,7 +529,7 @@
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
 <div id="cineUI"><div id="cineFade"></div><div id="cineViews"><button data-v="couch" class="on" title="From behind the couch">&#128715;&#65039;</button><button data-v="side" title="Watch her watch the film">&#128064;</button><button data-v="toss" title="Toss her popcorn">&#127871;</button></div><button id="cinePill" title="Say something">&#8230;</button><div id="cineHeat" title="How close the evening has got"><i></i><b>&#128151;</b></div><button id="cineKiss" title="Lean in">&#128139;</button><div id="cineCount"></div></div>
-<button id="agreeBtn" hidden>&#129309;</button><div id="movieBar" hidden><span id="movieClock"></span><button id="moviePause" title="Pause or resume"></button></div><div id="fpMoments"></div><div id="fpChoices" hidden></div><div id="bondPop"></div>
+<button id="agreeBtn" hidden>&#129309;</button><div id="keyLv" hidden></div><div id="movieBar" hidden><span id="movieClock"></span><button id="moviePause" title="Pause or resume"></button></div><div id="fpMoments"></div><div id="fpChoices" hidden></div><div id="bondPop"></div>
 <div id="fpBar"><button id="fpLeave">Head home</button><button id="fpLog" class="quiet">Chat log</button><span id="fpHint"></span></div>
 <!-- the video call: a phone on the screen with her on it. Nothing is written during a call; you talk, she answers out loud. -->
 <button id="callX" title="Hang up">&#10005;</button>
@@ -909,8 +910,8 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
-  if (was !== undefined && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { key: !!d.key, solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  if (was !== undefined && !d.key && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
   setPlace.level = visitInfo.level;
   const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
   setPlace.fit = fitKey;
@@ -919,7 +920,8 @@ function setPlace(d, arriving) {
   drawMoments(); WizraSound.path(visitInfo.path);
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
   showInvite(); filmSync(); try { WizraDnd.sync(d.dnd); } catch {}
-  { const ab = $('agreeBtn'); ab.hidden = !(d.agree || (d.camp && d.place && !d.solo));   /* at the campsite with her; and anywhere while it is on, so it can always be undone */ ab.classList.toggle('on', !!d.agree); ab.title = d.agree ? 'She is agreeable. Press to undo.' : 'Make her agreeable'; }
+  { const ab = $('agreeBtn'); ab.hidden = !(d.agree || (d.camp && d.place && !d.solo));   /* at the campsite with her; and anywhere while it is on, so it can always be undone */ ab.classList.toggle('on', !!d.agree); ab.title = d.agree ? 'She is agreeable. Press to undo.' : 'Make her agreeable'; if (d.key) ab.innerHTML = '&#128273;'; else ab.innerHTML = '&#129309;';
+    const kl = $('keyLv'); kl.hidden = !d.key; if (d.key && kl.dataset.v !== d.level + '/' + d.levelMax) { kl.dataset.v = d.level + '/' + d.levelMax; kl.textContent = ''; for (let i = 0; i <= (d.levelMax | 0); i++) { const b = document.createElement('button'); b.textContent = 'L' + i; b.title = 'Test romance level ' + i; if (i === d.level) b.className = 'on'; b.onclick = async ev => { ev.stopPropagation(); try { const r = await api('/api/agree', { level: i }), j = await r.json(); if (j.error) addSys(j.error); setPlace(j); } catch {} }; kl.append(b); } } }
 }
 function showInvite() {
   const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite, due = visitInfo.place || away ? null : visitInfo.due;
@@ -1216,7 +1218,7 @@ $('actBtn').onclick = ev => { ev.stopPropagation(); WizraHang.start(); };
 $('agreeBtn').onclick = async ev => { ev.stopPropagation(); try { const r = await api('/api/agree', {}), d = await r.json(); if (d.error) addSys(d.error); setPlace(d); WizraSound.fx(d.agree ? 'pop' : 'click'); } catch {} };
 // the games made in the Studio: a controller on the dock opens a row of them (only those her level allows, and only while she is here)
 { const gb = el('button', { id: 'gameBtn', textContent: '\ud83c\udfae', title: 'Play a game with her' }); $('dock').insertBefore(gb, $('senseBtn')); const row = el('div', { id: 'gameRow', hidden: true }); document.body.append(row);
-  const gamesNow = () => (dev.games || []).filter(g => (g.minLevel | 0) <= (visitInfo.level | 0));
+  const gamesNow = () => (dev.games || []).filter(g => visitInfo.key || (g.minLevel | 0) <= (visitInfo.level | 0));
   gb.onclick = ev => { ev.stopPropagation(); if (!row.hidden) { row.hidden = true; return; } const list = gamesNow(); if (away) return addSys('She is out. Games need her here.'); if (!list.length) return addSys('No games yet. Make some in the Studio.'); row.textContent = '';
     for (const g of list) { const b = el('button', { title: g.name }, el('i', { textContent: g.icon }), el('span', { textContent: g.name })); b.onclick = e => { e.stopPropagation(); row.hidden = true; WizraSound.fx('click'); WizraGames.start(g); }; row.append(b); } row.hidden = false; };
   addEventListener('click', () => { row.hidden = true; });

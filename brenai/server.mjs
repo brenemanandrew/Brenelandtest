@@ -555,7 +555,8 @@ const RULES = {
 };
 const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinite(+db.rules[k]) ? +db.rules[k] : d; return Math.max(lo, Math.min(hi, v)); };
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
-const canVisit = () => !!process.env.VISIT_TEST || (db.sheet.rapport | 0) >= rule('visitAt');
+const KEY = () => !!db.agree && isOwner();   /* the campsite switch, on an owner's save, is a master key for testing: it opens every gate below */
+const canVisit = () => !!process.env.VISIT_TEST || KEY() || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
 // He can go out on his own (db.solo): she is not with him, they text as usual. While he is out she may turn up; and when they are
 // both at home she now and then asks him somewhere herself. Both are checked whenever the page asks how things stand.
@@ -563,7 +564,7 @@ function socialTick() { const now = Date.now(), dt = Math.min(10, (now - (db.soc
   const close = (db.sheet.rapport | 0) / 100, hit = perMin => Math.random() < 1 - Math.pow(1 - perMin, dt);
   if (db.place && db.solo) { if (process.env.WANDER_TEST ? now - (db.soloAt || now) > 12000 : now - (db.soloAt || now) > 90000 && hit(0.03 + 0.07 * close)) { db.solo = false; const nm = placeLabel(db.place); db.log.push({ who: 'sys', text: `Wizra showed up at ${nm}.`, at: now }); cur().touches.push({ kind: 'wandered', at: now }); remember('wander', 'The first time she turned up where you were, uninvited.'); save(); } return; }
   if (!db.place && !inviteNow() && now - (db.askedAt || 0) > 3 * 3600000 && now - ((db.log[db.log.length - 1] || {}).at || 0) < 20 * 60000 && hit(0.004 + 0.01 * close)) { const made = devData().maps.custom.map(m => m.id), where = Math.random() < 0.4 || !made.length ? 'dorm' : made[Math.random() * made.length | 0]; db.invite = { place: where, at: now }; db.askedAt = now; db.log.push({ who: 'sys', text: `Wizra is asking you to come to ${placeLabel(where)}.`, at: now }); cur().touches.push({ kind: 'sheasked', at: now }); save(); } }
-const placeView = () => (socialTick(), { agree: !!db.agree, camp: atCamp(), dnd: dndView(db.dnd), solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
+const placeView = () => (socialTick(), { agree: !!db.agree, key: KEY(), camp: atCamp(), dnd: dndView(db.dnd), solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
 // ---- movie night: he plays the real film on his own screen; db.movie = { id, t0 (when minute zero was), paused (ms) or 0, said (last beat she reacted to), saidAt }
 const moviePos = () => { const m = db.movie; return m ? ((m.paused || Date.now()) - m.t0) / 60000 : 0; };
 const movieView = () => { const m = db.movie, M = m && MOVIES[m.id]; return M ? { id: m.id, title: M.title, minutes: M.minutes, pos: +moviePos().toFixed(2), paused: !!m.paused, tint: M.tint, heat: Math.round(m.heat || 0) } : null; };
@@ -605,7 +606,7 @@ const SPOTS = { gift: [[2.65, 2.55, -0.8], [1.9, 1.45, -0.5], [-1.6, 0.15, 0.6],
   decor: [[1.5, 2.0, -0.6], [2.3, 1.0, -1.2], [-3.3, 0.6, 1.2], [-0.4, 2.7, 0.2], [1.1, 3.7, 3.14], [-3.1, 2.1, 1.4], [0.9, 0.9, 0], [2.6, 2.9, -2.2]] };
 const WALL = { picture: 1.4, stringlights: 1.95 };   // these hang: against the back wall, at this height
 const HANG_LV = [40, 110, 220, 380, 600];   // xp for each level of the one-on-one skill
-const hangView = () => { const xp = db.hangXp | 0, lvl = HANG_LV.filter(v => xp >= v).length, base = lvl ? HANG_LV[lvl - 1] : 0; return { lvl, xp: xp - base, need: (HANG_LV[lvl] || HANG_LV[HANG_LV.length - 1] + 400) - base }; };
+const hangView = () => { const xp = db.hangXp | 0, lvl = KEY() ? HANG_LV.length : HANG_LV.filter(v => xp >= v).length, base = lvl ? HANG_LV[lvl - 1] : 0; return { lvl, xp: xp - base, need: (HANG_LV[lvl] || HANG_LV[HANG_LV.length - 1] + 400) - base }; };
 const earn = n => { db.coins = Math.max(0, (db.coins | 0) + n); };
 const shopView = () => ({ coins: db.coins | 0, gift: SHOP.gift.map(([id, name, price]) => ({ id, name, price, have: (db.gifts || []).filter(g => g.kind === id).length })), decor: SHOP.decor.map(([id, name, price]) => ({ id, name, price, have: (db.decor || []).filter(g => g.kind === id).length })), room: { gift: SPOTS.gift.length - (db.gifts || []).length, decor: SPOTS.decor.length - (db.decor || []).length } });
 // what this player's own things add to the rooms (the page lays them over the shared maps)
@@ -888,7 +889,7 @@ async function handle(req, res) {
         const dm = t => `DM: "${t}"`;
         if (b.stop) { if (g) { db.dnd = null; db.log.push({ who: 'sys', text: 'The game was packed away.', at: now }); save(); } return json(res, 200, placeView()); }
         if (b.start) { if (!db.place || db.solo || db.away) return json(res, 409, { error: 'She has to be there with you.', ...placeView() });
-          g = db.dnd = dndNew(String(b.start)); const day = new Date().toLocaleDateString('en-CA', { timeZone: TZ }), surprise = db.dndDay !== day; db.dndDay = day; db.log.push({ who: 'sys', text: `D&D night: ${DND_ADV.title}.`, at: now }); cur().touches.push({ kind: 'dndstart', at: now }); save();
+          g = db.dnd = dndNew(String(b.start)); const day = new Date().toLocaleDateString('en-CA', { timeZone: TZ }), surprise = KEY() || db.dndDay !== day; db.dndDay = day; db.log.push({ who: 'sys', text: `D&D night: ${DND_ADV.title}.`, at: now }); cur().touches.push({ kind: 'dndstart', at: now }); save();
           const text = await word(DND.intro(g, USER_NAME), dm(`${DND_ADV.intro} ${dndScene(g).notes} What do you do?`)); g.step = 'ask'; save(); return json(res, 200, { ...placeView(), text, surprise }); }
         if (!g || !g.on) return json(res, 409, { error: 'No game is on.', ...placeView() });
         if (b.roll) { const r = dndRoll(g); if (!r) return json(res, 409, { error: 'Nothing to roll.', ...placeView() }); save();
@@ -900,14 +901,15 @@ async function handle(req, res) {
         if (!(dndSkill(said) || /^\s*(i|we|my|let'?s|lets)\b/i.test(said)) || /^\s*\(/.test(said)) { const text = await word(DND.talk(g, USER_NAME, said), '(table talk)', said); save(); return json(res, 200, { ...placeView(), text: text === '(table talk)' ? '' : text }); }
         const c = dndDeclare(g, said); save(); const text = await word(DND.declare(g, USER_NAME, said, c), dm('All right. Roll for it.'), said); save(); return json(res, 200, { ...placeView(), text });
       }
-      if (url.pathname === '/api/agree' && req.method === 'POST') { const b = await readBody(req); if (!db.agree && !atCamp()) return json(res, 409, { error: 'That switch is at the campsite.', ...placeView() }); db.agree = b.on === undefined ? !db.agree : !!b.on; save(); return json(res, 200, placeView()); }   /* the campsite switch: on, or off again */
+      if (url.pathname === '/api/agree' && req.method === 'POST') { const b = await readBody(req); if (!db.agree && !atCamp() && !(isOwner() && b.on === true)) return json(res, 409, { error: 'That switch is at the campsite.', ...placeView() }); if (b.level !== undefined) { if (!KEY()) return json(res, 409, { error: 'Turn the key on first.', ...placeView() }); fixBond(); if (!db.keyLv) db.keyLv = { lvl: db.sheet.romLevel, rom: db.sheet.bond.romance }; db.sheet.romLevel = Math.max(0, Math.min(ROM_MAX, Math.round(+b.level || 0))); db.sheet.bond.romance = 0; save(); return json(res, 200, placeView()); }   /* try any romance level while the key is on; the real one is kept and put back */
+        db.agree = b.on === undefined ? !db.agree : !!b.on; if (!db.agree && db.keyLv) { db.sheet.romLevel = db.keyLv.lvl; db.sheet.bond.romance = db.keyLv.rom; delete db.keyLv; } save(); return json(res, 200, placeView()); }   /* the campsite switch: on, or off again */
       if (url.pathname === '/api/movie' && req.method === 'POST') {
         const b = await readBody(req), now = Date.now(); let m = db.movie, M = m && MOVIES[m.id];
         if (b.start) { if (!db.place) return json(res, 409, { error: 'You two need to be in the same place first.' }); if (!MOVIES[b.start]) return json(res, 400, { error: 'No such film.' }); db.movie = { id: b.start, t0: now, paused: 0, said: -1, saidAt: 0 }; db.log.push({ who: 'sys', text: `Movie night: ${MOVIES[b.start].title}.`, at: now }); cur().touches.push({ kind: 'moviestart', at: now }); save(); return json(res, 200, placeView()); }
         if (!M) return json(res, 200, placeView());
         if (b.pause && !m.paused) m.paused = now; if (b.resume && m.paused) { m.t0 += now - m.paused; m.paused = 0; } if (Number.isFinite(+b.nudge)) m.t0 -= Math.max(-600, Math.min(600, +b.nudge)) * 1000;
         if (Number.isFinite(+b.heat)) { m.heat = Math.max(0, Math.min(100, (m.heat || 0) + Math.max(-6, Math.min(8, +b.heat)))); save(); return json(res, 200, placeView()); }   /* how close the evening has got: the page adds a little as you watch, share popcorn and look her way */
-        if (b.kiss) { if ((m.heat || 0) < 100) return json(res, 409, { error: 'Not yet.', ...placeView() }); m.heat = 55; cur().touches.push({ kind: 'moviekiss', at: now }); addBond('romance', 3); remember('moviekiss', 'Your first kiss on the couch during a film.'); save(); return json(res, 200, { ...placeView(), kissed: true }); }
+        if (b.kiss) { if ((m.heat || 0) < 100 && !KEY()) return json(res, 409, { error: 'Not yet.', ...placeView() }); m.heat = 55; cur().touches.push({ kind: 'moviekiss', at: now }); addBond('romance', 3); remember('moviekiss', 'Your first kiss on the couch during a film.'); save(); return json(res, 200, { ...placeView(), kissed: true }); }
         if (b.stop) { db.movie = null; db.log.push({ who: 'sys', text: 'The film was switched off.', at: now }); save(); return json(res, 200, placeView()); }
         if (b.react) { const pos = moviePos(), over = pos >= M.minutes, beat = beatAt(M, Math.min(pos, M.minutes));
           if (busy || m.paused || db.away || (!over && (beat.i <= m.said || now - m.saidAt < 150000))) { save(); return json(res, 200, { ...placeView(), text: '' }); }
@@ -1109,8 +1111,8 @@ async function handle(req, res) {
       // a minigame was played: { id, score }. A win pays out (her bond with him, coins) at most once per cool-down of that game.
       if (url.pathname === '/api/game' && req.method === 'POST') {
         const b = await readBody(req), g = devData().games.find(x => x.id === String(b.id || '')), now = Date.now(); if (!g) return json(res, 404, { error: 'no such game' });
-        fixBond(); if (db.sheet.romLevel < g.minLevel) return json(res, 409, { error: 'not yet' }); if (db.away) return json(res, 409, { error: 'She is out.' });
-        const score = Math.max(0, Math.min(999, Math.round(+b.score || 0))), won = score >= g.need, at = (db.gameAt = db.gameAt || {}), since = (now - (at[g.id] || 0)) / 60000, ready = since >= g.cool;
+        fixBond(); if (db.sheet.romLevel < g.minLevel && !KEY()) return json(res, 409, { error: 'not yet' }); if (db.away) return json(res, 409, { error: 'She is out.' });
+        const score = Math.max(0, Math.min(999, Math.round(+b.score || 0))), won = score >= g.need, at = (db.gameAt = db.gameAt || {}), since = (now - (at[g.id] || 0)) / 60000, ready = KEY() || since >= g.cool;
         let pts = 0, coins = 0; if (won && ready) { pts = g.pts; coins = g.coins; if (pts) addBond(g.bond || db.sheet.path || 'friend', pts); if (coins) earn(coins); at[g.id] = now; }
         db.log.push({ who: 'sys', text: `You played ${g.name} with Wizra${won ? ' and won' : ''} (${score} of ${g.need}).`, at: now }); cur().touches.push({ kind: won ? 'gamewon' : 'gamelost', at: now }); save();
         return json(res, 200, { ...placeView(), won, awarded: won && ready, pts, coins, wait: won && !ready ? Math.ceil(g.cool - since) : 0 });
@@ -1129,7 +1131,7 @@ async function handle(req, res) {
       }
       // the heart game (rub her head, pop the hearts): ten pops is +10 romance, three misses is -1. Once a minute at most.
       if (url.pathname === '/api/hearts' && req.method === 'POST') {
-        const { result, bonus } = await readBody(req), now = Date.now(); if (db.heartsAt && now - db.heartsAt < rule('heartCooldown') * 1000) return json(res, 429, { error: 'too soon', ...placeView() });
+        const { result, bonus } = await readBody(req), now = Date.now(); if (!KEY() && db.heartsAt && now - db.heartsAt < rule('heartCooldown') * 1000) return json(res, 429, { error: 'too soon', ...placeView() });
         db.heartsAt = now; fixBond();
         if (result === 'win') { earn(10); addBond('romance', rule('heartWin') + Math.max(0, Math.min(rule('bonusTaps') * Math.max(rule('bonusHeart'), rule('bonusFace'), rule('bonusOther')), Math.round(+bonus || 0)))); cur().touches.push({ kind: 'heartwin', at: now }); }
         else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - rule('heartLose')); fixBond(); cur().touches.push({ kind: 'heartlose', at: now }); }
@@ -1199,7 +1201,7 @@ async function handle(req, res) {
         // he asks to get together (the page's visit button): she has made up her mind before she answers, like a call
         let ask = (visit === 'house' || visit === 'dorm') && !db.place && canVisit() ? visit : '', askPre = '';
         if (ask) {
-          const g = currentGlow(), yes = process.env.VISIT_TEST_ANSWER ? process.env.VISIT_TEST_ANSWER === 'yes' : !(g && ['upset', 'groggy'].includes(g.kind)) && Math.random() < 0.9;
+          const g = currentGlow(), yes = process.env.VISIT_TEST_ANSWER ? process.env.VISIT_TEST_ANSWER === 'yes' : KEY() || !(g && ['upset', 'groggy'].includes(g.kind)) && Math.random() < 0.9;
           askPre = ask === 'house' ? (yes ? 'invites her over to his house; she says yes, comes over, and has just walked in his front door' : 'invites her over to his house; she is not up for it right now and says so')
             : (yes ? 'asks to come over to her dorm; she says yes, and he has just arrived and walked into her room' : 'asks to come over to her dorm; she is not up for company right now and says so');
           if (yes) setPlace(ask); else { ask = ''; db.invite = null; }
@@ -1210,7 +1212,7 @@ async function handle(req, res) {
           const close = (db.sheet.rapport | 0) / 100, g = currentGlow(), kind = g ? g.kind : '';
           const what = wantsPic(msg) ? requested(msg, pack, { home: true, close, lvl: db.sheet.romLevel }) : null;   // a picture OF something: her room, her dice, the view...
           if (what && what !== 'self') { if (what.none) picPre = `asks for a picture of ${what.none}; she has nothing like that in front of her to photograph right now and says so in her own way (no picture is sent)`; else if (close * 100 >= rule('picAskMin')) { pic = what; picPre = `asks for ${what.desc.replace(/^a picture of /, 'a picture of ')}; she takes it and sends it: ${what.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending pictures yet and says so in her own way'; }
-          else if (wantsPic(msg)) { const pz = posed(msg, devData().cues); if (close * 100 >= rule('picAskMin') && (pz || Math.random() < 0.55 + 0.45 * close)) { pic = pz ? { ...selfie('dorm', kind, close), pose: 'plain', face: 'happy', ...(pz.gest ? { gest: pz.gest } : { clip: pz.clip, t: 0 }), ...(pz.cam ? { cam: pz.cam } : {}), desc: `a picture of her ${pz.label}, in her dorm room` } : (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
+          else if (wantsPic(msg)) { const pz = posed(msg, devData().cues); if ((KEY() || close * 100 >= rule('picAskMin')) && (pz || KEY() || Math.random() < 0.55 + 0.45 * close)) { pic = pz ? { ...selfie('dorm', kind, close), pose: 'plain', face: 'happy', ...(pz.gest ? { gest: pz.gest } : { clip: pz.clip, t: 0 }), ...(pz.cam ? { cam: pz.cam } : {}), desc: `a picture of her ${pz.label}, in her dorm room` } : (!kind && await choosePic({ home: true, close, path: db.sheet.path, ask: true })) || selfie('dorm', kind, close); picPre = `asks for a picture; she takes one and sends it: ${pic.desc}`; } else picPre = 'asks for a picture; she is not comfortable sending one yet and says so in her own way'; }
           else if (process.env.PIC_TEST_CHAT || Math.random() < chatChance(close, db.sheet.path === 'romance') * rule('picRate') / 100) { pic = (!kind && Math.random() < 0.85 && await choosePic({ home: true, close, path: db.sheet.path })) || (Math.random() < 0.4 ? thing(db.sheet.likes) : selfie('dorm', kind, close)); picPre = `she also sends him ${pic.desc} with this message, on a whim`; }
         }
         const lastSeen = db.log.filter(e => !e.hidden && e.who !== 'sys').slice(-2, -1)[0], gapMin = lastSeen ? (Date.now() - lastSeen.at) / 60000 : 999, clockNow = new Date().toLocaleString('en-US', { timeZone: TZ, weekday: 'long', hour: 'numeric', minute: '2-digit' });
@@ -1255,7 +1257,7 @@ async function handle(req, res) {
         try {
           remember(hers ? 'call:hers' : 'call:yours', hers ? 'The first time she called you.' : 'The first time you called her.');
           if (hers) db.away.rang = 'answered';
-          else if (!(process.env.CALL_TEST_ANSWER ? process.env.CALL_TEST_ANSWER === 'yes' : picksUp(db.away))) { // no answer; she texts back instead
+          else if (!(process.env.CALL_TEST_ANSWER ? process.env.CALL_TEST_ANSWER === 'yes' : KEY() || picksUp(db.away))) { // no answer; she texts back instead
             const pre = 'tries to video call her; she lets it ring out and sends a short text back instead';
             db.log.push({ who: 'sys', text: 'You called Wizra. No answer.', at: Date.now() }, { who: 'me', text: '', at: Date.now(), pre, hidden: true });
             let text = ''; try { text = await reply(`*${pre}*`, () => {}); db.log.push({ who: 'her', text, at: Date.now() }); } catch { db.log.pop(); }
