@@ -5,7 +5,7 @@ Read this first. It tells you what the game is, where everything lives, what you
 
 Two readers are expected:
 - **The design editor (Violet):** decides what should change and writes content: her personality, rules, reactions, stories, picture ideas, events, rooms. Sections 1 to 5 are yours.
-- **The coding assistant:** changes the code. All sections are yours, and sections 6 to 10 matter most.
+- **The coding assistant:** changes the code. All sections are yours, and sections 6 to 10 matter most. Then read `CODING.md`, which is written for you: the rules, how requests flow, the main functions, recipes for common changes, how to test, and the traps.
 
 ## 1. What Brenai is
 A companion game at https://brenai.fly.dev. The player talks with **Wizra**: 22, goth, plays D&D, college student. She has a 3D body, a voice, a dorm, a schedule, moods, memory of the player, and a relationship that grows through five romance levels (0 to 4). The owner and main player is **Andrew**.
