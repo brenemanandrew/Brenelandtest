@@ -245,6 +245,7 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   cameDorm: ['took her up on the invite and has just walked into her dorm room', ''], cameHouse: ['said yes, and she has just arrived at his house and walked in', ''], homeDorm: ['has left her dorm and gone home; you two are apart again, chatting like usual', ''], homeHouse: ['has seen her out; she is back in her own dorm and you two are chatting like usual', ''],
   powerout: ['is there when the storm knocks the power out: every light and screen in the room just died and it is dark except for the lightning', ''], powerback: ['is there as the power comes back on and the lights flicker up again', ''],
   wandered: ['is out on his own when she turns up there to join him, on a whim: she has just walked in', ''], sheasked: ['has just been asked by her to come and hang out (she sent him the invitation a moment ago)', ''],
+  gamewon: ['just played a little game with her, and won; she can be a good or a sore loser about it, in her own way', ''], gamelost: ['just played a little game with her and lost; she is allowed to gloat a bit', ''],
   moviekiss: ['leans in on the couch, in the dark of the film, and kisses her; it has been building all evening and she kisses him back', ''],
   moviestart: ['dims the lights and starts the film; she settles in next to him on the couch', ''],
   planned: ['just put a plan with her on the calendar (see the plans in your notes); she can say how she feels about it', ''],
@@ -648,7 +649,15 @@ const CUES_DEFAULT = [
   { label: 'makes a little heart', words: 'love you, i adore you, you are the best, youre the best', gesture: 'fingerheart', emote: '\ud83d\udc96' },
 ];
 const cleanCues = list => list.slice(0, 80).map(c => ({ label: String(c.label || '').slice(0, 60), words: String(c.words || '').slice(0, 200), gesture: String(c.gesture || '').replace(/[^a-z0-9_:]/gi, '').slice(0, 46), emote: String(c.emote || '').slice(0, 8), hold: Math.max(1, Math.min(12, +c.hold || 3.5)) })).filter(c => c.words.trim() && (c.gesture || c.emote));
-const devData = () => { const d = db.dev || (db.dev = {}); if (!Array.isArray(d.cues)) d.cues = cleanCues(CUES_DEFAULT); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
+// Minigames made in the Studio: a template (toss, tap or timing) and its settings. See public/minigame.js.
+const GAMES_DEFAULT = [
+  { id: 'snacktoss', name: 'Snack toss', icon: '\ud83c\udf6c', kind: 'toss', item: '\ud83c\udf6c', target: 'mouth', rounds: 8, need: 5, speed: 3, hitGest: 'chew', missGest: 'eep', winGest: 'cheer', loseGest: 'pout', bond: '', pts: 2, coins: 3, minLevel: 0, cool: 30 },
+  { id: 'hearts', name: 'Catch the hearts', icon: '\ud83d\udc97', kind: 'tap', item: '\ud83d\udc97', secs: 25, need: 12, speed: 3, hitGest: 'chuckle', winGest: 'fingerheart', loseGest: 'shrug', bond: 'romance', pts: 2, coins: 2, minLevel: 0, cool: 30 },
+  { id: 'highfive', name: 'High five', icon: '\u270b', kind: 'timing', item: '\u270b', rounds: 6, need: 4, speed: 3, hitGest: 'clap', missGest: 'laugh', winGest: 'cheer', loseGest: 'facepalm', bond: 'friend', pts: 2, coins: 2, minLevel: 0, cool: 30 }];
+const GAME_KINDS = ['toss', 'tap', 'timing'], GAME_TARGETS = ['mouth', 'head', 'hair', 'face', 'hand', 'shoulder'], gest = v => String(v || '').replace(/[^a-z0-9_]/gi, '').slice(0, 30), num = (v, lo, hi, d) => Number.isFinite(+v) ? Math.max(lo, Math.min(hi, Math.round(+v))) : d;
+const cleanGames = list => list.slice(0, 40).map(g => ({ id: String(g.id || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16) || 'g' + Math.random().toString(36).slice(2, 9), name: String(g.name || 'A game').replace(/[<>]/g, '').slice(0, 40), icon: String(g.icon || '\ud83c\udfae').slice(0, 8), kind: GAME_KINDS.includes(g.kind) ? g.kind : 'toss', item: String(g.item || '\ud83c\udf6c').slice(0, 8), target: GAME_TARGETS.includes(g.target) ? g.target : 'mouth',
+  rounds: num(g.rounds, 1, 30, 8), secs: num(g.secs, 5, 120, 25), need: num(g.need, 1, 60, 5), speed: num(g.speed, 1, 5, 3), hitGest: gest(g.hitGest), missGest: gest(g.missGest), winGest: gest(g.winGest), loseGest: gest(g.loseGest), bond: ['romance', 'friend', 'mentor'].includes(g.bond) ? g.bond : '', pts: num(g.pts, 0, 10, 2), coins: num(g.coins, 0, 20, 2), minLevel: num(g.minLevel, 0, ROM_MAX, 0), cool: num(g.cool, 0, 1440, 30) }));
+const devData = () => { const d = db.dev || (db.dev = {}); if (!Array.isArray(d.cues)) d.cues = cleanCues(CUES_DEFAULT); if (!Array.isArray(d.games)) d.games = cleanGames(GAMES_DEFAULT); d.ui = d.ui || {}; d.events = Array.isArray(d.events) ? d.events : []; d.maps = d.maps || {}; d.maps.custom = Array.isArray(d.maps.custom) ? d.maps.custom : []; d.fired = d.fired || {}; return d; };
 const customMap = id => devData().maps.custom.find(m => m.id === id);
 function leaveNow(leave, since = Date.now()) {
   if (db.place) setPlace('');                                                       // wherever she is going, the visit is over
@@ -1070,17 +1079,26 @@ async function handle(req, res) {
       }
 
       // the Studio's data: GET all of it; POST replaces the sections given ({ ui }, { events }, { maps }, { layout })
+      // a minigame was played: { id, score }. A win pays out (her bond with him, coins) at most once per cool-down of that game.
+      if (url.pathname === '/api/game' && req.method === 'POST') {
+        const b = await readBody(req), g = devData().games.find(x => x.id === String(b.id || '')), now = Date.now(); if (!g) return json(res, 404, { error: 'no such game' });
+        fixBond(); if (db.sheet.romLevel < g.minLevel) return json(res, 409, { error: 'not yet' }); if (db.away) return json(res, 409, { error: 'She is out.' });
+        const score = Math.max(0, Math.min(999, Math.round(+b.score || 0))), won = score >= g.need, at = (db.gameAt = db.gameAt || {}), since = (now - (at[g.id] || 0)) / 60000, ready = since >= g.cool;
+        let pts = 0, coins = 0; if (won && ready) { pts = g.pts; coins = g.coins; if (pts) addBond(g.bond || db.sheet.path || 'friend', pts); if (coins) earn(coins); at[g.id] = now; }
+        db.log.push({ who: 'sys', text: `You played ${g.name} with Wizra${won ? ' and won' : ''} (${score} of ${g.need}).`, at: now }); cur().touches.push({ kind: won ? 'gamewon' : 'gamelost', at: now }); save();
+        return json(res, 200, { ...placeView(), won, awarded: won && ready, pts, coins, wait: won && !ready ? Math.ceil(g.cool - since) : 0 });
+      }
       if (url.pathname === '/api/dev') {
         const d = devData();
         if (req.method === 'POST') {
           const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 3e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
           let b; try { b = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
-          if (Array.isArray(b.cues)) d.cues = cleanCues(b.cues); if (b.cues === 'default') d.cues = cleanCues(CUES_DEFAULT);
+          if (Array.isArray(b.cues)) d.cues = cleanCues(b.cues); if (b.cues === 'default') d.cues = cleanCues(CUES_DEFAULT); if (Array.isArray(b.games)) d.games = cleanGames(b.games); if (b.games === 'default') d.games = cleanGames(GAMES_DEFAULT);
           if (b.ui && typeof b.ui === 'object') d.ui = b.ui; if (Array.isArray(b.events)) d.events = b.events.slice(0, 200); if (b.maps && typeof b.maps === 'object') { d.maps = b.maps; devData(); } if (b.layout && typeof b.layout === 'object') d.layout = b.layout;
           if (b.run) d.run = { id: String(b.run), at: Date.now() };                      // "run this event now" from the Studio
           d.v = Date.now(); save();
         }
-        return json(res, 200, { cues: d.cues, ui: d.ui, events: d.events, maps: d.maps, layout: d.layout || null, fired: d.fired, run: d.run || null, v: d.v || 0 });
+        return json(res, 200, { games: d.games, cues: d.cues, ui: d.ui, events: d.events, maps: d.maps, layout: d.layout || null, fired: d.fired, run: d.run || null, v: d.v || 0 });
       }
       // the heart game (rub her head, pop the hearts): ten pops is +10 romance, three misses is -1. Once a minute at most.
       if (url.pathname === '/api/hearts' && req.method === 'POST') {

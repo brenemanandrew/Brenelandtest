@@ -471,6 +471,9 @@
   /* a character in a story she is telling: their own colour, their name on a chip, their actions under their name */
   .msg .say.cast { margin:5px 0; padding-left:10px; border-left:3px solid hsl(var(--cast) 70% 62%); } .msg .say.cast::before { content:attr(data-c); display:inline-block; margin-right:8px; padding:0 9px; border-radius:999px; font:700 .78em "Fredoka",sans-serif; letter-spacing:.03em; color:#fff; background:hsl(var(--cast) 60% 48%); vertical-align:middle; }
   .msg .act.cast, .msg.her .act.cast { color:hsl(var(--cast) 65% 34%); border-color:hsl(var(--cast) 60% 48%); background:hsl(var(--cast) 70% 92%); margin-left:10px; }
+  #gameBtn { background:none; border:0; width:32px; height:32px; font-size:20px; line-height:1; padding:0; cursor:pointer; opacity:.9; }
+  #gameRow { position:fixed; left:50%; top:calc(58px + env(safe-area-inset-top)); transform:translateX(-50%); z-index:24; display:flex; flex-wrap:wrap; justify-content:center; gap:8px; max-width:94vw; padding:10px 12px; border-radius:22px; background:rgba(30,18,58,.88); box-shadow:0 10px 30px rgba(0,0,0,.45); backdrop-filter:blur(6px); } #gameRow[hidden] { display:none; }
+  #gameRow button { width:84px; border:0; background:rgba(255,255,255,.1); border-radius:16px; padding:8px 4px 6px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:3px; color:#fff; font:600 12.5px "Fredoka",sans-serif; } #gameRow button i { font-style:normal; font-size:30px; line-height:1.1; } #gameRow button:active { transform:scale(.94); } body.calling #gameRow, body.cine #gameRow, body.hang #gameRow { display:none; }
 </style>
 </head>
 <body>
@@ -550,6 +553,7 @@
 <script src="intro.js"></script>
 <script src="facecam.js"></script>
 <script src="hang.js"></script>
+<script src="minigame.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -1202,7 +1206,15 @@ $('mePick').onchange = async e => {
     if (r.ok) setMeThumb(d.me); else addError(d.error || 'That picture could not be used.');
   } catch { addError('That picture could not be opened.'); }
 };
-$('actBtn').onclick = ev => { ev.stopPropagation(); WizraHang.start(); };   // the hand: one-on-one time with her (hang.js)
+$('actBtn').onclick = ev => { ev.stopPropagation(); WizraHang.start(); };
+// the games made in the Studio: a controller on the dock opens a row of them (only those her level allows, and only while she is here)
+{ const gb = el('button', { id: 'gameBtn', textContent: '\ud83c\udfae', title: 'Play a game with her' }); $('dock').insertBefore(gb, $('senseBtn')); const row = el('div', { id: 'gameRow', hidden: true }); document.body.append(row);
+  const gamesNow = () => (dev.games || []).filter(g => (g.minLevel | 0) <= (visitInfo.level | 0));
+  gb.onclick = ev => { ev.stopPropagation(); if (!row.hidden) { row.hidden = true; return; } const list = gamesNow(); if (away) return addSys('She is out. Games need her here.'); if (!list.length) return addSys('No games yet. Make some in the Studio.'); row.textContent = '';
+    for (const g of list) { const b = el('button', { title: g.name }, el('i', { textContent: g.icon }), el('span', { textContent: g.name })); b.onclick = e => { e.stopPropagation(); row.hidden = true; WizraSound.fx('click'); WizraGames.start(g); }; row.append(b); } row.hidden = false; };
+  addEventListener('click', () => { row.hidden = true; });
+  /* the Studio's "Try it": /#game=<id> starts that game as a preview once she is on screen */
+  const want = /#game=([a-z0-9]+)/.exec(location.hash); if (want) { let n = 0; const go = setInterval(() => { const g = (dev.games || []).find(x => x.id === want[1]); if (g && WizraGames.start(g, true)) { clearInterval(go); history.replaceState(null, '', location.pathname); } else if (++n > 60) clearInterval(go); }, 1000); } }   // the hand: one-on-one time with her (hang.js)
 addEventListener('pointerdown', ev => { if (!ev.target.closest('#meBox')) $('meBox').classList.remove('fan'); });
 
 // The avatar: tap to expand to a big view, tap again (or outside) to shrink.
