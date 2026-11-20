@@ -749,7 +749,7 @@ async function handle(req, res) {
     }
 
     if (url.pathname.startsWith('/api/')) {
-      /* the inbox: a way to hand files to the game from a page that cannot log in (Mixamo's own page, running a script the owner pasted). The owner opens it for two hours and gets a one-time code; only .fbx files, only with that code. */
+      /* the inbox: a way to hand files to the game from a page that cannot log in (Mixamo's own page, running a script the owner pasted). The owner opens it for two days and gets a one-time code; only .fbx files, only with that code. */
       if (url.pathname === '/api/inbox' && (req.method === 'OPTIONS' || (req.method === 'POST' && url.searchParams.get('code')))) {
         const cors = { 'access-control-allow-origin': 'https://www.mixamo.com', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '600' };
         if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
@@ -909,7 +909,7 @@ async function handle(req, res) {
 
       // outfits: GET the set-up, POST changes to it ({ situations }, { force }, { clear: slot }); a model for a slot is uploaded to /api/outfit/slot
       if (url.pathname.startsWith('/api/inbox')) { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const dir = path.join(DATA_DIR, 'inbox');
-        if (req.method === 'POST') { const b = await readBody(req); if (b.open) { inbox.code = crypto.randomBytes(12).toString('hex'); inbox.until = Date.now() + 2 * 3600e3; return json(res, 200, { code: inbox.code, until: inbox.until }); } if (b.close) { inbox.code = ''; } if (b.clear) fs.rmSync(dir, { recursive: true, force: true }); return json(res, 200, { ok: true }); }
+        if (req.method === 'POST') { const b = await readBody(req); if (b.open) { inbox.code = crypto.randomBytes(12).toString('hex'); inbox.until = Date.now() + 48 * 3600e3; return json(res, 200, { code: inbox.code, until: inbox.until }); } if (b.close) { inbox.code = ''; } if (b.clear) fs.rmSync(dir, { recursive: true, force: true }); return json(res, 200, { ok: true }); }
         const f = url.pathname.slice(11); if (f) { if (!/^[a-z0-9_]+\.fbx$/.test(f) || !fs.existsSync(path.join(dir, f))) return json(res, 404, { error: 'no such file' }); res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': fs.statSync(path.join(dir, f)).size }); return fs.createReadStream(path.join(dir, f)).pipe(res); }
         let files = []; try { files = fs.readdirSync(dir).map(n => ({ name: n, kb: Math.round(fs.statSync(path.join(dir, n)).size / 1000) })); } catch {} return json(res, 200, { open: !!inbox.code && Date.now() < inbox.until, files }); }
       if (url.pathname === '/api/disk') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); let free = 0, total = 0, used = 0; try { const st = fs.statfsSync(DATA_DIR); free = st.bavail * st.bsize; total = st.blocks * st.bsize; } catch {} try { for (const f of fs.readdirSync(OUTFITS)) used += fs.statSync(path.join(OUTFITS, f)).size; } catch {} return json(res, 200, { freeMB: Math.round(free / 1e6), totalMB: Math.round(total / 1e6), outfitsMB: Math.round(used / 1e6) }); }
