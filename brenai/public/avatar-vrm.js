@@ -891,7 +891,7 @@ export async function create(url, opts = {}) {
     part(new THREE.ConeGeometry(0.11, 0.42, 12), T('#f2f2f2'), 0, 1.0, -0.17).rotation.x = Math.PI + 0.25; part(new THREE.ConeGeometry(0.2, 0.34, 14), T('#2a1d45'), 0, 1.5, 0.02); for (const sx of [-0.045, 0.045]) part(new THREE.SphereGeometry(0.014, 8, 8), glowM('#1a1226'), sx, 1.225, -0.21);
     for (const sx of [-1, 1]) { const a = part(new THREE.CapsuleGeometry(0.055, 0.42, 4, 10), T('#3b2a5c'), sx * 0.3, 0.86, -0.3); a.rotation.set(1.15, 0, sx * 0.35); part(new THREE.SphereGeometry(0.05, 10, 8), T('#d9b08c'), sx * 0.2, 0.8, -0.5); } dn.dm = dm; }
   function dndMode(on) { on = !!on; if (on === dn.on) return dn.on; dn.on = on; dnG.visible = on; dn.lx = dn.ly = 0; dn.cut = 0;
-    if (on) { /* the table goes down a step and a half in front of where you stand, facing you */ const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw); dn.yaw = fp.yaw; dn.px = fp.x; dn.pz = fp.z; dn.ox = fp.x + fx * 1.45; dn.oz = fp.z + fz * 1.45; dnG.position.set(dn.ox, floorY, dn.oz); dnG.rotation.y = fp.yaw; vrm.scene.visible = true; }
+    if (on) { /* the table goes down a step and a half in front of where you stand, facing you */ const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw); dn.yaw = fp.yaw; dn.px = fp.x; dn.pz = fp.z; dn.ox = fp.x + fx * 1.95; dn.oz = fp.z + fz * 1.95; dnG.position.set(dn.ox, floorY, dn.oz); dnG.rotation.y = fp.yaw; vrm.scene.visible = true; }
     return dn.on; }
   function dndSurprise() { if (dn.on) dn.cut = performance.now(); }
   function dndCamera(dt, t) { if (!dn.on) return; fp.locked = true; const fx = Math.sin(dn.yaw), fz = Math.cos(dn.yaw), rx = Math.cos(dn.yaw), rz = -Math.sin(dn.yaw), eye = floorY + 1.22;
@@ -900,12 +900,12 @@ export async function create(url, opts = {}) {
     const tau = window.WIZRA_DND_T !== undefined ? window.WIZRA_DND_T : dn.cut ? (performance.now() - dn.cut) / 1000 : -1;   /* (WIZRA_DND_T: hold the surprise at one moment, for looking at it) */
     if (tau >= 0 && tau < 9.2) { /* the surprise, second by second: 0 she sees it, 1.2 she runs at you, 2.3 she spins you round, 4.4 a hug, 5.8 a kiss, 7.6 she pulls back */
       const ease = v => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); }, dist = tau < 1.2 ? 2.1 : tau < 2.3 ? 2.1 - 1.35 * ease((tau - 1.2) / 1.1) : tau < 4.4 ? 0.75 : tau < 5.8 ? 0.75 - 0.33 * ease((tau - 4.4) / 0.5) : tau < 7.6 ? 0.42 - 0.1 * ease((tau - 5.8) / 0.5) : 0.32 + 1.1 * ease((tau - 7.6) / 0.9);
-      const spin = tau < 2.3 ? 0 : Math.PI * 2 * ease((tau - 2.3) / 2.1), hx = dn.px + fx * 0.9, hz = dn.pz + fz * 0.9, ang = dn.yaw + Math.PI + spin;   /* she holds the middle; you go round her, and she turns to keep facing you: the room spins */
+      const spin = tau < 2.3 ? 0 : Math.PI * 2 * ease((tau - 2.3) / 2.1), hx = dn.px + fx * 0.75, hz = dn.pz + fz * 0.75, ang = dn.yaw + Math.PI + spin;   /* she holds the middle; you go round her, and she turns to keep facing you: the room spins */
       put(hx, hz, ang); head.getWorldPosition(tmpA); const hy = Math.max(tmpA.y, floorY + 1.2), side = tau >= 4.4 && tau < 5.8 ? 0.11 : 0;
       camera.position.set(hx + Math.sin(ang) * dist + Math.cos(ang) * side, hy + 0.03 + (tau >= 4.4 && tau < 5.8 ? 0.06 : 0), hz + Math.cos(ang) * dist - Math.sin(ang) * side); camera.lookAt(hx, hy - (tau >= 5.8 && tau < 7.6 ? 0.035 : 0.01), hz); return; }
     if (dn.cut) dn.cut = 0;
-    const sx = dn.ox - rx * -0.98, sz = dn.oz - rz * -0.98; put(sx - fx * 0.12, sz - fz * 0.12, Math.atan2(dn.ox - sx, dn.oz - sz));                 /* she stands at the table on your left, leaning in */
-    camera.position.set(dn.px + fx * 0.25, eye, dn.pz + fz * 0.25); camera.lookAt(dn.ox - rx * -0.28, floorY + 1.02, dn.oz + fz * 0.35 - rz * -0.28); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
+    const sx = dn.ox + rx * 0.86 + fx * 0.5, sz = dn.oz + rz * 0.86 + fz * 0.5; put(sx, sz, Math.atan2(dn.px - sx, dn.pz - sz) * 0.5 + Math.atan2(dn.ox - sx, dn.oz - sz) * 0.5);   /* she stands at the far left of the table, beside the Dungeon Master, half turned to you */
+    camera.position.set(dn.px + fx * 0.55, eye + 0.08, dn.pz + fz * 0.55); camera.lookAt(dn.ox + rx * 0.3, floorY + 1.08, dn.oz + rz * 0.3 + fz * 0.4); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
   // ---- movie night as a film is shot: fixed cameras that cut from one to the next. You cannot walk; you can only glance around.
   //   'couch'  from behind the couch: the backs of two heads, the TV past them, the couch heavy and dark in front
   //   'side'   from your seat, turned to watch her watch the film
