@@ -261,3 +261,6 @@ Romance now runs to level 4 (`ROM_MAX`, rule `lvl4`). The outfit grid holds a mo
 
 ## Her pictures, by romance level
 The picture pack is now about 27 pictures for each of the five levels (`tools/picpack/shots2.cjs` lists them, `gen2.cjs` renders them through the live game with `?wear=<outfit file>`, so each is her in the outfit that level wears for that moment). A picture carries `lvl` and is only ever sent while they are at that level: not before, and not after she has moved on. Nothing in the game says so. Uploading a new pack keeps the files of pictures already sent to anyone, so old chats still show them, but they are off the list. Selfies are taken as a phone would: `spec.arm` puts the camera where the phone is and runs her arm out of the bottom of the frame, and her eyes go to the lens.
+
+## Picture cheats
+A still picture may cheat, and the cheat is undone the moment it is taken: `spec.roll` tilts the camera, `spec.fov` changes the lens, `spec.view` puts the camera closer than an arm could hold it, `spec.set` bends a bone past what the live game allows, and `spec.hide` takes a hand or arm out of the shot. The pack uses them for its dynamic shots (peeking up from the bottom of the frame, leaning into the lens, lying back on her pillow, reaching for the camera, extreme close-ups).
