@@ -20,6 +20,7 @@ import { wantsPic, selfie, thing, chatChance, awayChance, picNote, candidates, r
 import { AsyncLocalStorage } from 'node:async_hooks';
 import webpush from 'web-push';
 import { MOVIES, beatAt } from './movies.mjs';
+import { CHARS as DND_CHARS, newGame as dndNew, view as dndView, declare as dndDeclare, roll as dndRoll, sceneOf as dndScene, PROMPT as DND, ADVENTURE as DND_ADV } from './dnd.mjs';
 import { TRAITS_DEFAULT } from './persona.mjs';
 import { PERSONA, SHEET_DEFAULT, SETTINGS_DEFAULT, STATE_BLOCK, LEARN_PROMPT } from './persona.mjs';
 
@@ -246,6 +247,7 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
   powerout: ['is there when the storm knocks the power out: every light and screen in the room just died and it is dark except for the lightning', ''], powerback: ['is there as the power comes back on and the lights flicker up again', ''],
   wandered: ['is out on his own when she turns up there to join him, on a whim: she has just walked in', ''], sheasked: ['has just been asked by her to come and hang out (she sent him the invitation a moment ago)', ''],
   gamewon: ['just played a little game with her, and won; she can be a good or a sore loser about it, in her own way', ''], gamelost: ['just played a little game with her and lost; she is allowed to gloat a bit', ''],
+  dndstart: ['has set up a whole D&D game as a surprise for her: a table, dice, a Dungeon Master; she is over the moon', ''], dndend: ['just finished a D&D adventure with her, start to finish; she is glowing about it', ''],
   moviekiss: ['leans in on the couch, in the dark of the film, and kisses her; it has been building all evening and she kisses him back', ''],
   moviestart: ['dims the lights and starts the film; she settles in next to him on the couch', ''],
   planned: ['just put a plan with her on the calendar (see the plans in your notes); she can say how she feels about it', ''],
@@ -561,7 +563,7 @@ function socialTick() { const now = Date.now(), dt = Math.min(10, (now - (db.soc
   const close = (db.sheet.rapport | 0) / 100, hit = perMin => Math.random() < 1 - Math.pow(1 - perMin, dt);
   if (db.place && db.solo) { if (process.env.WANDER_TEST ? now - (db.soloAt || now) > 12000 : now - (db.soloAt || now) > 90000 && hit(0.03 + 0.07 * close)) { db.solo = false; const nm = placeLabel(db.place); db.log.push({ who: 'sys', text: `Wizra showed up at ${nm}.`, at: now }); cur().touches.push({ kind: 'wandered', at: now }); remember('wander', 'The first time she turned up where you were, uninvited.'); save(); } return; }
   if (!db.place && !inviteNow() && now - (db.askedAt || 0) > 3 * 3600000 && now - ((db.log[db.log.length - 1] || {}).at || 0) < 20 * 60000 && hit(0.004 + 0.01 * close)) { const made = devData().maps.custom.map(m => m.id), where = Math.random() < 0.4 || !made.length ? 'dorm' : made[Math.random() * made.length | 0]; db.invite = { place: where, at: now }; db.askedAt = now; db.log.push({ who: 'sys', text: `Wizra is asking you to come to ${placeLabel(where)}.`, at: now }); cur().touches.push({ kind: 'sheasked', at: now }); save(); } }
-const placeView = () => (socialTick(), { solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
+const placeView = () => (socialTick(), { dnd: dndView(db.dnd), solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
 // ---- movie night: he plays the real film on his own screen; db.movie = { id, t0 (when minute zero was), paused (ms) or 0, said (last beat she reacted to), saidAt }
 const moviePos = () => { const m = db.movie; return m ? ((m.paused || Date.now()) - m.t0) / 60000 : 0; };
 const movieView = () => { const m = db.movie, M = m && MOVIES[m.id]; return M ? { id: m.id, title: M.title, minutes: M.minutes, pos: +moviePos().toFixed(2), paused: !!m.paused, tint: M.tint, heat: Math.round(m.heat || 0) } : null; };
@@ -874,6 +876,25 @@ async function handle(req, res) {
       }
       // movie night controls: { start: id } { pause } { resume } { nudge: seconds } { stop }, and { react } which the page sends every minute:
       // she says something when the film has reached a new beat (or, with { credits }, when it is over)
+      // D&D night (dnd.mjs): { start: class } { say: text } { roll: true } { stop: true }. The server runs the game; her model words it.
+      // If the model cannot be reached the game still moves: the DM's line falls back to the plain facts of the scene.
+      if (url.pathname === '/api/dnd' && req.method === 'POST') {
+        const b = await readBody(req), now = Date.now(); let g = db.dnd;
+        const word = async (prompt, plain, his) => { if (busy) return plain; busy = true; try { db.log.push({ who: 'me', text: his || '', at: Date.now(), ...(his ? {} : { hidden: true }), pre: 'D&D night' }); let t = ''; try { t = (await reply(prompt, () => {})).trim(); } catch {} if (!/DM\s*:/.test(t) && plain && !/^\(table talk\)/.test(plain)) t = plain + (t ? '\n' + t : ''); t = t || plain; db.log.push({ who: 'her', text: t, at: Date.now() }); return t; } finally { busy = false; } };
+        const dm = t => `DM: "${t}"`;
+        if (b.stop) { if (g) { db.dnd = null; db.log.push({ who: 'sys', text: 'The game was packed away.', at: now }); save(); } return json(res, 200, placeView()); }
+        if (b.start) { if (!db.place || db.solo || db.away) return json(res, 409, { error: 'She has to be there with you.', ...placeView() });
+          g = db.dnd = dndNew(String(b.start)); const day = new Date().toLocaleDateString('en-CA', { timeZone: TZ }), surprise = db.dndDay !== day; db.dndDay = day; db.log.push({ who: 'sys', text: `D&D night: ${DND_ADV.title}.`, at: now }); cur().touches.push({ kind: 'dndstart', at: now }); save();
+          const text = await word(DND.intro(g, USER_NAME), dm(`${DND_ADV.intro} ${dndScene(g).notes} What do you do?`)); g.step = 'ask'; save(); return json(res, 200, { ...placeView(), text, surprise }); }
+        if (!g || !g.on) return json(res, 409, { error: 'No game is on.', ...placeView() });
+        if (b.roll) { const r = dndRoll(g); if (!r) return json(res, 409, { error: 'Nothing to roll.', ...placeView() }); save();
+          const text = await word(DND.result(g, USER_NAME, r), dm(`${r.outcome.charAt(0).toUpperCase() + r.outcome.slice(1)}.${r.over ? ' And that is where our story ends tonight.' : r.moved ? ' ' + dndScene(g).notes + ' What do you do?' : ' What do you try next?'}`));
+          if (r.over) { g.on = false; remember('dnd:' + DND_ADV.id, `You played "${DND_ADV.title}" together, start to finish.`); addBond(db.sheet.path || 'friend', 5); earn(10); cur().touches.push({ kind: 'dndend', at: Date.now() }); } else if (g.step === 'scene') g.step = 'ask';
+          save(); return json(res, 200, { ...placeView(), text, roll: r, over: r.over }); }
+        const said = String(b.say || '').trim().slice(0, 400); if (!said) return json(res, 400, { error: 'say?' }); if (g.step === 'roll') return json(res, 200, { ...placeView(), text: '' });
+        if ((/\?\s*$/.test(said) && !/\bi\b/i.test(said)) || /^\s*\(/.test(said)) { const text = await word(DND.talk(g, USER_NAME, said), '(table talk)', said); save(); return json(res, 200, { ...placeView(), text: text === '(table talk)' ? '' : text }); }
+        const c = dndDeclare(g, said); save(); const text = await word(DND.declare(g, USER_NAME, said, c), dm('All right. Roll for it.'), said); save(); return json(res, 200, { ...placeView(), text });
+      }
       if (url.pathname === '/api/movie' && req.method === 'POST') {
         const b = await readBody(req), now = Date.now(); let m = db.movie, M = m && MOVIES[m.id];
         if (b.start) { if (!db.place) return json(res, 409, { error: 'You two need to be in the same place first.' }); if (!MOVIES[b.start]) return json(res, 400, { error: 'No such film.' }); db.movie = { id: b.start, t0: now, paused: 0, said: -1, saidAt: 0 }; db.log.push({ who: 'sys', text: `Movie night: ${MOVIES[b.start].title}.`, at: now }); cur().touches.push({ kind: 'moviestart', at: now }); save(); return json(res, 200, placeView()); }
