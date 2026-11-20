@@ -711,7 +711,7 @@ function readBody(req) {
 }
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
-let busy = false;
+let busy = false; const inbox = { code: '', until: 0 };
 // the match questions (the page shows them as picture cards, in this order): what each answer does to her temperament
 const MATCH = [
   [{ playfulness: -15, patience: 25, confidence: -5 }, { playfulness: 30, sarcasm: 10 }, { confidence: 25, patience: -15, bluntness: 5 }],                 // her energy: calm / playful / fiery
@@ -749,6 +749,18 @@ async function handle(req, res) {
     }
 
     if (url.pathname.startsWith('/api/')) {
+      /* the inbox: a way to hand files to the game from a page that cannot log in (Mixamo's own page, running a script the owner pasted). The owner opens it for two hours and gets a one-time code; only .fbx files, only with that code. */
+      if (url.pathname === '/api/inbox' && (req.method === 'OPTIONS' || (req.method === 'POST' && url.searchParams.get('code')))) {
+        const cors = { 'access-control-allow-origin': 'https://www.mixamo.com', 'access-control-allow-methods': 'POST, OPTIONS', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '600' };
+        if (req.method === 'OPTIONS') { res.writeHead(204, cors); return res.end(); }
+        const fail = (c, e) => { res.writeHead(c, { ...cors, 'content-type': 'application/json' }); res.end(JSON.stringify({ error: e })); };
+        if (!inbox.code || Date.now() > inbox.until || url.searchParams.get('code') !== inbox.code) return fail(403, 'The inbox is closed.');
+        const name = String(url.searchParams.get('name') || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 50); if (!name) return fail(400, 'name?');
+        const dir = path.join(DATA_DIR, 'inbox'); fs.mkdirSync(dir, { recursive: true }); if (fs.readdirSync(dir).length >= 300) return fail(409, 'The inbox is full.');
+        const parts = []; let size = 0, big = false; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 30e6) { big = true; req.destroy(); resolve(); } else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+        const buf = Buffer.concat(parts); if (big || buf.subarray(0, 18).toString('latin1') !== 'Kaydara FBX Binary') return fail(400, 'Only FBX files (binary), up to 30 MB.');
+        fs.writeFileSync(path.join(dir, name + '.fbx'), buf); res.writeHead(200, { ...cors, 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, name, kb: Math.round(size / 1000) }));
+      }
       /* the PC that runs her brain may also load her outfit models: it proves itself with the brain token instead of a login, and acts as the owner, for the outfit routes only */
       const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk'].includes(url.pathname);
       if (byToken && !als.getStore()) { const u = shared.owner && playerOf(shared.owner); if (!u) return json(res, 409, { error: 'This game has no owner yet.' }); return als.run(u, () => handle(req, res)); }
@@ -896,6 +908,10 @@ async function handle(req, res) {
       if (url.pathname === '/api/away') { awayPic(); return json(res, 200, { depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), tail: tailView(), devRun: devData().run || null, devV: devData().v || 0, ...placeView() }); }
 
       // outfits: GET the set-up, POST changes to it ({ situations }, { force }, { clear: slot }); a model for a slot is uploaded to /api/outfit/slot
+      if (url.pathname.startsWith('/api/inbox')) { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const dir = path.join(DATA_DIR, 'inbox');
+        if (req.method === 'POST') { const b = await readBody(req); if (b.open) { inbox.code = crypto.randomBytes(12).toString('hex'); inbox.until = Date.now() + 2 * 3600e3; return json(res, 200, { code: inbox.code, until: inbox.until }); } if (b.close) { inbox.code = ''; } if (b.clear) fs.rmSync(dir, { recursive: true, force: true }); return json(res, 200, { ok: true }); }
+        const f = url.pathname.slice(11); if (f) { if (!/^[a-z0-9_]+\.fbx$/.test(f) || !fs.existsSync(path.join(dir, f))) return json(res, 404, { error: 'no such file' }); res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': fs.statSync(path.join(dir, f)).size }); return fs.createReadStream(path.join(dir, f)).pipe(res); }
+        let files = []; try { files = fs.readdirSync(dir).map(n => ({ name: n, kb: Math.round(fs.statSync(path.join(dir, n)).size / 1000) })); } catch {} return json(res, 200, { open: !!inbox.code && Date.now() < inbox.until, files }); }
       if (url.pathname === '/api/disk') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); let free = 0, total = 0, used = 0; try { const st = fs.statfsSync(DATA_DIR); free = st.bavail * st.bsize; total = st.blocks * st.bsize; } catch {} try { for (const f of fs.readdirSync(OUTFITS)) used += fs.statSync(path.join(OUTFITS, f)).size; } catch {} return json(res, 200, { freeMB: Math.round(free / 1e6), totalMB: Math.round(total / 1e6), outfitsMB: Math.round(used / 1e6) }); }
       if (url.pathname === '/api/outfits') {
         const o = outfitData();
