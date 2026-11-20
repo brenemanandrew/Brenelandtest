@@ -904,8 +904,8 @@ export async function create(url, opts = {}) {
       put(hx, hz, ang); head.getWorldPosition(tmpA); const hy = Math.max(tmpA.y, floorY + 1.2), side = tau >= 4.4 && tau < 5.8 ? 0.11 : 0;
       camera.position.set(hx + Math.sin(ang) * dist + Math.cos(ang) * side, hy + 0.03 + (tau >= 4.4 && tau < 5.8 ? 0.06 : 0), hz + Math.cos(ang) * dist - Math.sin(ang) * side); camera.lookAt(hx, hy - (tau >= 5.8 && tau < 7.6 ? 0.035 : 0.01), hz); return; }
     if (dn.cut) dn.cut = 0;
-    const sx = dn.ox + rx * 0.86 + fx * 0.5, sz = dn.oz + rz * 0.86 + fz * 0.5; put(sx, sz, Math.atan2(dn.px - sx, dn.pz - sz) * 0.5 + Math.atan2(dn.ox - sx, dn.oz - sz) * 0.5);   /* she stands at the far left of the table, beside the Dungeon Master, half turned to you */
-    camera.position.set(dn.px + fx * 0.55, eye + 0.08, dn.pz + fz * 0.55); camera.lookAt(dn.ox + rx * 0.3, floorY + 1.08, dn.oz + rz * 0.3 + fz * 0.4); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
+    const sx = dn.ox + rx * 0.66 + fx * 0.62, sz = dn.oz + rz * 0.66 + fz * 0.62; put(sx, sz, Math.atan2(dn.px - sx, dn.pz - sz) * 0.5 + Math.atan2(dn.ox - sx, dn.oz - sz) * 0.5);   /* she stands at the far left of the table, beside the Dungeon Master, half turned to you */
+    camera.position.set(dn.px + fx * 0.55, eye + 0.08, dn.pz + fz * 0.55); camera.lookAt(dn.ox + rx * 0.36, floorY + 1.1, dn.oz + rz * 0.36 + fz * 0.4); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
   // ---- movie night as a film is shot: fixed cameras that cut from one to the next. You cannot walk; you can only glance around.
   //   'couch'  from behind the couch: the backs of two heads, the TV past them, the couch heavy and dark in front
   //   'side'   from your seat, turned to watch her watch the film
