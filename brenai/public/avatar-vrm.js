@@ -991,14 +991,15 @@ export async function create(url, opts = {}) {
       { const s2 = R ? 1 : -1, side = R ? 'right' : 'left'; set(side + 'UpperArm', 0.3, s2 * 0.95, s2 * (spec.high ? -0.25 : 0.2)); set(side + 'LowerArm', 0, s2 * 0.2, 0); if (vrm.springBoneManager) vrm.springBoneManager.reset(); vrm.update(0); vrm.scene.updateMatrixWorld(true); } }   /* (a phone's front camera is a wide one, held a little past a straight arm) */
     else if (spec.view && !lying) { const [vs, vu, vd, vl] = spec.view; camera.position.set(tmpA.x + fx * vd + fz * vs, tmpA.y + vu, tmpA.z + fz * vd - fx * vs); camera.lookAt(tmpA.x + fz * (spec.arm ? (spec.arm === 'R' ? -0.05 : 0.05) : 0), tmpA.y + (vl || 0), tmpA.z); }   /* her own camera spot: [to her side, above her eyes, how far, where on her it points] */
     if (!inDorm) { backdrop.position.set(tmpA.x, tmpA.y - (full ? 0.6 : half ? 0.35 : 0.3), tmpA.z - 1.05); backdrop.scale.set(full ? 2.4 : half ? 1.6 : 1.5, full ? 1.5 : half ? 1.15 : 1.2, 1); }
-    if (!inDorm && spec.arm) { backdrop.scale.set(3.4, 2.5, 1); backdrop.position.y = tmpA.y - 0.15; }   /* the wide selfie camera, off to one side, sees more of what is behind her */
+    if (!inDorm && spec.arm) { backdrop.scale.set(3.4, 2.5, 1); backdrop.position.y = tmpA.y - 0.15; }
+    if (!inDorm) { /* the painted backdrop stands straight behind her as the camera sees her, wherever the camera went, and is big enough to fill the frame */ const dx = tmpA.x - camera.position.x, dz = tmpA.z - camera.position.z, dl = Math.hypot(dx, dz) || 1; backdrop.position.x = tmpA.x + dx / dl * 1.05; backdrop.position.z = tmpA.z + dz / dl * 1.05; backdrop.rotation.y = Math.atan2(-dx, -dz); backdrop.scale.multiplyScalar(spec.turn ? 1.5 : 1.15); }   /* the wide selfie camera, off to one side, sees more of what is behind her */
     /* a picture is taken looking at whoever holds the camera: her eyes go to the lens */
     if (!lying && spec.eyes !== false) { target.position.copy(camera.position); target.updateMatrixWorld(true); if (vrm.lookAt) { try { vrm.lookAt.update(0); } catch {} } vrm.scene.updateMatrixWorld(true); }
     blushMat.opacity = (spec.blush || 0) * 0.5;
     renderer.render(scene, camera); blushMat.opacity = blushNow;
     let url = ''; try { url = renderer.domElement.toDataURL('image/webp', 0.86); } catch {}
     // and put everything back for the live view (the pose and camera are rebuilt every frame anyway)
-    backdrop.visible = false; backdrop.scale.set(1, 1, 1); setPlace(here); props.forEach((o, i) => { o.visible = propVis[i]; });
+    backdrop.visible = false; backdrop.scale.set(1, 1, 1); backdrop.rotation.y = 0; setPlace(here); props.forEach((o, i) => { o.visible = propVis[i]; });
     vrm.scene.visible = keep.vis; camera.fov = keep.fov; camera.updateProjectionMatrix(); sun.intensity = keep.sun; sun.color.copy(keep.sunC); amb.intensity = keep.amb; el.style.background = keep.bg; clipHip = 0; if (vrm.springBoneManager) vrm.springBoneManager.reset();
     return url;
   }

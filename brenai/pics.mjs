@@ -13,7 +13,7 @@ export const wantsPic = text => /\b(send|show|take|snap|text|share)\b[^.?!]{0,40
 export function selfie(scene, kind, close) { // kind: how she is right now ('' or tipsy, high...); close 0..1: the closer, the more playful the pose
   const poses = scene === 'dorm' ? ['plain', 'peace', 'wave', 'full', 'bed', 'bed2', 'knees', 'knee', 'hair', ...(close > 0.6 ? ['heart', 'fox', 'heart'] : [])] : ['plain', 'plain', 'peace', 'wave', ...(close > 0.6 ? ['heart', 'fox'] : [])];
   const pose = pick(poses), face = FACE[kind] || pick(pose === 'plain' ? ['neutral', 'playful', 'happy'] : ['happy', 'playful', 'joy']);
-  return { id: id(), kind: 'selfie', pose, scene, face, desc: `${POSE[pose]}, ${WHERE[scene] || WHERE.street}${kind ? ', looking ' + kind : ''}` };
+  return { id: id(), kind: 'selfie', pose, scene, face, ...(pose === 'plain' ? { arm: pick(['R', 'L']) } : {}), desc: `${POSE[pose]}, ${WHERE[scene] || WHERE.street}${kind ? ', looking ' + kind : ''}` };
 }
 const THINGS = [[/dice/i, 'dice', 'a close-up of a handful of her dice'], [/coffee/i, 'coffee', 'her iced coffee'], [/cat|moth\b/i, 'cat', 'her black cat Moth, staring at the camera'], [/horror|movie/i, 'movie', 'an old horror movie poster she spotted'],
   [/thunder|storm|rain/i, 'storm', 'dark storm clouds rolling in'], [/thrift/i, 'thrift', 'a ridiculous thrift store find'], [/histor|medieval|book/i, 'book', 'a page of an old history book she is reading']];
