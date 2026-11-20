@@ -204,6 +204,8 @@ export async function create(url, opts = {}) {
     hips: () => ({ leftUpperArm: [0.25, 0, -0.85], rightUpperArm: [0.25, 0, 0.85], leftLowerArm: [0, -1.5, 0], rightLowerArm: [0, 1.5, 0], leftHand: [0, 0, -0.5], rightHand: [0, 0, 0.5], _head: [0, 0, 0.08] }),
     cheer: t => ({ leftUpperArm: [0, 0, 1.1 + 0.1 * sin(t * 9)], rightUpperArm: [0, 0, -1.1 - 0.1 * sin(t * 9)], leftLowerArm: [0, -0.5, 0], rightLowerArm: [0, 0.5, 0], _hipY: 0.012 * abs(sin(t * 9)), _head: [-0.1, 0, 0], _face: { happy: 1 } }),
     tongue: t => ({ _tongue: [1, -0.25, 0.4 * Math.sin(t * 9) * Math.exp(-t * 0.8)], _head: [-0.06, 0.12, 0.16], _face: { happy: 0.55, blink: 0.75 } }),   /* bleh: eyes squeezed, tongue out with a wiggle */
+    hug: () => ({ rightUpperArm: [0.2, 1.1, 0.3], leftUpperArm: [0.2, -1.1, -0.3], rightLowerArm: [0, 0.5, 0], leftLowerArm: [0, -0.5, 0], _head: [0.12, 0, 0.16], _face: { happy: 0.9 } }),   /* arms out and round you */
+    smooch: () => ({ rightUpperArm: [0.2, 1.0, 0.45], leftUpperArm: [0.2, -1.0, -0.45], rightLowerArm: [0, 0.7, 0], leftLowerArm: [0, -0.7, 0], spine: plus('spine', 0.1), _head: [0.02, 0, 0.1], _face: { blink: 1, ou: 0.75 } }),
     pout: () => ({ leftShoulder: [0, 0, 0.12], rightShoulder: [0, 0, -0.12], _eyes: [2.2, -0.6], _head: [0.1, 0.3, -0.1], _face: { sad: 0.45, angry: 0.25, ou: 0.5 } }),
     handsup: t => ({ leftUpperArm: [0, 0, 1.38], rightUpperArm: [0, 0, -1.38], leftLowerArm: [0, -0.2, 0], rightLowerArm: [0, 0.2, 0], leftHand: [0, 0, 0.2], rightHand: [0, 0, -0.2], spine: plus('spine', -0.06), _head: [-0.05, 0, 0], _face: { surprised: 0.8 } }),
     eep: t => { const j = Math.exp(-t * 1.6); return { leftUpperArm: [-0.4, -0.35, -1.2], rightUpperArm: [-0.4, 0.35, 1.2], leftLowerArm: [0, -2.2, 0], rightLowerArm: [0, 2.2, 0], leftShoulder: [0, 0, 0.3], rightShoulder: [0, 0, -0.3], spine: plus('spine', -0.12 - 0.08 * j), _hipY: 0.03 * j * abs(sin(t * 14)), _head: [-0.08, 0.25 * sin(t * 6) * j, 0.06], _eyes: [1.5 * sin(t * 5), 0], _face: { surprised: 1 } }; },
@@ -873,6 +875,37 @@ export async function create(url, opts = {}) {
     spot('heart', hc.at); heartGlow.visible = true; heartGlow.position.copy(hc.at).addScaledVector(hc.pos.copy(camera.position).sub(hc.at).normalize(), 0.09); heartGlow.scale.setScalar(0.13 * (1 + 0.14 * Math.abs(Math.sin(t / 110)))); heartGlow.material.opacity = 1;
   }
   // ---- one-on-one time: she stands facing you at arm's length. You can look about a little and lean round her, but not walk off.
+  // ---- D&D night: a round table set down in front of you, a Dungeon Master across it, her at your left. You sit; you can glance
+  // around. It opens with a scene of its own (dndSurprise): she sees the table, rushes you, spins you round, hugs you, kisses you,
+  // pulls back and gets down to business. All of it is your own eyes: the camera stays on her face.
+  const dn = { on: false, cut: 0, lx: 0, ly: 0, ox: 0, oz: 0, yaw: 0, px: 0, pz: 0 }, dnG = new THREE.Group(); dnG.visible = false; scene.add(dnG);
+  { const T = c => (kit.toon ? kit.toon(c) : new THREE.MeshToonMaterial({ color: c })), add = (g, m, x, y, z, ry = 0) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.rotation.y = ry; o.castShadow = true; dnG.add(o); return o; }, glowM = c => new THREE.MeshBasicMaterial({ color: c });
+    add(new THREE.CylinderGeometry(0.78, 0.78, 0.06, 28), T('#6b4326'), 0, 0.74, 0); add(new THREE.CylinderGeometry(0.7, 0.7, 0.012, 28), T('#2f6b4a'), 0, 0.776, 0); add(new THREE.CylinderGeometry(0.1, 0.16, 0.72, 12), T('#4a2d18'), 0, 0.36, 0);   /* the table, with a green felt */
+    add(new THREE.BoxGeometry(0.5, 0.008, 0.36), T('#e8d9b0'), 0.02, 0.786, 0.05, 0.2);                                                                                                            /* the map */
+    for (const [x, z, c] of [[-0.22, -0.2, '#c0392b'], [-0.12, -0.28, '#8e44ad'], [0.25, -0.22, '#f1c40f'], [0.33, -0.1, '#2980b9']]) add(new THREE.IcosahedronGeometry(0.028, 0), T(c), x, 0.81, z, x * 9);   /* dice */
+    add(new THREE.CylinderGeometry(0.022, 0.026, 0.11, 10), T('#f4ecd8'), -0.42, 0.835, 0.22); const flame = add(new THREE.SphereGeometry(0.022, 8, 8), glowM('#ffcf6b'), -0.42, 0.915, 0.22); flame.scale.y = 1.7; const cl = new THREE.PointLight('#ffb968', 1.6, 4.5, 1.6); cl.position.set(-0.42, 0.95, 0.22); dnG.add(cl); dn.flame = flame; dn.light = cl;
+    for (const [x, ry] of [[-0.3, 0.45], [0, 0], [0.3, -0.45]]) add(new THREE.BoxGeometry(0.3, 0.26, 0.012), T('#5a1f2e'), x, 0.92, 0.5 - Math.abs(x) * 0.22, ry);                                 /* the DM's screen */
+    /* the Dungeon Master: a robed old game master with a long white beard, on the far side */
+    const dm = new THREE.Group(); dm.position.set(0, 0, 1.12); dnG.add(dm); const part = (g, m, x, y, z) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.castShadow = true; dm.add(o); return o; };
+    part(new THREE.CylinderGeometry(0.2, 0.36, 1.05, 16), T('#3b2a5c'), 0, 0.6, 0); part(new THREE.SphereGeometry(0.2, 16, 12), T('#3b2a5c'), 0, 1.22, 0.02).scale.set(1, 1.08, 1.05); dn.dmHead = part(new THREE.SphereGeometry(0.13, 16, 12), T('#d9b08c'), 0, 1.2, -0.09);
+    part(new THREE.ConeGeometry(0.11, 0.42, 12), T('#f2f2f2'), 0, 1.0, -0.17).rotation.x = Math.PI + 0.25; part(new THREE.ConeGeometry(0.2, 0.34, 14), T('#2a1d45'), 0, 1.5, 0.02); for (const sx of [-0.045, 0.045]) part(new THREE.SphereGeometry(0.014, 8, 8), glowM('#1a1226'), sx, 1.225, -0.21);
+    for (const sx of [-1, 1]) { const a = part(new THREE.CapsuleGeometry(0.055, 0.42, 4, 10), T('#3b2a5c'), sx * 0.3, 0.86, -0.3); a.rotation.set(1.15, 0, sx * 0.35); part(new THREE.SphereGeometry(0.05, 10, 8), T('#d9b08c'), sx * 0.2, 0.8, -0.5); } dn.dm = dm; }
+  function dndMode(on) { on = !!on; if (on === dn.on) return dn.on; dn.on = on; dnG.visible = on; dn.lx = dn.ly = 0; dn.cut = 0;
+    if (on) { /* the table goes down a step and a half in front of where you stand, facing you */ const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw); dn.yaw = fp.yaw; dn.px = fp.x; dn.pz = fp.z; dn.ox = fp.x + fx * 1.45; dn.oz = fp.z + fz * 1.45; dnG.position.set(dn.ox, floorY, dn.oz); dnG.rotation.y = fp.yaw; vrm.scene.visible = true; }
+    return dn.on; }
+  function dndSurprise() { if (dn.on) dn.cut = performance.now(); }
+  function dndCamera(dt, t) { if (!dn.on) return; fp.locked = true; const fx = Math.sin(dn.yaw), fz = Math.cos(dn.yaw), rx = Math.cos(dn.yaw), rz = -Math.sin(dn.yaw), eye = floorY + 1.22;
+    dn.flame.scale.x = dn.flame.scale.z = 1 + 0.15 * Math.sin(t / 90); dn.light.intensity = 1.5 + 0.35 * Math.sin(t / 130) * Math.sin(t / 47); dn.dmHead.rotation.y = 0.12 * Math.sin(t / 2300); dn.dm.rotation.z = 0.015 * Math.sin(t / 1700);
+    const put = (x, z, yaw) => Object.assign(rt, { act: 'up', leaving: false, stand: 1, k: 1, x, z, yaw, i: 0, stepT: 0, until: performance.now() + 60000, nextAt: performance.now() + 600000 });
+    const tau = window.WIZRA_DND_T !== undefined ? window.WIZRA_DND_T : dn.cut ? (performance.now() - dn.cut) / 1000 : -1;   /* (WIZRA_DND_T: hold the surprise at one moment, for looking at it) */
+    if (tau >= 0 && tau < 9.2) { /* the surprise, second by second: 0 she sees it, 1.2 she runs at you, 2.3 she spins you round, 4.4 a hug, 5.8 a kiss, 7.6 she pulls back */
+      const ease = v => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); }, dist = tau < 1.2 ? 2.1 : tau < 2.3 ? 2.1 - 1.35 * ease((tau - 1.2) / 1.1) : tau < 4.4 ? 0.75 : tau < 5.8 ? 0.75 - 0.33 * ease((tau - 4.4) / 0.5) : tau < 7.6 ? 0.42 - 0.1 * ease((tau - 5.8) / 0.5) : 0.32 + 1.1 * ease((tau - 7.6) / 0.9);
+      const spin = tau < 2.3 ? 0 : Math.PI * 2 * ease((tau - 2.3) / 2.1), hx = dn.px + fx * 0.9, hz = dn.pz + fz * 0.9, ang = dn.yaw + Math.PI + spin;   /* she holds the middle; you go round her, and she turns to keep facing you: the room spins */
+      put(hx, hz, ang); head.getWorldPosition(tmpA); const hy = Math.max(tmpA.y, floorY + 1.2), side = tau >= 4.4 && tau < 5.8 ? 0.11 : 0;
+      camera.position.set(hx + Math.sin(ang) * dist + Math.cos(ang) * side, hy + 0.03 + (tau >= 4.4 && tau < 5.8 ? 0.06 : 0), hz + Math.cos(ang) * dist - Math.sin(ang) * side); camera.lookAt(hx, hy - (tau >= 5.8 && tau < 7.6 ? 0.035 : 0.01), hz); return; }
+    if (dn.cut) dn.cut = 0;
+    const sx = dn.ox - rx * -0.98, sz = dn.oz - rz * -0.98; put(sx - fx * 0.12, sz - fz * 0.12, Math.atan2(dn.ox - sx, dn.oz - sz));                 /* she stands at the table on your left, leaning in */
+    camera.position.set(dn.px + fx * 0.25, eye, dn.pz + fz * 0.25); camera.lookAt(dn.ox - rx * -0.28, floorY + 1.02, dn.oz + fz * 0.35 - rz * -0.28); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
   // ---- movie night as a film is shot: fixed cameras that cut from one to the next. You cannot walk; you can only glance around.
   //   'couch'  from behind the couch: the backs of two heads, the TV past them, the couch heavy and dark in front
   //   'side'   from your seat, turned to watch her watch the film
@@ -1027,7 +1060,7 @@ export async function create(url, opts = {}) {
     walkTo, holdClip, where: () => [rt.k > 0.5 ? rt.x : 0, rt.k > 0.5 ? rt.z : hip.z], clips: () => Object.keys(CLIPS), gestures: () => Object.keys(GESTURE).filter(n => n !== 'test'),
     // what the Studio needs to draw the rooms without her model: floor height, each room's walls and the built-in furniture's footprints
     layout: () => ({ floorY, hipZ: hip.z, bounds: { dorm: places.bounds.dorm, house: places.bounds.house }, solid: places.baseSolid, anchors: { seat: [0, hip.z], stand: STAND_AT, shelf: AT_SHELF, counter: AT_COUNTER, door: DOOR, bed: places.bed.side } }),
-    look(dx, dy) { if (mv.on) return movieLook(dx, dy); if (!fp.on || fp.locked) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
+    look(dx, dy) { if (dn.on) { if (!dn.cut) { dn.lx = Math.max(-0.8, Math.min(0.8, dn.lx - dx * 0.004)); dn.ly = Math.max(-0.4, Math.min(0.4, dn.ly - dy * 0.003)); } return; } if (mv.on) return movieLook(dx, dy); if (!fp.on || fp.locked) return; fp.yaw -= dx * 0.0052; fp.pitch = Math.max(-1.15, Math.min(1.15, fp.pitch - dy * 0.0042)); },
     // wheel or pinch in the enlarged view: positive pulls back toward the whole-body view
     zoom(d) { if (focusWant > 0) return true; if (inCall || !document.body.classList.contains('big')) return false; zoomWant = Math.max(0, Math.min(1, zoomWant + d)); localStorage.setItem('brenai.zoom', zoomWant.toFixed(2)); return true; },
     locate(e) { // screen -> puppet space, measured from her eye line
@@ -1041,7 +1074,7 @@ export async function create(url, opts = {}) {
       frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; Object.assign(bz, { mode: 'cut', shot: 0 }); if (!on) heartGlow.visible = false; },
     bonusShot() { bz.shot++; frozeAt = performance.now(); },
     bonusOrbit(dx, dy, dz) { bz.yaw -= dx * 0.008; bz.pitch = Math.max(-0.05, Math.min(1.25, bz.pitch + dy * 0.006)); bz.dist = Math.max(0.5, Math.min(2.8, bz.dist * (1 + dz))); },
-    bonusHit, hang, hangView, hangZone, hangMouth, movieMode, movieLook,
+    bonusHit, hang, hangView, hangZone, hangMouth, movieMode, movieLook, dndMode, dndSurprise,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
@@ -1058,13 +1091,13 @@ export async function create(url, opts = {}) {
       if (em) { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised']) if (has(n)) em.setValue(n, mix(n, w[n]));
         { /* happy and relaxed both close her eyes: together they never add up to more than one whole smile */ const h = mix('happy', w.happy), r = mix('relaxed', w.relaxed), tot = h + r; if (tot > 1) { if (has('happy')) em.setValue('happy', h / tot); if (has('relaxed')) em.setValue('relaxed', r / tot); } }
         /* her happy and relaxed faces already close her eyes into a smile. A blink on top of that pushes the lids past shut and the eyes collapse into odd little lines, so the more she smiles the less of the blink is added. */
-        const smiling = Math.min(1, mix('happy', w.happy) * 1.15 + mix('relaxed', w.relaxed) * 1.0); if (has('blink')) em.setValue('blink', mix('blink', blink) * (1 - smiling)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh);
+        const smiling = Math.min(1, mix('happy', w.happy) * 1.15 + mix('relaxed', w.relaxed) * 1.0); if (has('blink')) em.setValue('blink', mix('blink', blink) * (1 - smiling)); if (has('aa')) em.setValue('aa', mix('aa', aa)); if (has('oh')) em.setValue('oh', oh); if (has('ou')) em.setValue('ou', (gf.ou || 0) * gx.k);   /* (puckered lips, for a pout or a kiss) */
         { const cf = clipFace || {}, to = Math.max(gx.tongue[0], cf.tongueOut || 0), fromClip = (cf.tongueOut || 0) > gx.tongue[0]; tongue.set(to, fromClip ? (cf.tongueCurl === undefined ? 0 : cf.tongueCurl * 2 - 1) : gx.tongue[1], fromClip ? (cf.tongueSide === undefined ? 0 : cf.tongueSide * 2 - 1) : gx.tongue[2], to > 0.03 ? Math.max(mix('aa', aa), 0.3 + 0.3 * to) : 0, fromClip && cf.tongueWide ? cf.tongueWide + 0.5 : 1); tongue.update(s.dt); if (to > 0.03 && has('aa')) em.setValue('aa', Math.max(mix('aa', aa), 0.3 + 0.3 * to)); }
         if (!clipFace && fineOn) { fine.set(null); fineOn = false; }
         if (clipFace) { const useFine = fine.has && clipFace.mFun !== undefined; if (useFine) { fine.set(clipFace); fineOn = true; } for (const k in clipFace) if (em.getExpression(k) && !(useFine && WHOLE.includes(k))) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.9 - tearMat.opacity) * Math.min(1, s.dt * 4);
-      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt);
+      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt); dndCamera(s.dt, s.t);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp && !(mv.on && mv.view === 'toss');   // the TV is on and nobody is talking

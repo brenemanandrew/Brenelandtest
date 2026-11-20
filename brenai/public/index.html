@@ -554,6 +554,7 @@
 <script src="facecam.js"></script>
 <script src="hang.js"></script>
 <script src="minigame.js"></script>
+<script src="dnd.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -915,7 +916,7 @@ function setPlace(d, arriving) {
   for (const k in PATHS) if (was && old[k] !== undefined && visitInfo.bond[k] > old[k]) { const pop = $('bondPop'); pop.textContent = '+' + (visitInfo.bond[k] - old[k]) + ' ' + PATHS[k][0]; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); }
   drawMoments(); WizraSound.path(visitInfo.path);
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
-  showInvite(); filmSync();
+  showInvite(); filmSync(); try { WizraDnd.sync(d.dnd); } catch {}
 }
 function showInvite() {
   const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite, due = visitInfo.place || away ? null : visitInfo.due;
@@ -937,7 +938,7 @@ function openFly() {
   const old = $('fly'); if (old) return old.remove(); const v = visitInfo, items = [], close = () => { const f = $('fly'); if (f) f.remove(); };
   const go = async (id, name) => { close(); try { const r = await api('/api/visit', { place: id, solo: true }); const d = await r.json(); if (!r.ok) return addSys(d.error || 'You could not go there.'); setPlace(d, true); } catch {} };
   if (!avatar.canVisit()) items.push(['\u2753', 'Needs her 3D model', null]);
-  else if (v.place) items.push(['\ud83c\udfe0', 'Head home', () => { close(); $('fpLeave').click(); }]);
+  else if (v.place) { items.push(['\ud83c\udfe0', 'Head home', () => { close(); $('fpLeave').click(); }]); if (!v.solo && !away && !WizraDnd.on) items.push(['\ud83c\udfb2', 'D&D night', () => { close(); WizraDnd.open(); }]); }
   else {
     items.push(['\ud83d\udecb\ufe0f', 'My room', () => go('house', 'your room')]);
     if (!v.canVisit) items.push(['\ud83d\udd12', `Opens at ${v.visitAt} points (you: ${v.rapport})`, null]);
@@ -1094,6 +1095,8 @@ async function followUp(ask) {
 async function send(quick, visit, lean) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return; clearTimeout(followTimer);
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
+  if (!WizraDnd.on && visitInfo.place && !visitInfo.solo && !away && WizraDnd.hears(text)) setTimeout(() => WizraDnd.open(), 900);   /* telling her about it brings the game out: she answers, and you pick who you are */
+  if (WizraDnd.on && !sendBtn.disabled) { if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); } return WizraDnd.say(text); }   /* at the D&D table what you say goes to the game */
   if (sendBtn.disabled) { if (typeof quick !== 'string') voice.pending = true; return; } // she is still answering: send this right after
   if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }
   sendBtn.disabled = true; speaker.stop(typeof quick === 'string' ? 'a button or an event sent a message for you' : 'you sent a message'); if (!away) { avatar.setThinking(true); userDid(text); }
