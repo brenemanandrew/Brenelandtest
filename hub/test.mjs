@@ -31,5 +31,22 @@ for (const [t, want] of CASES) {
 }
 const s = split('use the persona [[local]]she is 22 and goth[[/local]] with token: abc123456 and sk-ant-api03-xxxxxxxxxxxxxxxx');
 console.log('\nsplit out:', s.out, '\nsecrets removed:', s.secrets, '\nrejoined:', rejoin('code uses [[KEPT-LOCAL-1: x]] here', s.held));
-console.log(`\n${pass}/${CASES.length} routed as expected`);
-process.exit(pass === CASES.length ? 0 : 1);
+import * as P from './parts.mjs';
+const sp = P.plan('Make me a game where you run a tavern, guests come in and order drinks, you serve them and get paid, and use cel shaded visuals like my Breneland trees. The barkeep is named Grum and he is grumpy but kind.');
+const brief = P.codeBrief(sp, { id: 'x', repo: 'me/game' });
+const SPLIT = [
+  ['rules go to code', sp.mechanics.length === 3],
+  ['look goes to art', sp.art.length === 1 && /cel shaded/.test(sp.art[0])],
+  ['Grum goes to story', sp.story.length === 1 && /Grum/.test(sp.story[0])],
+  ['no art or story words in the brief', !/grum|grumpy|barkeep|cel shaded|trees/i.test(brief)],
+  ['brief asks for the merge manifest', /hub-merge\.json/.test(brief) && /```hub-merge/.test(brief)],
+  ['slots found: character, place, dialogue, names', ['character', 'environment', 'dialogue', 'names'].every(t => sp.slots.some(x => x.type === t))],
+  ['labelled lines go where they say', (() => { const q = P.plan('code: a timer counts down\nart: neon city\nstory: the courier is late'); return q.mechanics.length === 1 && q.art.length === 1 && q.story.length === 1; })()],
+  ['proper names in rules become ids', (() => { const q = P.plan('Make a game where you chase Vexa through the market'); return q.mechanics[0].includes('entity_1') && !q.mechanics[0].includes('Vexa'); })()],
+  ['style words are stripped from rules', (() => { const q = P.plan('Make a game where a cute toon frog jumps between lily pads'); return !/cute|toon/.test(q.mechanics[0]); })()],
+  ['bad files are rejected at merge', P.checkFile('character', Buffer.from('nope')) && P.checkFile('names', Buffer.from('{}')) && !P.checkFile('names', Buffer.from('{"entities":[]}'))],
+];
+let sOk = 0; for (const [n, ok] of SPLIT) { if (ok) sOk++; console.log(`${ok ? 'ok  ' : 'MISS'} split: ${n}`); }
+pass += sOk; const total = CASES.length + SPLIT.length;
+console.log(`\n${pass}/${total} as expected`);
+process.exit(pass === total ? 0 : 1);

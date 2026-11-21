@@ -59,6 +59,31 @@ This is the rule the router follows (`pick3d` and `pickMotion` in `route.mjs`):
 | Overtime kiosk (ardenot) | Opened as a link. Code changes go to the Coder | Nothing. The hub never sends kiosk data to an outside model |
 | Meshy | Called directly: generate, retexture, rig. Previews only until you OK a refine | Refine step and auto-download into your asset folder |
 
+## Split jobs: art and story one way, code the other
+Press **Split it** instead of Route it. Example: "Make me a game where you run a tavern, guests come in and order drinks, you serve them and get paid, and use cel shaded visuals like my Breneland trees. The barkeep is named Grum and he is grumpy but kind."
+
+1. **The split happens here, by rules**, so your full request never goes to an outside model to be split.
+   - **Code part** (Claude Code) gets the game rules: "you run a tavern", "guests come in and order drinks", "you serve them and get paid".
+   - **Art part** (Meshy, Blender or you) gets the look: "cel shaded visuals like my Breneland trees".
+   - **Story part** (your PC model) gets the rest: "The barkeep is named Grum...".
+   - To force a line to one side, start it with `code:`, `art:` or `story:`.
+2. **Only as much as needed goes to Claude:**
+   - Style words are stripped from the rules ("a cute toon frog" becomes "a frog").
+   - Proper names become ids ("chase Vexa" becomes "chase entity_1").
+   - Assets are **slots** with neutral ids, paths and formats only: `character_1: assets/hub/models/character_1.glb (GLB), humanoid, 66-bone Mixamo skeleton, under 15000 triangles`.
+   - The page shows **exactly what Claude Code gets** before you send. It warns you if a word from your art or story still appears in the code part. You can edit all three parts and add or remove slots.
+3. **Claude Code is told to send back merge info.** It must load every slot from a file, make grey stand-ins, and write `hub-merge.json`: where each slot is loaded, the stand-in it made, units, pivot, facing, the animation clip names it plays, the event names the data can use, a test command, a start command, and what to check by eye. It also puts the same JSON at the end of its reply in case the file is missing.
+4. **Parts run in order:**
+   - Code first, on the PC, on branch `hub/<job id>`.
+   - The story part waits for the code, then writes dialogue and names as JSON using the real event names.
+   - Each single model slot gets a Meshy part. These wait for your OK because they spend credits, and they cancel themselves if you fill that slot by hand.
+   - Folders of items (props, icons) you fill by hand: a link, a file path on the PC, or pasted JSON.
+5. **Merge.** When every slot is filled, the split shows **OK, merge it**. The PC worker:
+   - switches to the branch
+   - puts each file where the manifest says
+   - checks it: a GLB must be a GLB, a PNG a PNG, and JSON must have the right top-level keys (anything else is rejected and named)
+   - runs the test command, commits, and reports what to look at and how to run it
+
 ## Keeping things private
 - `[[local]] ... [[/local]]` text is swapped for a placeholder before anything goes to Claude, and put back when the result comes home.
 - Files on the keep-local list (her persona, saves, `/data`, the roster, `.vrm` models, motion clips) are never sent.
@@ -74,12 +99,13 @@ This is the rule the router follows (`pick3d` and `pickMotion` in `route.mjs`):
 | `route.mjs` | The router: rules first, then Claude or the PC model if unsure, then asks you |
 | `adapters.mjs` | How each backend runs, and the instructions behind each mode |
 | `split.mjs` | Keep-local split and rejoin |
+| `parts.mjs` | Split jobs: rules, art and story apart, slots, the brief for Claude, merge checks |
 | `ledger.mjs` | The job list (one JSON file) |
 | `server.mjs` | The page, the API and the PC queue |
 | `public/index.html` | The phone page: Send, Jobs, Tools |
 | `worker/hub-worker.mjs` | Runs on your PC. Connects out to the hub and does PC jobs: PC model, Claude Code, Blender, named scripts |
 | `worker/blender_ops.py` | Headless Blender jobs: info, decimate, convert, and the allowed pipeline scripts |
-| `test.mjs` | 20 sample thoughts and where they should go |
+| `test.mjs` | 20 sample thoughts and where they should go, plus 10 split checks |
 
 ## Run it
 Locally:
@@ -109,7 +135,15 @@ fly deploy --ha=false
 - A wrong worker token was refused.
 - The phone layout was checked in an iPhone-size screenshot.
 
+- Split, end to end, with a stand-in `claude` command and a stand-in PC model:
+  - Code part, then story part (with the code's event names), then hand-filled models, then the merge.
+  - Files landed where the manifest said, the test passed, and both commits were made on the branch.
+  - The brief Claude received had no art or story words. The only match was the repo name.
+  - A wrong file type was rejected.
+
 ## Not tested
 - Real Claude API calls: there is no API key in this container. The Planner and Expert fail cleanly without one.
 - A real Meshy job: I did not want to spend your credits. The list endpoints answer. The field names for image, retexture and rig requests need checking on the first real run.
 - Claude Code, Blender and the pipeline scripts on your actual PC.
+- A split with real Claude Code output. Whether it reliably writes `hub-merge.json` will show on the first run. The hub falls back to the planned paths if it does not.
+- Triangle counts and rigs are not checked at merge yet, only file types.

@@ -18,6 +18,7 @@ import { spawn, spawnSync } from 'child_process';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import { checkFile, SLOT_TYPES } from '../parts.mjs';
 
 const HUB = (process.env.HUB_URL || 'http://localhost:8080').replace(/\/$/, '');
 const TOKEN = process.env.HUB_WORKER_TOKEN || '';
@@ -41,10 +42,11 @@ if (await bionicUp()) can.push('pc-model');
 if (found('claude')) can.push('claude-code');
 if (found(`"${BLENDER}"`)) can.push('blender');
 can.push('pc-run');
+if (found('git')) can.push('merge');
 console.log(`hub worker: ${HUB}\ncan do: ${can.join(', ')}`);
 
 const run = (cmd, args, cwd, input) => new Promise(ok => {
-  const p = spawn(cmd, args, { cwd, shell: process.platform === 'win32' });
+  const p = spawn(cmd, args, { cwd, shell: process.platform === 'win32' || !args.length });
   let out = '', err = ''; p.stdout.on('data', d => out += d); p.stderr.on('data', d => err += d);
   if (input) { p.stdin.write(input); p.stdin.end(); }
   p.on('close', code => ok({ code, out: out.slice(-20000), err: err.slice(-4000) }));
@@ -52,16 +54,19 @@ const run = (cmd, args, cwd, input) => new Promise(ok => {
 
 async function doJob(j) {
   if (j.backend === 'pc-model') {
-    const r = await fetch(`${BIONIC}/v1/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'system', content: j.system || '' }, { role: 'user', content: j.text }], temperature: 0.8, max_tokens: 800 }) });
+    const r = await fetch(`${BIONIC}/v1/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'system', content: j.system || '' }, { role: 'user', content: j.text }], temperature: 0.8, max_tokens: j.maxTokens || 800 }) });
     const d = await r.json(); return { ok: r.ok, text: d.choices?.[0]?.message?.content || '', error: r.ok ? undefined : JSON.stringify(d).slice(0, 300) };
   }
   if (j.backend === 'claude-code') {
     const repo = path.join(REPOS, (j.repo || 'brenemanandrew/Brenelandtest').split('/').pop());
     if (!fs.existsSync(repo)) return { ok: false, error: `No checkout at ${repo}. Clone it there or set REPOS.` };
-    await run('git', ['checkout', '-B', `hub/${j.id}`], repo);
+    const branch = j.parent ? `hub/${j.parent}` : `hub/${j.id}`;
+    await run('git', ['checkout', '-B', branch], repo);
     const r = await run('claude', ['-p', '--output-format', 'text'], repo, j.prompt);
-    const diff = await run('git', ['diff', '--stat', 'HEAD'], repo);
-    return { ok: r.code === 0, text: r.out, result: { branch: `hub/${j.id}`, diff: diff.out }, error: r.code ? r.err : undefined };
+    await run('git', ['add', '-A'], repo); await run('git', ['commit', '-m', `hub: ${j.label}`], repo);
+    const diff = await run('git', ['diff', '--stat', 'HEAD~1'], repo);
+    let merge = null; try { merge = JSON.parse(fs.readFileSync(path.join(repo, 'hub-merge.json'), 'utf8')); } catch { /* not written; the hub also looks in the reply */ }
+    return { ok: r.code === 0, text: r.out, result: { branch, diff: diff.out, merge }, error: r.code ? r.err : undefined };
   }
   if (j.backend === 'blender') {
     const r = await run(BLENDER, ['-b', '--python', path.join(HERE, 'blender_ops.py'), '--', JSON.stringify({ mode: j.mode, ...j.args })], REPOS);
@@ -73,7 +78,39 @@ async function doJob(j) {
     const [cmd, args] = f(j); const r = await run(cmd, args, REPOS);
     return { ok: r.code === 0, text: r.out || r.err, error: r.code ? r.err : undefined };
   }
+  if (j.backend === 'merge') return merge(j);
   return { ok: false, error: `This PC cannot do ${j.backend}` };
+}
+
+/* Merge: put each filled slot where the code's manifest says, check it, run the build test, commit on the branch. */
+async function merge(j) {
+  const repo = path.join(REPOS, (j.repo || 'brenemanandrew/Brenelandtest').split('/').pop());
+  if (!fs.existsSync(repo)) return { ok: false, error: `No checkout at ${repo}` };
+  const co = await run('git', ['checkout', j.branch], repo); if (co.code) return { ok: false, error: `Could not switch to ${j.branch}: ${co.err}` };
+  const where = Object.fromEntries(((j.manifest && j.manifest.slots) || []).map(x => [x.id, x.path]));
+  const report = [];
+  for (const sl of j.slots) {
+    if (!sl.fill) { report.push(`${sl.id}: EMPTY, skipped`); continue; }
+    const T = SLOT_TYPES[sl.type], many = T.many;
+    let dest = path.join(repo, where[sl.id] || sl.path);
+    let buf;
+    if (sl.fill.source === 'text') buf = Buffer.from(sl.fill.value);
+    else if (sl.fill.source === 'pcpath') buf = fs.readFileSync(sl.fill.value);
+    else { const r = await fetch(sl.fill.value); if (!r.ok) { report.push(`${sl.id}: download failed (${r.status})`); continue; } buf = Buffer.from(await r.arrayBuffer()); }
+    if (many) { fs.mkdirSync(dest, { recursive: true }); dest = path.join(dest, `${sl.id}_1.${T.ext}`); }
+    const bad = checkFile(sl.type, buf);
+    if (bad) { report.push(`${sl.id}: REJECTED, ${bad}`); continue; }
+    fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, buf);
+    report.push(`${sl.id}: ok -> ${path.relative(repo, dest)} (${Math.round(buf.length / 1024)} KB, from ${sl.fill.from || sl.fill.source})`);
+  }
+  const runCfg = (j.manifest && j.manifest.run) || {};
+  let tested = 'no test command in the manifest';
+  if (runCfg.install) await run(runCfg.install, [], repo);
+  if (runCfg.test) { const t = await run(runCfg.test, [], repo); tested = t.code === 0 ? `test passed: ${runCfg.test}` : `TEST FAILED: ${runCfg.test}\n${(t.err || t.out).slice(-1500)}`; }
+  await run('git', ['add', '-A'], repo); await run('git', ['commit', '-m', 'hub: merge art and story into the code'], repo);
+  const rejected = report.filter(l => /REJECTED|EMPTY|failed/.test(l)).length;
+  const look = (j.manifest && j.manifest.look_at) || [];
+  return { ok: !rejected && !/FAILED/.test(tested), text: [...report, '', tested, look.length ? `\nLook at:\n- ${look.join('\n- ')}` : '', runCfg.start ? `\nRun it: ${runCfg.start}` : ''].join('\n'), result: { branch: j.branch } };
 }
 
 const H = { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' };

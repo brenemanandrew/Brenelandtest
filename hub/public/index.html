@@ -15,7 +15,7 @@ button.sm{background:var(--card);color:var(--text);border:1px solid var(--line);
 select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
 .dim{color:var(--dim);font-size:14px}.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--dim)}
-.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}
+.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}.st-held,.st-cancelled{color:var(--dim)}
 pre{white-space:pre-wrap;word-break:break-word;background:#0f1116;border-radius:8px;padding:10px;font-size:13px;max-height:340px;overflow:auto}
 h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
 #login{display:none}
@@ -27,7 +27,7 @@ h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
 
 <section id="send">
   <textarea id="thought" placeholder="Dump the thought here. The hub picks where it goes."></textarea>
-  <div class="row"><button class="go" id="routeBtn">Route it</button><span class="dim">Wrap private parts in [[local]] ... [[/local]]</span></div>
+  <div class="row"><button class="go" id="routeBtn">Route it</button><button class="go" id="splitBtn" style="background:#b48cff">Split it</button><span class="dim">Wrap private parts in [[local]] ... [[/local]]</span></div>
   <div id="pick" class="card" style="display:none">
     <div id="why" class="dim"></div>
     <div class="row"><select id="tool"></select><select id="mode"></select><select id="area"></select></div>
@@ -35,6 +35,20 @@ h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
     <div id="does" class="dim"></div>
     <div id="extra"></div>
     <div class="row"><button class="go" id="sendBtn">Send</button><span id="q" class="dim"></span></div>
+  </div>
+  <div id="splitBox" class="card" style="display:none">
+    <b>Code part</b> <span class="dim">(goes to Claude Code, one rule per line)</span>
+    <textarea id="sp_mech"></textarea>
+    <b>Art part</b> <span class="dim">(Meshy, Blender or you. Never sent to Claude)</span>
+    <textarea id="sp_art" style="min-height:60px"></textarea>
+    <b>Story part</b> <span class="dim">(your PC model. Never sent to Claude)</span>
+    <textarea id="sp_story" style="min-height:60px"></textarea>
+    <b>Slots</b> <span class="dim">(what the code loads; Claude sees only the id, path and format)</span>
+    <div id="sp_slots"></div>
+    <div class="row"><select id="sp_addType"></select><button class="sm" id="sp_add">Add slot</button></div>
+    <div id="sp_leaks"></div>
+    <details open><summary><b>Exactly what Claude Code gets</b></summary><pre id="sp_brief"></pre></details>
+    <div class="row"><input id="sp_repo" placeholder="Repo (owner/name)" value="brenemanandrew/Brenelandtest" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="go" id="sp_send">Send the parts</button></div>
   </div>
   <div id="last"></div>
 </section>
@@ -81,7 +95,7 @@ $('sendBtn').onclick = async () => {
 
 function jobCard(j) {
   const r = j.result || {};
-  const btns = (j.status === 'waiting' ? `<button class="sm" onclick="act('${j.id}','approve')">OK, run it</button> ` : '') + (['waiting', 'queued', 'running'].includes(j.status) ? `<button class="sm" onclick="act('${j.id}','cancel')">Cancel</button> ` : '') + (j.backend === 'meshy' && j.status === 'running' ? `<button class="sm" onclick="act('${j.id}','refresh')">Check Meshy</button>` : '');
+  const btns = (j.status === 'waiting' ? `<button class="sm" onclick="act('${j.id}','approve')">${j.backend === 'split' ? 'OK, merge it' : 'OK, run it'}</button> ` : '') + (['waiting', 'queued', 'running'].includes(j.status) ? `<button class="sm" onclick="act('${j.id}','cancel')">Cancel</button> ` : '') + (j.backend === 'meshy' && j.status === 'running' ? `<button class="sm" onclick="act('${j.id}','refresh')">Check Meshy</button>` : '');
   return `<div class="card"><div class="row" style="margin:0"><b>${esc(j.label)}</b>${j.area ? `<span class="tag">${esc(j.area)}</span>` : ''}<span class="tag">${esc(j.runsOn)}</span><span class="st-${j.status}">${j.status}</span></div>
   <div class="dim">${esc((j.text || '').slice(0, 160))}</div>
   ${j.error ? `<p class="st-failed">${esc(j.error)}</p>` : ''}
@@ -89,9 +103,36 @@ function jobCard(j) {
   ${r.thumb ? `<img src="${esc(r.thumb)}" style="max-width:100%;border-radius:8px">` : ''}
   ${r.branch ? `<p class="dim">Branch: ${esc(r.branch)}</p>` : ''}
   ${r.text ? `<pre>${esc(r.text)}</pre>` : ''}
+  ${j.slots ? `<div class="dim" style="margin:6px 0">Stage: ${esc(j.stage)}</div>` + j.slots.map(x => `<div class="row" style="margin:3px 0"><span class="${x.fill ? 'st-done' : 'st-waiting'}">${x.fill ? 'filled' : 'empty'}</span><b>${esc(x.id)}</b><span class="dim">${x.fill ? 'from ' + esc(x.fill.from || x.fill.source) : ''}</span><button class="sm" onclick="fill('${j.id}','${x.id}')">${x.fill ? 'Replace' : 'Fill'}</button></div>`).join('') : ''}
+  ${j.parent ? `<div class="dim">Part of split ${esc(j.parent)}</div>` : ''}
   ${j.status === 'queued' && j.prompt ? `<details><summary class="dim">What goes to Claude Code</summary><pre>${esc(j.prompt)}</pre></details>` : ''}
   <div class="row">${btns}</div></div>`;
 }
+/* ---- split ---- */
+let SP = null;
+const lines = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
+async function spRefresh(add) {
+  if (SP) { SP.mechanics = lines('sp_mech'); SP.art = lines('sp_art'); SP.story = lines('sp_story'); }
+  const d = await api('/api/split/plan', SP ? { plan: SP, repo: $('sp_repo').value, add } : { text: $('thought').value, repo: $('sp_repo').value });
+  SP = d.plan;
+  $('sp_mech').value = SP.mechanics.join('\n'); $('sp_art').value = SP.art.join('\n'); $('sp_story').value = SP.story.join('\n');
+  $('sp_slots').innerHTML = SP.slots.map((x, i) => `<div class="row" style="margin:4px 0"><span class="tag">${x.side}</span><b>${esc(x.id)}</b><span class="dim">${esc(x.path)}</span><button class="sm" onclick="spDrop(${i})">Remove</button></div>`).join('') || '<p class="dim">No slots found. Add the ones the game needs.</p>';
+  $('sp_addType').innerHTML = d.types.map(t => `<option>${t}</option>`).join('');
+  $('sp_brief').textContent = d.brief.replace(/hub\/NEW/g, 'hub/<job id>');
+  $('sp_leaks').innerHTML = d.leaks.length ? `<p class="st-waiting">These words from your art or story also appear in the code part: <b>${d.leaks.map(esc).join(', ')}</b>. Reword the code part if they should stay private.</p>` : '<p class="st-done">Nothing from the art or story part is in what Claude gets.</p>';
+}
+window.spDrop = i => { SP.slots.splice(i, 1); spRefresh(); };
+$('splitBtn').onclick = async () => { if (!$('thought').value.trim()) return; SP = null; $('pick').style.display = 'none'; $('splitBox').style.display = ''; await spRefresh(); };
+$('sp_add').onclick = () => spRefresh($('sp_addType').value);
+let spT = 0; for (const id of ['sp_mech', 'sp_art', 'sp_story']) $(id).oninput = () => { clearTimeout(spT); spT = setTimeout(() => spRefresh(), 600); };
+$('sp_send').onclick = async () => {
+  SP.mechanics = lines('sp_mech'); SP.art = lines('sp_art'); SP.story = lines('sp_story');
+  const j = await api('/api/split/run', { text: $('thought').value, plan: SP, repo: $('sp_repo').value });
+  if (j.error) return alert(j.error);
+  $('splitBox').style.display = 'none'; $('thought').value = ''; $('last').innerHTML = jobCard(j);
+};
+window.fill = async (id, slot) => { const v = prompt(`Link, PC file path, or JSON for ${slot}`); if (v == null) return; const source = /^https?:/.test(v) ? 'url' : /^[\[{]/.test(v.trim()) ? 'text' : 'pcpath'; await api(`/api/jobs/${id}/fill`, { slot, source, value: v }); jobs(); };
+
 window.act = async (id, what) => { const j = await api(`/api/jobs/${id}/${what}`, {}); jobs(); if ($('last').innerHTML.includes(id)) $('last').innerHTML = jobCard(j); };
 async function jobs() { const d = await api('/api/jobs'); $('wdot').classList.toggle('on', d.worker.online); $('jobList').innerHTML = d.jobs.map(jobCard).join('') || '<p class="dim">No jobs yet.</p>'; }
 
