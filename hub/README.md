@@ -133,12 +133,27 @@ Each card has: what it is, where it lives, its repo, tools and when to use them,
 - **Its own Claude Code jobs count as updates** when they finish, even if the session forgot the file.
 - **Where they show:** under each project card. Broken and Open bullets also show up as hints on related requests, and the latest updates go into the context agents get.
 
-## Copilot: big model work that is plain and safe
+## Copilot: plain, safe work, checked by Claude Opus
+- **Which Copilot:** your personal Microsoft Copilot (copilot.microsoft.com). It has no API, so it's copy and paste:
+  1. The job shows the ready prompt with **Copy** and **Open Copilot** buttons.
+  2. You paste Copilot's answer back.
 - **Use it for:** summaries, rewrites and proofreading, drafts, general research, long documents.
-- **Fit check, every time:** a job is refused with the reason if it has `[[local]]` parts or a secret, looks personal (legal, medical, money, passwords), is not SFW, is real coding, or belongs to a private project.
-- **Automatic** through GitHub Models when `COPILOT_TOKEN` is set (a GitHub token with Models access, `COPILOT_MODEL`, default `openai/gpt-4.1`).
-- **Otherwise copy and paste:** the job shows the ready prompt with Copy and Open Copilot buttons, and you paste the answer back.
-- **Work doc mode** is for Hubbell material in the company Microsoft 365 Copilot, which is approved for company data. It is copy and paste only.
+- **Fit check, every time, before anything goes out:** it refuses with the reason if the job:
+  - has `[[local]]` parts or a secret
+  - looks personal (legal, medical, money, passwords)
+  - isn't SFW
+  - is real coding
+  - belongs to a private project (work stays on the PC model for now)
+- **Claude Opus checks the answer before you see it.** It fixes wrong facts, numbers and made-up sources, and anything that doesn't answer what you asked.
+  - You get the corrected answer, a list of each correction (was, now, why), and Copilot's original folded underneath.
+  - A verdict is shown: no changes needed, corrected, or too wrong to use.
+  - It needs `ANTHROPIC_API_KEY` on Brenebase. Without it the answer is shown marked "not checked".
+- **Turning the check down:** Tools tab, "Copilot check by Claude Opus":
+  - **Check complex answers** (default): research, drafts, answers over about 600 characters, long prompts
+  - **Check every answer**
+  - **Off**
+- **Track record:** the same box shows how many answers were checked, how many needed no changes, and how many corrections Opus made. Use it to decide when Copilot has earned the check being turned off.
+- The work Copilot is left out until you want it. `COPILOT_TOKEN` (GitHub Models) is an automatic path you don't need.
 
 ## Keeping things private
 - `[[local]] ... [[/local]]` text is swapped for a placeholder before anything goes to Claude, and put back when the result comes home.

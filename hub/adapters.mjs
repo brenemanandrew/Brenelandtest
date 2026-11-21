@@ -100,8 +100,9 @@ export const LINKS = {
 };
 
 /* ---- Copilot: only for safe, plain, non-sensitive bulk work ----
-   Automatic through GitHub Models when COPILOT_TOKEN is set (a GitHub token with Models access, included with Copilot),
-   otherwise by copy and paste into Microsoft 365 Copilot (COPILOT_URL). The fit check runs first, every time. */
+   Andrew's personal Microsoft Copilot has no API, so it is copy and paste: Brenebase prepares the prompt, he pastes the
+   answer back. (COPILOT_TOKEN, a GitHub Models token, is an optional automatic path he does not use.) The fit check runs
+   first, every time, and complex answers are reviewed by Claude Opus before he sees them (reviewCopilot). */
 const NOT_FOR_COPILOT = {
   private: /\[\[local\]\]/i,
   personal: /\b(divorce|custody|lawsuit|attorney|lawyer|court|trial|deposition|mortgage|loan number|child support|ssn|social security|diagnos\w*|therapy|therapist|medication|bank account|routing number|password|passphrase|pin code)\b/i,
@@ -115,20 +116,50 @@ export function copilotFit(job, project) {
   if (NOT_FOR_COPILOT.personal.test(t)) why.push('it looks personal or sensitive (legal, medical, money or passwords)');
   if (NOT_FOR_COPILOT.adult.test(t)) why.push('it is not SFW');
   if (NOT_FOR_COPILOT.coding.test(t)) why.push('it is real coding (that goes to Claude Code)');
-  if (project && project.private && job.mode !== 'workdoc') why.push(`${project.name} is private (use Work doc mode for the company Copilot, or the PC model)`);
-  if (job.mode === 'workdoc' && project && !project.private && project.area !== 'work') why.push('Work doc mode is only for work material');
+  if (project && project.private) why.push(`${project.name} is private (work material stays on the PC model for now)`);
   return { ok: !why.length, why };
 }
 export async function runCopilot(job, project) {
   const fit = copilotFit(job, project);
   if (!fit.ok) throw new Error(`Not sent to Copilot: ${fit.why.join('; ')}. Pick Claude or the PC model instead.`);
-  const system = `${STYLE}\n\n${{ summarize: 'Summarize into the points that matter, shortest first.', rewrite: 'Rewrite for clarity and correct grammar. Keep the meaning and the voice.', draft: 'Write a first draft he can edit.', research: 'Answer plainly, say what you are unsure of.', workdoc: 'Help with this work document.' }[job.mode] || ''}`;
-  if (process.env.COPILOT_TOKEN && job.mode !== 'workdoc') {
+  const system = `${STYLE}\n\n${{ summarize: 'Summarize into the points that matter, shortest first.', rewrite: 'Rewrite for clarity and correct grammar. Keep the meaning and the voice.', draft: 'Write a first draft he can edit.', research: 'Answer plainly, say what you are unsure of.' }[job.mode] || ''}`;
+  if (process.env.COPILOT_TOKEN) {
     const r = await fetch('https://models.github.ai/inference/chat/completions', { method: 'POST', headers: { authorization: `Bearer ${process.env.COPILOT_TOKEN}`, 'content-type': 'application/json', accept: 'application/vnd.github+json' }, body: JSON.stringify({ model: process.env.COPILOT_MODEL || 'openai/gpt-4.1', messages: [{ role: 'system', content: system }, { role: 'user', content: job.text }] }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(`GitHub Models ${r.status}: ${(j.error && j.error.message) || JSON.stringify(j).slice(0, 200)}`);
     return { text: j.choices?.[0]?.message?.content || '', via: 'GitHub Models' };
   }
   /* copy and paste: the prompt is ready, Andrew pastes the answer back */
-  return { relay: true, prompt: `${system}\n\n---\n\n${job.text}`, link: process.env.COPILOT_URL || 'https://m365.cloud.microsoft/chat', via: 'copy and paste' };
+  return { relay: true, prompt: `${system}\n\n---\n\n${job.text}`, link: process.env.COPILOT_URL || 'https://copilot.microsoft.com/', via: 'copy and paste' };
+}
+
+/* ---- Claude Opus checks Copilot's work ----
+   review setting: 'complex' (default: long answers, long prompts, research and drafts), 'all', or 'off' (Andrew turns it
+   off once Copilot has earned it). The track record (how often Opus had to correct it) is kept so he can decide. */
+export function needsReview(job, answer, setting) {
+  if (setting === 'off') return false;
+  if (setting === 'all') return true;
+  return ['research', 'draft'].includes(job.mode) || String(answer || '').length > 600 || String(job.text || '').length > 1500;
+}
+const REVIEW_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['verdict', 'corrected', 'corrections', 'note'],
+  properties: {
+    verdict: { type: 'string', enum: ['ok', 'fixed', 'unreliable'], description: 'ok = no changes needed; fixed = corrected; unreliable = too wrong to fix, say why in note' },
+    corrected: { type: 'string', description: 'The answer to give Andrew: Copilot\'s answer with corrections applied, otherwise unchanged. Empty if unreliable.' },
+    corrections: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['was', 'now', 'why'], properties: { was: { type: 'string' }, now: { type: 'string' }, why: { type: 'string' } } } },
+    note: { type: 'string', description: 'One sentence for Andrew' },
+  },
+};
+export async function reviewCopilot(job, answer, claude) {
+  if (!claude) return { verdict: 'unchecked', corrected: answer, corrections: [], note: 'Not checked: Brenebase has no ANTHROPIC_API_KEY, so Claude Opus could not review this.' };
+  const r = await claude.beta.messages.create({
+    model: 'claude-opus-5-5', max_tokens: 16000,
+    betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
+    output_config: { effort: 'high', format: { type: 'json_schema', schema: REVIEW_SCHEMA } },
+    system: 'You check another assistant\'s answer before Andrew sees it. Fix factual errors, wrong numbers, made-up sources, things that do not answer what he asked, and unclear wording. Do not rewrite for style when it is already fine, and do not add length. List every change you make. Never use em dashes, use hyphens or commas.',
+    messages: [{ role: 'user', content: `What Andrew asked (${job.mode}):\n${job.text}\n\nCopilot's answer:\n${answer}` }],
+  });
+  if (r.stop_reason === 'refusal') return { verdict: 'unchecked', corrected: answer, corrections: [], note: 'Claude declined to review this one.' };
+  const t = r.content.find(b => b.type === 'text');
+  return JSON.parse(t.text);
 }

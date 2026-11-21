@@ -14,8 +14,9 @@
      PC_TAILNET_HOST   the PC's tailnet name, e.g. andrew-pc, so the agent can be called directly
      HUB_UPDATE_DIRS   PC folders to look in for update files, ; separated
      HUB_UPDATES_MINUTES  how often to look (default 15 with GITHUB_TOKEN, 60 without)
-     COPILOT_TOKEN     GitHub token with Models access: Copilot jobs run automatically (else copy and paste)
-     COPILOT_MODEL     default openai/gpt-4.1     COPILOT_URL  where copy-and-paste jobs open (M365 Copilot) */
+     COPILOT_URL       where Copilot jobs open (default https://copilot.microsoft.com/, his personal Copilot)
+     COPILOT_TOKEN     optional, unused by Andrew: a GitHub Models token for an automatic path
+     Copilot review (complex / all / off) is set on the page, Tools tab, and kept in DATA_DIR/settings.json */
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -23,7 +24,7 @@ import crypto from 'crypto';
 import { TOOLS, AREAS, AUTONOMY, resolve } from './tools.mjs';
 import { route } from './route.mjs';
 import * as L from './ledger.mjs';
-import { PC_BACKENDS, SPENDS, brief, runClaude, runMeshy, meshyStatus, LINKS, systemFor, runCopilot } from './adapters.mjs';
+import { PC_BACKENDS, SPENDS, brief, runClaude, runMeshy, meshyStatus, LINKS, systemFor, runCopilot, needsReview, reviewCopilot } from './adapters.mjs';
 import { rejoin } from './split.mjs';
 import * as P from './parts.mjs';
 import * as PJ from './projects.mjs';
@@ -37,6 +38,22 @@ const PUB = path.join(path.dirname(new URL(import.meta.url).pathname), 'public')
 let claude = null;
 if (process.env.ANTHROPIC_API_KEY) { const { default: Anthropic } = await import('@anthropic-ai/sdk'); claude = new Anthropic(); }
 const worker = { seen: 0, can: [] };
+/* small settings Andrew changes on the page, kept on the volume */
+const SETFILE = path.join(process.env.DATA_DIR || './data', 'settings.json');
+let SETTINGS = { copilotReview: 'complex', copilotRecord: { reviewed: 0, ok: 0, fixed: 0, unreliable: 0, corrections: 0 } };
+try { SETTINGS = { ...SETTINGS, ...JSON.parse(fs.readFileSync(SETFILE, 'utf8')) }; } catch { /* defaults */ }
+const saveSettings = () => { fs.mkdirSync(path.dirname(SETFILE), { recursive: true }); fs.writeFileSync(SETFILE, JSON.stringify(SETTINGS, null, 1)); };
+
+/* a Copilot answer arrived (pasted back or automatic): check it with Claude Opus first if it needs it */
+async function copilotAnswer(j, answer, via) {
+  if (!needsReview(j, answer, SETTINGS.copilotReview)) return L.update(j.id, { status: 'done', result: { ...j.result, text: answer, relay: false, review: null } }, `answer from Copilot (${via}), not reviewed (${SETTINGS.copilotReview === 'off' ? 'review is off' : 'simple'})`);
+  L.update(j.id, { status: 'reviewing', result: { ...j.result, relay: false, original: answer } }, 'Claude Opus is checking Copilot\'s answer');
+  try {
+    const rv = await reviewCopilot(j, answer, claude);
+    if (rv.verdict !== 'unchecked') { const R = SETTINGS.copilotRecord; R.reviewed++; R[rv.verdict] = (R[rv.verdict] || 0) + 1; R.corrections += rv.corrections.length; saveSettings(); }
+    return L.update(j.id, { status: 'done', result: { ...L.get(j.id).result, text: rv.verdict === 'unreliable' ? '' : rv.corrected || answer, original: answer, review: rv } }, `Opus review: ${rv.verdict}${rv.corrections.length ? `, ${rv.corrections.length} correction(s)` : ''}`);
+  } catch (e) { return L.update(j.id, { status: 'done', result: { ...L.get(j.id).result, text: answer, original: answer, review: { verdict: 'unchecked', corrections: [], note: `Review failed: ${e.message || e}` } } }, 'review failed, answer shown unchecked'); }
+}
 const workerOnline = () => Date.now() - worker.seen < 30000;
 
 const SESSION = crypto.createHash('sha256').update('hub:' + PASS).digest('hex').slice(0, 32);
@@ -63,7 +80,7 @@ async function start(j) {
     if (j.backend === 'brief') { const b = brief(j, PJ.context(j.project && PJ.card(j.project), 'code', j.text)); return L.update(j.id, { status: 'done', result: { text: b.prompt }, held: b.held }, b.secrets ? `${b.secrets} secret(s) removed` : 'brief written'); }
     if (j.backend === 'link') { const f = LINKS[`${j.tool}:${j.mode}`]; return L.update(j.id, { status: 'done', result: { link: f ? f(j.target) : null, text: j.does } }, 'link ready'); }
     if (j.backend === 'claude') { L.update(j.id, { status: 'running' }); const r = await runClaude(j, claude, PJ.context(j.project && PJ.card(j.project), 'cloud', j.text)); return L.update(j.id, { status: 'done', result: { text: rejoin(r.text, r.held) } }, 'answered by Claude'); }
-    if (j.backend === 'copilot') { const r = await runCopilot(j, j.project && PJ.card(j.project)); return r.relay ? L.update(j.id, { status: 'waiting-answer', result: { text: r.prompt, link: r.link, relay: true } }, 'Ready: copy it into Copilot, paste the answer back') : L.update(j.id, { status: 'done', result: { text: r.text } }, `answered by Copilot (${r.via})`); }
+    if (j.backend === 'copilot') { const r = await runCopilot(j, j.project && PJ.card(j.project)); return r.relay ? L.update(j.id, { status: 'waiting-answer', result: { text: r.prompt, link: r.link, relay: true } }, 'Ready: copy it into Copilot, paste the answer back') : copilotAnswer(j, r.text, r.via); }
     if (j.backend === 'meshy') { L.update(j.id, { status: 'running' }); const r = await runMeshy(j); return L.update(j.id, { status: 'running', result: r }, `Meshy task ${r.task} started`); }
     if (PC_BACKENDS.includes(j.backend)) {
       const pj = j.project && PJ.card(j.project);
@@ -179,6 +196,8 @@ http.createServer(async (req, res) => {
     }
 
     if (p.startsWith('/api/') && !authed(req)) return send(res, 401, { error: 'login' });
+    if (p === '/api/settings' && req.method === 'GET') return send(res, 200, SETTINGS);
+    if (p === '/api/settings' && req.method === 'POST') { const b = await body(req); if (['complex', 'all', 'off'].includes(b.copilotReview)) SETTINGS.copilotReview = b.copilotReview; saveSettings(); return send(res, 200, SETTINGS); }
     if (p === '/api/catalogue') return send(res, 200, { tools: TOOLS, areas: Object.fromEntries(Object.entries(AREAS).map(([k, v]) => [k, v.label])), autonomy: AUTONOMY, worker: { online: workerOnline(), can: worker.can }, claude: !!claude, meshy: !!process.env.MESHY_API_KEY });
     if (p === '/api/route' && req.method === 'POST') { const b = await body(req); const r = await route(b.text, { claude }); const pj = PJ.match(b.text); return send(res, 200, { ...r, project: pj ? { id: pj.id, name: pj.name, private: !!pj.private } : null, hints: PJ.hints(pj, b.text) }); }
     if (p === '/api/pc' && req.method === 'GET') return send(res, 200, { ...(await PA.state()), worker: { online: workerOnline(), can: worker.can }, actions: PA.ACTIONS });
@@ -197,7 +216,7 @@ http.createServer(async (req, res) => {
     const fm = p.match(/^\/api\/jobs\/([a-f0-9]+)\/fill$/);
     if (fm && req.method === 'POST') { const b = await body(req); const par = L.get(fm[1]); if (!par || !par.slots) return send(res, 404, {}); fillSlot(par, b.slot, b.value ? { source: b.source || 'url', value: b.value, from: 'you' } : null); L.update(par.id, {}, `${b.slot} ${b.value ? 'filled by you' : 'cleared'}`); return send(res, 200, afterChange({ parent: par.id })); }
     const ans = p.match(/^\/api\/jobs\/([a-f0-9]+)\/answer$/);
-    if (ans && req.method === 'POST') { const b = await body(req); const j = L.get(ans[1]); if (!j) return send(res, 404, {}); return send(res, 200, L.update(j.id, { status: 'done', result: { ...j.result, text: b.text, relay: false, prompt: j.result && j.result.text } }, 'answer pasted back from Copilot')); }
+    if (ans && req.method === 'POST') { const b = await body(req); const j = L.get(ans[1]); if (!j) return send(res, 404, {}); L.update(j.id, { result: { ...j.result, prompt: j.result && j.result.text } }, 'answer pasted back from Copilot'); return send(res, 200, await copilotAnswer(L.get(j.id), b.text, 'pasted')); }
     const m = p.match(/^\/api\/jobs\/([a-f0-9]+)\/(approve|cancel|refresh)$/);
     if (m && req.method === 'POST') {
       const j = L.get(m[1]); if (!j) return send(res, 404, {});

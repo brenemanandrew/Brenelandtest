@@ -17,7 +17,7 @@ button.sm{background:var(--card);color:var(--text);border:1px solid var(--line);
 select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
 .dim{color:var(--dim);font-size:14px}.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--dim)}
-.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}.st-held,.st-cancelled{color:var(--dim)}.st-waiting-answer{color:var(--warn)}
+.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}.st-held,.st-cancelled{color:var(--dim)}.st-waiting-answer,.st-reviewing{color:var(--warn)}
 pre{white-space:pre-wrap;word-break:break-word;background:#0f1116;border-radius:8px;padding:10px;font-size:13px;max-height:340px;overflow:auto}
 h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
 #login{display:none}
@@ -109,6 +109,7 @@ function jobCard(j) {
   ${r.link ? `<p><a href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open</a></p>` : ''}
   ${r.thumb ? `<img src="${esc(r.thumb)}" style="max-width:100%;border-radius:8px">` : ''}
   ${r.branch ? `<p class="dim">Branch: ${esc(r.branch)}</p>` : ''}
+  ${r.review ? `<div class="card" style="margin:8px 0;border-color:${r.review.verdict === 'ok' ? 'var(--ok)' : r.review.verdict === 'fixed' ? 'var(--warn)' : 'var(--bad)'}"><b>Claude Opus check: ${esc({ ok: 'no changes needed', fixed: 'corrected', unreliable: 'too wrong to use', unchecked: 'not checked' }[r.review.verdict] || r.review.verdict)}</b><div class="dim">${esc(r.review.note || '')}</div>${(r.review.corrections || []).map(c => `<div class="mode"><span class="st-failed">was:</span> ${esc(c.was)}<br><span class="st-done">now:</span> ${esc(c.now)}<br><span class="dim">why: ${esc(c.why)}</span></div>`).join('')}${r.original && r.original !== r.text ? `<details><summary class="dim">Copilot's original answer</summary><pre>${esc(r.original)}</pre></details>` : ''}</div>` : ''}
   ${r.relay ? `<p class="dim">Copy this into Copilot, then paste its answer below.</p><div class="row"><button class="sm" onclick="navigator.clipboard.writeText(document.getElementById('rp_${j.id}').textContent)">Copy</button><a class="sm" href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open Copilot</a></div><pre id="rp_${j.id}">${esc(r.text)}</pre><textarea id="ra_${j.id}" placeholder="Paste Copilot's answer here" style="min-height:70px"></textarea><div class="row"><button class="sm" onclick="pasteBack('${j.id}')">Save answer</button></div>` : r.text ? `<pre>${esc(r.text)}</pre>` : ''}
   ${j.slots ? `<div class="dim" style="margin:6px 0">Stage: ${esc(j.stage)}</div>` + j.slots.map(x => `<div class="row" style="margin:3px 0"><span class="${x.fill ? 'st-done' : 'st-waiting'}">${x.fill ? 'filled' : 'empty'}</span><b>${esc(x.id)}</b><span class="dim">${x.fill ? 'from ' + esc(x.fill.from || x.fill.source) : ''}</span><button class="sm" onclick="fill('${j.id}','${x.id}')">${x.fill ? 'Replace' : 'Fill'}</button></div>`).join('') : ''}
   ${j.project ? `<span class="tag">${esc(j.project)}</span>` : ''}
@@ -194,8 +195,10 @@ async function boot() {
   $('autonomy').innerHTML = Object.entries(CAT.autonomy).map(([k, v]) => `<option value="${k}"${k === 'draft' ? ' selected' : ''}>${k}</option>`).join('');
   const ad = () => $('autoDoes').textContent = CAT.autonomy[$('autonomy').value]; $('autonomy').onchange = ad; ad();
   fillModes();
-  $('catalogue').innerHTML = `<p class="dim">Cloud model: ${CAT.claude ? 'on' : 'off'}. Meshy: ${CAT.meshy ? 'on' : 'off'}. PC worker: ${CAT.worker.online ? 'online (' + CAT.worker.can.join(', ') + ')' : 'offline'}.</p>` + CAT.tools.map(t => `<h3>${esc(t.name)} <span class="tag">${t.type}</span> <span class="tag">${t.runsOn}</span></h3><div class="dim">${esc(t.what)}</div>${Object.values(t.modes).map(m => `<div class="mode"><b>${esc(m.label)}</b> <span class="dim">${esc(m.does)}</span></div>`).join('')}${t.built.length ? `<div class="dim" style="margin-top:4px">Wraps: ${t.built.map(esc).join('; ')}</div>` : ''}`).join('');
+  const ST = await api('/api/settings'), R = ST.copilotRecord;
+  const copilotBox = `<div class="card"><b>Copilot check by Claude Opus</b><div class="row"><select id="revSel">${['complex', 'all', 'off'].map(v => `<option value="${v}"${ST.copilotReview === v ? ' selected' : ''}>${{ complex: 'Check complex answers', all: 'Check every answer', off: 'Off (trust Copilot)' }[v]}</option>`).join('')}</select></div><div class="dim">Track record: ${R.reviewed} checked, ${R.ok} needed no changes, ${R.fixed} corrected (${R.corrections} corrections), ${R.unreliable} too wrong to use${R.reviewed ? `. Clean rate ${Math.round(100 * R.ok / R.reviewed)}%.` : '.'}</div></div>`;
+  $('catalogue').innerHTML = copilotBox + `<p class="dim">Cloud model: ${CAT.claude ? 'on' : 'off'}. Meshy: ${CAT.meshy ? 'on' : 'off'}. PC worker: ${CAT.worker.online ? 'online (' + CAT.worker.can.join(', ') + ')' : 'offline'}.</p>` + CAT.tools.map(t => `<h3>${esc(t.name)} <span class="tag">${t.type}</span> <span class="tag">${t.runsOn}</span></h3><div class="dim">${esc(t.what)}</div>${Object.values(t.modes).map(m => `<div class="mode"><b>${esc(m.label)}</b> <span class="dim">${esc(m.does)}</span></div>`).join('')}${t.built.length ? `<div class="dim" style="margin-top:4px">Wraps: ${t.built.map(esc).join('; ')}</div>` : ''}`).join('');
 }
-boot().catch(() => {});
+boot().then(() => { const r = $('revSel'); if (r) r.onchange = () => api('/api/settings', { copilotReview: r.value }); }).catch(() => {});
 setInterval(() => { if ($('jobs').style.display !== 'none') jobs().catch(() => {}); }, 5000);
 </script></body></html>
