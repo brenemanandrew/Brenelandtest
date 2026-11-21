@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hub</title>
+<style>
+:root{--bg:#14161c;--card:#1e222b;--line:#2d3340;--text:#e8eaf0;--dim:#9aa3b5;--acc:#6aa8ff;--ok:#4cc38a;--warn:#e5b54a;--bad:#e5645a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,sans-serif}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+header b{font-size:18px}.dot{width:9px;height:9px;border-radius:50%;background:var(--bad);display:inline-block}.dot.on{background:var(--ok)}
+nav{margin-left:auto;display:flex;gap:6px}nav button{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:5px 10px}nav button.on{color:var(--text);border-color:var(--acc)}
+main{max-width:720px;margin:0 auto;padding:14px}
+textarea{width:100%;min-height:96px;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;resize:vertical}
+button.go{background:var(--acc);color:#081020;border:0;border-radius:10px;padding:10px 16px;font-weight:600}
+button.sm{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.dim{color:var(--dim);font-size:14px}.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--dim)}
+.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}
+pre{white-space:pre-wrap;word-break:break-word;background:#0f1116;border-radius:8px;padding:10px;font-size:13px;max-height:340px;overflow:auto}
+h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
+#login{display:none}
+</style></head><body>
+<header><b>Hub</b><span class="dim"><span id="wdot" class="dot"></span> PC</span>
+<nav><button data-tab="send" class="on">Send</button><button data-tab="jobs">Jobs</button><button data-tab="tools">Tools</button></nav></header>
+<main>
+<div id="login" class="card"><p>Password</p><div class="row"><input id="pw" type="password" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="go" id="loginBtn">Go</button></div></div>
+
+<section id="send">
+  <textarea id="thought" placeholder="Dump the thought here. The hub picks where it goes."></textarea>
+  <div class="row"><button class="go" id="routeBtn">Route it</button><span class="dim">Wrap private parts in [[local]] ... [[/local]]</span></div>
+  <div id="pick" class="card" style="display:none">
+    <div id="why" class="dim"></div>
+    <div class="row"><select id="tool"></select><select id="mode"></select><select id="area"></select></div>
+    <div class="row"><select id="autonomy"></select><span id="autoDoes" class="dim" style="flex:1;min-width:160px"></span></div>
+    <div id="does" class="dim"></div>
+    <div id="extra"></div>
+    <div class="row"><button class="go" id="sendBtn">Send</button><span id="q" class="dim"></span></div>
+  </div>
+  <div id="last"></div>
+</section>
+<section id="jobs" style="display:none"><div id="jobList"></div></section>
+<section id="tools" style="display:none"><div id="catalogue"></div></section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let CAT = null;
+const api = async (p, b) => { const r = await fetch(p, b ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) } : {}); if (r.status === 401) { $('login').style.display = 'block'; throw new Error('login'); } return r.json(); };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); for (const s of ['send', 'jobs', 'tools']) $(s).style.display = s === b.dataset.tab ? '' : 'none'; if (b.dataset.tab === 'jobs') jobs(); });
+$('loginBtn').onclick = async () => { await api('/api/login', { password: $('pw').value }).catch(() => {}); $('login').style.display = 'none'; boot(); };
+
+function fillModes(sel) { const t = CAT.tools.find(t => t.id === $('tool').value); $('mode').innerHTML = Object.entries(t.modes).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join(''); if (sel && t.modes[sel]) $('mode').value = sel; showDoes(); }
+function showDoes() {
+  const t = CAT.tools.find(t => t.id === $('tool').value), m = t.modes[$('mode').value];
+  $('does').textContent = m.does;
+  const need = { 'make3d:generate': ['image_url', 'Picture link (optional)'], 'make3d:retexture': ['model_url', 'Model link'], 'make3d:rig': ['model_url', 'Model link'], 'make3d:process': ['in', 'Model file on the PC'], 'coder:build': ['repo', 'Repo (owner/name)'], 'coder:fix': ['repo', 'Repo (owner/name)'], 'coder:brief': ['repo', 'Repo (owner/name)'] }[`${t.id}:${$('mode').value}`];
+  $('extra').innerHTML = need ? `<div class="row"><input id="x_${need[0]}" placeholder="${esc(need[1])}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"></div>` : '';
+}
+$('tool').onchange = () => fillModes(); $('mode').onchange = showDoes;
+
+let routed = null;
+$('routeBtn').onclick = async () => {
+  const text = $('thought').value.trim(); if (!text) return;
+  $('routeBtn').disabled = true;
+  try {
+    routed = await api('/api/route', { text });
+    $('pick').style.display = '';
+    $('why').textContent = (routed.why || '') + (routed.by ? `  (by ${routed.by}, ${Math.round((routed.confidence || 0) * 100)}%)` : '');
+    $('tool').value = routed.pick ? routed.pick.tool : 'planner'; fillModes(routed.pick && routed.pick.mode);
+    $('area').value = routed.area || 'hobby';
+    $('q').textContent = routed.question || '';
+  } finally { $('routeBtn').disabled = false; }
+};
+$('sendBtn').onclick = async () => {
+  const args = {}; let repo;
+  document.querySelectorAll('#extra input').forEach(i => { const k = i.id.slice(2); if (!i.value) return; if (k === 'repo') repo = i.value; else args[k] = i.value; });
+  const j = await api('/api/jobs', { text: $('thought').value, tool: $('tool').value, mode: $('mode').value, area: $('area').value, autonomy: $('autonomy').value, args, repo, target: routed && routed.target });
+  $('last').innerHTML = jobCard(j); $('pick').style.display = 'none'; $('thought').value = '';
+};
+
+function jobCard(j) {
+  const r = j.result || {};
+  const btns = (j.status === 'waiting' ? `<button class="sm" onclick="act('${j.id}','approve')">OK, run it</button> ` : '') + (['waiting', 'queued', 'running'].includes(j.status) ? `<button class="sm" onclick="act('${j.id}','cancel')">Cancel</button> ` : '') + (j.backend === 'meshy' && j.status === 'running' ? `<button class="sm" onclick="act('${j.id}','refresh')">Check Meshy</button>` : '');
+  return `<div class="card"><div class="row" style="margin:0"><b>${esc(j.label)}</b>${j.area ? `<span class="tag">${esc(j.area)}</span>` : ''}<span class="tag">${esc(j.runsOn)}</span><span class="st-${j.status}">${j.status}</span></div>
+  <div class="dim">${esc((j.text || '').slice(0, 160))}</div>
+  ${j.error ? `<p class="st-failed">${esc(j.error)}</p>` : ''}
+  ${r.link ? `<p><a href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open</a></p>` : ''}
+  ${r.thumb ? `<img src="${esc(r.thumb)}" style="max-width:100%;border-radius:8px">` : ''}
+  ${r.branch ? `<p class="dim">Branch: ${esc(r.branch)}</p>` : ''}
+  ${r.text ? `<pre>${esc(r.text)}</pre>` : ''}
+  ${j.status === 'queued' && j.prompt ? `<details><summary class="dim">What goes to Claude Code</summary><pre>${esc(j.prompt)}</pre></details>` : ''}
+  <div class="row">${btns}</div></div>`;
+}
+window.act = async (id, what) => { const j = await api(`/api/jobs/${id}/${what}`, {}); jobs(); if ($('last').innerHTML.includes(id)) $('last').innerHTML = jobCard(j); };
+async function jobs() { const d = await api('/api/jobs'); $('wdot').classList.toggle('on', d.worker.online); $('jobList').innerHTML = d.jobs.map(jobCard).join('') || '<p class="dim">No jobs yet.</p>'; }
+
+async function boot() {
+  CAT = await api('/api/catalogue');
+  $('wdot').classList.toggle('on', CAT.worker.online);
+  $('tool').innerHTML = CAT.tools.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  $('area').innerHTML = Object.entries(CAT.areas).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  $('autonomy').innerHTML = Object.entries(CAT.autonomy).map(([k, v]) => `<option value="${k}"${k === 'draft' ? ' selected' : ''}>${k}</option>`).join('');
+  const ad = () => $('autoDoes').textContent = CAT.autonomy[$('autonomy').value]; $('autonomy').onchange = ad; ad();
+  fillModes();
+  $('catalogue').innerHTML = `<p class="dim">Cloud model: ${CAT.claude ? 'on' : 'off'}. Meshy: ${CAT.meshy ? 'on' : 'off'}. PC worker: ${CAT.worker.online ? 'online (' + CAT.worker.can.join(', ') + ')' : 'offline'}.</p>` + CAT.tools.map(t => `<h3>${esc(t.name)} <span class="tag">${t.type}</span> <span class="tag">${t.runsOn}</span></h3><div class="dim">${esc(t.what)}</div>${Object.values(t.modes).map(m => `<div class="mode"><b>${esc(m.label)}</b> <span class="dim">${esc(m.does)}</span></div>`).join('')}${t.built.length ? `<div class="dim" style="margin-top:4px">Wraps: ${t.built.map(esc).join('; ')}</div>` : ''}`).join('');
+}
+boot().catch(() => {});
+setInterval(() => { if ($('jobs').style.display !== 'none') jobs().catch(() => {}); }, 5000);
+</script></body></html>
