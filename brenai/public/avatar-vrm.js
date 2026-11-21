@@ -63,16 +63,17 @@ export async function create(url, opts = {}) {
   // Cloth weight: VRoid skirts and coat tails come with no gravity and nothing to collide with, so they hold their standing bell
   // shape in the air when she sits. Here they are given weight (softer, pulled down, damped), her legs become things the cloth
   // rests on, and while she is seated a flat surface sits just under her hips so the cloth lies on the seat, not through it.
-  const cloth = { plane: null, stand: 0, hips: null };
+  const cloth = { plane: null, legs: null };
   try { const man = vrm.springBoneManager, T = window.WIZRA_CLOTH || {}, raw = n => vrm.humanoid.getRawBoneNode(n), skirt = man ? [...man.joints].filter(j => /skirt/i.test(j.bone.name)) : [];
     if (skirt.length && !T.off) { const cols = [], cap = (bone, child, r) => { const a = raw(bone), b = raw(child); if (!a || !b) return; const c = new VRMSpringBoneCollider(new VRMSpringBoneColliderShapeCapsule({ offset: new THREE.Vector3(), tail: b.position.clone(), radius: r })); a.add(c); cols.push(c); };
       for (const sd of ['left', 'right']) { cap(sd + 'UpperLeg', sd + 'LowerLeg', T.thigh ?? 0.078); cap(sd + 'LowerLeg', sd + 'Foot', T.shin ?? 0.052); }
       cloth.plane = new VRMSpringBoneCollider(new VRMSpringBoneColliderShapePlane({ offset: new THREE.Vector3(), normal: new THREE.Vector3(0, 1, 0) })); cloth.plane.position.y = -50; vrm.scene.add(cloth.plane); cols.push(cloth.plane);
-      cloth.hips = raw('hips'); vrm.scene.updateMatrixWorld(true); cloth.stand = cloth.hips ? cloth.hips.getWorldPosition(new THREE.Vector3()).y - vrm.scene.getWorldPosition(new THREE.Vector3()).y : 0;
+      cloth.legs = ['left', 'right'].map(sd => [raw(sd + 'UpperLeg'), raw(sd + 'LowerLeg')]).filter(p => p[0] && p[1]);
       const group = { colliders: cols, name: 'cloth' }; for (const j of skirt) { const st = j.settings; st.stiffness *= T.k ?? 0.28; st.gravityPower = T.g ?? 0.55; st.dragForce = Math.max(st.dragForce || 0, T.d ?? 0.45); j.colliderGroups = [...(j.colliderGroups || []), group]; }
       man.setInitState(); man.reset(); } } catch (e) { console.warn('cloth weight', e); }
   // every frame: the seat surface follows her hips while they are low (any seated pose), and is far below otherwise
-  const clothTick = () => { if (!cloth.plane || !cloth.hips || !cloth.stand) return; const hy = cloth.hips.getWorldPosition(_clothV).y - vrm.scene.getWorldPosition(_clothV2).y, sc = vrm.scene.scale.y || 1; cloth.plane.position.y = hy < cloth.stand * 0.8 ? (hy - (window.WIZRA_CLOTH?.seat ?? 0.085) * sc) / sc : -50; cloth.plane.quaternion.copy(vrm.scene.quaternion).invert(); cloth.plane.updateMatrixWorld(true); };
+  const clothTick = () => { if (!cloth.plane || !cloth.legs) return; let seated = false, top = 1e9; for (const [a, b] of cloth.legs) { a.getWorldPosition(_clothV); b.getWorldPosition(_clothV2); const len = _clothV.distanceTo(_clothV2) || 1; if ((_clothV.y - _clothV2.y) / len < (window.WIZRA_CLOTH?.tilt ?? 0.72)) seated = true; top = Math.min(top, _clothV.y); }   /* a thigh that is nearer level than upright: she is sitting, kneeling or lying */
+    const sc = vrm.scene.scale.y || 1, base = vrm.scene.getWorldPosition(_clothV2).y; cloth.plane.position.y = seated ? (top - base) / sc - (window.WIZRA_CLOTH?.seat ?? 0.085) : -50; cloth.plane.quaternion.copy(vrm.scene.quaternion).invert(); cloth.plane.updateMatrixWorld(true); };
   const _clothV = new THREE.Vector3(), _clothV2 = new THREE.Vector3();
   // Her mouth: this model's inside-of-the-mouth picture is plain grey (teeth, a grey cavity, a grey tongue), which shows as a grey
   // mouth whenever she smiles wide or talks. Repaint it as it is drawn here: dark red inside, a pink tongue, the teeth left white.
