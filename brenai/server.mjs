@@ -886,17 +886,19 @@ async function handle(req, res) {
       // If the model cannot be reached the game still moves: the DM's line falls back to the plain facts of the scene.
       if (url.pathname === '/api/dnd' && req.method === 'POST') {
         const b = await readBody(req), now = Date.now(); let g = db.dnd;
-        const word = async (prompt, plain, his) => { if (busy) return plain; busy = true; try { db.log.push({ who: 'me', text: his || '', at: Date.now(), ...(his ? {} : { hidden: true }), pre: 'D&D night' }); let t = ''; try { t = (await reply(prompt, () => {})).trim(); } catch {} if (!/DM\s*:/.test(t) && plain && !/^\(table talk\)/.test(plain)) t = plain + (t ? '\n' + t : ''); t = t || plain; db.log.push({ who: 'her', text: t, at: Date.now() }); return t; } finally { busy = false; } };
+        const word = async (prompt, plain, his) => { if (busy) return plain; busy = true; try { db.log.push({ who: 'me', text: his || '', at: Date.now(), ...(his ? {} : { hidden: true }), pre: 'D&D night' }); let t = ''; try { t = String(await Promise.race([reply(prompt, () => {}), new Promise(r => setTimeout(() => r(''), 60000))]) || '').trim(); } catch {}   /* a model that never answers must not hold the table up: after a minute the plain line is used */
+          if (!/DM\s*:/.test(t) && plain && !/^\(table talk\)/.test(plain)) t = plain + (t ? '\n' + t : ''); t = t || plain; db.log.push({ who: 'her', text: t, at: Date.now() }); return t; } finally { busy = false; } };
         const dm = t => `DM: "${t}"`;
         if (b.stop) { if (g) { db.dnd = null; db.log.push({ who: 'sys', text: 'The game was packed away.', at: now }); save(); } return json(res, 200, placeView()); }
         if (b.start) { if (!db.place || db.solo || db.away) return json(res, 409, { error: 'She has to be there with you.', ...placeView() });
           g = db.dnd = dndNew(String(b.start)); const day = new Date().toLocaleDateString('en-CA', { timeZone: TZ }), surprise = KEY() || db.dndDay !== day; db.dndDay = day; db.log.push({ who: 'sys', text: `D&D night: ${DND_ADV.title}.`, at: now }); cur().touches.push({ kind: 'dndstart', at: now }); save();
           const text = await word(DND.intro(g, USER_NAME), dm(`${DND_ADV.intro} ${dndScene(g).notes} What do you do?`)); g.step = 'ask'; save(); return json(res, 200, { ...placeView(), text, surprise }); }
+        if (b.narrate) { const t = g && g.told; if (!t) return json(res, 200, { ...placeView(), text: '' }); delete g.told; save(); const text = await word(t.prompt, t.plain); save(); return json(res, 200, { ...placeView(), text }); }
         if (!g || !g.on) return json(res, 409, { error: 'No game is on.', ...placeView() });
-        if (b.roll) { const r = dndRoll(g); if (!r) return json(res, 409, { error: 'Nothing to roll.', ...placeView() }); save();
-          const text = await word(DND.result(g, USER_NAME, r), dm(`${r.outcome.charAt(0).toUpperCase() + r.outcome.slice(1)}.${r.over ? ' And that is where our story ends tonight.' : r.moved ? ' ' + dndScene(g).notes + ' What do you do?' : ' What do you try next?'}`));
+        if (b.roll) { const r = dndRoll(g); if (!r) return json(res, 409, { error: 'Nothing to roll.', ...placeView() });   /* the die answers at once; the telling of it is fetched separately (narrate), so a slow model never leaves the die spinning */
+          g.told = { prompt: DND.result(g, USER_NAME, r), plain: dm(`${r.outcome.charAt(0).toUpperCase() + r.outcome.slice(1)}.${r.over ? ' And that is where our story ends tonight.' : r.moved ? ' ' + dndScene(g).notes + ' What do you do?' : ' What do you try next?'}`) };
           if (r.over) { g.on = false; remember('dnd:' + DND_ADV.id, `You played "${DND_ADV.title}" together, start to finish.`); addBond(db.sheet.path || 'friend', 5); earn(10); cur().touches.push({ kind: 'dndend', at: Date.now() }); } else if (g.step === 'scene') g.step = 'ask';
-          save(); return json(res, 200, { ...placeView(), text, roll: r, over: r.over }); }
+          save(); const { was, ...rr } = r; return json(res, 200, { ...(r.over ? {} : placeView()), roll: rr, over: r.over }); }
         const said = String(b.say || '').trim().slice(0, 400); if (!said) return json(res, 400, { error: 'say?' }); if (g.step === 'roll') return json(res, 200, { ...placeView(), text: '' });
         /* an action is something his character does ("I sneak past", "we bribe them", or a plain "attack"); anything else is just talk at the table and nobody rolls */
         if (!(dndSkill(said) || /^\s*(i|we|my|let'?s|lets)\b/i.test(said)) || /^\s*\(/.test(said)) { const text = await word(DND.talk(g, USER_NAME, said), '(table talk)', said); save(); return json(res, 200, { ...placeView(), text: text === '(table talk)' ? '' : text }); }

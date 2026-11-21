@@ -26,7 +26,8 @@
   die.onclick = async e => { e.stopPropagation(); if (S.busy || !S.v || !S.v.pending) return; S.busy = true; die.className = 'show rolling'; try { WizraSound.fx('click'); } catch {}
     const spin = setInterval(() => { die.firstChild.textContent = 1 + Math.floor(Math.random() * 20); }, 70); let d = {}; try { d = await post({ roll: true }); } catch {} await new Promise(r => setTimeout(r, 500)); clearInterval(spin);
     if (d.roll) { die.className = 'show done'; die.textContent = ''; die.append(el('b', { textContent: d.roll.r }), d.roll.ok ? '✔' : '✖'); try { WizraSound.fx(d.roll.ok ? 'pop' : 'click'); avatar.gesture(d.roll.crit ? 'jump' : d.roll.ok ? 'cheer' : d.roll.fumble ? 'facepalm' : 'eep', 2.4); } catch {} await new Promise(r => setTimeout(r, 1300)); }
-    S.busy = false; die.className = ''; await tell(d); if (d.over) { try { avatar.gesture('cheer', 3); } catch {} } };
+    else if (d.error) { try { addSys(d.error); } catch {} }
+    S.busy = false; die.className = ''; if (d.place !== undefined && typeof setPlace === 'function') setPlace(d, true); else draw(); if (d.roll) { let n = {}; try { n = await post({ narrate: true }); } catch {} await tell(n); } if (d.over) { try { avatar.gesture('cheer', 3); } catch {} } };
   x.onclick = async e => { e.stopPropagation(); if (!confirm('Pack the game away? It ends here.')) return; await tell(await post({ stop: true })); };
   function open() { if (S.on) return; if (typeof away !== 'undefined' && away) return addSys('She is out.'); if (!visitInfo.place || visitInfo.solo) return addSys('Take her somewhere first: the game needs a table and the two of you.');
     pick.textContent = ''; const box = el('div', {}, el('h3', { textContent: 'Who are you tonight?' })); for (const [id, ic, nm, tip] of CLASSES) { const b = el('button', {}, el('i', { textContent: ic }), nm, el('small', { textContent: tip })); b.onclick = () => { pick.className = ''; begin(id); }; box.append(b); }
