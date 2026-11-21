@@ -214,6 +214,7 @@ function systemBlocks() {
   if (db.profile) {
     blocks.push({ type: 'text', text: `What you have picked up about ${USER_NAME} so far (your own private notes; use them, never recite them):\n${db.profile}` });
   }
+  if (db.nowNote) blocks.push({ type: 'text', text: `IMPORTANT, your state right now (this is current and true, and it comes before any other mood described above): ${db.nowNote} Let it shape how you act, feel and talk from this message on, without announcing it or explaining where it came from.` });   /* set by the owner in the robot panel */
   if (db.agree) blocks.push({ type: 'text', text: AGREE.replace('{user}', USER_NAME) });   /* the campsite switch: last, so a small model weighs it most */
   return blocks;
 }
@@ -904,6 +905,16 @@ async function handle(req, res) {
         if (!(dndSkill(said) || /^\s*(i|we|my|let'?s|lets)\b/i.test(said)) || /^\s*\(/.test(said)) { const text = await word(DND.talk(g, USER_NAME, said), '(table talk)', said); save(); return json(res, 200, { ...placeView(), text: text === '(table talk)' ? '' : text }); }
         const c = dndDeclare(g, said); save(); const text = await word(DND.declare(g, USER_NAME, said, c), dm('All right. Roll for it.'), said); save(); return json(res, 200, { ...placeView(), text });
       }
+      // the robot panel (owner only): everything about who she is and how she is right now, read and changed in one place. Changes apply to her next reply.
+      if (url.pathname === '/api/robot') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); fixBond(); if (!db.sheet.traits) db.sheet.traits = { ...TRAITS_DEFAULT };
+        if (req.method === 'POST') { const b = await readBody(req);
+          if (typeof b.now === 'string') db.nowNote = b.now.trim().slice(0, 1500);
+          if (typeof b.feeling === 'string') db.feeling = b.feeling.trim() ? { text: b.feeling.trim().slice(0, 400), at: Date.now() } : null;
+          if (b.clearMood) { db.glow = null; db.feeling = null; }
+          if (b.home && db.away) { db.away = null; db.call = null; db.glow = null; db.log.push({ who: 'sys', text: 'Wizra is back.', at: Date.now() }); }
+          if (b.sheet || typeof b.persona === 'string' || typeof b.notes === 'string') applySettings({ ...(b.sheet ? { sheet: b.sheet } : {}), ...(typeof b.persona === 'string' ? { persona: b.persona } : {}), ...(typeof b.notes === 'string' ? { notes: b.notes } : {}) });
+          save(); }
+        const g = currentGlow(); return json(res, 200, { sheet: db.sheet, persona: db.persona || PERSONA('{user}'), personaEdited: !!db.persona, traitsDefault: TRAITS_DEFAULT, now: db.nowNote || '', feeling: db.feeling && Date.now() - db.feeling.at < 72 * 3600000 ? db.feeling.text : '', mood: g && g.kind ? `${g.kind}: back from ${g.where}, ${g.truth}` : '', away: db.away ? db.away.where || 'out' : '', notes: db.profile || '', levelMax: ROM_MAX, ...placeView() }); }
       if (url.pathname === '/api/agree' && req.method === 'POST') { const b = await readBody(req); if (!db.agree && !atCamp() && !isOwner()) return json(res, 409, { error: 'That switch is at the campsite.', ...placeView() }); if (b.level !== undefined) { if (!KEY()) return json(res, 409, { error: 'Turn the key on first.', ...placeView() }); fixBond(); if (!db.keyLv) db.keyLv = { lvl: db.sheet.romLevel, rom: db.sheet.bond.romance }; db.sheet.romLevel = Math.max(0, Math.min(ROM_MAX, Math.round(+b.level || 0))); db.sheet.bond.romance = 0; save(); return json(res, 200, placeView()); }   /* try any romance level while the key is on; the real one is kept and put back */
         db.agree = b.on === undefined ? !db.agree : !!b.on; if (!db.agree && db.keyLv) { db.sheet.romLevel = db.keyLv.lvl; db.sheet.bond.romance = db.keyLv.rom; delete db.keyLv; } save(); return json(res, 200, placeView()); }   /* the campsite switch: on, or off again */
       if (url.pathname === '/api/movie' && req.method === 'POST') {

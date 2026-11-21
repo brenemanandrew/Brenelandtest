@@ -558,6 +558,7 @@
 <script src="hang.js"></script>
 <script src="minigame.js"></script>
 <script src="dnd.js"></script>
+<script src="robot.js"></script>
 <script src="avatar.js"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -910,7 +911,7 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { key: !!d.key, solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { key: !!d.key, keyable: !!d.keyable, solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
   if (was !== undefined && !d.key && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
   setPlace.level = visitInfo.level;
   const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
@@ -920,8 +921,8 @@ function setPlace(d, arriving) {
   drawMoments(); WizraSound.path(visitInfo.path);
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
   showInvite(); filmSync(); try { WizraDnd.sync(d.dnd); } catch {}
-  { const ab = $('agreeBtn'); ab.hidden = !(d.agree || d.keyable || (d.camp && d.place && !d.solo));   /* at the campsite with her; and anywhere while it is on, so it can always be undone */ ab.classList.toggle('on', !!d.agree); ab.title = d.agree ? 'She is agreeable. Press to undo.' : 'Make her agreeable'; if (d.key || d.keyable) ab.innerHTML = '&#128273;'; else ab.innerHTML = '&#129309;';
-    const kl = $('keyLv'); kl.hidden = !d.key; if (d.key && kl.dataset.v !== d.level + '/' + d.levelMax) { kl.dataset.v = d.level + '/' + d.levelMax; kl.textContent = ''; for (let i = 0; i <= (d.levelMax | 0); i++) { const b = document.createElement('button'); b.textContent = 'L' + i; b.title = 'Test romance level ' + i; if (i === d.level) b.className = 'on'; b.onclick = async ev => { ev.stopPropagation(); try { const r = await api('/api/agree', { level: i }), j = await r.json(); if (j.error) addSys(j.error); setPlace(j); } catch {} }; kl.append(b); } } }
+  { const ab = $('agreeBtn'); ab.hidden = !(d.agree || d.keyable || (d.camp && d.place && !d.solo));   /* at the campsite with her; and anywhere while it is on, so it can always be undone */ ab.classList.toggle('on', !!d.agree); ab.title = d.agree ? 'She is agreeable. Press to undo.' : 'Make her agreeable'; if (d.keyable) { ab.innerHTML = '&#129302;'; ab.title = 'Edit her: personality, mood, state'; } else ab.innerHTML = '&#129309;';
+    const kl = $('keyLv'); kl.hidden = !d.key || !!d.keyable;   /* owners set the level in the robot panel */ if (d.key && kl.dataset.v !== d.level + '/' + d.levelMax) { kl.dataset.v = d.level + '/' + d.levelMax; kl.textContent = ''; for (let i = 0; i <= (d.levelMax | 0); i++) { const b = document.createElement('button'); b.textContent = 'L' + i; b.title = 'Test romance level ' + i; if (i === d.level) b.className = 'on'; b.onclick = async ev => { ev.stopPropagation(); try { const r = await api('/api/agree', { level: i }), j = await r.json(); if (j.error) addSys(j.error); setPlace(j); } catch {} }; kl.append(b); } } }
 }
 function showInvite() {
   const c = $('inviteCard'), inv = visitInfo.place || away ? '' : visitInfo.invite, due = visitInfo.place || away ? null : visitInfo.due;
@@ -1215,7 +1216,7 @@ $('mePick').onchange = async e => {
   } catch { addError('That picture could not be opened.'); }
 };
 $('actBtn').onclick = ev => { ev.stopPropagation(); WizraHang.start(); };
-$('agreeBtn').onclick = async ev => { ev.stopPropagation(); try { const r = await api('/api/agree', {}), d = await r.json(); if (d.error) addSys(d.error); setPlace(d); WizraSound.fx(d.agree ? 'pop' : 'click'); } catch {} };
+$('agreeBtn').onclick = async ev => { ev.stopPropagation(); if (visitInfo.keyable && window.WizraRobot) return WizraRobot.open(); try { const r = await api('/api/agree', {}), d = await r.json(); if (d.error) addSys(d.error); setPlace(d); WizraSound.fx(d.agree ? 'pop' : 'click'); } catch {} };
 // the games made in the Studio: a controller on the dock opens a row of them (only those her level allows, and only while she is here)
 { const gb = el('button', { id: 'gameBtn', textContent: '\ud83c\udfae', title: 'Play a game with her' }); $('dock').insertBefore(gb, $('senseBtn')); const row = el('div', { id: 'gameRow', hidden: true }); document.body.append(row);
   const gamesNow = () => (dev.games || []).filter(g => visitInfo.key || (g.minLevel | 0) <= (visitInfo.level | 0));
