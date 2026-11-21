@@ -1,0 +1,57 @@
+# Deploys Brenebase (hub/) to https://brenebase.fly.dev. ONLY when run by hand: Actions > Brenebase Deploy > Run workflow,
+# and pick the branch that holds hub/ in "Use workflow from". Never runs on a push.
+# Repo secrets it reads (Settings > Secrets and variables > Actions). Only names here, never values:
+#   BRENEBASE_FLY_TOKEN        required the first time: an org token that can create apps (fly tokens create org).
+#                              Falls back to FLY_API_TOKEN once the app exists.
+#   BRENEBASE_PASSWORD         required: the page login
+#   BRENEBASE_PC_KEY           required: the PC key (HUB_WORKER_TOKEN), same value as on the PC
+#   BRENEBASE_ANTHROPIC_KEY    optional: Claude for Planner, Expert and the Opus check of Copilot answers
+#   BRENEBASE_TS_AUTHKEY       optional: Tailscale auth key, so Brenebase joins the tailnet
+#   BRENEBASE_PC_TAILNET_HOST  optional: the PC's tailnet name
+#   BRENEBASE_GITHUB_TOKEN     optional: reads private repos (ardenot) for project notes and update files
+#   BRENEBASE_MESHY_KEY        optional: 3D generate, retexture, rig
+name: Brenebase Deploy
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency: brenebase-deploy
+    defaults:
+      run:
+        working-directory: hub
+    env:
+      FLY_API_TOKEN: ${{ secrets.BRENEBASE_FLY_TOKEN || secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Required secrets are there
+        env:
+          PW: ${{ secrets.BRENEBASE_PASSWORD }}
+          PK: ${{ secrets.BRENEBASE_PC_KEY }}
+        run: |
+          [ -n "$FLY_API_TOKEN" ] || { echo "Missing BRENEBASE_FLY_TOKEN (or FLY_API_TOKEN)"; exit 1; }
+          [ -n "$PW" ] || { echo "Missing BRENEBASE_PASSWORD"; exit 1; }
+          [ -n "$PK" ] || { echo "Missing BRENEBASE_PC_KEY"; exit 1; }
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl status --app brenebase >/dev/null 2>&1 || flyctl apps create brenebase
+      - run: flyctl volumes list --app brenebase | grep -q brenebase_data || flyctl volumes create brenebase_data --app brenebase --region iad --size 1 --yes
+      - name: Copy secrets to Fly (only the ones the repo has)
+        env:
+          PW: ${{ secrets.BRENEBASE_PASSWORD }}
+          PK: ${{ secrets.BRENEBASE_PC_KEY }}
+          AK: ${{ secrets.BRENEBASE_ANTHROPIC_KEY }}
+          TS: ${{ secrets.BRENEBASE_TS_AUTHKEY }}
+          TH: ${{ secrets.BRENEBASE_PC_TAILNET_HOST }}
+          GT: ${{ secrets.BRENEBASE_GITHUB_TOKEN }}
+          MK: ${{ secrets.BRENEBASE_MESHY_KEY }}
+        run: |
+          args="HUB_PASSWORD=$PW HUB_WORKER_TOKEN=$PK"
+          [ -n "$AK" ] && args="$args ANTHROPIC_API_KEY=$AK"
+          [ -n "$TS" ] && args="$args TS_AUTHKEY=$TS"
+          [ -n "$TH" ] && args="$args PC_TAILNET_HOST=$TH"
+          [ -n "$GT" ] && args="$args GITHUB_TOKEN=$GT"
+          [ -n "$MK" ] && args="$args MESHY_API_KEY=$MK"
+          flyctl secrets set --stage --app brenebase $args
+      - run: flyctl deploy --remote-only --ha=false --app brenebase
+      - name: Check it answers
+        run: sleep 10 && curl -fsS -o /dev/null -w "brenebase.fly.dev answered %{http_code}\n" https://brenebase.fly.dev/

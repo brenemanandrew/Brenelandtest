@@ -33,6 +33,8 @@ import * as U from './updates.mjs';
 
 const PORT = +process.env.PORT || 8080;
 const PASS = process.env.HUB_PASSWORD || '';
+/* an unconfigured copy is closed, not open: on Fly it refuses to start without its password and PC key */
+if (process.env.FLY_APP_NAME && (!PASS || !process.env.HUB_WORKER_TOKEN)) { console.error('Refusing to start: set HUB_PASSWORD and HUB_WORKER_TOKEN as Fly secrets.'); process.exit(1); }
 const WTOKEN = process.env.HUB_WORKER_TOKEN || '';
 const PUB = path.join(path.dirname(new URL(import.meta.url).pathname), 'public');
 let claude = null;
