@@ -1023,7 +1023,7 @@ async function handle(req, res) {
           if (db.away) return json(res, 409, { error: 'She is out.', ...placeView() });
           setPlace(place); db.log.push({ who: 'sys', text: `You two went to ${customMap(place).name}.`, at: now }); save(); return json(res, 200, placeView());
         }
-        if (place !== inviteNow()) return json(res, 409, { error: 'There is no invitation open right now.', ...placeView() });
+        if (place !== inviteNow() && !(KEY() && ['dorm', 'house'].includes(place) && !db.away)) return json(res, 409, { error: 'There is no invitation open right now.', ...placeView() });
         setPlace(place); db.log.push({ who: 'sys', text: place === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.', at: now }); cur().touches.push({ kind: place === 'dorm' ? 'cameDorm' : 'cameHouse', at: now }); save();
         return json(res, 200, placeView());
       }
