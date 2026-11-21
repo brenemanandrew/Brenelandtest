@@ -13,6 +13,7 @@
      BIONIC_URL        default http://127.0.0.1:1234
      BLENDER           path to blender.exe (default: "blender" on PATH)
      REPOS             folder that holds your repo checkouts (default: %USERPROFILE%\repos)
+     READ_ROOTS        folders project notes may be read from, ; separated (default G:\My Drive;F:\Projects)
    Run: node hub-worker.mjs */
 import { spawn, spawnSync } from 'child_process';
 import path from 'path';
@@ -43,6 +44,9 @@ if (found('claude')) can.push('claude-code');
 if (found(`"${BLENDER}"`)) can.push('blender');
 can.push('pc-run');
 if (found('git')) can.push('merge');
+/* project notes on this PC: only files inside these folders can be read (Google Drive for desktop, project folders) */
+const READ_ROOTS = (process.env.READ_ROOTS || 'G:\\My Drive;F:\\Projects').split(';').map(r => path.resolve(r.trim())).filter(Boolean);
+can.push('read');
 console.log(`hub worker: ${HUB}\ncan do: ${can.join(', ')}`);
 
 const run = (cmd, args, cwd, input) => new Promise(ok => {
@@ -79,6 +83,12 @@ async function doJob(j) {
     return { ok: r.code === 0, text: r.out || r.err, error: r.code ? r.err : undefined };
   }
   if (j.backend === 'merge') return merge(j);
+  if (j.backend === 'read') {
+    const f = path.resolve(j.source.path);
+    if (!READ_ROOTS.some(r => f.toLowerCase().startsWith(r.toLowerCase() + path.sep) || f.toLowerCase() === r.toLowerCase())) return { ok: false, error: `${f} is outside READ_ROOTS` };
+    if (!fs.existsSync(f)) return { ok: false, error: `Not found on this PC: ${f}` };
+    return { ok: true, text: fs.readFileSync(f, 'utf8').slice(0, 400000) };
+  }
   return { ok: false, error: `This PC cannot do ${j.backend}` };
 }
 

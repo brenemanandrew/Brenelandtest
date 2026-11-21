@@ -75,10 +75,11 @@ export const TOOLS = [
   {
     id: 'make3d', type: 'make3d', name: '3D', runsOn: 'meshy', backend: 'meshy',
     what: 'Models and assets. The mode picks Meshy, Blender, code or the checker (see route.mjs pick3d for the rules).',
-    built: ['Meshy API (text, image, retexture, rigging)', 'pipeline/scripts/*.py (29 Blender scripts: fit, decimate, convert, rig, morph)', 'pipeline/jstest/piece.mjs + psheet.py (render checker)', 'brenai/public/props.js (38 code-built props)'],
+    built: ['Meshy API (text, image, retexture, rigging)', 'pipeline/scripts/*.py (29 Blender scripts: fit, decimate, convert, rig, morph)', 'pipeline/jstest/piece.mjs + psheet.py (render checker)', 'brenai/public/props.js (38 code-built props)', 'Brenerig (brenerig.fly.dev)'],
     modes: {
       generate:   { label: 'Generate (Meshy)',  does: 'A new model from words or a picture. Preview first (cheap), refine only after OK.', words: ['generate', 'new model', 'make a model', 'model of', 'from this picture', 'from a photo', 'image to 3d', 'text to 3d', 'asset', 'prop', 'creature'] },
       retexture:  { label: 'Retexture (Meshy)', does: 'New paint on an existing model, cel shade or style change.', words: ['retexture', 'repaint', 'texture', 'cel shade', 'cel-shade', 'toon', 'recolor', 'recolour', 'reskin'] },
+      rigstudio:  { label: 'Rig by hand (Brenerig)', does: 'Your browser rig and pose studio: place joints, bind, pose, chains with physics, export GLB. Free.', backend: 'link', runsOn: 'browser', words: ['brenerig', 'rig studio', 'pose it', 'rig by hand', 'fix the rig', 'chain physics'] },
       rig:        { label: 'Rig (Meshy)',       does: 'Auto-rig a humanoid so it can take Mixamo-style motion.', words: ['rig', 'skeleton', 'bones', 'auto rig', 'skin weights'] },
       process:    { label: 'Process (Blender)', does: 'Headless Blender on the PC: decimate, convert, clean, bake, fit to a body.', backend: 'blender', runsOn: 'pc', words: ['decimate', 'reduce', 'polycount', 'poly count', 'convert', 'fbx', 'glb', 'obj', 'bake', 'uv', 'clean up', 'fit', 'morph', 'shrink', 'compress', 'merge', 'blender'] },
       breneland:  { label: 'Breneland fit',     does: 'Character builder pipeline: fit a garment or hair to the two bodies (fit_wear, shell, snug_hair).', backend: 'blender', runsOn: 'pc', words: ['garment', 'clothing', 'outfit', 'shirt', 'pants', 'hairstyle', 'fit to body', 'shell'] },

@@ -1,0 +1,364 @@
+{
+ "id": "breneland",
+ "name": "Breneland (Breneland-Next game + character builder test)",
+ "area": "hobby",
+ "private": false,
+ "keywords": [
+  "breneland",
+  "breneland-next",
+  "breneland 2",
+  "town game",
+  "townsfolk",
+  "dax",
+  "nala",
+  "molly",
+  "joyce",
+  "kevin",
+  "tool crib",
+  "lovecraft",
+  "maze",
+  "ghoul",
+  "peak body",
+  "peak threads",
+  "d&d night",
+  "dm voice",
+  "piper",
+  "hud editor",
+  "water tower",
+  "character builder",
+  "character creator",
+  "outfit",
+  "garment",
+  "shell clothes",
+  "fit_wear",
+  "hair",
+  "mirror",
+  "dressing room"
+ ],
+ "what": "Breneland-Next (Breneland 2.0) is Andrew's multiplayer browser town game built in Three.js and live at breneland.fly.dev. Players make an avatar and hang out in a cartoon small town: dogs Dax, Nala and Molly, scripted townsfolk, fishing, swimming, a water tower climb, a maze under the Lovecraft house, table games, D&D night with Claude as the DM, shops and a clothing store. Work runs as numbered waves and fix rounds, each deployed as a Fly version (now around v319). The character builder test build (Brenelandtest repo) is a modular creator being developed separately before anything moves into the main game.",
+ "where": [
+  "Code: the Breneland-Next repo. The one working copy is on Andrew's PC F: drive, and Google Drive is a backup (cleanup v154)",
+  "Live: breneland.fly.dev on Fly.io, persistent data volume at /data (snapshot before each deploy)",
+  "Docs in the repo: docs/briefs/*.md (one brief per job), docs/refs/<job>/, docs/CONTRACTS.md, LIGHTS.md, BLUEPRINT.md",
+  "On Drive: breneland2-progress.md (wave log), breneland2-plan.md, breneland2-answers.md (Andrew's answers, which override the plan)",
+  "Deploy: flyctl deploy from the PM session once tests pass. --depot=false was needed when Fly's registry refused pushes (v267)",
+  "Voice data lives in F:/Projects/Breneland-Voice",
+  "Cloud sessions deliver branches that the PM session merges and ships",
+  "Character builder test: repo brenemanandrew/Brenelandtest (site/ and pipeline/); Fly deploy of the test site has failed twice at flyctl deploy (likely missing FLY_API_TOKEN or app-name mismatch)"
+ ],
+ "stack": [
+  "Three.js in the browser, custom toon and ink-outline renderer (toon.js, camera-fade.js, occlusion.js)",
+  "Node server (server.js, lib/*.js) holding the shared simulations: dogs at 20 Hz, maze ghoul, fires, table games, clock",
+  "Docker node:20-bookworm-slim plus python3 on Fly.io, 1 GB memory",
+  "Blender set pieces exported to public/models/*.json plus webp atlases; code-built versions kept as fallbacks",
+  "MPFB Blender characters with baked clips (BakedCharacter) for mall staff and the DM",
+  "Meshy props from the World Refresh (Meshy dogs now off)",
+  "Player bodies: the toy 'peak' body (PeakHuman, peak-body.js, peak-wear.js) since v310",
+  "D&D DM: Claude claude-opus-5-5 at low effort, server-rolled dice, 1.5M-token cap per night",
+  "DM voice: Andrew's fine-tuned Piper voice in a Python worker (lib/dm-voice-worker.py); browser voice fallback",
+  "Townsfolk brain: PC model MN-Violet-Lotus-12B via tools/npc-brain-bridge.mjs (NPC_BRAIN_TOKEN), text replies only",
+  "Music and SFX generated in Web Audio from CC0/CC-BY instruments",
+  "MediaPipe tasks-vision 1.2.3 vendored for owner-only /mocap",
+  "Puppeteer headless test suites (tools/*-test.mjs, run-all)",
+  "Builder: Three.js r181 from CDN, one file poser/index.html, data as base64 GLB in small JS files; two rigs (plus female, male) on the same 66-bone Mixamo skeleton with morph targets; pipeline in Blender Python (bpy) and puppeteer checks"
+ ],
+ "tools": [
+  {
+   "name": "run-all + tools/*-test.mjs",
+   "what": "headless test suites (smoke, perf-budget, phone-budget, new-bodies, creator-v2, peak-body, dnd-test and more)",
+   "use_when": "before every deploy: smoke plus the suites for the area touched"
+  },
+  {
+   "name": "perf-budget-test / phone-budget-test / phone-memory-test",
+   "what": "draw call, triangle, garbage and memory caps; phone-memory is a 3-minute walk with a 950 MB budget",
+   "use_when": "after adding geometry, textures or lights"
+  },
+  {
+   "name": "tools/fix-house-flicker-coplanar.mjs (--all)",
+   "what": "finds z-fighting faces across 34 areas",
+   "use_when": "after placing or moving models"
+  },
+  {
+   "name": "lights-audit.mjs",
+   "what": "every light has a visible source",
+   "use_when": "adding lights"
+  },
+  {
+   "name": "tree-overlap-test",
+   "what": "trees against buildings and set pieces",
+   "use_when": "moving trees or buildings"
+  },
+  {
+   "name": "tools/store-clipping-probe.mjs",
+   "what": "props clipping in stores",
+   "use_when": "store or prop changes"
+  },
+  {
+   "name": "HUD Editor /editor/hud.html",
+   "what": "drag/size editor for every HUD layout and the D&D table, saves to /api/hud-layouts",
+   "use_when": "layout changes; his saved layouts beat built-in ones"
+  },
+  {
+   "name": "Owner tools menu",
+   "what": "Play, NPC Editor, World Editor, HUD Editor, Music & SFX, Dog voices, Voice booth, Pose Editor, Mocap, Real time / 5 pm now",
+   "use_when": "Andrew's account only (OWNER_KEYS)"
+  },
+  {
+   "name": "NPC / Dog / staff editors",
+   "what": "tune looks; a saved look wins over code",
+   "use_when": "look tuning"
+  },
+  {
+   "name": "Pose Editor /editor/pose.html",
+   "what": "poses up to 5 people in town spots, pen, draw-to-pose, sculpt",
+   "use_when": "stills and pose authoring"
+  },
+  {
+   "name": "/mocap",
+   "what": "MediaPipe capture onto the new bodies, JSON/BVH export, 25-step tutorial",
+   "use_when": "recording poses (not wired into gameplay)"
+  },
+  {
+   "name": "Voice booth + tools/voice-pull.mjs",
+   "what": "records takes to the volume, exports to F: for Piper retraining (~4 h on the 5060 Ti)",
+   "use_when": "voice retrains"
+  },
+  {
+   "name": "tools/npc-brain-bridge.mjs",
+   "what": "townsfolk replies from the PC model",
+   "use_when": "must run on the PC for townsfolk to reply"
+  },
+  {
+   "name": "build_crib.py, lsp_*.py, build_clothes.py, crib_tarp.py, export_game.py, toon_mpfb.py",
+   "what": "Blender build scripts for set pieces, clothes and MPFB characters",
+   "use_when": "rebuilding Blender assets (needs Blender on the PC; none headless in cloud)"
+  },
+  {
+   "name": "tools/half-textures.py + half-tex.js",
+   "what": "half-size textures for iOS",
+   "use_when": "adding textures phones load"
+  },
+  {
+   "name": "tools/w16-maze-check.mjs",
+   "what": "18-check gate for maze seeds",
+   "use_when": "adding maze seeds"
+  },
+  {
+   "name": "URL flags",
+   "what": "?bodies=old, ?baked=off, ?vibrant, ?reflect, ?meshydog, ?fulltex/?halftex, ?lovecraft=code, ?fishshack=code, ?fingers=real, ?norig, ?notour",
+   "use_when": "A/B checks and fallbacks"
+  },
+  {
+   "name": "Builder: scripts/build.py",
+   "what": "builds poser/index_embedded.html and the data files",
+   "use_when": "after any builder change; then copy into site/"
+  },
+  {
+   "name": "Builder: scripts/fit_wear.py KEY SLOT m|f",
+   "what": "fits a scanned garment to a body (needs decimated scans not in the repo)",
+   "use_when": "a new garment"
+  },
+  {
+   "name": "Builder: snug_hair.py, conform_hair.py",
+   "what": "pull hairstyles onto each body's skull",
+   "use_when": "a new hairstyle"
+  },
+  {
+   "name": "Builder: jstest/piece.mjs + psheet.py",
+   "what": "six close views per piece and percent of underlayer showing",
+   "use_when": "checking a garment"
+  },
+  {
+   "name": "Builder: shell_wear.py (shell clothes)",
+   "what": "garment built from the body surface, pushed out, with the body's weights and morphs",
+   "use_when": "the proposed fix for clothes"
+  },
+  {
+   "name": "Brenerig (brenerig.fly.dev)",
+   "what": "browser rigging and posing",
+   "use_when": "rigging or posing a model by hand"
+  }
+ ],
+ "settings": [
+  {
+   "name": "Fly memory",
+   "value": "1 GB",
+   "note": "raised for the Piper worker (v195)"
+  },
+  {
+   "name": "Secrets (names only)",
+   "value": "NPC_BRAIN_TOKEN, EDIT_KEY",
+   "note": "brain offline unless the bridge runs on the PC"
+  },
+  {
+   "name": "OWNER_KEYS",
+   "value": "server env, account names",
+   "note": "a rename drops owner rights"
+  },
+  {
+   "name": "CLOCK_LAG_START_HOUR",
+   "value": "17",
+   "note": "stored in /data/clock-lag.json"
+  },
+  {
+   "name": "DM model",
+   "value": "claude-opus-5-5, effort low",
+   "note": "1.5M tokens per night cap"
+  },
+  {
+   "name": "DM voice files",
+   "value": "voices/andrew-styles.onnx (+ andrew.onnx)",
+   "note": "git-ignored; copy from F:/Projects/Breneland-Voice before deploying from a fresh copy"
+  },
+  {
+   "name": "D&D mic quiet wait",
+   "value": "2.5 s",
+   "note": "was 1.2 s"
+  },
+  {
+   "name": "Walk / run speed",
+   "value": "2.5 m/s / 7.2 m/s",
+   "note": "v318, walk was 4.3"
+  },
+  {
+   "name": "VIBRANT_PAUSED / REFLECT_PAUSED",
+   "value": "false / false",
+   "note": "back on in v306"
+  },
+  {
+   "name": "MESHY_DOGS",
+   "value": "false",
+   "note": "code dogs used"
+  },
+  {
+   "name": "Perf budgets (draw calls)",
+   "value": "PC town 411, store 344, storein 240, lake 220; phone town 302, store 198, woods 121",
+   "note": "rebased v255"
+  },
+  {
+   "name": "Fire season",
+   "value": "6 pm-2 am Eastern, Oct 1-Feb 14",
+   "note": "fire-season.js"
+  },
+  {
+   "name": "Maze",
+   "value": "one a week from five seeds",
+   "note": "six weekly goals"
+  },
+  {
+   "name": "Builder female shoulderLift",
+   "value": "4 cm at load",
+   "note": "clothes have it baked in"
+  },
+  {
+   "name": "Builder paths",
+   "value": "/home/claude/... fixed paths",
+   "note": "run pipeline/setup.sh once; blocks running the scripts on the PC as is"
+  }
+ ],
+ "working": [
+  "Toy 'peak' body with creator v2 (gender, build, skin, faces, hair, beards, outfits, hats, glasses)",
+  "Shared dog simulation: naps, affection, walk-with-me, porch beds, frisbee",
+  "Townsfolk routines (Joyce, Kevin, mall staff), Bus Route 7, mail van",
+  "Townsfolk text replies through the PC brain bridge",
+  "D&D night with Claude as DM in Andrew's voice, phone mic hold-to-talk",
+  "Table games with bots and leaderboard (Mexican Train, Word Weave, The Missing Pie, Town Tycoon, Hearthfield, Pillow Forts, Mahjong)",
+  "Beneath Angell Street maze with ghoul and weekly goals",
+  "Water tower climb, swing hill, pie contest, fishing, swimming",
+  "HUD round 3 with the HUD Editor and live owner editing",
+  "Peak Threads clothing store, wardrobe, Spa",
+  "Weekly crossword at the Tool Crib",
+  "Fires and fire season, indoor camera, no weather indoors",
+  "Generated music by place and hour",
+  "Perf pass 4, graphics watchdog, iOS half textures",
+  "Owner tools: Pose Editor, Mocap, Voice booth, clock lag",
+  "Builder: dressing room intro, identity, walk to mirror, Face, Hair, Body, Outfit, Voice, Finish",
+  "Builder: 28 garments fitted, underlayer hides holes from a distance"
+ ],
+ "broken": [
+  "Builder clothes close up: flat underlayer patches, ragged cut edges, mottled whites, loose silhouettes (worst: sweater 4.5% underlayer, blazer 2.3%)",
+  "Builder: buzz cut has small pits at the back; skinny jeans cuffs ragged",
+  "Builder: men's pieces never run through the checker; LIFT=1 cloth lifting threw spikes (off)",
+  "Builder: test site Fly deploy failed twice",
+  "2026-11-21 (v319): 36 of 52 suites failing after the 2.5 m/s walk still unsorted; clothing-store phone stand 1 names the wrong piece; dm-hood-test needs a rewrite",
+  "v318: fence vault needs a run; fish not scared by a walk; feet at 2.5 m/s unverified; no phone run toggle",
+  "2026-11-21: dive camera left alone; emotes high five 114/115; swim-test phone HUD overlap",
+  "2026-11-20: bus cannot be ridden while moving; toy-body clothes are approximations; nothing tested on a real phone",
+  "2026-11-19: dog paw slide in bursts and turns; iPhone crash fix not confirmed (700 MB target not reached)",
+  "2026-11-18: garbage per frame over budget (9-12); Plus sock tops jagged; Pizza/Peak Threads seats too tall",
+  "2026-11-18: toon_mpfb.py export fix unrun (no headless Blender)",
+  "2026-11-16: North store fronts dark in woods shade by day; World Refresh doubled triangles",
+  "2026-11-11: long hair falls through chair slats; feet dangle at 0.45 m seats",
+  "2026-11-09: pizza lamp shows through the party wall; seasonal Lovecraft skins in HD untested",
+  "Flaky suites: avatar-fit 3, tool-crib two-client week, w3-lovecraft phone toggle, w16-door insideShown, gaze-test D&D, hud-editor boxOf",
+  "Name tags through some walls"
+ ],
+ "open": [
+  "Builder: approve and build shell clothes (prototype women's sweater and men's tee, compare with piece.mjs)",
+  "Builder: outfit tiles for None rows, face and eye shapes from in26/head.glb, 12 shop accessories",
+  "Numbered sheet of all Breneland plant and tree assets plus Meshy cel-shade instructions (tree code in world-trees.js on Drive)",
+  "Sort the remaining 36 failing suites after the walk speed change",
+  "Confirm the iPhone crash fix on the real iPhone (docs/briefs/iphone-fallback-plan.md)",
+  "NPCs onto the new bodies (stage 2); old outfit details; chest accessories",
+  "Toy body: bocce throw, Kevin's boat, riding the moving bus",
+  "Dog paw slide in turns",
+  "Andrew to record voice set 2 (~75 min), then retrain Piper",
+  "Wave 15 Dogs that listen: PARKED until Andrew un-parks it",
+  "Events (Weekend BBQ, Parade) once more scenic pins are placed",
+  "Maze: hand-walk the five seeds",
+  "CC0 animation pack trial on feat/anim-packs not merged",
+  "Mocap not tried on a phone; mocap clips not wired into gameplay",
+  "D&D: no NPC at the table; handouts untested",
+  "Lovecraft hedges faceted; Maple Row coplanar fails in 5 areas"
+ ],
+ "rules": [
+  "Do NOT ship anything from the builder to Breneland-Next until Andrew says so; then send to the project master, update it, upload to Drive, deploy if possible",
+  "A sexual animation request was declined and removed; do not rebuild it",
+  "Never use em dashes. Answer short. Report only what was tested",
+  "Do not ship to breneland.fly.dev without Andrew's go. Deploy only when tests pass",
+  "If any wave row is IN PROGRESS, stop and post a note; retry FAILED/PARTIAL before TODO, one wave per night; nightly task stays disabled unless he turns it on",
+  "Andrew's answers file overrides the plan",
+  "His saved HUD layouts beat built-in ones; never overwrite them",
+  "Every light must have a visible source (LIGHTS.md)",
+  "Visible-goal rule in CONTRACTS.md",
+  "Table games must be original, not copies of trademarked games",
+  "Ship cloud-session deliveries as delivered; integration only",
+  "Quality over quantity",
+  "Show before/after sheets to Andrew first for look changes",
+  "Snapshot the /data volume before deploys",
+  "Copy the git-ignored voice models into voices/ before deploying from a fresh copy"
+ ],
+ "avoid_redoing": [
+  "Builder: Andrew will not regenerate every garment in Meshy per iteration; use the fitted scans in out/wear as inputs",
+  "Builder: two pieces held back as broken in out/wear_hold (women's wide-leg trousers, chunky loafers)",
+  "PEAK link for the tower: dropped 2026-11-04",
+  "Visible leash: dropped",
+  "Blender mailboxes: reverted at v222, do not reintroduce",
+  "Coins: removed v243",
+  "Meshy Dax and Nala: off, keep the code dogs",
+  "PEAK hands: finger knobs and mitten rejected, starfish approved; sausage fingers rejected",
+  "Borrowed MP3 music deleted; all music generated in house",
+  "Seasonal Lovecraft skins parked",
+  "Rufallia Diner and Sweet Crumb Bakery replaced by the strip mall, then Stores v2",
+  "Waves 0-10 and 14, board-game base and HUD Part 0 are built: do not rebuild"
+ ],
+ "last_update": "2026-11-21 (v319)",
+ "sources": [
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Brenelandtest",
+   "path": "CLAUDE.md"
+  },
+  {
+   "kind": "pc-file",
+   "path": "G:\\My Drive\\breneland2-progress.md",
+   "note": "check the path on the PC; the file is in a Drive folder"
+  },
+  {
+   "kind": "pc-file",
+   "path": "G:\\My Drive\\breneland2-answers.md",
+   "note": "check the path on the PC"
+  }
+ ],
+ "repo": "Breneland-Next (local only, F: drive on the PC)"
+}

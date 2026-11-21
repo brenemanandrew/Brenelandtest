@@ -1,8 +1,10 @@
-# Hub: where a thought goes
+# Brenebase (brenebase.fly.dev): where a thought goes
 
-One page you dump thoughts into. It works out which tool should handle each one, sends it there, gets the result back and files it in a job list.
+One app you dump thoughts into. It works out which tool should handle each one, sends it there, gets the result back and files it in a job list.
 
-**Status: built and tested locally. Not deployed.** Nothing here touches Brenai, the kiosk or Breneland-Next.
+**Status: built and tested locally. Not deployed.** The address will be https://brenebase.fly.dev (`fly.toml` app `brenebase`). Nothing here touches Brenai, the kiosk or Breneland-Next.
+
+Tabs: **Send** (route or split a request), **Jobs**, **Projects**, **PC** (start the models from anywhere), **Tools**. The header lights show the PC agent, the model and the worker at a glance.
 
 ## The idea in one screen
 1. **Type a thought.** Wrap anything private in `[[local]] ... [[/local]]`.
@@ -84,6 +86,40 @@ Press **Split it** instead of Route it. Example: "Make me a game where you run a
    - checks it: a GLB must be a GLB, a PNG a PNG, and JSON must have the right top-level keys (anything else is rejected and named)
    - runs the test command, commits, and reports what to look at and how to run it
 
+## Projects: what already exists, what is broken, what the rules are
+Cards live in `projects/` (one JSON file each): Breneland (Breneland-Next plus the character builder test), Brenai, Arden work tools (Arden Hub, the overtime kiosk, Staging Lane Health, Arden Pack), Brenerig, and Valinfor (empty: it is not in any repo or on Drive yet).
+
+Each card has: what it is, where it lives, its repo, tools and when to use them, settings as they are now (secret names only, never values), what works, known problems, open work, rules for agents, and things not to redo.
+
+**It keeps itself up to date.**
+- Every hour (`HUB_SYNC_MINUTES`) and on **Update notes now**, Brenebase rereads each project's own files: repo READMEs, HANDOFF and WISHLIST files, recent commit messages, and files on your PC such as the Breneland progress log on Google Drive.
+- It pulls out sections headed like known issues, not done, open, wishlist, next steps, gaps and recent changes, and logs anything new with the date. So when a repo gets a new known issue, Brenebase knows.
+- PC files are read by the worker, and only inside `READ_ROOTS` (default `G:\My Drive;F:\Projects`). The two Drive paths in the Breneland card are guesses: fix them if the files live in a subfolder.
+- Private repos (ardenot) need `GITHUB_TOKEN` on Brenebase. Public ones work without it.
+
+**How it is used.**
+- Every request is matched to a project. The Send screen shows what is already known: known problems, already planned, already works, an existing tool, do not redo. That way you see it before something gets built twice.
+- Each agent gets project context sized to what it needs:
+  - Claude Code: only the rules, the do-not-redo list and the hints for that request
+  - Claude API: the card without setting values
+  - Your PC model: everything
+- The Work card is private. Its context never goes to Claude, and Planner or Expert jobs for it run on your PC model instead.
+- **Get help** next to any known problem or open item starts a job for it with the project context attached.
+
+## PC: start the models from anywhere (Tailscale)
+- **The agent** (`pc/brenebase-agent.mjs`) runs on your PC, starts at login and stays hidden. It can only:
+  - load or unload the model (the same `lms` steps as start-wizra.ps1)
+  - start or stop the Wizra bridge, the town bridge and the Brenebase worker
+  - report status and show their logs
+- **Two ways in, both need the PC key** (`HUB_WORKER_TOKEN`):
+  1. **Tailscale, direct.** Brenebase joins your tailnet in userspace mode (`start.sh`, `TS_AUTHKEY` secret) and calls `http://<PC_TAILNET_HOST>:8765`. The agent only answers tailnet addresses and the PC itself.
+  2. **Polling.** The agent also checks in with Brenebase every 5 seconds, so the buttons work even when Tailscale is down.
+- **As needed:** when a job needs the PC and the worker is not running, Brenebase asks the agent to start the worker, and the model if the job needs it. It asks at most once every 3 minutes.
+- **One-time setup on the PC** (PowerShell): `irm https://brenebase.fly.dev/pc/install-agent.ps1 | iex`. It asks for the PC key and prints the PC's tailnet name.
+- **The PC must be awake.** Nothing can start a sleeping PC over Tailscale. The installer shows the `powercfg` line that stops it sleeping on mains power.
+- The machine stays on (`min_machines_running = 1`) so Brenebase stays on the tailnet and answers the agent.
+- The town bridge needs `TOWN_BRIDGE` set to Breneland-Next's `tools\npc-brain-bridge.mjs` on the PC.
+
 ## Keeping things private
 - `[[local]] ... [[/local]]` text is swapped for a placeholder before anything goes to Claude, and put back when the result comes home.
 - Files on the keep-local list (her persona, saves, `/data`, the roster, `.vrm` models, motion clips) are never sent.
@@ -105,6 +141,10 @@ Press **Split it** instead of Route it. Example: "Make me a game where you run a
 | `public/index.html` | The phone page: Send, Jobs, Tools |
 | `worker/hub-worker.mjs` | Runs on your PC. Connects out to the hub and does PC jobs: PC model, Claude Code, Blender, named scripts |
 | `worker/blender_ops.py` | Headless Blender jobs: info, decimate, convert, and the allowed pipeline scripts |
+| `projects.mjs`, `projects/` | Project cards and their self-updating notes |
+| `pcagent.mjs` | Brenebase's side of the PC agent: Tailscale direct, polling fallback, jumpstart |
+| `pc/brenebase-agent.mjs`, `pc/install-agent.ps1` | The PC agent and its one-time installer |
+| `start.sh` | Joins the tailnet (if `TS_AUTHKEY` is set), then starts the app |
 | `test.mjs` | 20 sample thoughts and where they should go, plus 10 split checks |
 
 ## Run it
@@ -120,12 +160,13 @@ setx HUB_URL "http://localhost:8080"; setx HUB_WORKER_TOKEN "<same secret>"; set
 node hub\worker\hub-worker.mjs
 ```
 
-Deploying to Fly (not done yet; `fly.toml` uses a placeholder app name):
+Deploying to Fly (not done yet):
 ```
-fly apps create <name>; fly volumes create hub_data -s 1 -r iad
-fly secrets set HUB_PASSWORD=... HUB_WORKER_TOKEN=... ANTHROPIC_API_KEY=... MESHY_API_KEY=...
+fly apps create brenebase; fly volumes create brenebase_data -s 1 -r iad -a brenebase
+fly secrets set -a brenebase HUB_PASSWORD=... HUB_WORKER_TOKEN=... TS_AUTHKEY=... PC_TAILNET_HOST=... ANTHROPIC_API_KEY=... MESHY_API_KEY=... GITHUB_TOKEN=...
 fly deploy --ha=false
 ```
+Only `HUB_PASSWORD` and `HUB_WORKER_TOKEN` are required. Everything else turns on one part. For `TS_AUTHKEY`, make a reusable auth key in the Tailscale admin console (Settings, Keys).
 
 ## What was tested (2026-11-21, in the cloud container)
 - Routing: 20 of 20 sample thoughts went where expected (`node test.mjs`). The rules were tuned against these same samples, so real use will miss some. You can override any pick on the page.
@@ -141,9 +182,20 @@ fly deploy --ha=false
   - The brief Claude received had no art or story words. The only match was the repo name.
   - A wrong file type was rejected.
 
+- Projects: the cards load; the GitHub sources synced (through this container's proxy); a new line in a source was caught and logged; requests matched their project and showed the right known issue; a work Expert job moved to the PC model; the Claude Code brief got rules only, no setting values.
+- PC agent with a stand-in `lms`, model server, bridge and Tailscale proxy:
+  - By polling: Start everything loaded the model and started the Wizra bridge, and starting the worker brought it online.
+  - Through the stand-in Tailscale proxy: status, logs and Stop everything worked.
+  - A wrong key was refused, and an action outside the list was refused.
+  - A Companion job sent while the PC was idle started the worker and the model by itself.
+
 ## Not tested
 - Real Claude API calls: there is no API key in this container. The Planner and Expert fail cleanly without one.
 - A real Meshy job: I did not want to spend your credits. The list endpoints answer. The field names for image, retexture and rig requests need checking on the first real run.
 - Claude Code, Blender and the pipeline scripts on your actual PC.
 - A split with real Claude Code output. Whether it reliably writes `hub-merge.json` will show on the first run. The hub falls back to the planned paths if it does not.
 - Triangle counts and rigs are not checked at merge yet, only file types.
+- Real Tailscale: Brenebase joining a tailnet on Fly, and the real `lms` commands on your PC.
+- Arden Hub sources: blocked in this container only (outside its GitHub access); they are public, so Fly should read them.
+- The Breneland Drive progress files through the PC worker (paths unconfirmed).
+- The PC installer script on Windows.

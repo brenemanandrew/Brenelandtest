@@ -1,0 +1,66 @@
+{
+ "id": "brenerig",
+ "name": "Brenerig (Rig Studio)",
+ "area": "hobby",
+ "private": false,
+ "keywords": [
+  "brenerig",
+  "rig studio",
+  "rigging",
+  "pose",
+  "posing",
+  "bind skin",
+  "skin weights",
+  "chain physics",
+  "pose json"
+ ],
+ "what": "Browser tool for drag-and-drop rigging and posing of any humanoid model (GLB, GLTF, FBX, OBJ). Place joint markers, bind skin, pose with IK, add extra chains for hair, tails and skirts with physics, play Mixamo clips, sculpt, export GLB.",
+ "where": [
+  "Repo brenemanandrew/Brenerig",
+  "Live: https://brenerig.fly.dev (deploys on push to main, needs FLY_API_TOKEN repo secret)"
+ ],
+ "stack": [
+  "three.js in the browser, no server logic (nginx static)",
+  "studio.js (main), bindworker.js (skin binding in a worker), clips.js (bundled clips)"
+ ],
+ "tools": [
+  {
+   "name": "Brenerig",
+   "what": "Rig, bind, pose, preset poses, pose files (load, save, copy, paste JSON), Mixamo FBX clips, chain physics, sculpt brushes, Export GLB, characters saved in the browser",
+   "use_when": "Rigging a model by hand for free, fixing a Meshy auto-rig, or making a pose; before paying for a Meshy rig"
+  }
+ ],
+ "settings": [
+  {
+   "name": "Deploy",
+   "value": "fly deploy --ha=false",
+   "note": "GitHub Action fly-deploy.yml"
+  }
+ ],
+ "working": [
+  "Open model, place markers, bind skin, pose with IK and mirror",
+  "Extra chains with physics",
+  "Load Mixamo FBX, play animations",
+  "Pose files load and save (also reads Pose editor files)",
+  "Export GLB"
+ ],
+ "broken": [],
+ "open": [
+  "Not yet wired as a hub tool beyond a link"
+ ],
+ "rules": [
+  "Never use em dashes",
+  "Do not push to main without Andrew's OK (it deploys)"
+ ],
+ "avoid_redoing": [
+  "Rigging and posing UI already exists here: do not build another in Breneland or Brenai"
+ ],
+ "sources": [
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Brenerig",
+   "path": "README.md"
+  }
+ ],
+ "repo": "brenemanandrew/Brenerig"
+}

@@ -1,0 +1,26 @@
+{
+ "id": "valinfor",
+ "name": "Valinfor",
+ "area": "hobby",
+ "private": false,
+ "needs_info": true,
+ "keywords": [
+  "valinfor"
+ ],
+ "what": "Not found in any repo or on Drive yet. Andrew to fill in: what it is, where it lives.",
+ "where": [],
+ "stack": [],
+ "tools": [],
+ "settings": [],
+ "working": [],
+ "broken": [],
+ "open": [
+  "Tell the hub what Valinfor is and where its files are (repo, Drive folder or PC folder), then add a source here so it updates itself"
+ ],
+ "rules": [
+  "Never use em dashes"
+ ],
+ "avoid_redoing": [],
+ "sources": [],
+ "repo": ""
+}

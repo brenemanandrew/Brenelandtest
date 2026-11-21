@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hub</title>
+<title>Brenebase</title>
+<meta name="theme-color" content="#14161c">
 <style>
 :root{--bg:#14161c;--card:#1e222b;--line:#2d3340;--text:#e8eaf0;--dim:#9aa3b5;--acc:#6aa8ff;--ok:#4cc38a;--warn:#e5b54a;--bad:#e5645a}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,sans-serif}
-header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:5}
+#lights .dot{margin-left:6px}.dot.mid{background:var(--warn)}
 header b{font-size:18px}.dot{width:9px;height:9px;border-radius:50%;background:var(--bad);display:inline-block}.dot.on{background:var(--ok)}
 nav{margin-left:auto;display:flex;gap:6px}nav button{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:5px 10px}nav button.on{color:var(--text);border-color:var(--acc)}
 main{max-width:720px;margin:0 auto;padding:14px}
@@ -20,8 +22,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0f1116;border-radius:
 h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
 #login{display:none}
 </style></head><body>
-<header><b>Hub</b><span class="dim"><span id="wdot" class="dot"></span> PC</span>
-<nav><button data-tab="send" class="on">Send</button><button data-tab="jobs">Jobs</button><button data-tab="tools">Tools</button></nav></header>
+<header><b>Brenebase</b><span class="dim" id="lights"><span id="adot" class="dot"></span> PC <span id="mdot" class="dot"></span> Model <span id="wdot" class="dot"></span> Worker</span>
+<nav><button data-tab="send" class="on">Send</button><button data-tab="jobs">Jobs</button><button data-tab="projects">Projects</button><button data-tab="pc">PC</button><button data-tab="tools">Tools</button></nav></header>
 <main>
 <div id="login" class="card"><p>Password</p><div class="row"><input id="pw" type="password" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="go" id="loginBtn">Go</button></div></div>
 
@@ -30,7 +32,8 @@ h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
   <div class="row"><button class="go" id="routeBtn">Route it</button><button class="go" id="splitBtn" style="background:#b48cff">Split it</button><span class="dim">Wrap private parts in [[local]] ... [[/local]]</span></div>
   <div id="pick" class="card" style="display:none">
     <div id="why" class="dim"></div>
-    <div class="row"><select id="tool"></select><select id="mode"></select><select id="area"></select></div>
+    <div class="row"><select id="tool"></select><select id="mode"></select><select id="area"></select><select id="proj"></select></div>
+    <div id="hints"></div>
     <div class="row"><select id="autonomy"></select><span id="autoDoes" class="dim" style="flex:1;min-width:160px"></span></div>
     <div id="does" class="dim"></div>
     <div id="extra"></div>
@@ -53,6 +56,8 @@ h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
   <div id="last"></div>
 </section>
 <section id="jobs" style="display:none"><div id="jobList"></div></section>
+<section id="projects" style="display:none"><div class="row"><button class="sm" id="syncBtn">Update notes now</button><span id="syncMsg" class="dim"></span></div><div id="projList"></div></section>
+<section id="pc" style="display:none"><div id="pcBox"></div></section>
 <section id="tools" style="display:none"><div id="catalogue"></div></section>
 </main>
 <script>
@@ -61,7 +66,7 @@ let CAT = null;
 const api = async (p, b) => { const r = await fetch(p, b ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) } : {}); if (r.status === 401) { $('login').style.display = 'block'; throw new Error('login'); } return r.json(); };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-document.querySelectorAll('nav button').forEach(b => b.onclick = () => { document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); for (const s of ['send', 'jobs', 'tools']) $(s).style.display = s === b.dataset.tab ? '' : 'none'; if (b.dataset.tab === 'jobs') jobs(); });
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); for (const s of ['send', 'jobs', 'projects', 'pc', 'tools']) $(s).style.display = s === b.dataset.tab ? '' : 'none'; if (b.dataset.tab === 'jobs') jobs(); if (b.dataset.tab === 'projects') projects(); if (b.dataset.tab === 'pc') pc(); });
 $('loginBtn').onclick = async () => { await api('/api/login', { password: $('pw').value }).catch(() => {}); $('login').style.display = 'none'; boot(); };
 
 function fillModes(sel) { const t = CAT.tools.find(t => t.id === $('tool').value); $('mode').innerHTML = Object.entries(t.modes).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join(''); if (sel && t.modes[sel]) $('mode').value = sel; showDoes(); }
@@ -84,12 +89,14 @@ $('routeBtn').onclick = async () => {
     $('tool').value = routed.pick ? routed.pick.tool : 'planner'; fillModes(routed.pick && routed.pick.mode);
     $('area').value = routed.area || 'hobby';
     $('q').textContent = routed.question || '';
+    $('proj').value = routed.project ? routed.project.id : '';
+    $('hints').innerHTML = routed.hints && routed.hints.length ? `<div class="dim" style="margin-top:6px">Already known in ${esc(routed.project.name)}:</div>` + routed.hints.map(h => `<div class="mode"><span class="tag">${esc(h.kind)}</span> ${esc(h.text)}</div>`).join('') : '';
   } finally { $('routeBtn').disabled = false; }
 };
 $('sendBtn').onclick = async () => {
   const args = {}; let repo;
   document.querySelectorAll('#extra input').forEach(i => { const k = i.id.slice(2); if (!i.value) return; if (k === 'repo') repo = i.value; else args[k] = i.value; });
-  const j = await api('/api/jobs', { text: $('thought').value, tool: $('tool').value, mode: $('mode').value, area: $('area').value, autonomy: $('autonomy').value, args, repo, target: routed && routed.target });
+  const j = await api('/api/jobs', { text: $('thought').value, tool: $('tool').value, mode: $('mode').value, area: $('area').value, autonomy: $('autonomy').value, args, repo, project: $('proj').value, target: routed && routed.target });
   $('last').innerHTML = jobCard(j); $('pick').style.display = 'none'; $('thought').value = '';
 };
 
@@ -104,6 +111,7 @@ function jobCard(j) {
   ${r.branch ? `<p class="dim">Branch: ${esc(r.branch)}</p>` : ''}
   ${r.text ? `<pre>${esc(r.text)}</pre>` : ''}
   ${j.slots ? `<div class="dim" style="margin:6px 0">Stage: ${esc(j.stage)}</div>` + j.slots.map(x => `<div class="row" style="margin:3px 0"><span class="${x.fill ? 'st-done' : 'st-waiting'}">${x.fill ? 'filled' : 'empty'}</span><b>${esc(x.id)}</b><span class="dim">${x.fill ? 'from ' + esc(x.fill.from || x.fill.source) : ''}</span><button class="sm" onclick="fill('${j.id}','${x.id}')">${x.fill ? 'Replace' : 'Fill'}</button></div>`).join('') : ''}
+  ${j.project ? `<span class="tag">${esc(j.project)}</span>` : ''}
   ${j.parent ? `<div class="dim">Part of split ${esc(j.parent)}</div>` : ''}
   ${j.status === 'queued' && j.prompt ? `<details><summary class="dim">What goes to Claude Code</summary><pre>${esc(j.prompt)}</pre></details>` : ''}
   <div class="row">${btns}</div></div>`;
@@ -133,13 +141,54 @@ $('sp_send').onclick = async () => {
 };
 window.fill = async (id, slot) => { const v = prompt(`Link, PC file path, or JSON for ${slot}`); if (v == null) return; const source = /^https?:/.test(v) ? 'url' : /^[\[{]/.test(v.trim()) ? 'text' : 'pcpath'; await api(`/api/jobs/${id}/fill`, { slot, source, value: v }); jobs(); };
 
+/* ---- projects ---- */
+const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+async function projects() {
+  const d = await api('/api/projects');
+  const list = (title, arr, help, id) => arr && arr.length ? `<details><summary><b>${title}</b> <span class="dim">(${arr.length})</span></summary>${arr.map(x => { const t = typeof x === 'string' ? x : x.name ? `<b>${esc(x.name)}</b>${x.value ? ' = ' + esc(x.value) : ''} <span class="dim">${esc(x.what || x.note || '')}${x.use_when ? '. Use when: ' + esc(x.use_when) : ''}</span>` : esc(x.text); return `<div class="mode">${typeof x === 'string' ? esc(t) : t}${help ? ` <button class="sm" onclick="help('${id}', this)" data-item="${esc(typeof x === 'string' ? x : x.text || x.name)}">Get help</button>` : ''}</div>`; }).join('')}</details>` : '';
+  $('projList').innerHTML = d.projects.map(c => {
+    const src = Object.values(c.live.sources || {});
+    const liveItems = src.flatMap(x => (x.items || []).map(i => `${i.section}: ${i.text}`));
+    return `<div class="card"><div class="row" style="margin:0"><b>${esc(c.name)}</b><span class="tag">${esc(c.area)}</span>${c.private ? '<span class="tag">stays on PC</span>' : ''}${c.needs_info ? '<span class="st-waiting">needs your info</span>' : ''}</div>
+      <div class="dim">${esc(c.what)}</div>
+      ${list('Where', c.where)}${list('Tools', c.tools)}${list('Settings', c.settings)}${list('Works', c.working)}${list('Known problems', c.broken, true, c.id)}${list('Open', c.open, true, c.id)}${list('Rules for agents', c.rules)}${list('Do not redo', c.avoid_redoing)}
+      ${list('From its own notes (auto)', liveItems.slice(0, 60))}
+      ${c.live.changes && c.live.changes.length ? list('Recently added', c.live.changes.slice(0, 5).flatMap(x => x.added.map(a => `${ago(x.at)}, ${x.source}: ${a}`))) : ''}
+      <div class="dim" style="margin-top:6px">Sources: ${src.length ? src.map(x => `${esc(x.label)} ${x.error ? '<span class="st-failed">' + esc(x.error) + '</span>' : 'checked ' + ago(x.checked)}`).join('; ') : (c.sources || []).length ? 'not read yet' : 'none yet'}</div></div>`;
+  }).join('');
+}
+window.help = async (id, btn) => { btn.disabled = true; const j = await api(`/api/projects/${id}/help`, { item: btn.dataset.item }); btn.textContent = j.label ? `Sent: ${j.label}` : 'Failed'; };
+$('syncBtn').onclick = async () => { $('syncMsg').textContent = 'reading...'; const r = await api('/api/projects/sync', {}); $('syncMsg').textContent = `${r.report.filter(x => /new/.test(x) && !/ 0 new/.test(x)).length} sources changed, ${r.report.filter(x => /FAILED/.test(x)).length} failed, ${r.pcFiles} PC files asked for`; projects(); };
+
+/* ---- PC: the agent on Andrew's PC, reached over Tailscale or by its polling ---- */
+async function pc(quiet) {
+  const d = await api('/api/pc'); const st = d.status;
+  const loaded = st && st.model && st.model.loaded.length;
+  $('adot').className = 'dot' + (d.reach === 'tailscale' ? ' on' : d.reach === 'polling' ? ' on' : '');
+  $('mdot').className = 'dot' + (loaded ? ' on' : st && st.model && st.model.server ? ' mid' : '');
+  $('wdot').className = 'dot' + (d.worker.online ? ' on' : '');
+  if (quiet) return;
+  const btn = (a, label) => `<button class="sm" onclick="pcDo('${a}', this)">${label}</button>`;
+  const helpers = st ? Object.entries(st.helpers).map(([k, h]) => `<div class="row" style="margin:4px 0"><span class="${h.running ? 'st-done' : 'st-waiting'}">${h.running ? 'running' : h.setUp ? 'stopped' : 'not set up'}</span><b>${esc(h.label)}</b>${h.setUp ? (h.running ? btn('stop:' + k, 'Stop') : btn('start:' + k, 'Start')) + btn('logs:' + k, 'Log') : ''}</div>`).join('') : '';
+  $('pcBox').innerHTML = `<div class="card"><div class="row" style="margin:0"><b>${st ? esc(st.pc) : 'Your PC'}</b><span class="tag">${d.reach === 'tailscale' ? 'Tailscale, direct' : d.reach === 'polling' ? 'reached by polling' : 'offline'}</span>${d.reach !== 'tailscale' && !d.tailscaleSetUp ? '<span class="tag">Tailscale not set up on Brenebase</span>' : ''}</div>
+    ${st ? `<p class="dim">Checked ${d.statusAge != null ? d.statusAge + ' s ago' : 'just now'}. Up ${Math.round(st.uptimeMin / 60)} h.</p>` : '<p class="dim">No word from the PC agent. Is the PC on and awake, and the agent installed?</p>'}
+    <div class="row">${btn('start-all', 'Start everything')}${btn('stop-all', 'Stop everything')}${btn('status', 'Refresh')}</div></div>
+    ${st ? `<div class="card"><div class="row" style="margin:0"><span class="${loaded ? 'st-done' : 'st-waiting'}">${loaded ? 'loaded' : st.model.server ? 'server up, no model' : 'off'}</span><b>Model</b><span class="dim">${esc(st.model.name)}, ${st.model.context} context</span>${loaded ? btn('model-stop', 'Unload') : btn('model-start', 'Load')}</div>${loaded ? `<div class="dim">${st.model.loaded.map(esc).join(', ')}</div>` : ''}${st.model.lmsFound ? '' : '<p class="st-failed">lms not found on the PC (set LMS)</p>'}</div><div class="card">${helpers}</div>` : ''}
+    <div class="card"><div class="row" style="margin:0"><span class="${d.worker.online ? 'st-done' : 'st-waiting'}">${d.worker.online ? 'online' : 'offline'}</span><b>Worker</b><span class="dim">${esc((d.worker.can || []).join(', '))}</span></div></div>
+    <pre id="pcOut" style="display:none"></pre>
+    <details class="card"><summary><b>Set up the PC (once)</b></summary><p class="dim">In PowerShell on the PC:</p><pre>irm ${location.origin}/pc/install-agent.ps1 | iex</pre><p class="dim">For the direct path, install Tailscale on the PC and put a Tailscale auth key in Brenebase's TS_AUTHKEY secret, and the PC's tailnet name in PC_TAILNET_HOST. Without Tailscale the agent still works by checking in every few seconds.</p></details>`;
+}
+window.pcDo = async (a, b) => { b.disabled = true; b.textContent = '...'; const r = await api('/api/pc/do', { action: a }); $('pcOut').style.display = ''; $('pcOut').textContent = `${a} (${r.via || ''}): ${r.ok ? 'ok' : 'not done'}\n${r.note || ''}`; await pc(); };
+setInterval(() => pc(true).catch(() => {}), 15000);
+
 window.act = async (id, what) => { const j = await api(`/api/jobs/${id}/${what}`, {}); jobs(); if ($('last').innerHTML.includes(id)) $('last').innerHTML = jobCard(j); };
-async function jobs() { const d = await api('/api/jobs'); $('wdot').classList.toggle('on', d.worker.online); $('jobList').innerHTML = d.jobs.map(jobCard).join('') || '<p class="dim">No jobs yet.</p>'; }
+async function jobs() { const d = await api('/api/jobs'); $('jobList').innerHTML = d.jobs.map(jobCard).join('') || '<p class="dim">No jobs yet.</p>'; }
 
 async function boot() {
   CAT = await api('/api/catalogue');
-  $('wdot').classList.toggle('on', CAT.worker.online);
+  pc(true).catch(() => {});
   $('tool').innerHTML = CAT.tools.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  const PJS = (await api('/api/projects')).projects; $('proj').innerHTML = '<option value="">No project</option>' + PJS.map(c => `<option value="${c.id}">${esc(c.name.split(' (')[0])}</option>`).join('');
   $('area').innerHTML = Object.entries(CAT.areas).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
   $('autonomy').innerHTML = Object.entries(CAT.autonomy).map(([k, v]) => `<option value="${k}"${k === 'draft' ? ' selected' : ''}>${k}</option>`).join('');
   const ad = () => $('autoDoes').textContent = CAT.autonomy[$('autonomy').value]; $('autonomy').onchange = ad; ad();

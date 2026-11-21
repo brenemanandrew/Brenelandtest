@@ -10,7 +10,7 @@
    Jobs for the PC sit in the ledger as "queued" until worker/hub-worker.mjs picks them up. */
 import { split } from './split.mjs';
 
-export const PC_BACKENDS = ['claude-code', 'pc-model', 'blender', 'pc-run', 'merge'];
+export const PC_BACKENDS = ['claude-code', 'pc-model', 'blender', 'pc-run', 'merge', 'read'];
 export const SPENDS = ['meshy'];
 
 /* How each tool + mode is told to behave. The mode is the whole point: same tool, different handling. */
@@ -43,7 +43,7 @@ export function systemFor(tool, mode) {
 }
 
 /* A Claude Code brief. Private parts are held back by split(); the job keeps them to rejoin later. */
-export function brief(job) {
+export function brief(job, projectNotes = '') {
   const { out, held, secrets } = split(job.text);
   const repo = job.repo || 'brenemanandrew/Brenelandtest';
   const lines = [
@@ -53,19 +53,20 @@ export function brief(job) {
     '', 'Task:', out, '',
     'When done: say what you changed, what you tested and what you could not test. Never use em dashes.',
   ];
+  if (projectNotes) lines.push('', projectNotes);
   if (held.length) lines.push(`Note: ${held.length} part(s) were held back on purpose and are marked KEPT-LOCAL. Write code that takes them as input; do not invent them.`);
   return { prompt: lines.join('\n'), held, secrets };
 }
 
 /* ---- cloud backends ---- */
-export async function runClaude(job, claude) {
+export async function runClaude(job, claude, projectNotes = '') {
   if (!claude) throw new Error('No ANTHROPIC_API_KEY on the hub, so the Planner and Expert cannot run in the cloud. Set it, or switch this job to the PC model.');
   const { out, held } = split(job.text);
   const r = await claude.beta.messages.create({
     model: process.env.HUB_MODEL || 'claude-opus-5-5', max_tokens: 16000,
     betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default',
     output_config: { effort: job.tool === 'expert' ? 'high' : 'medium' },
-    system: systemFor(job.tool, job.mode), messages: [{ role: 'user', content: out }],
+    system: systemFor(job.tool, job.mode) + (projectNotes ? '\n\n' + projectNotes : ''), messages: [{ role: 'user', content: out }],
   });
   if (r.stop_reason === 'refusal') throw new Error('Claude declined this one.');
   const text = r.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
@@ -93,6 +94,7 @@ export async function meshyStatus(kind, id) { return meshy('GET', `${kind}/${id}
 
 export const LINKS = {
   'motion:capture': t => `https://brenai.fly.dev/mocap.html${t ? `?rig=${t}` : ''}`,
+  'make3d:rigstudio': () => 'https://brenerig.fly.dev/',
   'workapp:open': () => 'https://ardenot.fly.dev/',
   'workapp:roster': () => 'https://ardenot.fly.dev/',
 };
