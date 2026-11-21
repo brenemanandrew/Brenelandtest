@@ -10,7 +10,7 @@
    Jobs for the PC sit in the ledger as "queued" until worker/hub-worker.mjs picks them up. */
 import { split } from './split.mjs';
 
-export const PC_BACKENDS = ['claude-code', 'pc-model', 'blender', 'pc-run', 'merge', 'read'];
+export const PC_BACKENDS = ['claude-code', 'pc-model', 'blender', 'pc-run', 'merge', 'read', 'readdir'];
 export const SPENDS = ['meshy'];
 
 /* How each tool + mode is told to behave. The mode is the whole point: same tool, different handling. */
@@ -51,7 +51,7 @@ export function brief(job, projectNotes = '') {
     `Read AGENTS.md and CLAUDE.md first if they exist, and follow them.`,
     job.mode === 'brief' ? 'Do the task below.' : `Mode: ${job.mode}. ${job.does}`,
     '', 'Task:', out, '',
-    'When done: say what you changed, what you tested and what you could not test. Never use em dashes.',
+    'When done: write an update file for Brenebase at .brenebase/updates/<YYYY-MM-DD>-<short-name>.md (front matter: project, by, date, branch, title; then ## Done, ## Tested, ## Not tested, ## Broken, ## Open, ## Settings changed as bullets) and commit it with the work. Then say what you changed, what you tested and what you could not test. Never use em dashes.',
   ];
   if (projectNotes) lines.push('', projectNotes);
   if (held.length) lines.push(`Note: ${held.length} part(s) were held back on purpose and are marked KEPT-LOCAL. Write code that takes them as input; do not invent them.`);
@@ -98,3 +98,37 @@ export const LINKS = {
   'workapp:open': () => 'https://ardenot.fly.dev/',
   'workapp:roster': () => 'https://ardenot.fly.dev/',
 };
+
+/* ---- Copilot: only for safe, plain, non-sensitive bulk work ----
+   Automatic through GitHub Models when COPILOT_TOKEN is set (a GitHub token with Models access, included with Copilot),
+   otherwise by copy and paste into Microsoft 365 Copilot (COPILOT_URL). The fit check runs first, every time. */
+const NOT_FOR_COPILOT = {
+  private: /\[\[local\]\]/i,
+  personal: /\b(divorce|custody|lawsuit|attorney|lawyer|court|trial|deposition|mortgage|loan number|child support|ssn|social security|diagnos\w*|therapy|therapist|medication|bank account|routing number|password|passphrase|pin code)\b/i,
+  adult: /\b(nsfw|sex\w*|nude|naked|porn\w*|explicit|lewd|erotic\w*|fetish)\b/i,
+  coding: /```|\bfunction\s*\w*\s*\(|\bdef\s+\w+\(|=>\s*\{|\bclass\s+\w+\s*\{|\b(refactor|stack trace|traceback|compile error|fix (the|this|my) (code|bug)|write (a|the) (function|script|class))\b/i,
+};
+export function copilotFit(job, project) {
+  const t = String(job.text || ''), why = [];
+  if (NOT_FOR_COPILOT.private.test(t)) why.push('it has [[local]] private parts');
+  if (split(t).secrets) why.push('it contains a password, token or key');
+  if (NOT_FOR_COPILOT.personal.test(t)) why.push('it looks personal or sensitive (legal, medical, money or passwords)');
+  if (NOT_FOR_COPILOT.adult.test(t)) why.push('it is not SFW');
+  if (NOT_FOR_COPILOT.coding.test(t)) why.push('it is real coding (that goes to Claude Code)');
+  if (project && project.private && job.mode !== 'workdoc') why.push(`${project.name} is private (use Work doc mode for the company Copilot, or the PC model)`);
+  if (job.mode === 'workdoc' && project && !project.private && project.area !== 'work') why.push('Work doc mode is only for work material');
+  return { ok: !why.length, why };
+}
+export async function runCopilot(job, project) {
+  const fit = copilotFit(job, project);
+  if (!fit.ok) throw new Error(`Not sent to Copilot: ${fit.why.join('; ')}. Pick Claude or the PC model instead.`);
+  const system = `${STYLE}\n\n${{ summarize: 'Summarize into the points that matter, shortest first.', rewrite: 'Rewrite for clarity and correct grammar. Keep the meaning and the voice.', draft: 'Write a first draft he can edit.', research: 'Answer plainly, say what you are unsure of.', workdoc: 'Help with this work document.' }[job.mode] || ''}`;
+  if (process.env.COPILOT_TOKEN && job.mode !== 'workdoc') {
+    const r = await fetch('https://models.github.ai/inference/chat/completions', { method: 'POST', headers: { authorization: `Bearer ${process.env.COPILOT_TOKEN}`, 'content-type': 'application/json', accept: 'application/vnd.github+json' }, body: JSON.stringify({ model: process.env.COPILOT_MODEL || 'openai/gpt-4.1', messages: [{ role: 'system', content: system }, { role: 'user', content: job.text }] }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(`GitHub Models ${r.status}: ${(j.error && j.error.message) || JSON.stringify(j).slice(0, 200)}`);
+    return { text: j.choices?.[0]?.message?.content || '', via: 'GitHub Models' };
+  }
+  /* copy and paste: the prompt is ready, Andrew pastes the answer back */
+  return { relay: true, prompt: `${system}\n\n---\n\n${job.text}`, link: process.env.COPILOT_URL || 'https://m365.cloud.microsoft/chat', via: 'copy and paste' };
+}

@@ -29,6 +29,7 @@ The mode is what changes how the work is handled. Same tool, different job.
 | Motion | motion | Browser, PC | Capture (mocap), Library, Retarget, Hand-made in code |
 | Overtime kiosk | workapp | Browser | Open, Roster, Change kiosk |
 | Ship | ship | PC | Test copy, Deploy (always waits for OK) |
+| Copilot | think | GitHub Models or copy and paste | Summarize, Rewrite, Draft, Research, Work doc (company Copilot) |
 
 All of this lives in `tools.mjs`. To add a tool or a mode, add an entry there. The router, the page and the job list pick it up automatically.
 
@@ -120,6 +121,25 @@ Each card has: what it is, where it lives, its repo, tools and when to use them,
 - The machine stays on (`min_machines_running = 1`) so Brenebase stays on the tailnet and answers the agent.
 - The town bridge needs `TOWN_BRIDGE` set to Breneland-Next's `tools\npc-brain-bridge.mjs` on the PC.
 
+## Update files: every Claude session reports back
+- **The rule:** any Claude session that changes a project writes `.brenebase/updates/<date>-<name>.md` and commits it with the work (`hub/UPDATE-TEMPLATE.md`). The file holds:
+  - front matter: project, by, date, branch, title
+  - bullets under Done, Tested, Not tested, Broken, Open and Settings changed
+- **Where the rule lives:** CLAUDE.md / AGENTS.md in Brenelandtest, brenai, ardenot and Brenerig. That's on branches for now; it takes effect once merged to main. Arden-hub and Breneland-Next need the same block pasted in by hand (copy it from Brenelandtest's CLAUDE.md).
+- **Brenebase looks for them routinely** (every 15 min with `GITHUB_TOKEN`, hourly without):
+  - every project repo's main branch and its recent `claude/` branches
+  - PC folders through the worker (`HUB_UPDATE_DIRS`, default `G:\My Drive\Brenebase\updates` and Breneland-Next's `.brenebase\updates`)
+  - direct posts to `/api/updates/post` with the PC key
+- **Its own Claude Code jobs count as updates** when they finish, even if the session forgot the file.
+- **Where they show:** under each project card. Broken and Open bullets also show up as hints on related requests, and the latest updates go into the context agents get.
+
+## Copilot: big model work that is plain and safe
+- **Use it for:** summaries, rewrites and proofreading, drafts, general research, long documents.
+- **Fit check, every time:** a job is refused with the reason if it has `[[local]]` parts or a secret, looks personal (legal, medical, money, passwords), is not SFW, is real coding, or belongs to a private project.
+- **Automatic** through GitHub Models when `COPILOT_TOKEN` is set (a GitHub token with Models access, `COPILOT_MODEL`, default `openai/gpt-4.1`).
+- **Otherwise copy and paste:** the job shows the ready prompt with Copy and Open Copilot buttons, and you paste the answer back.
+- **Work doc mode** is for Hubbell material in the company Microsoft 365 Copilot, which is approved for company data. It is copy and paste only.
+
 ## Keeping things private
 - `[[local]] ... [[/local]]` text is swapped for a placeholder before anything goes to Claude, and put back when the result comes home.
 - Files on the keep-local list (her persona, saves, `/data`, the roster, `.vrm` models, motion clips) are never sent.
@@ -145,6 +165,7 @@ Each card has: what it is, where it lives, its repo, tools and when to use them,
 | `pcagent.mjs` | Brenebase's side of the PC agent: Tailscale direct, polling fallback, jumpstart |
 | `pc/brenebase-agent.mjs`, `pc/install-agent.ps1` | The PC agent and its one-time installer |
 | `start.sh` | Joins the tailnet (if `TS_AUTHKEY` is set), then starts the app |
+| `updates.mjs`, `UPDATE-TEMPLATE.md` | Update files from Claude sessions: format, parsing, scanning repos and PC folders |
 | `test.mjs` | 20 sample thoughts and where they should go, plus 10 split checks |
 
 ## Run it

@@ -17,7 +17,7 @@ button.sm{background:var(--card);color:var(--text);border:1px solid var(--line);
 select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
 .dim{color:var(--dim);font-size:14px}.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--dim)}
-.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}.st-held,.st-cancelled{color:var(--dim)}
+.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}.st-held,.st-cancelled{color:var(--dim)}.st-waiting-answer{color:var(--warn)}
 pre{white-space:pre-wrap;word-break:break-word;background:#0f1116;border-radius:8px;padding:10px;font-size:13px;max-height:340px;overflow:auto}
 h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
 #login{display:none}
@@ -109,7 +109,7 @@ function jobCard(j) {
   ${r.link ? `<p><a href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open</a></p>` : ''}
   ${r.thumb ? `<img src="${esc(r.thumb)}" style="max-width:100%;border-radius:8px">` : ''}
   ${r.branch ? `<p class="dim">Branch: ${esc(r.branch)}</p>` : ''}
-  ${r.text ? `<pre>${esc(r.text)}</pre>` : ''}
+  ${r.relay ? `<p class="dim">Copy this into Copilot, then paste its answer below.</p><div class="row"><button class="sm" onclick="navigator.clipboard.writeText(document.getElementById('rp_${j.id}').textContent)">Copy</button><a class="sm" href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open Copilot</a></div><pre id="rp_${j.id}">${esc(r.text)}</pre><textarea id="ra_${j.id}" placeholder="Paste Copilot's answer here" style="min-height:70px"></textarea><div class="row"><button class="sm" onclick="pasteBack('${j.id}')">Save answer</button></div>` : r.text ? `<pre>${esc(r.text)}</pre>` : ''}
   ${j.slots ? `<div class="dim" style="margin:6px 0">Stage: ${esc(j.stage)}</div>` + j.slots.map(x => `<div class="row" style="margin:3px 0"><span class="${x.fill ? 'st-done' : 'st-waiting'}">${x.fill ? 'filled' : 'empty'}</span><b>${esc(x.id)}</b><span class="dim">${x.fill ? 'from ' + esc(x.fill.from || x.fill.source) : ''}</span><button class="sm" onclick="fill('${j.id}','${x.id}')">${x.fill ? 'Replace' : 'Fill'}</button></div>`).join('') : ''}
   ${j.project ? `<span class="tag">${esc(j.project)}</span>` : ''}
   ${j.parent ? `<div class="dim">Part of split ${esc(j.parent)}</div>` : ''}
@@ -181,6 +181,7 @@ async function pc(quiet) {
 window.pcDo = async (a, b) => { b.disabled = true; b.textContent = '...'; const r = await api('/api/pc/do', { action: a }); $('pcOut').style.display = ''; $('pcOut').textContent = `${a} (${r.via || ''}): ${r.ok ? 'ok' : 'not done'}\n${r.note || ''}`; await pc(); };
 setInterval(() => pc(true).catch(() => {}), 15000);
 
+window.pasteBack = async id => { const v = $('ra_' + id).value.trim(); if (!v) return; await api(`/api/jobs/${id}/answer`, { text: v }); jobs(); };
 window.act = async (id, what) => { const j = await api(`/api/jobs/${id}/${what}`, {}); jobs(); if ($('last').innerHTML.includes(id)) $('last').innerHTML = jobCard(j); };
 async function jobs() { const d = await api('/api/jobs'); $('jobList').innerHTML = d.jobs.map(jobCard).join('') || '<p class="dim">No jobs yet.</p>'; }
 

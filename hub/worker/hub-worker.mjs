@@ -46,7 +46,7 @@ can.push('pc-run');
 if (found('git')) can.push('merge');
 /* project notes on this PC: only files inside these folders can be read (Google Drive for desktop, project folders) */
 const READ_ROOTS = (process.env.READ_ROOTS || 'G:\\My Drive;F:\\Projects').split(';').map(r => path.resolve(r.trim())).filter(Boolean);
-can.push('read');
+can.push('read', 'readdir');
 console.log(`hub worker: ${HUB}\ncan do: ${can.join(', ')}`);
 
 const run = (cmd, args, cwd, input) => new Promise(ok => {
@@ -83,6 +83,13 @@ async function doJob(j) {
     return { ok: r.code === 0, text: r.out || r.err, error: r.code ? r.err : undefined };
   }
   if (j.backend === 'merge') return merge(j);
+  if (j.backend === 'readdir') {
+    const d = path.resolve(j.dir);
+    if (!READ_ROOTS.some(r => d.toLowerCase().startsWith(r.toLowerCase()))) return { ok: false, error: `${d} is outside READ_ROOTS` };
+    if (!fs.existsSync(d)) return { ok: true, result: { files: [] }, text: 'folder not there yet' };
+    const files = fs.readdirSync(d).filter(n => n.endsWith('.md')).map(n => ({ name: n, mtime: fs.statSync(path.join(d, n)).mtimeMs })).sort((a, b) => b.mtime - a.mtime).slice(0, 50).map(f => ({ ...f, text: fs.readFileSync(path.join(d, f.name), 'utf8').slice(0, 50000) }));
+    return { ok: true, result: { files } };
+  }
   if (j.backend === 'read') {
     const f = path.resolve(j.source.path);
     if (!READ_ROOTS.some(r => f.toLowerCase().startsWith(r.toLowerCase() + path.sep) || f.toLowerCase() === r.toLowerCase())) return { ok: false, error: `${f} is outside READ_ROOTS` };

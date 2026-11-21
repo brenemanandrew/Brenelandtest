@@ -17,6 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import * as U from './updates.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const CARDS = path.join(HERE, 'projects');
@@ -121,6 +122,7 @@ export function hints(c, text, n = 6) {
   for (const t of c.working || []) consider('already works', t);
   for (const tl of c.tools || []) consider('existing tool', `${tl.name}: ${tl.what}`);
   for (const s of Object.values(liveFor(c.id).sources)) for (const i of s.items || []) consider(`from ${s.label}`, i.text);
+  for (const u of U.list(c.id, 15)) { for (const t of u.broken) consider(`broken, update ${u.date}`, t); for (const t of u.open) consider(`open, update ${u.date}`, t); for (const t of u.done) consider(`done ${u.date}`, t); }
   /* the same issue often sits in the card and in the project's own notes: keep the first of near-duplicates */
   const kept = [];
   for (const h of out.sort((a, b) => b.score - a.score)) { const hw = words(h.text); if (!kept.some(k => { const kw = words(k.text); const same = [...hw].filter(x => kw.has(x)).length; return same / Math.min(hw.size, kw.size || 1) >= 0.7; })) kept.push(h); }
@@ -138,5 +140,6 @@ export function context(c, who, text) {
   const h = hints(c, text || '');
   if (who === 'code') return [`Project: ${c.name}.`, L('Rules', c.rules), L('Already exists or was decided, do not redo', c.avoid_redoing), h.length ? L('Known about this request', h.map(x => `${x.kind}: ${x.text}`)) : ''].filter(Boolean).join('\n\n');
   const recent = liveFor(c.id).changes.slice(0, 3).flatMap(x => x.added).slice(0, 8);
-  return [`Project: ${c.name}. ${c.what}`, L('Where', c.where), L('Tools', c.tools), L('Settings', c.settings), L('Works', c.working), L('Known problems', c.broken), L('Open', c.open), L('Rules', c.rules), L('Do not redo', c.avoid_redoing), recent.length ? L('Recently added to its notes', recent) : '', h.length ? L('Most relevant to this request', h.map(x => `${x.kind}: ${x.text}`)) : ''].filter(Boolean).join('\n\n');
+  const ups = U.list(c.id, 5).map(u => `${u.date} ${u.title}${u.broken.length ? ' (broken: ' + u.broken.slice(0, 2).join('; ') + ')' : ''}`);
+  return [`Project: ${c.name}. ${c.what}`, L('Where', c.where), L('Tools', c.tools), L('Settings', c.settings), L('Works', c.working), L('Known problems', c.broken), L('Open', c.open), L('Rules', c.rules), L('Do not redo', c.avoid_redoing), recent.length ? L('Recently added to its notes', recent) : '', ups.length ? L('Latest updates from Claude sessions', ups) : '', h.length ? L('Most relevant to this request', h.map(x => `${x.kind}: ${x.text}`)) : ''].filter(Boolean).join('\n\n');
 }

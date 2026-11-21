@@ -11,7 +11,11 @@
      HUB_WORK_LOCAL=1  send Work-area thinking to the PC model instead of Claude
      GITHUB_TOKEN      read private repos for project notes (optional; public repos work without it)
      TS_AUTHKEY        Tailscale auth key: Brenebase joins the tailnet as "brenebase" (start.sh)
-     PC_TAILNET_HOST   the PC's tailnet name, e.g. andrew-pc, so the agent can be called directly */
+     PC_TAILNET_HOST   the PC's tailnet name, e.g. andrew-pc, so the agent can be called directly
+     HUB_UPDATE_DIRS   PC folders to look in for update files, ; separated
+     HUB_UPDATES_MINUTES  how often to look (default 15 with GITHUB_TOKEN, 60 without)
+     COPILOT_TOKEN     GitHub token with Models access: Copilot jobs run automatically (else copy and paste)
+     COPILOT_MODEL     default openai/gpt-4.1     COPILOT_URL  where copy-and-paste jobs open (M365 Copilot) */
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -19,11 +23,12 @@ import crypto from 'crypto';
 import { TOOLS, AREAS, AUTONOMY, resolve } from './tools.mjs';
 import { route } from './route.mjs';
 import * as L from './ledger.mjs';
-import { PC_BACKENDS, SPENDS, brief, runClaude, runMeshy, meshyStatus, LINKS, systemFor } from './adapters.mjs';
+import { PC_BACKENDS, SPENDS, brief, runClaude, runMeshy, meshyStatus, LINKS, systemFor, runCopilot } from './adapters.mjs';
 import { rejoin } from './split.mjs';
 import * as P from './parts.mjs';
 import * as PJ from './projects.mjs';
 import * as PA from './pcagent.mjs';
+import * as U from './updates.mjs';
 
 const PORT = +process.env.PORT || 8080;
 const PASS = process.env.HUB_PASSWORD || '';
@@ -48,7 +53,7 @@ function makeJob({ text, tool, mode, area, autonomy = 'draft', args = {}, repo, 
   /* a private (work) project's context never goes to the cloud: those jobs move to the PC model */
   if (pj && pj.private && r.backend === 'claude') r = { ...r, backend: 'pc-model', runsOn: 'pc' };
   const job = { text, area: area || (pj && pj.area), autonomy, args, repo: repo || (pj && pj.repo && pj.repo.includes('/') && !pj.repo.includes(' ') ? pj.repo : undefined), target, project: pj ? pj.id : null, ...r };
-  const safe = ['brief', 'claude', 'link'].includes(r.backend) || (r.backend === 'pc-model');
+  const safe = ['brief', 'claude', 'link', 'copilot'].includes(r.backend) || (r.backend === 'pc-model');
   const mustAsk = r.gate === 'always' || SPENDS.includes(r.backend) || autonomy === 'ask' || (autonomy === 'draft' && !safe);
   return L.add({ ...job, status: mustAsk ? 'waiting' : 'ready' });
 }
@@ -58,6 +63,7 @@ async function start(j) {
     if (j.backend === 'brief') { const b = brief(j, PJ.context(j.project && PJ.card(j.project), 'code', j.text)); return L.update(j.id, { status: 'done', result: { text: b.prompt }, held: b.held }, b.secrets ? `${b.secrets} secret(s) removed` : 'brief written'); }
     if (j.backend === 'link') { const f = LINKS[`${j.tool}:${j.mode}`]; return L.update(j.id, { status: 'done', result: { link: f ? f(j.target) : null, text: j.does } }, 'link ready'); }
     if (j.backend === 'claude') { L.update(j.id, { status: 'running' }); const r = await runClaude(j, claude, PJ.context(j.project && PJ.card(j.project), 'cloud', j.text)); return L.update(j.id, { status: 'done', result: { text: rejoin(r.text, r.held) } }, 'answered by Claude'); }
+    if (j.backend === 'copilot') { const r = await runCopilot(j, j.project && PJ.card(j.project)); return r.relay ? L.update(j.id, { status: 'waiting-answer', result: { text: r.prompt, link: r.link, relay: true } }, 'Ready: copy it into Copilot, paste the answer back') : L.update(j.id, { status: 'done', result: { text: r.text } }, `answered by Copilot (${r.via})`); }
     if (j.backend === 'meshy') { L.update(j.id, { status: 'running' }); const r = await runMeshy(j); return L.update(j.id, { status: 'running', result: r }, `Meshy task ${r.task} started`); }
     if (PC_BACKENDS.includes(j.backend)) {
       const pj = j.project && PJ.card(j.project);
@@ -77,6 +83,16 @@ async function syncProjects(id) {
   return { report, pcFiles: pcJobs.length };
 }
 setTimeout(() => syncProjects().catch(() => {}), 5000);
+
+/* ---- update files from Claude sessions: repos, PC folders (Drive), direct posts; checked routinely ---- */
+const UPDATE_DIRS = (process.env.HUB_UPDATE_DIRS || 'G:\\My Drive\\Brenebase\\updates;F:\\Projects\\Breneland-Next\\.brenebase\\updates').split(';').filter(Boolean);
+async function syncUpdates() {
+  const report = await U.scanRepos(PJ.cards());
+  for (const dir of UPDATE_DIRS) L.add({ tool: 'projects', mode: 'updates', backend: 'readdir', runsOn: 'pc', label: `Look for update files in ${dir}`, text: dir, dir, status: 'queued', quiet: true });
+  return { report, pcFolders: UPDATE_DIRS.length };
+}
+setTimeout(() => syncUpdates().catch(() => {}), 8000);
+setInterval(() => syncUpdates().catch(() => {}), (+process.env.HUB_UPDATES_MINUTES || (process.env.GITHUB_TOKEN ? 15 : 60)) * 60000);
 setInterval(() => syncProjects().catch(() => {}), (+process.env.HUB_SYNC_MINUTES || 60) * 60000);
 
 /* ---- split jobs: a parent with parts, put back together by a merge job on the PC ---- */
@@ -142,12 +158,23 @@ http.createServer(async (req, res) => {
       PA.agentDone(b); return send(res, 200, { ok: true });
     }
 
+    /* ---- direct update posts from Claude sessions that can reach Brenebase (PC key) ---- */
+    if (p === '/api/updates/post' && req.method === 'POST') {
+      if (!isWorker(req)) return send(res, 401, { error: 'key refused' });
+      const b = await body(req); const u = U.add(b.text, { key: `post:${b.id || ''}`, project: b.project, from: b.from || 'direct post' });
+      return send(res, 200, u ? { ok: true, id: u.id } : { ok: true, note: 'already had it, or nothing in it' });
+    }
+
     /* ---- the PC worker ---- */
     if (p.startsWith('/api/worker/')) {
       if (!isWorker(req)) return send(res, 401, { error: 'worker token refused' });
       worker.seen = Date.now();
       if (p === '/api/worker/next') { worker.can = (u.searchParams.get('can') || '').split(',').filter(Boolean); return send(res, 200, { job: L.next(worker.can) }); }
-      if (p === '/api/worker/done' && req.method === 'POST') { const b = await body(req); const j = L.get(b.id); if (!j) return send(res, 404, {}); if (j.backend === 'read') { const added = PJ.recordPc(j.project, j.source, b.ok, b.text || '', b.error); return send(res, 200, L.update(j.id, { status: b.ok ? 'done' : 'failed', error: b.error, result: { text: b.ok ? `${added.length} new note(s)` : '' } }, 'notes read')); } const text = b.text != null ? rejoin(b.text, j.held || []) : undefined; return send(res, 200, afterChange(L.update(b.id, { status: b.ok ? 'done' : 'failed', result: { ...b.result, text }, error: b.error }, b.ok ? 'back from the PC' : 'PC reported a failure'))); }
+      if (p === '/api/worker/done' && req.method === 'POST') { const b = await body(req); const j = L.get(b.id); if (!j) return send(res, 404, {}); if (j.backend === 'readdir') { const n = b.ok ? U.fromPcFiles(b.result && b.result.files, j.dir) : 0; return send(res, 200, L.update(j.id, { status: b.ok ? 'done' : 'failed', error: b.error, result: { text: `${n} new update(s)` } }, 'update folder read')); }
+      if (j.backend === 'read') { const added = PJ.recordPc(j.project, j.source, b.ok, b.text || '', b.error); return send(res, 200, L.update(j.id, { status: b.ok ? 'done' : 'failed', error: b.error, result: { text: b.ok ? `${added.length} new note(s)` : '' } }, 'notes read')); } const text = b.text != null ? rejoin(b.text, j.held || []) : undefined; const fin = afterChange(L.update(b.id, { status: b.ok ? 'done' : 'failed', result: { ...b.result, text }, error: b.error }, b.ok ? 'back from the PC' : 'PC reported a failure'));
+        /* a Claude Code job that finished is itself an update, even if it forgot to write the file */
+        if (j.backend === 'claude-code' && b.ok) U.add(`---\nproject: ${j.project || (j.parent && (L.get(j.parent) || {}).project) || ''}\nby: Claude Code via Brenebase job ${j.id}\nbranch: ${(b.result && b.result.branch) || ''}\ntitle: ${String(j.label).replace(/\n/g, ' ')}\n---\n## Done\n${String(text || '').split('\n').filter(l => l.trim()).slice(0, 25).map(l => '- ' + l.replace(/^[-*]\s*/, '')).join('\n')}`, { key: `job:${j.id}`, from: `Brenebase job ${j.id}` });
+        return send(res, 200, fin); }
       return send(res, 404, {});
     }
 
@@ -156,7 +183,10 @@ http.createServer(async (req, res) => {
     if (p === '/api/route' && req.method === 'POST') { const b = await body(req); const r = await route(b.text, { claude }); const pj = PJ.match(b.text); return send(res, 200, { ...r, project: pj ? { id: pj.id, name: pj.name, private: !!pj.private } : null, hints: PJ.hints(pj, b.text) }); }
     if (p === '/api/pc' && req.method === 'GET') return send(res, 200, { ...(await PA.state()), worker: { online: workerOnline(), can: worker.can }, actions: PA.ACTIONS });
     if (p === '/api/pc/do' && req.method === 'POST') { const b = await body(req); return send(res, 200, await PA.call(b.action)); }
-    if (p === '/api/projects' && req.method === 'GET') return send(res, 200, { projects: PJ.cards().map(c => ({ ...c, live: PJ.liveFor(c.id) })) });
+    if (p === '/api/projects' && req.method === 'GET') return send(res, 200, { projects: PJ.cards().map(c => ({ ...c, live: PJ.liveFor(c.id), updates: U.list(c.id, 20) })), unassigned: U.list(null, 200).filter(u => !u.project || !PJ.card(u.project)).slice(0, 20) });
+    if (p === '/api/updates' && req.method === 'GET') return send(res, 200, { updates: U.list(u.searchParams.get('project'), 100) });
+    if (p === '/api/updates' && req.method === 'POST') { const b = await body(req); const x = U.add(b.text, { key: `page:${Date.now()}`, project: b.project, from: 'pasted on the page' }); return send(res, 200, x || { error: 'nothing found in it (needs Done, Tested, Broken or Open bullets)' }); }
+    if (p === '/api/updates/scan' && req.method === 'POST') return send(res, 200, await syncUpdates());
     if (p === '/api/projects/sync' && req.method === 'POST') { const b = await body(req); return send(res, 200, await syncProjects(b.id)); }
     const ph = p.match(/^\/api\/projects\/([a-z0-9-]+)\/help$/);
     if (ph && req.method === 'POST') { const b = await body(req); const pj = PJ.card(ph[1]); if (!pj) return send(res, 404, {}); const text = `Help me solve this in ${pj.name}: ${b.item}`; const r = await route(text, { claude, rulesOnly: true }); const pick = r.pick && r.pick.tool !== 'companion' ? r.pick : { tool: 'expert', mode: pj.area === 'work' ? 'ops' : 'game' }; let j = makeJob({ text, tool: pick.tool, mode: pick.mode, area: pj.area, autonomy: 'draft', project: pj.id, repo: b.repo }); if (j.status === 'ready') j = await start(j); return send(res, 200, j); }
@@ -166,6 +196,8 @@ http.createServer(async (req, res) => {
     if (p === '/api/jobs' && req.method === 'POST') { const b = await body(req); let j = makeJob(b); if (j.status === 'ready') j = await start(j); return send(res, 200, j); }
     const fm = p.match(/^\/api\/jobs\/([a-f0-9]+)\/fill$/);
     if (fm && req.method === 'POST') { const b = await body(req); const par = L.get(fm[1]); if (!par || !par.slots) return send(res, 404, {}); fillSlot(par, b.slot, b.value ? { source: b.source || 'url', value: b.value, from: 'you' } : null); L.update(par.id, {}, `${b.slot} ${b.value ? 'filled by you' : 'cleared'}`); return send(res, 200, afterChange({ parent: par.id })); }
+    const ans = p.match(/^\/api\/jobs\/([a-f0-9]+)\/answer$/);
+    if (ans && req.method === 'POST') { const b = await body(req); const j = L.get(ans[1]); if (!j) return send(res, 404, {}); return send(res, 200, L.update(j.id, { status: 'done', result: { ...j.result, text: b.text, relay: false, prompt: j.result && j.result.text } }, 'answer pasted back from Copilot')); }
     const m = p.match(/^\/api\/jobs\/([a-f0-9]+)\/(approve|cancel|refresh)$/);
     if (m && req.method === 'POST') {
       const j = L.get(m[1]); if (!j) return send(res, 404, {});

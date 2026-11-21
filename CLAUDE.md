@@ -49,3 +49,11 @@ Inputs already exist for all 28 pieces (`out/wear/*.glb`), so nothing has to be 
 - Buzz cut has small pits at the back. Jeans cuffs on her skinny jeans are ragged.
 - Outfit tiles for the "None" rows, face and eye shapes from his head model (`in26/head.glb`, not in repo), and the 12 shop accessories are not started.
 - He asked for a numbered sheet of all Breneland plant and tree assets plus Meshy cel-shade instructions. Instructions were given in chat. The sheet is not made. The tree code is on his Google Drive (`world-trees.js`).
+
+## Brenebase updates (required)
+After any change to this project, write `.brenebase/updates/<YYYY-MM-DD>-<short-name>.md` and commit it with the work, on the same branch. Brenebase (brenebase.fly.dev) reads these routinely to keep its project notes current.
+- Front matter: `project:` (breneland, brenai, work, brenerig, brenebase or valinfor), `by:`, `date:`, `branch:`, `title:`.
+- Then bullets under `## Done`, `## Tested`, `## Not tested`, `## Broken`, `## Open`, `## Settings changed`.
+- Never put passwords, PINs, tokens or their values in it. Name a secret, never its value.
+- No repo to commit to (a claude.ai chat, or Breneland-Next on the PC)? Save the same file in the Google Drive folder `Brenebase/updates` instead.
+- Template: `hub/UPDATE-TEMPLATE.md` in brenemanandrew/Brenelandtest.

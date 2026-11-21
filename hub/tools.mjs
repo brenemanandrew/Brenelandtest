@@ -73,6 +73,18 @@ export const TOOLS = [
     },
   },
   {
+    id: 'copilot', type: 'think', name: 'Copilot (big model, SFW only)', runsOn: 'cloud', backend: 'copilot',
+    what: 'Copilot for plain, safe, non-sensitive bulk work: summaries, rewrites, drafts, research, long documents. A fit check blocks anything private, personal, adult, or real coding before it goes.',
+    built: ['GitHub Models with COPILOT_TOKEN (automatic)', 'Microsoft 365 Copilot by copy and paste (no setup)'],
+    modes: {
+      summarize: { label: 'Summarize', does: 'Shorten something long into the points that matter.', words: ['summarize', 'summarise', 'summary of', 'tl dr', 'tldr', 'boil down', 'with copilot', 'use copilot'] },
+      rewrite:   { label: 'Rewrite / proofread', does: 'Clean up wording, fix grammar, change tone.', words: ['proofread', 'reword', 'rewrite this', 'clean up this', 'fix the grammar', 'make this sound'] },
+      draft:     { label: 'Draft', does: 'First drafts of emails, posts, descriptions, lists.', words: ['draft an email', 'write an email', 'draft a post', 'write a description', 'product description'] },
+      research:  { label: 'Research', does: 'General knowledge questions and comparisons, nothing private.', words: ['compare', 'what is the difference', 'explain how', 'look into', 'research'] },
+      workdoc:   { label: 'Work doc (company Copilot)', does: 'Hubbell documents in the company Microsoft 365 Copilot, which is approved for company data. Copy and paste only.', backend: 'copilot', runsOn: 'relay', words: ['in copilot at work', 'company copilot', 'work copilot', 'm365 copilot'] },
+    },
+  },
+  {
     id: 'make3d', type: 'make3d', name: '3D', runsOn: 'meshy', backend: 'meshy',
     what: 'Models and assets. The mode picks Meshy, Blender, code or the checker (see route.mjs pick3d for the rules).',
     built: ['Meshy API (text, image, retexture, rigging)', 'pipeline/scripts/*.py (29 Blender scripts: fit, decimate, convert, rig, morph)', 'pipeline/jstest/piece.mjs + psheet.py (render checker)', 'brenai/public/props.js (38 code-built props)', 'Brenerig (brenerig.fly.dev)'],
