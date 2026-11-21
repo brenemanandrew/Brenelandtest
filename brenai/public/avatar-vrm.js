@@ -779,7 +779,7 @@ export async function create(url, opts = {}) {
   let zoomWant = Number(localStorage.getItem('brenai.zoom')) || 0, zoom = 0, camYaw = 0;
   const aim = new THREE.Vector3();
   // ---- visiting: you are in the room with her and see it through your own eyes. Drag to look, tap the floor (or WASD) to walk. ----
-  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 };
+  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 }; if (window.WIZRA_STILL) window.WIZRA_T = { fp, vrm };   /* test hook: lets a headless check place the first-person camera */
   let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0; daylight();
   const mugDorm = REST_AT.mug[0].clone();
   function setPlace(name) {
