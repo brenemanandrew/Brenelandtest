@@ -1100,6 +1100,8 @@ async function followUp(ask) {
 }
 async function send(quick, visit, lean) {
   const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return; clearTimeout(followTimer);
+  { const pm = visitInfo.keyable && /^wizra\s*:\s*([\s\S]+)/i.exec(text); if (pm) { if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }   /* an owner typing "Wizra: ..." puts the line in her mouth */
+      try { const r = await api('/api/puppet', { text: pm[1].trim() }), d = await r.json(); if (d.error) return addSys(d.error); setPlace(d); const body = addLine('her', ''); try { avatar.act(d.text); } catch {} try { speaker.say(voicedOf(d.text)); } catch {} await typeOut(body, d.text); } catch { addSys('Could not do that right now.'); } return; } }
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
   if (!WizraDnd.on && visitInfo.place && !visitInfo.solo && !away && WizraDnd.hears(text)) setTimeout(() => WizraDnd.open(), 900);   /* telling her about it brings the game out: she answers, and you pick who you are */
   if (WizraDnd.on && !sendBtn.disabled) { if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); } return WizraDnd.say(text); }   /* at the D&D table what you say goes to the game */

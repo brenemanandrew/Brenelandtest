@@ -282,3 +282,6 @@ In `avatar-vrm.js`, right after the model is added: every spring bone whose name
 
 ## The robot panel (owner only)
 The round button on the right edge is a robot for owners, shown everywhere (it stays the campsite agreeable switch for other players). It opens `public/robot.js`: one panel to edit who she is and how she is right now. Server: `/api/robot` (GET reads, POST changes; reuses `applySettings`). It edits: a free text "right now" state (`db.nowNote`, sent near the end of her instructions and taken as true until changed), how she feels about the player (`db.feeling`), clear her mood (glow and feeling), bring her home, the agreeable switch, romance level, rapport and bond points, swearing level, temperament sliders (add or remove any trait), likes, dislikes, secret likes, backstory, her notes on the player, and the core character text. Changes save 0.6 s after the last edit and apply to her next reply.
+
+## Putting words in her mouth (owner only)
+An owner who types `Wizra: some line` in the chat box puts that line down as hers (`/api/puppet`): it shows, is spoken and acted like any reply, and is stored as her own turn (`put: true` in the log), so her model sees it as something she said. While such a line is among the last 40 log entries her instructions add that she stands by everything in her earlier turns and never denies or retracts it.
