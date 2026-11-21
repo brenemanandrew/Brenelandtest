@@ -61,6 +61,7 @@
     H('Likes', 'One per line.'); body.append(area(lines(sh.likes), v => put({ sheet: { likes: unlines(v) } })));
     H('Dislikes', 'One per line.'); body.append(area(lines(sh.dislikes), v => put({ sheet: { dislikes: unlines(v) } })));
     H('Secret likes', 'One per line. Things she has not told you yet.'); body.append(area((sh.hiddenLikes || []).map(h => h.text).join('\n'), v => { const old = sh.hiddenLikes || []; put({ sheet: { hiddenLikes: unlines(v).map(t => old.find(h => h.text === t) || { text: t, revealed: false }) } }); }));
+    H('How she has changed', 'One per line. What being with you has changed in her so far. She adds to this herself as you talk; you can edit or clear it.'); body.append(area(lines(sh.growth), v => put({ sheet: { growth: unlines(v) } })));
     H('Backstory'); body.append(area(sh.backstory, v => put({ sheet: { backstory: v } })));
     H('What she knows about you', 'Her notes on you. She reads these every reply.'); body.append(area(D.notes, v => put({ notes: v })));
     H('Core character', 'The full text that tells her who she is. Edit freely. Clearing it puts the original back.' + (D.personaEdited ? ' (Edited.)' : ' (Original.)')); body.append(area(D.persona, v => put({ persona: v }), 'tall'));

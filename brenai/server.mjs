@@ -406,6 +406,9 @@ async function learn() {
   sh.rapport = Math.max(0, Math.min(100, sh.rapport + d));
   for (const i of Array.isArray(out.revealed) ? out.revealed : []) if (sh.hiddenLikes[i]) sh.hiddenLikes[i].revealed = true;
   if (typeof out.feeling === 'string') db.feeling = out.feeling.trim() ? { text: out.feeling.trim().slice(0, 160), at: Date.now() } : null;   // what she carries into the next conversation
+  { /* she develops: a line for how he changed her, and small nudges to her temperament */ const gr = typeof out.growth === 'string' ? out.growth.trim().replace(/\s+/g, ' ').slice(0, 160) : ''; sh.growth = Array.isArray(sh.growth) ? sh.growth : [];
+    if (gr && !sh.growth.some(g => g.toLowerCase() === gr.toLowerCase())) { sh.growth.push(gr); if (sh.growth.length > 14) sh.growth.shift(); }
+    if (out.trait_shift && typeof out.trait_shift === 'object' && sh.traits) for (const [k, v] of Object.entries(out.trait_shift).slice(0, 2)) { const n = String(k).toLowerCase().trim(); if (sh.traits[n] !== undefined && Number.isFinite(+v)) sh.traits[n] = Math.max(0, Math.min(100, sh.traits[n] + Math.max(-4, Math.min(4, Math.round(+v))))); } }
   const nl = typeof out.new_hidden_like === 'string' ? out.new_hidden_like.trim() : '';
   if (nl && d > 0 && sh.hiddenLikes.length < 30 && !sh.hiddenLikes.some(h => h.text.toLowerCase() === nl.toLowerCase())) sh.hiddenLikes.push({ text: nl.slice(0, 200), revealed: false, grown: true });
   if (BOND.includes(out.bond_lean)) addBond(out.bond_lean, db.place ? 2 : 1);
@@ -481,6 +484,7 @@ function applySettings(body) {
   if (body.sheet && body.sheet.traits && typeof body.sheet.traits === 'object') { const t = {}; for (const [k, v] of Object.entries(body.sheet.traits).slice(0, 20)) { const name = String(k).toLowerCase().replace(/[^a-z0-9 '-]/g, '').trim().slice(0, 28); if (name && Number.isFinite(+v)) t[name] = Math.max(0, Math.min(100, Math.round(+v))); } db.sheet.traits = t; }
   const h = body.sheet || {}, H = db.sheet;
   for (const k of ['birthday', 'backstory']) if (typeof h[k] === 'string') H[k] = h[k].slice(0, 4000);
+  if (Array.isArray(h.growth)) H.growth = h.growth.map(String).map(x => x.trim().slice(0, 160)).filter(Boolean).slice(0, 14);
   for (const k of ['likes', 'dislikes']) if (Array.isArray(h[k])) H[k] = h[k].map(String).map(x => x.trim()).filter(Boolean).slice(0, 60);
   if (Array.isArray(h.hiddenLikes)) H.hiddenLikes = h.hiddenLikes.filter(x => x && String(x.text || '').trim()).slice(0, 60).map(x => ({ text: String(x.text).trim().slice(0, 200), revealed: !!x.revealed, ...(x.grown ? { grown: true } : {}) }));
   if (Number.isFinite(+h.rapport)) H.rapport = Math.max(0, Math.min(100, Math.round(+h.rapport)));
@@ -924,6 +928,12 @@ async function handle(req, res) {
       // "Wizra: ..." typed by an owner: the line is put down as hers. It goes into the record as her own turn, so to her it is something she said.
       if (url.pathname === '/api/puppet' && req.method === 'POST') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const b = await readBody(req), text = String(b.text || '').trim().slice(0, 2000); if (!text) return json(res, 400, { error: 'say what?' });
         if (busy) return json(res, 409, { error: 'She is in the middle of answering. Try again in a moment.' }); db.log.push({ who: 'her', text, at: Date.now(), put: true }); if (Array.isArray(db.history) && db.history.length && db.history[db.history.length - 1].role === 'user') db.history.push({ role: 'assistant', content: [{ type: 'text', text }] }); save(); return json(res, 200, { ...placeView(), text }); }
+      // Start the whole game over (owner only): every player's save is backed up and removed, and her core character goes back to the built-in one.
+      // Owner rights stay with the same PINs; everyone, owners included, meets her for the first time again. The Studio's work, outfits, rules and models are kept.
+      if (url.pathname === '/api/reset-all' && req.method === 'POST') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const b = await readBody(req); if (b.confirm !== 'RESET') return json(res, 400, { error: 'confirm with RESET' }); if (busy) return json(res, 409, { error: 'busy' });
+        const dir = path.join(DATA_DIR, 'backups', 'reset-' + Date.now()); fs.mkdirSync(path.join(dir, 'users'), { recursive: true }); let n = 0; try { fs.copyFileSync(SHARED, path.join(dir, 'shared.json')); } catch {}
+        for (const f of fs.existsSync(USERS) ? fs.readdirSync(USERS) : []) { const src = path.join(USERS, f); try { if (!fs.statSync(src).isFile()) continue; fs.copyFileSync(src, path.join(dir, 'users', f)); fs.unlinkSync(src); if (/^[0-9a-f]{24}\.json$/.test(f)) n++; } catch (e) { return json(res, 500, { error: 'stopped at ' + f + ': ' + e.message, backup: dir }); } }
+        players.clear(); delete shared.persona; shared.words = {}; write(SHARED, shared); console.log('[players] the game was reset:', n, 'saves backed up to', dir); return json(res, 200, { ok: true, saves: n, backup: dir }); }
       if (url.pathname === '/api/agree' && req.method === 'POST') { const b = await readBody(req); if (!db.agree && !atCamp() && !isOwner()) return json(res, 409, { error: 'That switch is at the campsite.', ...placeView() }); if (b.level !== undefined) { if (!KEY()) return json(res, 409, { error: 'Turn the key on first.', ...placeView() }); fixBond(); if (!db.keyLv) db.keyLv = { lvl: db.sheet.romLevel, rom: db.sheet.bond.romance }; db.sheet.romLevel = Math.max(0, Math.min(ROM_MAX, Math.round(+b.level || 0))); db.sheet.bond.romance = 0; save(); return json(res, 200, placeView()); }   /* try any romance level while the key is on; the real one is kept and put back */
         db.agree = b.on === undefined ? !db.agree : !!b.on; if (!db.agree && db.keyLv) { db.sheet.romLevel = db.keyLv.lvl; db.sheet.bond.romance = db.keyLv.rom; delete db.keyLv; } save(); return json(res, 200, placeView()); }   /* the campsite switch: on, or off again */
       if (url.pathname === '/api/movie' && req.method === 'POST') {
