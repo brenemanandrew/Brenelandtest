@@ -41,6 +41,9 @@
     acts.append(agree, clear); if (D.away) { const home = el('button', { textContent: '🏠 Bring her home' }); home.onclick = () => { put({ home: true }, true); setTimeout(reload, 500); }; acts.append(home); } body.append(acts);
     H('How she feels about you', 'What she is carrying from your last conversations. Empty means nothing in particular.');
     body.append(area(D.feeling, v => put({ feeling: v }), '', 'e.g. Still glowing from last night. / A little hurt that you forgot her birthday.'));
+    H('One-on-one zones', 'Where she likes being touched in one-on-one time. Tap to switch a place between liked and not liked. Her chest, hips and thighs are always off limits.');
+    const zs = el('div', { className: 'chips' }), no = new Set(D.noZones || []); for (const [z, name] of [['hair', 'Hair'], ['face', 'Cheek'], ['shoulder', 'Shoulders'], ['arm', 'Arms'], ['hand', 'Hands'], ['belly', 'Belly'], ['knee', 'Knees']]) { const b = el('button', { textContent: (no.has(z) ? '🚫 ' : '💗 ') + name, className: no.has(z) ? '' : 'on' }); b.onclick = () => { no.has(z) ? no.delete(z) : no.add(z); D.noZones = [...no]; put({ noZones: D.noZones }, true); draw(); }; zs.append(b); }
+    for (const name of ['Chest', 'Hips', 'Thighs']) zs.append(el('button', { textContent: '🔒 ' + name, disabled: true, style: 'opacity:.45' })); body.append(zs);
     /* ---- relationship ---- */
     H('Relationship');
     const lv = el('div', { className: 'chips' }); for (let i = 0; i <= (D.levelMax | 0); i++) { const b = el('button', { textContent: 'Romance L' + i, className: i === sh.romLevel ? 'on' : '' }); b.onclick = () => { sh.romLevel = i; put({ sheet: { romLevel: i } }, true); draw(); }; lv.append(b); } body.append(lv);

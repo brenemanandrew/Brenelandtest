@@ -557,6 +557,7 @@ const RULES = {
 };
 const rule = k => { const [d, lo, hi] = RULES[k], v = db.rules && Number.isFinite(+db.rules[k]) ? +db.rules[k] : d; return Math.max(lo, Math.min(hi, v)); };
 const rulesView = () => Object.fromEntries(Object.keys(RULES).map(k => [k, rule(k)]));
+const HANG_ZONES = ['face', 'hair', 'belly', 'shoulder', 'arm', 'hand', 'knee'];
 const KEY = () => !!db.agree && isOwner();   /* the campsite switch, on an owner's save, is a master key for testing: it opens every gate below */
 const canVisit = () => !!process.env.VISIT_TEST || KEY() || (db.sheet.rapport | 0) >= rule('visitAt');
 const inviteNow = () => db.invite && !db.place && !db.away && Date.now() - db.invite.at < 15 * 60000 ? db.invite.place : '';
@@ -566,7 +567,7 @@ function socialTick() { const now = Date.now(), dt = Math.min(10, (now - (db.soc
   const close = (db.sheet.rapport | 0) / 100, hit = perMin => Math.random() < 1 - Math.pow(1 - perMin, dt);
   if (db.place && db.solo) { if (process.env.WANDER_TEST ? now - (db.soloAt || now) > 12000 : now - (db.soloAt || now) > 90000 && hit(0.03 + 0.07 * close)) { db.solo = false; const nm = placeLabel(db.place); db.log.push({ who: 'sys', text: `Wizra showed up at ${nm}.`, at: now }); cur().touches.push({ kind: 'wandered', at: now }); remember('wander', 'The first time she turned up where you were, uninvited.'); save(); } return; }
   if (!db.place && !inviteNow() && now - (db.askedAt || 0) > 3 * 3600000 && now - ((db.log[db.log.length - 1] || {}).at || 0) < 20 * 60000 && hit(0.004 + 0.01 * close)) { const made = devData().maps.custom.map(m => m.id), where = Math.random() < 0.4 || !made.length ? 'dorm' : made[Math.random() * made.length | 0]; db.invite = { place: where, at: now }; db.askedAt = now; db.log.push({ who: 'sys', text: `Wizra is asking you to come to ${placeLabel(where)}.`, at: now }); cur().touches.push({ kind: 'sheasked', at: now }); save(); } }
-const placeView = () => (socialTick(), { agree: !!db.agree, key: KEY(), keyable: isOwner(), camp: atCamp(), dnd: dndView(db.dnd), solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
+const placeView = () => (socialTick(), { agree: !!db.agree, key: KEY(), keyable: isOwner(), noZones: db.noZones || [], camp: atCamp(), dnd: dndView(db.dnd), solo: !!db.solo, inviteName: inviteNow() ? placeLabel(inviteNow()) : '', movie: movieView(), films: Object.entries(MOVIES).map(([id, M]) => ({ id, title: M.title, minutes: M.minutes })), due: dateDue(), place: db.place || '', canVisit: canVisit(), rapport: db.sheet.rapport | 0, visitAt: rule('visitAt'), invite: inviteNow(), rules: rulesView(), outfit: outfitNow(), ...bondView() });
 // ---- movie night: he plays the real film on his own screen; db.movie = { id, t0 (when minute zero was), paused (ms) or 0, said (last beat she reacted to), saidAt }
 const moviePos = () => { const m = db.movie; return m ? ((m.paused || Date.now()) - m.t0) / 60000 : 0; };
 const movieView = () => { const m = db.movie, M = m && MOVIES[m.id]; return M ? { id: m.id, title: M.title, minutes: M.minutes, pos: +moviePos().toFixed(2), paused: !!m.paused, tint: M.tint, heat: Math.round(m.heat || 0) } : null; };
@@ -910,6 +911,7 @@ async function handle(req, res) {
         if (req.method === 'POST') { const b = await readBody(req);
           if (typeof b.now === 'string') db.nowNote = b.now.trim().slice(0, 1500);
           if (typeof b.feeling === 'string') db.feeling = b.feeling.trim() ? { text: b.feeling.trim().slice(0, 400), at: Date.now() } : null;
+          if (Array.isArray(b.noZones)) db.noZones = b.noZones.map(String).filter(z => HANG_ZONES.includes(z));   /* places she does not like being touched in one-on-one time; chest, hips and thighs are always off limits and are not in this list */
           if (b.clearMood) { db.glow = null; db.feeling = null; }
           if (b.home && db.away) { db.away = null; db.call = null; db.glow = null; db.log.push({ who: 'sys', text: 'Wizra is back.', at: Date.now() }); }
           if (b.sheet || typeof b.persona === 'string' || typeof b.notes === 'string') applySettings({ ...(b.sheet ? { sheet: b.sheet } : {}), ...(typeof b.persona === 'string' ? { persona: b.persona } : {}), ...(typeof b.notes === 'string' ? { notes: b.notes } : {}) });

@@ -32,13 +32,16 @@
   function setMode(m) { if (m === 'exit') return end(); G.mode = m; for (const b of bar.children) b.classList.toggle('on', b.dataset.m === m); tip.textContent = (MODES.find(x => x[0] === m) || [])[3] || ''; poses.style.display = m === 'stare' ? 'flex' : 'none'; for (const h of Object.values(G.hands)) h.el.remove(); G.hands = {}; aim.style.display = 'none'; if (m !== 'stare') avatar.hangView({ yaw: 0, dist: m === 'snack' ? 2.3 : 1.9 }); }
   for (const [m, icon, name] of MODES) { const b = el('button', { title: name }, el('i', { textContent: icon }), name); b.dataset.m = m; b.onclick = e => { e.stopPropagation(); fx('click'); setMode(m); }; bar.append(b); }
   function drawPoses() { poses.textContent = ''; for (const [name, g, lv] of POSES) { const b = el('button', { textContent: lv > G.lvl ? '🔒 Lv ' + lv : name }); b.disabled = lv > G.lvl; if (b.disabled) b.style.opacity = '.5'; b.onclick = e => { e.stopPropagation(); avatar.gesture(g, 7); G.n.pose = (G.n.pose || 0) + 1; fx('pop'); }; poses.append(b); } }
+  /* a place she is set not to like (the robot panel): she pulls away, nothing is scored, but it does not count against you */
+  const disliked = z => { try { return (visitInfo.noZones || []).includes(String(z).replace(/[LR]$/, '')); } catch { return false; } };
+  function nope(x, y) { avatar.gesture('blocked', 2); avatar.emote('😒', 1400); fx('click'); pop(x, y, 'Not a fan of that.'); }
   function strike(x, y) { G.strikes++; avatar.gesture('blocked', 2.6); avatar.emote('💢', 1600); fx('anger'); pop(x, y, 'Hey. Not there.'); if (G.strikes >= 3) { tip.textContent = 'She has had enough for now.'; setTimeout(() => end(true), 1400); } }
 
   // ---- what the pointer does in each mode ----
   layer.addEventListener('pointerdown', e => { if (!G.on) return; layer.setPointerCapture(e.pointerId);
     if (G.mode === 'stare') G.drag = { x: e.clientX, y: e.clientY };
     else if (G.mode === 'snack') { G.drag = { x: e.clientX, y: e.clientY, aim: true }; }
-    else if (G.mode === 'poke') { const z = avatar.hangZone(e); if (!z) return; if (!z.ok) return strike(e.clientX, e.clientY); const [g, em] = POKE[z.zone] || ['jolt', '']; avatar.gesture(g, 2.2); if (em) avatar.emote(em, 1400); fx('pop'); G.n.poke = (G.n.poke || 0) + 1; pop(e.clientX, e.clientY, G.n.poke <= 10 ? '+0.5 💗' : '✨'); drawHud(); }
+    else if (G.mode === 'poke') { const z = avatar.hangZone(e); if (!z) return; if (!z.ok) return strike(e.clientX, e.clientY); if (disliked(z.zone)) return nope(e.clientX, e.clientY); const [g, em] = POKE[z.zone] || ['jolt', '']; avatar.gesture(g, 2.2); if (em) avatar.emote(em, 1400); fx('pop'); G.n.poke = (G.n.poke || 0) + 1; pop(e.clientX, e.clientY, G.n.poke <= 10 ? '+0.5 💗' : '✨'); drawHud(); }
     else if (G.mode === 'rub') handDown(e.pointerId, e.clientX < innerWidth / 2 ? 'L' : 'R', e.clientX, e.clientY); });
   layer.addEventListener('pointermove', e => { if (!G.on) return;
     if (G.mode === 'stare' && G.drag) { avatar.hangView({ dyaw: -(e.clientX - G.drag.x) * 0.006, dx: 0, dy: -(e.clientY - G.drag.y) * 0.002 }); G.drag = { x: e.clientX, y: e.clientY }; }
@@ -65,6 +68,7 @@
   let petAt = 0;
   function handMove(id, x, y, e) { const h = G.hands[id]; if (!h || h.away) return; const moved = Math.hypot(x - h.x, y - h.y); h.x = x; h.y = y; h.el.style.left = x + 'px'; h.el.style.top = y + 'px'; const z = avatar.hangZone({ clientX: x, clientY: y }); if (!z || moved < 1) return;
     if (!z.ok) { h.away = true; h.el.style.opacity = '.25'; setTimeout(() => { h.away = false; h.el.style.opacity = '1'; }, 1200); return strike(x, y); }
+    if (disliked(z.zone)) { if (performance.now() - (h.nopeAt || 0) > 1500) { h.nopeAt = performance.now(); nope(x, y); } return; }
     if (!RUB[z.zone]) return; const key = z.zone.replace(/[LR]$/, ''); G.comfort[key] = (G.comfort[key] || 0) + moved / 520; const now = performance.now(); if (now - petAt > 1500) { petAt = now; avatar.gesture('petted', 2.2); }
     if (G.comfort[key] >= 1 && !G.rubbed[key]) { G.rubbed[key] = RUB[z.zone]; avatar.emote('💖', 1600); fx('heart'); pop(x, y - 30, '+2 💗'); drawHud(); } }
 
