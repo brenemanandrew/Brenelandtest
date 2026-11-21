@@ -18,7 +18,7 @@ const has = (t, w) => t.includes(' ' + w + ' ');
 
 const ART = ['visual', 'visuals', 'look', 'looks', 'looking', 'style', 'styled', 'art', 'cel', 'cel shaded', 'toon', 'shaded', 'color', 'colors', 'colour', 'colours', 'palette', 'texture', 'textures', 'aesthetic', 'pixel', 'low poly', 'sprite', 'sprites', 'like my', 'vibe', 'graphics', 'lighting', 'mood board', 'reference', 'art style', 'outfit', 'outfits', 'wearing', 'hair', 'pretty', 'cute', 'gritty', 'dark fantasy', 'painted'];
 const STORY = ['story', 'lore', 'backstory', 'plot', 'named', 'called', 'personality', 'history', 'legend', 'dialogue', 'dialog', 'lines', 'script', 'narrative', 'tone', 'setting', 'world building', 'his name', 'her name', 'their name', 'who is'];
-const VERBS = ['use', 'make', 'have', 'has', 'with', 'it', 'its', 'the', 'they', 'you', 'there', 'then', 'give', 'add'];
+const VERBS = ['use', 'make', 'have', 'has', 'with', 'it', 'its', 'the', 'they', 'you', 'there', 'then', 'give', 'add', 'draft', 'write', 'plan', 'fix', 'build', 'summarize', 'summarise', 'rewrite', 'proofread', 'research', 'schedule', 'check', 'create', 'send', 'help', 'also', 'i'];
 
 /* slot types: what the code needs to know, nothing else */
 export const SLOT_TYPES = {
@@ -36,7 +36,7 @@ export const SLOT_TYPES = {
     words: ['quest', 'quests', 'mission', 'missions', 'objective', 'objectives', 'task', 'tasks', 'goal', 'goals'] },
 };
 
-function clauses(text) {
+export function clauses(text) {
   const out = [];
   for (const line of String(text).split(/\n+/)) {
     const lab = line.match(/^\s*(art|visuals?|look|story|lore|code|game|rules?)\s*:\s*(.*)$/i);

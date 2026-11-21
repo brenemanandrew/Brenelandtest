@@ -1,0 +1,8 @@
+{
+ "id": "sui", "name": "SUI (World of Warcraft addon)", "area": "hobby", "private": false, "needs_info": true, "repo": "",
+ "keywords": ["sui", "wow addon", "world of warcraft", "warcraft", "addon", "lua", ".toc"],
+ "what": "Andrew's World of Warcraft addon. Not found in any repo or on Drive yet: tell Brenebase where its files live and what it does.",
+ "where": [], "stack": ["WoW addons are Lua plus XML with a .toc file"], "tools": [], "settings": [], "working": [], "broken": [],
+ "open": ["Tell Brenebase what SUI does and where its files are (repo, Drive or the AddOns folder on the PC), then add a source so it updates itself"],
+ "rules": ["Never use em dashes"], "avoid_redoing": [], "sources": []
+}

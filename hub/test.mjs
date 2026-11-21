@@ -46,6 +46,17 @@ const SPLIT = [
   ['style words are stripped from rules', (() => { const q = P.plan('Make a game where a cute toon frog jumps between lily pads'); return !/cute|toon/.test(q.mechanics[0]); })()],
   ['bad files are rejected at merge', P.checkFile('character', Buffer.from('nope')) && P.checkFile('names', Buffer.from('{}')) && !P.checkFile('names', Buffer.from('{"entities":[]}'))],
 ];
+import { vet } from './vet.mjs';
+const v1 = vet('Hubbell: fix the bug where the kiosk shows the old build, plan the kaizen event for receiving next week, and I am so pissed at my supervisor');
+const v2 = vet('SUI: the bag frame overlaps the minimap');
+const v3 = vet('Note: buy milk');
+SPLIT.push(
+  ['tag sets the project (Hubbell -> work)', v1.tags.project === 'work'],
+  ['whole statement vetted into 3 parts', v1.suggest === 'parts' && v1.parts.map(p => p.tool).join() === 'coder,expert,companion'],
+  ['SUI tag -> sui project, tag removed from text', v2.tags.project === 'sui' && !/SUI/.test(v2.tags.rest)],
+  ['a colon after ordinary words is not a tag', !v3.tags.found.length],
+  ['game with art suggests Split', vet('Breneland: make a fishing minigame where you cast and reel, and use cel shaded visuals like my trees').suggest === 'split'],
+);
 let sOk = 0; for (const [n, ok] of SPLIT) { if (ok) sOk++; console.log(`${ok ? 'ok  ' : 'MISS'} split: ${n}`); }
 pass += sOk; const total = CASES.length + SPLIT.length;
 console.log(`\n${pass}/${total} as expected`);

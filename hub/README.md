@@ -62,6 +62,25 @@ This is the rule the router follows (`pick3d` and `pickMotion` in `route.mjs`):
 | Overtime kiosk (ardenot) | Opened as a link. Code changes go to the Coder | Nothing. The hub never sends kiosk data to an outside model |
 | Meshy | Called directly: generate, retexture, rig. Previews only until you OK a refine | Refine step and auto-download into your asset folder |
 
+## Tags and vetting: a head start, never a shortcut
+Start a request with a tag to say what it's about: `SUI: the bag frame overlaps the minimap`, `Hubbell Kaizen: too much walking at receiving`, `Staging Lane: lanes show late after midnight`, `Wizra: ...`, `Breneland: ...`, `Vent: ...`.
+
+- **A tag can set:**
+  - a project, and a focus inside it (Staging Lane, Pack, Kiosk)
+  - an area
+  - a repo (Kiosk and OT point at ardenot)
+  - a tool and mode (Vent, Roleplay, Kaizen, Plan, Fix, Build, Script, Copilot, 3D, Mocap)
+- **Chaining:** several tags can go before the colon (`Hubbell Kaizen:`). A known tag as the first word counts even without a colon. A colon after ordinary words (`Note: ...`) is not a tag.
+- **The whole statement is still vetted:**
+  1. It is cut into clauses, and each clause is routed on its own. Clauses that land on the same tool stay together.
+  2. If it holds several requests, the Send screen says **This has N parts**, with **Send as parts**: one job per part, each going through every check on its own.
+     - `Hubbell: fix the kiosk bug, plan the kaizen event, and I am so pissed at my supervisor` becomes Coder: Fix, Expert: Kaizen and Companion: Vent.
+     - The Kaizen part runs on the PC model, because work stays off the cloud.
+  3. A game build with art or story in it points you to **Split it** instead.
+- **Tool tags:** a tool tag only decides the tool when the statement is one part, or for a part no rule could place.
+- **Editing tags:** defaults are in `tags.mjs`. Add or remove tags on the Tools tab (kept in `DATA_DIR/tags.json`).
+- **SUI** has its own card. It is empty until you say where the addon lives.
+
 ## Split jobs: art and story one way, code the other
 Press **Split it** instead of Route it. Example: "Make me a game where you run a tavern, guests come in and order drinks, you serve them and get paid, and use cel shaded visuals like my Breneland trees. The barkeep is named Grum and he is grumpy but kind."
 
@@ -181,7 +200,8 @@ Each card has: what it is, where it lives, its repo, tools and when to use them,
 | `pc/brenebase-agent.mjs`, `pc/install-agent.ps1` | The PC agent and its one-time installer |
 | `start.sh` | Joins the tailnet (if `TS_AUTHKEY` is set), then starts the app |
 | `updates.mjs`, `UPDATE-TEMPLATE.md` | Update files from Claude sessions: format, parsing, scanning repos and PC folders |
-| `test.mjs` | 20 sample thoughts and where they should go, plus 10 split checks |
+| `tags.mjs`, `vet.mjs` | Tags at the start of a request; vetting the whole statement into parts |
+| `test.mjs` | 20 sample thoughts and where they should go, 10 split checks and 5 tag and vetting checks |
 
 ## Run it
 Locally:

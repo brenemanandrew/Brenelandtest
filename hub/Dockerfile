@@ -6,7 +6,7 @@ COPY --from=docker.io/tailscale/tailscale:stable /usr/local/bin/tailscale /app/t
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.mjs route.mjs tools.mjs split.mjs ledger.mjs adapters.mjs parts.mjs projects.mjs pcagent.mjs updates.mjs start.sh UPDATE-TEMPLATE.md ./
+COPY server.mjs route.mjs tools.mjs split.mjs ledger.mjs adapters.mjs parts.mjs projects.mjs pcagent.mjs updates.mjs tags.mjs vet.mjs start.sh UPDATE-TEMPLATE.md ./
 COPY public ./public
 COPY worker ./worker
 COPY pc ./pc

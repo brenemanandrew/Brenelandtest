@@ -30,6 +30,8 @@ import * as P from './parts.mjs';
 import * as PJ from './projects.mjs';
 import * as PA from './pcagent.mjs';
 import * as U from './updates.mjs';
+import * as TG from './tags.mjs';
+import { vet } from './vet.mjs';
 
 const PORT = +process.env.PORT || 8080;
 const PASS = process.env.HUB_PASSWORD || '';
@@ -201,7 +203,25 @@ http.createServer(async (req, res) => {
     if (p === '/api/settings' && req.method === 'GET') return send(res, 200, SETTINGS);
     if (p === '/api/settings' && req.method === 'POST') { const b = await body(req); if (['complex', 'all', 'off'].includes(b.copilotReview)) SETTINGS.copilotReview = b.copilotReview; saveSettings(); return send(res, 200, SETTINGS); }
     if (p === '/api/catalogue') return send(res, 200, { tools: TOOLS, areas: Object.fromEntries(Object.entries(AREAS).map(([k, v]) => [k, v.label])), autonomy: AUTONOMY, worker: { online: workerOnline(), can: worker.can }, claude: !!claude, meshy: !!process.env.MESHY_API_KEY });
-    if (p === '/api/route' && req.method === 'POST') { const b = await body(req); const r = await route(b.text, { claude }); const pj = PJ.match(b.text); return send(res, 200, { ...r, project: pj ? { id: pj.id, name: pj.name, private: !!pj.private } : null, hints: PJ.hints(pj, b.text) }); }
+    if (p === '/api/route' && req.method === 'POST') {
+      const b = await body(req); const v = vet(b.text); const tg = v.tags;
+      const r = await route(tg.rest || b.text, { claude });
+      /* a tool tag is a head start: it wins only when the statement is one part */
+      if (tg.tool && v.parts.length === 1) { r.pick = resolve(v.parts[0].tool, v.parts[0].mode); r.why = `Tag ${tg.found.join(' + ')}: ${r.pick.label}`; r.confidence = 1; r.question = ''; }
+      if (tg.area) r.area = tg.area;
+      const pj = (tg.project && PJ.card(tg.project)) || PJ.match(b.text);
+      const hintText = `${tg.rest} ${tg.focus || ''}`;
+      return send(res, 200, { ...r, tags: tg, vet: v, project: pj ? { id: pj.id, name: pj.name, private: !!pj.private, needsInfo: !!pj.needs_info, byTag: !!tg.project } : null, hints: PJ.hints(pj, hintText) });
+    }
+    if (p === '/api/jobs/parts' && req.method === 'POST') {
+      /* one job per part; every part goes through makeJob's checks on its own */
+      const b = await body(req); const parent = L.add({ tool: 'parts', mode: 'parts', backend: 'parts', runsOn: 'cloud', label: `Parts: ${String(b.text || '').slice(0, 50)}`, text: b.text, project: b.project || null, status: 'running', children: [] });
+      const kids = [];
+      for (const pt of b.parts || []) { let j = makeJob({ text: pt.text, tool: pt.tool, mode: pt.mode, area: b.area, autonomy: b.autonomy, project: b.project, repo: b.repo }); L.update(j.id, { parent: parent.id }); if (j.status === 'ready') j = await start(j); kids.push(j.id); }
+      return send(res, 200, L.update(parent.id, { children: kids, status: 'done' }, `${kids.length} parts sent to their tools`));
+    }
+    if (p === '/api/tags' && req.method === 'GET') return send(res, 200, { tags: TG.tags() });
+    if (p === '/api/tags' && req.method === 'POST') { const b = await body(req); return send(res, 200, { tags: TG.saveTags(b.tags) }); }
     if (p === '/api/pc' && req.method === 'GET') return send(res, 200, { ...(await PA.state()), worker: { online: workerOnline(), can: worker.can }, actions: PA.ACTIONS });
     if (p === '/api/pc/do' && req.method === 'POST') { const b = await body(req); return send(res, 200, await PA.call(b.action)); }
     if (p === '/api/projects' && req.method === 'GET') return send(res, 200, { projects: PJ.cards().map(c => ({ ...c, live: PJ.liveFor(c.id), updates: U.list(c.id, 20) })), unassigned: U.list(null, 200).filter(u => !u.project || !PJ.card(u.project)).slice(0, 20) });

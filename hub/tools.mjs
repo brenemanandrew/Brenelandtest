@@ -32,7 +32,7 @@ export const TOOLS = [
     built: ['Claude Code sessions on brenemanandrew repos', 'AGENTS.md / CODING.md rules in each repo'],
     modes: {
       brief:  { label: 'Brief only', does: 'Write a ready-to-paste Claude Code prompt (private parts kept back). Nothing runs.', backend: 'brief', runsOn: 'cloud', words: ['prompt for claude', 'brief'] },
-      build:  { label: 'Build',  does: 'New feature: Claude Code on the PC works on a branch, never main.', words: ['add', 'build', 'make a', 'feature', 'implement', 'create a page', 'new button'] },
+      build:  { label: 'Build',  does: 'New feature: Claude Code on the PC works on a branch, never main.', words: ['add', 'build', 'make a', 'feature', 'implement', 'create a page', 'new button', 'make me a game', 'a game where', 'make a game', 'minigame', 'mini game'] },
       fix:    { label: 'Fix',    does: 'Find and fix a bug on a branch, with a test or a screenshot as proof.', words: ['fix', 'bug', 'broken', 'error', 'crash', 'not working', 'doesnt work', "doesn't work", 'fails'] },
       review: { label: 'Review', does: 'Read code or a diff and report problems. Changes nothing.', words: ['review', 'check my code', 'look over'] },
       script: { label: 'Script', does: 'A small one-off script (PowerShell, Python, Node, Blender Python).', words: ['script', 'powershell', 'automate', 'batch file', '.ps1', 'macro'] },
@@ -79,7 +79,7 @@ export const TOOLS = [
     modes: {
       summarize: { label: 'Summarize', does: 'Shorten something long into the points that matter.', words: ['summarize', 'summarise', 'summary of', 'tl dr', 'tldr', 'boil down', 'with copilot', 'use copilot'] },
       rewrite:   { label: 'Rewrite / proofread', does: 'Clean up wording, fix grammar, change tone.', words: ['proofread', 'reword', 'rewrite this', 'clean up this', 'fix the grammar', 'make this sound'] },
-      draft:     { label: 'Draft', does: 'First drafts of emails, posts, descriptions, lists.', words: ['draft an email', 'write an email', 'draft a post', 'write a description', 'product description'] },
+      draft:     { label: 'Draft', does: 'First drafts of emails, posts, descriptions, lists.', words: ['draft a', 'draft an', 'write an email', 'write a message', 'welcome message', 'write a description', 'product description'] },
       research:  { label: 'Research', does: 'General knowledge questions and comparisons, nothing private.', words: ['compare', 'what is the difference', 'explain how', 'look into', 'research'] },
     },
   },
@@ -105,7 +105,7 @@ export const TOOLS = [
     targets: { vrm: 'Wizra and other VRM models (clip JSON, 30 fps)', mixamo66: 'Breneland bodies, 66-bone Mixamo skeleton (GLB animation)' },
     modes: {
       capture:  { label: 'Capture (mocap)',  does: 'Act it out: camera, a video or photos through the mocap page.', backend: 'link', runsOn: 'browser', words: ['mocap', 'motion capture', 'record me', 'act it out', 'my moves', 'from a video', 'from video', 'film myself', 'webcam'] },
-      library:  { label: 'Library',          does: 'A stock move (walk, run, sit, dance) from Mixamo or Meshy, converted to the target rig.', backend: 'pc-run', runsOn: 'pc', words: ['walk', 'run', 'jump', 'dance', 'sit', 'idle', 'mixamo', 'stock animation', 'cycle'] },
+      library:  { label: 'Library',          does: 'A stock move (walk, run, sit, dance) from Mixamo or Meshy, converted to the target rig.', backend: 'pc-run', runsOn: 'pc', words: ['walk cycle', 'run cycle', 'walk animation', 'run animation', 'jump animation', 'dance animation', 'sit animation', 'idle animation', 'mixamo', 'stock animation', 'cycle'] },
       retarget: { label: 'Retarget',         does: 'Move an existing clip onto the other rig.', backend: 'blender', runsOn: 'pc', words: ['retarget', 'onto the other', 'to vrm', 'to mixamo', 'other skeleton'] },
       handkey:  { label: 'Hand-made in code', does: 'Small gestures, fidgets and idles written in code (like Wizra\'s 25 gestures). Sent to the Coder.', backend: 'claude-code', runsOn: 'pc', words: ['gesture', 'fidget', 'blink', 'wave', 'nod', 'shrug', 'small motion', 'procedural animation'] },
     },

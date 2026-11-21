@@ -34,6 +34,7 @@ h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
     <div id="why" class="dim"></div>
     <div class="row"><select id="tool"></select><select id="mode"></select><select id="area"></select><select id="proj"></select></div>
     <div id="hints"></div>
+    <div id="vetBox"></div>
     <div class="row"><select id="autonomy"></select><span id="autoDoes" class="dim" style="flex:1;min-width:160px"></span></div>
     <div id="does" class="dim"></div>
     <div id="extra"></div>
@@ -90,13 +91,18 @@ $('routeBtn').onclick = async () => {
     $('area').value = routed.area || 'hobby';
     $('q').textContent = routed.question || '';
     $('proj').value = routed.project ? routed.project.id : '';
+    const tg = routed.tags || {}, v = routed.vet || { parts: [] };
+    const tagLine = tg.found && tg.found.length ? `<div class="row" style="margin:6px 0">${tg.found.map(t => `<span class="tag">${esc(t)}</span>`).join('')}<span class="dim">${routed.project ? esc(routed.project.name) : ''}${tg.focus ? ', ' + esc(tg.focus) : ''}${tg.projects && tg.projects.length > 1 ? ' (tags name more than one project; the first is used)' : ''}</span></div>` : '';
+    const needs = routed.project && routed.project.needsInfo ? `<p class="st-waiting">${esc(routed.project.name)} has no details yet. Tell Brenebase about it on the Projects tab so agents get context.</p>` : '';
+    $('vetBox').innerHTML = tagLine + needs + (v.suggest === 'parts' ? `<div class="card" style="border-color:var(--acc)"><b>This has ${v.parts.length} parts.</b> Each goes to its own tool and through its own checks.${v.parts.map(p => `<div class="mode"><span class="tag">${esc(p.label)}</span> ${esc(p.text)}</div>`).join('')}<div class="row"><button class="go" id="partsBtn">Send as parts</button><span class="dim">or Send below to keep it as one job</span></div></div>` : v.suggest === 'split' ? `<div class="card" style="border-color:#b48cff"><b>This is a build with art or story in it.</b> Use <b>Split it</b> so Claude only gets the code part and the rest is merged later.</div>` : '');
+    if ($('partsBtn')) $('partsBtn').onclick = async () => { const j = await api('/api/jobs/parts', { text: $('thought').value, parts: v.parts, project: $('proj').value, area: $('area').value, autonomy: $('autonomy').value, repo: tg.repo }); $('last').innerHTML = jobCard(j); $('pick').style.display = 'none'; $('thought').value = ''; jobs(); };
     $('hints').innerHTML = routed.hints && routed.hints.length ? `<div class="dim" style="margin-top:6px">Already known in ${esc(routed.project.name)}:</div>` + routed.hints.map(h => `<div class="mode"><span class="tag">${esc(h.kind)}</span> ${esc(h.text)}</div>`).join('') : '';
   } finally { $('routeBtn').disabled = false; }
 };
 $('sendBtn').onclick = async () => {
   const args = {}; let repo;
   document.querySelectorAll('#extra input').forEach(i => { const k = i.id.slice(2); if (!i.value) return; if (k === 'repo') repo = i.value; else args[k] = i.value; });
-  const j = await api('/api/jobs', { text: $('thought').value, tool: $('tool').value, mode: $('mode').value, area: $('area').value, autonomy: $('autonomy').value, args, repo, project: $('proj').value, target: routed && routed.target });
+  const j = await api('/api/jobs', { text: $('thought').value, tool: $('tool').value, mode: $('mode').value, area: $('area').value, autonomy: $('autonomy').value, args, repo: repo || (routed && routed.tags && routed.tags.repo), project: $('proj').value, target: routed && routed.target });
   $('last').innerHTML = jobCard(j); $('pick').style.display = 'none'; $('thought').value = '';
 };
 
@@ -197,8 +203,12 @@ async function boot() {
   fillModes();
   const ST = await api('/api/settings'), R = ST.copilotRecord;
   const copilotBox = `<div class="card"><b>Copilot check by Claude Opus</b><div class="row"><select id="revSel">${['complex', 'all', 'off'].map(v => `<option value="${v}"${ST.copilotReview === v ? ' selected' : ''}>${{ complex: 'Check complex answers', all: 'Check every answer', off: 'Off (trust Copilot)' }[v]}</option>`).join('')}</select></div><div class="dim">Track record: ${R.reviewed} checked, ${R.ok} needed no changes, ${R.fixed} corrected (${R.corrections} corrections), ${R.unreliable} too wrong to use${R.reviewed ? `. Clean rate ${Math.round(100 * R.ok / R.reviewed)}%.` : '.'}</div></div>`;
-  $('catalogue').innerHTML = copilotBox + `<p class="dim">Cloud model: ${CAT.claude ? 'on' : 'off'}. Meshy: ${CAT.meshy ? 'on' : 'off'}. PC worker: ${CAT.worker.online ? 'online (' + CAT.worker.can.join(', ') + ')' : 'offline'}.</p>` + CAT.tools.map(t => `<h3>${esc(t.name)} <span class="tag">${t.type}</span> <span class="tag">${t.runsOn}</span></h3><div class="dim">${esc(t.what)}</div>${Object.values(t.modes).map(m => `<div class="mode"><b>${esc(m.label)}</b> <span class="dim">${esc(m.does)}</span></div>`).join('')}${t.built.length ? `<div class="dim" style="margin-top:4px">Wraps: ${t.built.map(esc).join('; ')}</div>` : ''}`).join('');
+  const TGS = (await api('/api/tags')).tags;
+  const tagBox = `<div class="card"><b>Tags</b> <span class="dim">Start a request with one (SUI: ..., Hubbell Kaizen: ...). The whole statement is still checked.</span><div id="tagList">${TGS.map((t, i) => `<div class="row" style="margin:3px 0"><b>${esc(t.tag)}</b><span class="dim">${esc(t.note || [t.project, t.focus, t.tool && t.tool + (t.mode ? ':' + t.mode : '')].filter(Boolean).join(', '))}</span><button class="sm" onclick="tagDel(${i})">Remove</button></div>`).join('')}</div><div class="row"><input id="tg_tag" placeholder="Tag" style="width:90px;padding:7px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><select id="tg_proj"><option value="">project</option>${PJS.map(c => `<option value="${c.id}">${esc(c.id)}</option>`).join('')}</select><select id="tg_tool"><option value="">tool</option>${CAT.tools.map(t => `<option value="${t.id}">${esc(t.id)}</option>`).join('')}</select><input id="tg_note" placeholder="what it means" style="flex:1;min-width:120px;padding:7px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="sm" id="tagAdd">Add</button></div></div>`;
+  window.TGS = TGS;
+  $('catalogue').innerHTML = copilotBox + tagBox + `<p class="dim">Cloud model: ${CAT.claude ? 'on' : 'off'}. Meshy: ${CAT.meshy ? 'on' : 'off'}. PC worker: ${CAT.worker.online ? 'online (' + CAT.worker.can.join(', ') + ')' : 'offline'}.</p>` + CAT.tools.map(t => `<h3>${esc(t.name)} <span class="tag">${t.type}</span> <span class="tag">${t.runsOn}</span></h3><div class="dim">${esc(t.what)}</div>${Object.values(t.modes).map(m => `<div class="mode"><b>${esc(m.label)}</b> <span class="dim">${esc(m.does)}</span></div>`).join('')}${t.built.length ? `<div class="dim" style="margin-top:4px">Wraps: ${t.built.map(esc).join('; ')}</div>` : ''}`).join('');
 }
-boot().then(() => { const r = $('revSel'); if (r) r.onchange = () => api('/api/settings', { copilotReview: r.value }); }).catch(() => {});
+window.tagDel = async i => { const t = window.TGS.slice(); t.splice(i, 1); await api('/api/tags', { tags: t }); boot(); };
+boot().then(() => { if ($('tagAdd')) $('tagAdd').onclick = async () => { const tag = $('tg_tag').value.trim(); if (!tag) return; const t = window.TGS.concat([{ tag, project: $('tg_proj').value || undefined, tool: $('tg_tool').value || undefined, note: $('tg_note').value || undefined }]); await api('/api/tags', { tags: t }); boot(); }; const r = $('revSel'); if (r) r.onchange = () => api('/api/settings', { copilotReview: r.value }); }).catch(() => {});
 setInterval(() => { if ($('jobs').style.display !== 'none') jobs().catch(() => {}); }, 5000);
 </script></body></html>
