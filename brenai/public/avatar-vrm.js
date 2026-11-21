@@ -904,7 +904,7 @@ export async function create(url, opts = {}) {
     const dm = new THREE.Group(); dm.position.set(0, 0, 1.12); dnG.add(dm); const part = (g, m, x, y, z) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); o.castShadow = true; dm.add(o); return o; };
     part(new THREE.CylinderGeometry(0.2, 0.36, 1.05, 16), T('#3b2a5c'), 0, 0.6, 0); part(new THREE.SphereGeometry(0.2, 16, 12), T('#3b2a5c'), 0, 1.22, 0.02).scale.set(1, 1.08, 1.05); dn.dmHead = part(new THREE.SphereGeometry(0.13, 16, 12), T('#d9b08c'), 0, 1.2, -0.09);
     part(new THREE.ConeGeometry(0.11, 0.42, 12), T('#f2f2f2'), 0, 1.0, -0.17).rotation.x = Math.PI + 0.25; part(new THREE.ConeGeometry(0.2, 0.34, 14), T('#2a1d45'), 0, 1.5, 0.02); for (const sx of [-0.045, 0.045]) part(new THREE.SphereGeometry(0.014, 8, 8), glowM('#1a1226'), sx, 1.225, -0.21);
-    for (const sx of [-1, 1]) { const a = part(new THREE.CapsuleGeometry(0.055, 0.42, 4, 10), T('#3b2a5c'), sx * 0.3, 0.86, -0.3); a.rotation.set(1.15, 0, sx * 0.35); part(new THREE.SphereGeometry(0.05, 10, 8), T('#d9b08c'), sx * 0.2, 0.8, -0.5); } dn.dm = dm; }
+    for (const sx of [-1, 1]) { const a = part(new THREE.CapsuleGeometry(0.055, 0.42, 4, 10), T('#3b2a5c'), sx * 0.3, 0.86, -0.3); a.rotation.set(1.15, 0, sx * 0.35); part(new THREE.SphereGeometry(0.05, 10, 8), T('#d9b08c'), sx * 0.2, 0.8, -0.5); } dn.dm = dm; dn.stool = add(new THREE.CylinderGeometry(0.19, 0.17, 1, 14), T('#4a2d18'), 0.78, 0.22, 0.5); add(new THREE.CylinderGeometry(0.2, 0.18, 0.5, 14), T('#4a2d18'), 0, 0.25, 1.12); }
   function dndMode(on) { on = !!on; if (on === dn.on) return dn.on; dn.on = on; dnG.visible = on; dn.lx = dn.ly = 0; dn.cut = 0;
     if (on) { /* the table goes down a step and a half in front of where you stand, facing you */ const fx = Math.sin(fp.yaw), fz = Math.cos(fp.yaw); dn.yaw = fp.yaw; dn.px = fp.x; dn.pz = fp.z; dn.ox = fp.x + fx * 1.95; dn.oz = fp.z + fz * 1.95; dnG.position.set(dn.ox, floorY, dn.oz); dnG.rotation.y = fp.yaw; vrm.scene.visible = true; }
     return dn.on; }
@@ -919,8 +919,13 @@ export async function create(url, opts = {}) {
       put(hx, hz, ang); head.getWorldPosition(tmpA); const hy = Math.max(tmpA.y, floorY + 1.2), side = tau >= 4.4 && tau < 5.8 ? 0.11 : 0;
       camera.position.set(hx + Math.sin(ang) * dist + Math.cos(ang) * side, hy + 0.03 + (tau >= 4.4 && tau < 5.8 ? 0.06 : 0), hz + Math.cos(ang) * dist - Math.sin(ang) * side); camera.lookAt(hx, hy - (tau >= 5.8 && tau < 7.6 ? 0.035 : 0.01), hz); return; }
     if (dn.cut) dn.cut = 0;
-    const sx = dn.ox + rx * 0.66 + fx * 0.62, sz = dn.oz + rz * 0.66 + fz * 0.62; put(sx, sz, Math.atan2(dn.px - sx, dn.pz - sz) * 0.5 + Math.atan2(dn.ox - sx, dn.oz - sz) * 0.5);   /* she stands at the far left of the table, beside the Dungeon Master, half turned to you */
-    camera.position.set(dn.px + fx * 0.55, eye + 0.08, dn.pz + fz * 0.55); camera.lookAt(dn.ox + rx * 0.36, floorY + 1.1, dn.oz + rz * 0.36 + fz * 0.4); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
+    /* everyone sits. She has a stool at the table beside the Dungeon Master, half turned to you, feet on the floor. She is held on it: nothing walks her off, and her reactions happen in her seat */
+    const sx = dn.ox + rx * 0.78 + fx * 0.5, sz = dn.oz + rz * 0.78 + fz * 0.5, yaw = Math.atan2(dn.px - sx, dn.pz - sz) * 0.45 + Math.atan2(dn.ox - sx, dn.oz - sz) * 0.55, now = performance.now();
+    if (rt.act !== 'sit' && rt.act !== 'gone') rt.act = rt.stand > 0.02 ? 'sitdown' : 'sit'; if (rt.act === 'sitdown') rt.act = 'sit';
+    Object.assign(rt, { leaving: false, steps: [], i: 0, stepT: 0, after: '', label: '', self: false, lieWant: 0, legs: 'floor', legsAt: now + 600000, nextAt: now + 600000, x: sx, z: sz, yaw });
+    vrm.scene.position.x = sx - Math.sin(yaw) * hip.z; vrm.scene.position.z = sz - Math.cos(yaw) * hip.z; vrm.scene.rotation.y = yaw;
+    if (dn.stool) { vrm.humanoid.getRawBoneNode('hips').getWorldPosition(tmpA); const top = Math.max(0.3, Math.min(0.7, tmpA.y - floorY - 0.1)); dn.stool.scale.y = top; dn.stool.position.y = top / 2; }
+    camera.position.set(dn.px + fx * 0.55, eye - 0.02, dn.pz + fz * 0.55); camera.lookAt(dn.ox + rx * 0.36, floorY + 1.1, dn.oz + rz * 0.36 + fz * 0.4); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
   // ---- movie night as a film is shot: fixed cameras that cut from one to the next. You cannot walk; you can only glance around.
   //   'couch'  from behind the couch: the backs of two heads, the TV past them, the couch heavy and dark in front
   //   'side'   from your seat, turned to watch her watch the film
