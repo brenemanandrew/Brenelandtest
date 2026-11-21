@@ -38,6 +38,8 @@ const WANT = /(known|gaps?\b|not done|broken|bugs?\b|issues?\b|problems?\b|todo|
 
 /* pull the useful lines out of a markdown file: bullets and table rows under headings that sound like problems or plans */
 export function extract(text) {
+  /* a WoW addon .toc: the ## lines are the useful part */
+  if (/^##\s*Interface:/m.test(text)) return String(text).split('\n').map(l => l.match(/^##\s*(Title|Notes|Version|Interface|Author|SavedVariables\w*|Dependencies|X-[\w-]+):\s*(.*)$/i)).filter(Boolean).map(m => ({ section: 'Addon info', text: `${m[1]}: ${m[2].replace(/\|c[0-9a-f]{8}|\|r/gi, '').trim()}` }));
   const items = []; let section = '', keep = false;
   for (const raw of String(text).split('\n')) {
     const h = raw.match(/^#{1,4}\s+(.*)/);
@@ -107,7 +109,7 @@ const words = s => new Set(lc(s).trim().split(' ').filter(w => w.length > 3 && !
 /* which project a thought is about */
 export function match(text) {
   const t = lc(text);
-  const scored = cards().map(c => ({ c, s: (c.keywords || []).reduce((n, k) => n + (t.includes(' ' + k.toLowerCase() + ' ') || t.includes(' ' + k.toLowerCase()) ? (k.includes(' ') ? 2 : 1) : 0), 0) + (t.includes(' ' + c.id + ' ') ? 2 : 0) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s);
+  const scored = cards().filter(c => !c.archived).map(c => ({ c, s: (c.keywords || []).reduce((n, k) => n + (t.includes(' ' + k.toLowerCase() + ' ') || t.includes(' ' + k.toLowerCase()) ? (k.includes(' ') ? 2 : 1) : 0), 0) + (t.includes(' ' + c.id + ' ') ? 2 : 0) })).filter(x => x.s > 0).sort((a, b) => b.s - a.s);
   return scored[0] ? scored[0].c : null;
 }
 

@@ -106,7 +106,7 @@ async function syncProjects(id) {
 setTimeout(() => syncProjects().catch(() => {}), 5000);
 
 /* ---- update files from Claude sessions: repos, PC folders (Drive), direct posts; checked routinely ---- */
-const UPDATE_DIRS = (process.env.HUB_UPDATE_DIRS || 'G:\\My Drive\\Brenebase\\updates;F:\\Projects\\Breneland-Next\\.brenebase\\updates').split(';').filter(Boolean);
+const UPDATE_DIRS = (process.env.HUB_UPDATE_DIRS || 'G:\\My Drive\\Brenebase\\updates;F:\\Projects\\Breneland-Next\\.brenebase\\updates;C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\SUI\\.brenebase\\updates').split(';').filter(Boolean);
 async function syncUpdates() {
   const report = await U.scanRepos(PJ.cards());
   for (const dir of UPDATE_DIRS) L.add({ tool: 'projects', mode: 'updates', backend: 'readdir', runsOn: 'pc', label: `Look for update files in ${dir}`, text: dir, dir, status: 'queued', quiet: true });

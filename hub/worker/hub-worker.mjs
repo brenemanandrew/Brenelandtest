@@ -13,7 +13,7 @@
      BIONIC_URL        default http://127.0.0.1:1234
      BLENDER           path to blender.exe (default: "blender" on PATH)
      REPOS             folder that holds your repo checkouts (default: %USERPROFILE%\repos)
-     READ_ROOTS        folders project notes may be read from, ; separated (default G:\My Drive;F:\Projects)
+     READ_ROOTS        folders project notes may be read from, ; separated (default G:\My Drive;F:\Projects;the WoW AddOns folder)
    Run: node hub-worker.mjs */
 import { spawn, spawnSync } from 'child_process';
 import path from 'path';
@@ -45,7 +45,7 @@ if (found(`"${BLENDER}"`)) can.push('blender');
 can.push('pc-run');
 if (found('git')) can.push('merge');
 /* project notes on this PC: only files inside these folders can be read (Google Drive for desktop, project folders) */
-const READ_ROOTS = (process.env.READ_ROOTS || 'G:\\My Drive;F:\\Projects').split(';').map(r => path.resolve(r.trim())).filter(Boolean);
+const READ_ROOTS = (process.env.READ_ROOTS || 'G:\\My Drive;F:\\Projects;C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns').split(';').map(r => path.resolve(r.trim())).filter(Boolean);
 can.push('read', 'readdir');
 console.log(`hub worker: ${HUB}\ncan do: ${can.join(', ')}`);
 

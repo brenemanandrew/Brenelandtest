@@ -153,7 +153,8 @@ const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 60
 async function projects() {
   const d = await api('/api/projects');
   const list = (title, arr, help, id) => arr && arr.length ? `<details><summary><b>${title}</b> <span class="dim">(${arr.length})</span></summary>${arr.map(x => { const t = typeof x === 'string' ? x : x.name ? `<b>${esc(x.name)}</b>${x.value ? ' = ' + esc(x.value) : ''} <span class="dim">${esc(x.what || x.note || '')}${x.use_when ? '. Use when: ' + esc(x.use_when) : ''}</span>` : esc(x.text); return `<div class="mode">${typeof x === 'string' ? esc(t) : t}${help ? ` <button class="sm" onclick="help('${id}', this)" data-item="${esc(typeof x === 'string' ? x : x.text || x.name)}">Get help</button>` : ''}</div>`; }).join('')}</details>` : '';
-  $('projList').innerHTML = d.projects.map(c => {
+  const live = d.projects.filter(c => !c.archived), arch = d.projects.filter(c => c.archived);
+  $('projList').innerHTML = (arch.length ? `<details class="card"><summary><b>Archived</b> <span class="dim">(${arch.length})</span></summary>${arch.map(c => `<div class="mode"><b>${esc(c.name)}</b> <span class="dim">${esc(c.what)}</span></div>`).join('')}</details>` : '') + live.map(c => {
     const src = Object.values(c.live.sources || {});
     const liveItems = src.flatMap(x => (x.items || []).map(i => `${i.section}: ${i.text}`));
     return `<div class="card"><div class="row" style="margin:0"><b>${esc(c.name)}</b><span class="tag">${esc(c.area)}</span>${c.private ? '<span class="tag">stays on PC</span>' : ''}${c.needs_info ? '<span class="st-waiting">needs your info</span>' : ''}</div>
@@ -196,7 +197,7 @@ async function boot() {
   CAT = await api('/api/catalogue');
   pc(true).catch(() => {});
   $('tool').innerHTML = CAT.tools.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
-  const PJS = (await api('/api/projects')).projects; $('proj').innerHTML = '<option value="">No project</option>' + PJS.map(c => `<option value="${c.id}">${esc(c.name.split(' (')[0])}</option>`).join('');
+  const PJS = (await api('/api/projects')).projects.filter(c => !c.archived); $('proj').innerHTML = '<option value="">No project</option>' + PJS.map(c => `<option value="${c.id}">${esc(c.name.split(' (')[0])}</option>`).join('');
   $('area').innerHTML = Object.entries(CAT.areas).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
   $('autonomy').innerHTML = Object.entries(CAT.autonomy).map(([k, v]) => `<option value="${k}"${k === 'draft' ? ' selected' : ''}>${k}</option>`).join('');
   const ad = () => $('autoDoes').textContent = CAT.autonomy[$('autonomy').value]; $('autonomy').onchange = ad; ad();

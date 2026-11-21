@@ -1,0 +1,26 @@
+{
+ "id": "home-kvm",
+ "name": "Home KVM",
+ "area": "hobby",
+ "private": false,
+ "archived": true,
+ "repo": "",
+ "keywords": [
+  "home kvm"
+ ],
+ "what": "Archived. An earlier session's work, kept on Google Drive as SURFACE__Home-KVM__local_4995eead.zip. Not active: Brenebase only brings it up if you tag or name it.",
+ "where": [
+  "Google Drive: SURFACE__Home-KVM__local_4995eead.zip (a session archive folder)"
+ ],
+ "stack": [],
+ "tools": [],
+ "settings": [],
+ "working": [],
+ "broken": [],
+ "open": [],
+ "rules": [
+  "Never use em dashes"
+ ],
+ "avoid_redoing": [],
+ "sources": []
+}
