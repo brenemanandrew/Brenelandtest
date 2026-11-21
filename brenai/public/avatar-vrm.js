@@ -926,7 +926,7 @@ export async function create(url, opts = {}) {
     vrm.scene.position.x = sx - Math.sin(yaw) * hip.z; vrm.scene.position.z = sz - Math.cos(yaw) * hip.z; vrm.scene.rotation.y = yaw;
     if (dn.stool) { vrm.humanoid.getRawBoneNode('hips').getWorldPosition(tmpA); const top = Math.max(0.3, Math.min(0.7, tmpA.y - floorY - 0.1)); dn.stool.scale.y = top; dn.stool.position.y = top / 2; }
     /* you sit at the table too: your eyes are level with theirs, and the Dungeon Master is straight ahead in the middle of the view */
-    camera.position.set(dn.px + fx * 0.8, floorY + 1.16, dn.pz + fz * 0.8); camera.lookAt(dn.ox + fx * 1.12, floorY + 1.1, dn.oz + fz * 1.12); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
+    camera.position.set(dn.px + fx * 0.8, floorY + 1.16, dn.pz + fz * 0.8); camera.lookAt(dn.ox + fx * 1.12, floorY + 0.98, dn.oz + fz * 1.12); camera.rotateY(dn.lx); camera.rotateX(dn.ly); }
   // ---- movie night as a film is shot: fixed cameras that cut from one to the next. You cannot walk; you can only glance around.
   //   'couch'  from behind the couch: the backs of two heads, the TV past them, the couch heavy and dark in front
   //   'side'   from your seat, turned to watch her watch the film
