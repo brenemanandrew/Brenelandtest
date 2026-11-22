@@ -921,6 +921,7 @@ function setPlace(d, arriving) {
   drawMoments(); WizraSound.path(visitInfo.path);
   if (!d.place && was && away) setTimeout(syncPlace, 7000); else syncPlace(arriving);   // if she is walking out, watch her go first
   showInvite(); filmSync(); try { WizraDnd.sync(d.dnd); } catch {}
+  if (d.build !== undefined) { try { avatar.build(d.build); } catch {} }
   { const ab = $('agreeBtn'); ab.hidden = d.keyable || !(d.agree || (d.camp && d.place && !d.solo));   /* owners reach the robot from the settings wheel instead: it is out of the way there */   /* at the campsite with her; and anywhere while it is on, so it can always be undone */ ab.classList.toggle('on', !!d.agree); ab.title = d.agree ? 'She is agreeable. Press to undo.' : 'Make her agreeable'; if (d.keyable) { ab.innerHTML = '&#129302;'; ab.title = 'Edit her: personality, mood, state'; } else ab.innerHTML = '&#129309;';
     const kl = $('keyLv'); kl.hidden = !d.key || !!d.keyable;   /* owners set the level in the robot panel */ if (d.key && kl.dataset.v !== d.level + '/' + d.levelMax) { kl.dataset.v = d.level + '/' + d.levelMax; kl.textContent = ''; for (let i = 0; i <= (d.levelMax | 0); i++) { const b = document.createElement('button'); b.textContent = 'L' + i; b.title = 'Test romance level ' + i; if (i === d.level) b.className = 'on'; b.onclick = async ev => { ev.stopPropagation(); try { const r = await api('/api/agree', { level: i }), j = await r.json(); if (j.error) addSys(j.error); setPlace(j); } catch {} }; kl.append(b); } } }
 }

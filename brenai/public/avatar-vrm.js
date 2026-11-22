@@ -60,6 +60,20 @@ export async function create(url, opts = {}) {
   VRMUtils.rotateVRM0(vrm); // older (0.x) models face the other way
   vrm.scene.traverse(o => { o.frustumCulled = false; });
   scene.add(vrm.scene);
+  // Build: a heavier or lighter set for her, on whatever outfit is loaded. Every vertex is moved out from the bone it hangs on (thigh,
+  // hip, waist, upper arm, calf) in the rest shape, by how much it belongs to that bone, so body and clothes thicken together and it
+  // holds in every pose. Skirt and coat bones count as the hips. Worked out once here (rest pose); setBuild(0..100) blends it in live.
+  const build = { v: 0, parts: [] };
+  try { vrm.scene.updateMatrixWorld(true); const H = vrm.humanoid, raw = n => H.getRawBoneNode(n), human = new Set(Object.keys(H.humanBones || {}).map(raw).filter(Boolean)), wp = o => o.getWorldPosition(new THREE.Vector3()), tgt = new Map(), hipsP = raw('hips') ? wp(raw('hips')) : null;
+    const limb = (a, b, f) => { const A = raw(a), B = raw(b); if (A && B) { const pa = wp(A), u = wp(B).sub(pa).normalize(); tgt.set(A, { a: pa, u, f }); } }, torso = (a, f) => { const A = raw(a); if (A && hipsP) tgt.set(A, { a: hipsP, u: new THREE.Vector3(0, 1, 0), f }); };
+    torso('hips', 0.17); torso('spine', 0.16); torso('chest', 0.08); torso('upperChest', 0.05); for (const sd of ['left', 'right']) { limb(sd + 'UpperLeg', sd + 'LowerLeg', 0.22); limb(sd + 'LowerLeg', sd + 'Foot', 0.1); limb(sd + 'UpperArm', sd + 'LowerArm', 0.14); limb(sd + 'LowerArm', sd + 'Hand', 0.06); }
+    const seen = new Set(), v = new THREE.Vector3(), r = new THREE.Vector3(); vrm.scene.traverse(m => { if (!m.isSkinnedMesh || !m.geometry.attributes.skinIndex) return; const pos = m.geometry.attributes.position; if (seen.has(pos)) return; seen.add(pos);
+      const si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight, inv = m.matrixWorld.clone().invert(), toW = m.matrixWorld, of = m.skeleton.bones.map(b => { let o = b; while (o && !human.has(o)) o = o.parent; return (o && tgt.get(o)) || null; }), orig = Float32Array.from(pos.array), D = new Float32Array(pos.count * 3); let any = false;
+      for (let i = 0; i < pos.count; i++) { let dx = 0, dy = 0, dz = 0; v.fromBufferAttribute(pos, i).applyMatrix4(toW); for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w < 0.004) continue; const t = of[si.getComponent(i, k)]; if (!t) continue; r.copy(v).sub(t.a); r.addScaledVector(t.u, -r.dot(t.u)); dx += r.x * w * t.f; dy += r.y * w * t.f; dz += r.z * w * t.f; }
+        if (dx || dy || dz) { any = true; r.set(dx, dy, dz).transformDirection(inv).multiplyScalar(Math.hypot(dx, dy, dz)); D[i * 3] = r.x; D[i * 3 + 1] = r.y; D[i * 3 + 2] = r.z; } }
+      if (any) build.parts.push({ pos, orig, D }); }); } catch (e) { console.warn('build', e); }
+  function setBuild(pct) { const b = Math.max(-60, Math.min(100, +pct || 0)) / 100; if (b === build.v) return; build.v = b; for (const { pos, orig, D } of build.parts) { const a = pos.array; for (let i = 0; i < a.length; i++) a[i] = orig[i] + D[i] * b; pos.needsUpdate = true; } }
+  if (window.WIZRA_BUILD != null) setBuild(window.WIZRA_BUILD);
   // Cloth weight: VRoid skirts and coat tails come with no gravity and nothing to collide with, so they hold their standing bell
   // shape in the air when she sits. Here they are given weight (softer, pulled down, damped), her legs become things the cloth
   // rests on, and while she is seated a flat surface sits just under her hips so the cloth lies on the seat, not through it.
@@ -1095,7 +1109,7 @@ export async function create(url, opts = {}) {
       frozen = !!on; frozeAt = performance.now(); fp.locked = frozen; Object.assign(bz, { mode: 'cut', shot: 0 }); if (!on) heartGlow.visible = false; },
     bonusShot() { bz.shot++; frozeAt = performance.now(); },
     bonusOrbit(dx, dy, dz) { bz.yaw -= dx * 0.008; bz.pitch = Math.max(-0.05, Math.min(1.25, bz.pitch + dy * 0.006)); bz.dist = Math.max(0.5, Math.min(2.8, bz.dist * (1 + dz))); },
-    bonusHit, hang, hangView, hangZone, hangMouth, movieMode, movieLook, dndMode, dndSurprise,
+    bonusHit, hang, hangView, hangZone, hangMouth, movieMode, movieLook, dndMode, dndSurprise, setBuild,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
