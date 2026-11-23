@@ -285,3 +285,6 @@ The round button on the right edge is a robot for owners, shown everywhere (it s
 
 ## Putting words in her mouth (owner only)
 An owner who types `Wizra: some line` in the chat box puts that line down as hers (`/api/puppet`): it shows, is spoken and acted like any reply, and is stored as her own turn (`put: true` in the log), so her model sees it as something she said. While such a line is among the last 40 log entries her instructions add that she stands by everything in her earlier turns and never denies or retracts it.
+
+## Body build
+`setBuild(pct)` in `avatar-vrm.js` (`avatar.build(pct)` from the page): at load, every skinned vertex gets a push direction out from the bone it hangs on (hips, waist, chest a little, thighs, calves, upper and lower arms), weighted by its skin weights; skirt and coat bones count as the hips. The slider blends that in on the rest shape, so body and clothes thicken together on any outfit and in any pose. Range -60 (slimmer) to 250 (very heavy); 0 is the model as made. The value is game-wide (`shared.build`), sent in `placeView()` as `build`, set in the robot panel under Body build. Test hook: `window.WIZRA_BUILD` holds one value. It stretches the mesh rather than sculpting it: a real body change belongs in VRoid Studio.

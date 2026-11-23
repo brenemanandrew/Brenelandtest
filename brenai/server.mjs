@@ -920,7 +920,7 @@ async function handle(req, res) {
           if (typeof b.now === 'string') db.nowNote = b.now.trim().slice(0, 1500);
           if (typeof b.feeling === 'string') db.feeling = b.feeling.trim() ? { text: b.feeling.trim().slice(0, 400), at: Date.now() } : null;
           if (Array.isArray(b.noZones)) db.noZones = b.noZones.map(String).filter(z => HANG_ZONES.includes(z));   /* places she does not like being touched in one-on-one time; chest, hips and thighs are always off limits and are not in this list */
-          if (Number.isFinite(+b.build)) shared.build = Math.max(-60, Math.min(100, Math.round(+b.build)));   /* her build, on every outfit, for everyone */
+          if (Number.isFinite(+b.build)) shared.build = Math.max(-60, Math.min(250, Math.round(+b.build)));   /* her build, on every outfit, for everyone */
           if (b.clearMood) { db.glow = null; db.feeling = null; }
           if (b.home && db.away) { db.away = null; db.call = null; db.glow = null; db.log.push({ who: 'sys', text: 'Wizra is back.', at: Date.now() }); }
           if (b.sheet || typeof b.persona === 'string' || typeof b.notes === 'string') applySettings({ ...(b.sheet ? { sheet: b.sheet } : {}), ...(typeof b.persona === 'string' ? { persona: b.persona } : {}), ...(typeof b.notes === 'string' ? { notes: b.notes } : {}) });
