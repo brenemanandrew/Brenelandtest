@@ -68,6 +68,10 @@
     H('Likes', 'One per line.'); body.append(area(lines(sh.likes), v => put({ sheet: { likes: unlines(v) } })));
     H('Dislikes', 'One per line.'); body.append(area(lines(sh.dislikes), v => put({ sheet: { dislikes: unlines(v) } })));
     H('Secret likes', 'One per line. Things she has not told you yet.'); body.append(area((sh.hiddenLikes || []).map(h => h.text).join('\n'), v => { const old = sh.hiddenLikes || []; put({ sheet: { hiddenLikes: unlines(v).map(t => old.find(h => h.text === t) || { text: t, revealed: false }) } }); }));
+    if (D.art && D.art.total) { const A = D.art, FE = { love: '😍 loved', like: '🙂 liked', mixed: '🤔 mixed', bored: '🥱 bored', dislike: '👎 disliked', none: '😐 nothing' };
+      H('Art she has seen', `${A.seen} of ${A.total} works seen. She is over ${A.over} of them (seen four times or more, or bored by it). When most are seen and many are worn out, it is time for new art.`);
+      const box = el('div', { style: 'font-size:14px;line-height:1.35' }); for (const w of A.works.slice().sort((a, b) => (b.n || 0) - (a.n || 0))) box.append(el('div', { style: 'padding:4px 0;border-bottom:1px solid rgba(255,255,255,.1);opacity:' + (w.n ? 1 : .55) }, el('b', { textContent: w.title }), ' · ' + (w.by || ''), el('br'), w.n ? `seen ${w.n}× · ${FE[w.feel] || 'no opinion noted yet'}${w.take ? ' · "' + w.take + '"' : ''}` : 'not seen yet'));
+      body.append(box); const fg = el('button', { className: 'act', textContent: '🧽 Make her forget all the art' }); fg.onclick = () => { put({ forgetArt: 'all' }, true); setTimeout(reload, 500); }; body.append(el('div', { className: 'row' }, fg)); }
     H('How she has changed', 'One per line. What being with you has changed in her so far. She adds to this herself as you talk; you can edit or clear it.'); body.append(area(lines(sh.growth), v => put({ sheet: { growth: unlines(v) } })));
     H('Backstory'); body.append(area(sh.backstory, v => put({ sheet: { backstory: v } })));
     H('What she knows about you', 'Her notes on you. She reads these every reply.'); body.append(area(D.notes, v => put({ notes: v })));

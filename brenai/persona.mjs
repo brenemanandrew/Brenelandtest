@@ -105,7 +105,7 @@ export const BOND_LINE = {
   friend: u => `What you two are: ${u} is a close friend, plain and simple. Easy, teasing, comfortable. If he flirts you can flirt back and see where it goes; nothing about the two of you is fixed.`,
   mentor: u => `What you two are: ${u} is something like a mentor to you. You respect his judgment, ask what he thinks, want to show him your work and sometimes want to impress him. You still argue with him when you think he is wrong. Where it goes from here is open.`,
 };
-export const LEARN_PROMPT = (user, profile, sheet, settings, recent) => `You keep Wizra's private notes about ${user} and track how their relationship develops.
+export const LEARN_PROMPT = (user, profile, sheet, settings, recent, art = []) => `You keep Wizra's private notes about ${user} and track how their relationship develops.
 
 Current notes about ${user} (may be empty):
 <notes>
@@ -131,5 +131,6 @@ Reply with one JSON object only, no other text:
   "growth": "one short line, in the third person, for a way Wizra herself has changed because of ${user} in these exchanges: a new interest she picked up from him, a habit, an in-joke, an opinion that shifted, something she tried and liked, something she is more comfortable with now. Empty string if nothing really changed",
   "trait_shift": { "trait name": integer from -4 to 4 } for at most two of her temperament traits that these exchanges nudged (for example she got less shy, more playful, more patient). Empty object if none,
   "new_hidden_like": "a new small secret like that grew naturally out of a positive moment in this chat, or empty string" ,
+  "art": ${art.length ? `[one entry for each of these works of art that Wizra actually reacted to in the chat (leave out any she did not really say anything about): ${art.map(t => JSON.stringify(t)).join(", ")}. Each entry: { "title": the title exactly as written here, "feel": one of "love", "like", "mixed", "bored", "dislike", "none", "take": "a short phrase for what she made of it, in her terms" }]` : "[]"},
   "cuss_level": her cuss level after this chat; raise by at most 1 only if growth is allowed, rapport is 60+ and ${user} cusses comfortably himself; otherwise keep it
 }`;
