@@ -84,6 +84,11 @@ export function boneCloth(THREE, vrm) {
   const humanSet = new Set(Object.keys(vrm.humanoid.humanBones || {}).map(raw).filter(Boolean)), heldBy = o => { while (o && !humanSet.has(o)) o = o.parent; return o; };
   for (const c of chains) { c.f = 0; if (heldBy(c.anchor) === hips) { const l = c.p[0].clone().applyMatrix4(hips.matrixWorld.clone().invert()); c.f = Math.max(0, Math.min(1, (l.z + 0.035) / 0.07)); c.leg = l.x >= 0 ? 0 : 1; c.q = new THREE.Quaternion(); } }
   const target = (c, i, out) => { out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld); if (i && c.f > 0 && legLevel[c.leg]) { t0v.copy(c.rest[0]).applyMatrix4(c.anchor.matrixWorld); out.sub(t0v).applyQuaternion(c.q).add(t0v); } return out; };
+  // A dress can have several layers of skirt (a panel over pleats over a lining), each with its own copy of the same strips in the same
+  // place. Simulated one by one they pass through each other and the dress looks torn. So only the first layer is simulated; every other
+  // layer's strip follows its twin, and the layers stay nested the way the outfit was made.
+  { const first = {}; for (const c of chains) { const key = c.bones[0].name.replace(/_\d+$/, ''), lead = first[key]; if (lead && lead.n === c.n && lead.rest[0].distanceTo(c.rest[0]) < 0.03 && /^J_Sec_/.test(c.bones[0].name)) c.lead = lead; else if (!lead) first[key] = c; } }
+  const sim = chains.filter(c => !c.lead); for (const c of sim) c.links = c.links.filter(l => !l.b.lead);
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
   function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t);
@@ -103,17 +108,18 @@ export function boneCloth(THREE, vrm) {
     keepK += ((seated ? KEEP : (T.keepUp ?? 0.045)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
     const steps = dt > 1 / 45 ? 2 : 1, h = dt / steps;
     for (let s = 0; s < steps; s++) {
-      for (const c of chains) { wp(c.bones[0], c.p[0]); c.prev[0].copy(c.p[0]);
+      for (const c of sim) { wp(c.bones[0], c.p[0]); c.prev[0].copy(c.p[0]);
         for (let i = 1; i < c.n; i++) { const p = c.p[i], pv = c.prev[i]; a.copy(p).sub(pv).multiplyScalar(DAMP); pv.copy(p); p.add(a); p.y -= G * h * h; target(c, i, b); p.addScaledVector(b.sub(p), c.keep ?? keepNow); } }   /* a little of the tailored shape is kept, so standing she still has a skirt and not a rag */
       for (let it = 0; it < ITERS; it++) {
-        for (const c of chains) { for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; if (i === 0) B.addScaledVector(d, (c.len[i] - l) / l); else { const k = 0.5 * (c.len[i] - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } }
+        for (const c of sim) { for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; if (i === 0) B.addScaledVector(d, (c.len[i] - l) / l); else { const k = 0.5 * (c.len[i] - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } }
           for (const L of c.links) { const A = c.p[L.i], B = L.b.p[L.i]; d.copy(B).sub(A); const l = d.length() || 1e-6, want = l > L.d * 1.04 ? L.d * 1.04 : l < L.d * 0.55 ? L.d * 0.55 : l; if (want !== l) { const k = 0.5 * (want - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } } }
-        for (const c of chains) { const sl = c.keep !== undefined; const cap = c.q ? c.p[0].y - (T.tuck ?? 0.22) : 1e9;   /* a skirt or coat tail only comes to rest on things well below her waist (the seat, a low table). An armrest beside her hip is too high: the cloth goes down past it, between her and the arm, as if tucked in, instead of spreading over it */
+        for (const c of sim) { const sl = c.keep !== undefined; const cap = c.q ? c.p[0].y - (T.tuck ?? 0.22) : 1e9;   /* a skirt or coat tail only comes to rest on things well below her waist (the seat, a low table). An armrest beside her hip is too high: the cloth goes down past it, between her and the arm, as if tucked in, instead of spreading over it */
           for (let i = 1; i < c.n; i++) collide(c.p[i], sl, c.prev[i], cap); } }
-      for (const c of chains) for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; B.copy(A).addScaledVector(d, c.len[i] / l); }   /* strips never stretch */
+      for (const c of sim) for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; B.copy(A).addScaledVector(d, c.len[i] / l); }   /* strips never stretch */
     }
     // turn each bone so it points at the next point down its strip
+    for (const c of chains) if (c.lead) { wp(c.bones[0], c.p[0]); for (let i = 1; i < c.n; i++) c.p[i].copy(c.lead.p[i]).sub(c.lead.p[0]).add(c.p[0]); }   /* the other layers of the same skirt go exactly where the first one went */
     for (const c of chains) for (let i = 0; i < c.bones.length; i++) { const bone = c.bones[i]; bone.quaternion.copy(c.q0[i]); bone.updateMatrix(); m4.multiplyMatrices(bone.parent.matrixWorld, bone.matrix); a.setFromMatrixPosition(m4); m4.invert(); b.copy(c.p[i + 1]).applyMatrix4(m4).normalize();
       if (b.lengthSq() > 0.5) { q.setFromUnitVectors(c.axis[i], b); bone.quaternion.multiply(q); } bone.updateMatrix(); bone.matrixWorld.multiplyMatrices(bone.parent.matrixWorld, bone.matrix); if (i === c.bones.length - 1) for (const ch of bone.children) ch.updateMatrixWorld(true); } }
-  return { tick, reset, dbg, joints: joints.length, bones: chains.reduce((s, c) => s + c.bones.length, 0), names: chains.map(c => c.bones[0].name + ':' + c.n + ':' + c.links.length), chains: chains.length, points: chains.reduce((s, c) => s + c.n, 0) };
+  return { tick, reset, dbg, layersTied: chains.length - sim.length, joints: joints.length, bones: chains.reduce((s, c) => s + c.bones.length, 0), names: chains.map(c => c.bones[0].name + ':' + c.n + ':' + c.links.length), chains: chains.length, points: chains.reduce((s, c) => s + c.n, 0) };
 }

@@ -94,6 +94,21 @@ export async function create(url, opts = {}) {
   const phMats = []; let phFadeNow = 1;
   function photoFade(k) { k = Math.round(k * 50) / 50; if (k === phFadeNow) return; phFadeNow = k; if (!phMats.length) vrm.scene.traverse(o => { if (o.isMesh) for (const m of (Array.isArray(o.material) ? o.material : [o.material])) if (m && !phMats.some(e => e.m === m)) phMats.push({ m, t: m.transparent, o: m.opacity, d: m.depthWrite }); });
     vrm.scene.visible = k > 0.02; for (const e of phMats) { if (k >= 1) { e.m.transparent = e.t; e.m.opacity = e.o; e.m.depthWrite = e.d; } else { e.m.transparent = true; e.m.opacity = e.o * k; e.m.depthWrite = k > 0.5 ? e.d : false; } e.m.needsUpdate = true; } }
+  // a two-bone reach: turn the upper and lower bone of a limb so its end lands on a point (the bend stays in the plane it is already in)
+  const ikv = [0, 1, 2, 3, 4, 5].map(() => new THREE.Vector3()), ikq = [0, 1, 2].map(() => new THREE.Quaternion());
+  function ikTurn(bone, qW) { bone.parent.getWorldQuaternion(ikq[1]); bone.getWorldQuaternion(ikq[2]); bone.quaternion.copy(ikq[1].invert()).multiply(qW).multiply(ikq[2]); bone.updateWorldMatrix(false, true); }
+  function ikReach(A, Bn, C, t) { const [a, b, c, u, w, ax] = ikv; A.updateWorldMatrix(true, true); A.getWorldPosition(a); Bn.getWorldPosition(b); C.getWorldPosition(c);
+    const l1 = a.distanceTo(b), l2 = b.distanceTo(c), d = Math.max(Math.abs(l1 - l2) + 0.02, Math.min(l1 + l2 - 0.004, a.distanceTo(t))); u.copy(a).sub(b); w.copy(c).sub(b); const phi = u.angleTo(w), theta = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + l2 * l2 - d * d) / (2 * l1 * l2))));
+    ax.crossVectors(u, w); if (ax.lengthSq() < 1e-8) ax.set(1, 0, 0).applyQuaternion(Bn.getWorldQuaternion(ikq[2])); ax.normalize(); ikTurn(Bn, ikq[0].setFromAxisAngle(ax, theta - phi)); C.getWorldPosition(c);
+    ikTurn(A, ikq[0].setFromUnitVectors(u.copy(c).sub(a).normalize(), w.copy(t).sub(a).normalize())); }
+  // Her arms on the arms of her chair: when that is how she is resting (and she is not gesturing, holding something or out of her chair),
+  // each wrist is put on its armrest and the hand is laid flat on it, palm down, fingers forward. Eased in and out.
+  const ar = { w: 0, t: new THREE.Vector3(), q: [0, 1, 2, 3, 4, 5].map(() => new THREE.Quaternion()), yq: new THREE.Quaternion(), up: new THREE.Vector3(0, 1, 0) };
+  function armRest(s) { const want = rt.arms === 'rest' && rt.act === 'sit' && rt.stand < 0.02 && here === 'dorm' && !s.gesture && !rt.carry && !hpose.on && !mv.on && !dn.on && (rt.lie || 0) < 0.02 ? 1 : 0; ar.w += (want - ar.w) * Math.min(1, (s.dt || 0.016) * 3); if (ar.w < 0.01) return; const k = ar.w * ar.w * (3 - 2 * ar.w);
+    let i = 0; for (const [side, sx] of [['left', 1], ['right', -1]]) { const A = B(side + 'UpperArm'), E = B(side + 'LowerArm'), H = B(side + 'Hand'); if (!A || !E || !H) continue; const q0 = ar.q[i++].copy(A.quaternion), q1 = ar.q[i++].copy(E.quaternion), q2 = ar.q[i++].copy(H.quaternion);
+      ar.t.set(sx * ARM_X, ARM_TOP + 0.035, hip.z + 0.2); ikReach(A, E, H, ar.t);
+      H.parent.getWorldQuaternion(ikq[1]); H.quaternion.copy(ikq[1].invert()).multiply(vrm.scene.getWorldQuaternion(ikq[2])).multiply(ar.yq.setFromAxisAngle(ar.up, -sx * Math.PI / 2));   /* a hand at rest in the T pose is palm down, fingers out to the side: turned a quarter, they point forward */
+      if (k < 0.999) { const a1 = A.quaternion.clone(), e1 = E.quaternion.clone(), h1 = H.quaternion.clone(); A.quaternion.copy(q0).slerp(a1, k); E.quaternion.copy(q1).slerp(e1, k); H.quaternion.copy(q2).slerp(h1, k); } } }
   function photoCamApply() { const c = ph.c, cp = Math.cos(c.pitch); const cy = Math.max(floorY + 0.06, c.ty + Math.sin(c.pitch) * c.dist); let hy = floorY + 0.9; try { hy = B('hips').getWorldPosition(tmpB).y; } catch {}
     photoFade(Math.max(0, Math.min(1, (cy - (hy - 0.3)) / 0.4)));   /* the camera may go anywhere, down to the floor; as it sinks below the level of her hips she fades out, and is gone 30 cm under them, so low angles of the room are yours and nothing is seen from beneath */
     camera.position.set(c.tx + Math.sin(c.yaw) * cp * c.dist, cy, c.tz + Math.cos(c.yaw) * cp * c.dist); camera.up.set(0, 1, 0); camera.lookAt(c.tx, c.ty, c.tz); if (c.roll) camera.rotateZ(c.roll); if (camera.fov !== c.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } }
@@ -154,7 +169,7 @@ export async function create(url, opts = {}) {
   };
   // where her arms rest while she is seated and her hands are free: she changes between these now and then
   const ARMS = window.WIZRA_ARMS || {
-    rest: { leftUpperArm: [-0.15, 0.3, -0.72], leftLowerArm: [0, -1.3, 0], leftHand: [0, 0, -0.05], rightUpperArm: [-0.15, -0.3, 0.72], rightLowerArm: [0, 1.3, 0], rightHand: [0, 0, 0.05] },   /* forearms along the arms of her armchair (only used in her own chair: nowhere else has arms to rest on) */
+    rest: { leftUpperArm: [-0.1, 0.35, -1.0], leftLowerArm: [0, -1.25, 0], leftHand: [0, 0, 0], rightUpperArm: [-0.1, -0.35, 1.0], rightLowerArm: [0, 1.25, 0], rightHand: [0, 0, 0] },   /* forearms along the arms of her armchair (only used in her own chair: nowhere else has arms to rest on) */
     lap: { leftUpperArm: [-0.12, -0.3, -1.3], leftLowerArm: [0, -1.1, 0], leftHand: [0, 0, -0.15], rightUpperArm: [-0.12, 0.3, 1.3], rightLowerArm: [0, 1.1, 0], rightHand: [0, 0, 0.15] },
     folded: { leftUpperArm: [-0.12, -0.5, -1.3], leftLowerArm: [0, -1.2, 0], leftHand: [0, 0, -0.15], rightUpperArm: [-0.14, 0.5, 1.3], rightLowerArm: [0, 1.25, 0], rightHand: [0, 0, 0.15] },
     side: { leftUpperArm: [-0.12, -0.3, -1.3], leftLowerArm: [0, -1.1, 0], leftHand: [0, 0, -0.15], rightUpperArm: [0.12, 0, 1.22], rightLowerArm: [0, 0.5, 0], rightHand: [0, 0, 0.1] },
@@ -328,11 +343,11 @@ export async function create(url, opts = {}) {
   let TAG = 'chair'; const tagged = []; // everything you can tap to send her to
   const tag = (m, t = TAG, where = 'dorm') => { m.traverse(o => { if (o.isMesh) { o.userData.tag = t; o.userData.place = where; tagged.push(o); } }); return m; };
   const box = (w, h, d, x, y, z, c, rx = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.rotation.x = rx; if (Math.max(w, h, d) > 0.24) kit.outline(m); room.add(m); return tag(m); };
-  const seatTop = hip.y - 0.1;
+  const seatTop = hip.y - 0.1, ARM_X = 0.335, ARM_TOP = seatTop + 0.25;
   box(0.74, seatTop - floorY - 0.12, 0.62, 0, (seatTop - 0.12 + floorY) / 2, hip.z - 0.01, '#3a2148');           // chair body
   box(0.6, 0.14, 0.54, 0, seatTop - 0.07, hip.z + 0.03, '#5b3570');                                               // seat cushion
   box(0.74, 0.95, 0.16, 0, seatTop + 0.3, hip.z - 0.36, '#4a2a5c', -0.28);                                       // back, tilted
-  box(0.13, 0.3, 0.62, -0.38, seatTop + 0.08, hip.z - 0.01, '#4a2a5c'); box(0.13, 0.3, 0.62, 0.38, seatTop + 0.08, hip.z - 0.01, '#4a2a5c'); // arms
+  box(0.14, 0.32, 0.62, -ARM_X, seatTop + 0.09, hip.z - 0.01, '#4a2a5c'); box(0.14, 0.32, 0.62, ARM_X, seatTop + 0.09, hip.z - 0.01, '#4a2a5c'); // arms: close enough in, and high enough, for her forearms to lie on
   const tableTop = feet.y - (window.WIZRA_TABLE || 0.1), tableZ = feet.z + 0.03; TAG = 'table';
   box(0.8, 0.05, 0.4, 0, tableTop - 0.025, tableZ + 0.02, '#3b2a1c');                                            // table top
   for (const [x, z] of [[-0.35, -0.13], [0.35, -0.13], [-0.35, 0.17], [0.35, 0.17]]) box(0.05, tableTop - floorY - 0.05, 0.05, x, (tableTop - 0.05 + floorY) / 2, tableZ + z, '#2a1d14');
@@ -1212,7 +1227,7 @@ export async function create(url, opts = {}) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       if (window.WIZRA_FIX) { let soft = Math.max(rt.lie || 0, hpose.on ? 1 : 0); for (const n in SEATED) soft = Math.max(soft, rt.lg[n] || 0); fixBody(1 - Math.min(1, soft)); }   // her arms and legs keep out of her own body (not in the recorded curled-up and lying poses, which fold her on purpose)
-      vrm.update(s.dt); clothTick(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
+      try { armRest(s); } catch {} vrm.update(s.dt); clothTick(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
       placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now()); quality(performance.now());
       if (cinema && places.power) { const f = 0.5 + 0.5 * Math.sin(s.t / 140) * Math.sin(s.t / 370); screenLight.color.set(cinema); screenLight.intensity = 1.2 + 1.3 * f; if (here === 'house') screenLight.position.copy(places.tv.at).add(tmpB.set(0, 0, 0.35)); else screenLight.position.set(0.2, floorY + 1.25, hip.z + 2.4); } else screenLight.intensity = 0;
       // flushed cheeks, only from the front
