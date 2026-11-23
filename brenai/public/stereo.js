@@ -3,8 +3,11 @@
 // twice, once in each eye's half, at the same place, so they read as one: her last line as a subtitle, a box to type in, and
 // buttons to change mode and leave. Voice works as usual.
 // Head tracking (so turning your head looks around her room) comes in through WizraStereo.head(yaw, pitch, roll) in degrees.
-// While the mode is on the page also listens for a small helper app on the same device at ws://127.0.0.1:8765 that sends
+// While the mode is on the page also listens for a small helper app on the same device at ws://127.0.0.1:8766 that sends
 // {"yaw":..,"pitch":..,"roll":..} lines. The helper is described in VITURE.md; nothing breaks if it is not there.
+// On a phone (touch screen) it also locks the screen sideways while the mode is on: the glasses show a copy of the phone's
+// screen, and an upright phone sends them a narrow picture that the glasses' side-by-side mode then splits in the wrong place.
+// Works in Chrome on Android; iPhones ignore it.
 //   WizraStereo.set('half' | 'full' | '')   WizraStereo.cycle()   WizraStereo.head(yaw, pitch, roll)   WizraStereo.mode
 (function () {
   const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids.filter(k => k != null)); return e; };
@@ -33,11 +36,15 @@
   const hook = () => { if (typeof window.typeOut !== 'function' || window.typeOut.__sbs) return; const base = window.typeOut, wrapped = function (body, text) { try { if (S.mode && body && body.dataset && body.dataset.who === 'her') say(text); } catch {} return base.apply(this, arguments); }; wrapped.__sbs = true; window.typeOut = wrapped; };
   // head tracking: degrees in, relative to where you were looking when it started (or when you pressed the centre button)
   function head(yaw, pitch, roll) { S.last = { yaw: +yaw || 0, pitch: +pitch || 0, roll: +roll || 0 }; if (!S.zero) S.zero = { ...S.last }; if (!S.mode) return; const r = Math.PI / 180; let dy = S.last.yaw - S.zero.yaw; dy = ((dy + 540) % 360) - 180; try { avatar.head(dy * r, Math.max(-70, Math.min(70, S.last.pitch - S.zero.pitch)) * r, (S.last.roll - S.zero.roll) * r); } catch {} }
-  function listen() { clearTimeout(S.wsT); if (!S.mode || S.ws) return; let ws; try { ws = new WebSocket('ws://127.0.0.1:8765'); } catch { return; } S.ws = ws;
+  function listen() { clearTimeout(S.wsT); if (!S.mode || S.ws) return; let ws; try { ws = new WebSocket('ws://127.0.0.1:8766'); } catch { return; } S.ws = ws;
     ws.onmessage = m => { try { const d = JSON.parse(m.data); if (d && typeof d.yaw === 'number') head(d.yaw, d.pitch, d.roll); } catch {} }; ws.onclose = ws.onerror = () => { if (S.ws === ws) S.ws = null; if (S.mode) S.wsT = setTimeout(listen, 6000); }; }
+  const touch = () => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } };
+  const lockSideways = () => { try { if (touch() && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch {} };
+  const unlockSideways = () => { try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch {} };
+  const goFull = () => { const d = document.documentElement; if (document.fullscreenElement || !d.requestFullscreen) return lockSideways(); try { d.requestFullscreen().then(lockSideways, lockSideways); } catch { lockSideways(); } };
   function set(mode) { mode = mode === 'full' || mode === 'half' ? mode : ''; hook(); let got = ''; try { got = avatar.stereo(mode) || ''; } catch {} if (mode && !got) { try { addSys('3D glasses mode needs her 3D model.'); } catch {} mode = ''; }
     S.mode = api.mode = mode; document.body.classList.toggle('sbs', !!mode); ui.classList.toggle('half', mode === 'half'); for (const e of eyes) e.mode.textContent = mode === 'half' ? 'Half ⇄' : 'Full ⇄'; try { localStorage.setItem('brenai.sbs', mode); } catch {}
-    if (mode) { listen(); try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch {} } else { say(''); S.zero = null; try { avatar.head(0, 0, 0); } catch {} if (S.ws) { try { S.ws.close(); } catch {} S.ws = null; } try { document.fullscreenElement && document.exitFullscreen(); } catch {} }
+    if (mode) { listen(); goFull(); } else { say(''); S.zero = null; try { avatar.head(0, 0, 0); } catch {} if (S.ws) { try { S.ws.close(); } catch {} S.ws = null; } unlockSideways(); try { document.fullscreenElement && document.exitFullscreen(); } catch {} }
     window.dispatchEvent(new Event('resize')); return mode; }
   const api = window.WizraStereo = { set, cycle: () => set(S.mode === '' ? 'half' : S.mode === 'half' ? 'full' : ''), head, mode: '' };
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.mode) set(''); });
