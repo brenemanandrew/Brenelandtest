@@ -97,6 +97,9 @@ Added since the reset on 2026-11-21, all live:
 - D&D night: everyone sits, the Dungeon Master is centred, the die answers at once, two adventures to choose from, pack away and carry on later, and walking in on her playing alone (evenings, at most once a day).
 - Movie night: she stays on the couch for the whole film, sits closer and leans in as romance level rises, a popcorn bucket sits in the player's lap, leaving asks first.
 - Phone menu bar is smaller. An owner typing `Wizra: line` puts the line down as hers.
+- Photo studio (settings wheel, owner only): free orbit camera, pose presets, drag hands and feet (IK), turn any joint, expressions, move her, take the picture as a PNG. The camera stays above her hip level. `public/photo.js`.
+- Rooms: one scenery panel per windowed wall meeting at the corners (no more panels cutting through each other or flickering); furniture placed through a wall is slid back inside at build time.
+- Wide sleeves hang under gravity (bone cloth strips made at load, like coat tails).
 - Skills for agents: `brenai/skills/*/SKILL.md` (seven). Rule: when a skill or this file changes, tell the Brenebase session and make sure Brenebase has the new version (see `AGENTS.md`).
 
 Not verified with the real PC model (it is not reachable from the cloud build session):
@@ -109,7 +112,8 @@ Not verified on a real screen or device:
 - 3D glasses mode on real glasses. Bone cloth standing and walking, and on outfits other than the Lv1 and Lv4 D&D ones. The D&D chooser and walk-in. Movie night lean and bucket after the last adjustment.
 
 Open work:
-- Wide sleeves still hang rigidly: they need the same made-at-load strips as coat tails.
+- Sleeves: small spikes can show near the elbow where arm-held and strip-held points meet. Only checked on the Lv1 D&D outfit.
+- Furniture overlapping other furniture in the Studio maps (bean bag and pouf, cooler and snacks, trees through the tent at the campsite) is not changed: some of it is intended.
 - The picture pack was rendered before bone cloth: pictures showing a stiff skirt or coat hoop need rendering again (`tools/picpack/gen2.cjs`, a long job against the live site).
 - Room clipping: the scenery outside the windows, and newer furniture placements. Not investigated.
 - Sound clips: someone has to make them (in her voice) and upload them.
