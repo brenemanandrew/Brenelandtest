@@ -962,7 +962,7 @@ $('visitBtn').onclick = e => { e.stopPropagation(); openFly(); };
 $('picView').onclick = () => { $('picView').hidden = true; };
 document.addEventListener('click', e => { if (!$('visitMenu').hidden && !$('visitMenu').contains(e.target)) $('visitMenu').hidden = true; });
 $('fpLog').onclick = () => { document.body.classList.toggle('fplog'); log.scrollTop = log.scrollHeight; };
-$('fpLeave').onclick = async () => {
+$('fpLeave').onclick = async () => { if (cine.on && !confirm('Get up in the middle of the film? She will notice.')) return;   /* on movie night you stay put unless you mean it */
   const was = visitInfo.place; if (seeingOut) return;
   try {
     const r = await api('/api/visit', { place: '' }); const d = await r.json(); if (was) addSys(was === 'house' ? 'Wizra headed home.' : 'You headed home.');
@@ -995,9 +995,9 @@ const cine = { on: false, view: 'couch', heat: 0, owe: 0, timer: 0, hit: 0, thro
 const cineWanted = () => !!(visitInfo.place === 'house' && visitInfo.movie && !visitInfo.solo && !away);
 function cineHeatShow() { const h = Math.max(0, Math.min(100, cine.heat)); $('cineHeat').firstElementChild.style.height = h + '%'; $('cineHeat').classList.toggle('full', h >= 100); }
 function cineWarm(n) { cine.heat = Math.max(0, Math.min(100, cine.heat + n)); cine.owe += n; cineHeatShow(); }
-function cineView(v, quiet) { if (!cine.on) return; const f = $('cineFade'); f.classList.add('on'); setTimeout(() => { cine.view = v; avatar.movieMode(true, v); for (const b of $('cineViews').children) b.classList.toggle('on', b.dataset.v === v); $('cineCount').classList.toggle('on', v === 'toss'); if (v === 'toss') { avatar.gesture('ahh', 4); cineCountShow(); } f.classList.remove('on'); }, quiet ? 0 : 170); }   /* a cut, not a glide: a blink of black between angles */
+function cineView(v, quiet) { if (!cine.on) return; const f = $('cineFade'); f.classList.add('on'); setTimeout(() => { cine.view = v; avatar.movieMode(true, v, visitInfo.level); for (const b of $('cineViews').children) b.classList.toggle('on', b.dataset.v === v); $('cineCount').classList.toggle('on', v === 'toss'); if (v === 'toss') { avatar.gesture('ahh', 4); cineCountShow(); } f.classList.remove('on'); }, quiet ? 0 : 170); }   /* a cut, not a glide: a blink of black between angles */
 function cineCountShow() { $('cineCount').textContent = cine.thrown ? `🍿 ${cine.hit} / ${cine.thrown}` : '🍿'; }
-function cineSet(on) { on = !!on; if (on === cine.on) return; if (on && !avatar.movieMode(true, 'couch')) return; cine.on = on; document.body.classList.toggle('cine', on); document.body.classList.remove('cinetalk'); clearInterval(cine.timer);
+function cineSet(on) { on = !!on; if (on === cine.on) return; if (on && !avatar.movieMode(true, 'couch', visitInfo.level)) return; cine.on = on; document.body.classList.toggle('cine', on); document.body.classList.remove('cinetalk'); clearInterval(cine.timer);
   if (!on) { avatar.movieMode(false); return; } cine.view = 'couch'; cine.heat = (visitInfo.movie && visitInfo.movie.heat) || 0; cine.owe = 0; cine.hit = cine.thrown = 0; cineHeatShow(); cineView('couch', true);
   cine.timer = setInterval(() => { if (!cine.on) return; const m = visitInfo.movie; if (m && !m.paused) cineWarm(cine.view === 'side' ? 1.5 : 1);   /* just sitting together warms it slowly; watching her, a little faster */
     if (Math.abs(cine.owe) >= 1) { const n = cine.owe; cine.owe = 0; api('/api/movie', { heat: n }).catch(() => {}); } }, 20000); }
