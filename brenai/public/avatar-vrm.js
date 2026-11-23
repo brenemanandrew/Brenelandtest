@@ -106,7 +106,7 @@ export async function create(url, opts = {}) {
   const ar = { w: 0, t: new THREE.Vector3(), q: [0, 1, 2, 3, 4, 5].map(() => new THREE.Quaternion()), yq: new THREE.Quaternion(), up: new THREE.Vector3(0, 1, 0) };
   function armRest(s) { const want = rt.arms === 'rest' && rt.act === 'sit' && rt.stand < 0.02 && here === 'dorm' && !s.gesture && !rt.carry && !hpose.on && !mv.on && !dn.on && (rt.lie || 0) < 0.02 ? 1 : 0; ar.w += (want - ar.w) * Math.min(1, (s.dt || 0.016) * 3); if (ar.w < 0.01) return; const k = ar.w * ar.w * (3 - 2 * ar.w);
     let i = 0; for (const [side, sx] of [['left', 1], ['right', -1]]) { const A = B(side + 'UpperArm'), E = B(side + 'LowerArm'), H = B(side + 'Hand'); if (!A || !E || !H) continue; const q0 = ar.q[i++].copy(A.quaternion), q1 = ar.q[i++].copy(E.quaternion), q2 = ar.q[i++].copy(H.quaternion);
-      ar.t.set(sx * ARM_X, ARM_TOP + 0.035, hip.z + 0.2); ikReach(A, E, H, ar.t);
+      ar.t.set(sx * ARM_X, ARM_TOP + 0.035, hip.z + (sx < 0 ? 0.02 : 0.2)); ikReach(A, E, H, ar.t);   /* (her right hand sits a little further back: her mug stands at the front of that arm) */
       H.parent.getWorldQuaternion(ikq[1]); H.quaternion.copy(ikq[1].invert()).multiply(vrm.scene.getWorldQuaternion(ikq[2])).multiply(ar.yq.setFromAxisAngle(ar.up, -sx * Math.PI / 2));   /* a hand at rest in the T pose is palm down, fingers out to the side: turned a quarter, they point forward */
       if (k < 0.999) { const a1 = A.quaternion.clone(), e1 = E.quaternion.clone(), h1 = H.quaternion.clone(); A.quaternion.copy(q0).slerp(a1, k); E.quaternion.copy(q1).slerp(e1, k); H.quaternion.copy(q2).slerp(h1, k); } } }
   function photoCamApply() { const c = ph.c, cp = Math.cos(c.pitch); const cy = Math.max(floorY + 0.06, c.ty + Math.sin(c.pitch) * c.dist); let hy = floorY + 0.9; try { hy = B('hips').getWorldPosition(tmpB).y; } catch {}
@@ -424,7 +424,7 @@ export async function create(url, opts = {}) {
     book: [new THREE.Vector3(0.24, tableTop + 0.012, feet.z - 0.08), new THREE.Euler(-Math.PI / 2, 0, 0.4)],
     bookShelf: [new THREE.Vector3(SHELF.x - 0.19, floorY + 0.07 + 2 * 0.41 + 0.1, SHELF.z + 0.02), new THREE.Euler(0, Math.PI / 2, 0)], // its gap on the shelf
     phone: [new THREE.Vector3(-0.26, tableTop + 0.006, feet.z - 0.1), new THREE.Euler(-Math.PI / 2, 0, -0.3)],
-    mug: [new THREE.Vector3(-0.38, seatTop + 0.275, hip.z + 0.16), new THREE.Euler(0, 0.6, 0)],
+    mug: [new THREE.Vector3(-ARM_X, ARM_TOP + 0.045, hip.z + 0.255), new THREE.Euler(0, 0.6, 0)],   /* at the front end of the chair arm, clear of her hand */
   };
   const PROP = { read: book, phone, sip: mug }, PROP_KEY = { read: 'book', phone: 'phone', sip: 'mug' };
   const raw = n => vrm.humanoid.getRawBoneNode(n);
