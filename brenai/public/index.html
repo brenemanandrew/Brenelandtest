@@ -405,6 +405,16 @@
   #fpMoments { display:none; } body.fp #fpMoments { display:flex; flex-direction:column; gap:10px; position:fixed; left:10px; top:34%; z-index:6; }
   #fpMoments button { width:48px; height:48px; border-radius:50%; border:0; background:#fff; font-size:22px; line-height:1; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); position:relative; } #fpMoments button.lead { box-shadow:0 0 0 3px #ff8fc0, 0 4px 0 rgba(0,0,0,.3); }
   #fpMoments button small { position:absolute; right:-6px; bottom:-4px; min-width:20px; padding:1px 5px; border-radius:999px; background:#3a2a66; color:#fff; font:700 11px "Fredoka",sans-serif; }
+  /* phones, when you are in the room with her: she is what the screen is for. The chat is a low sheet at the bottom you can see her over, the round
+     buttons are small and down the right edge, your own picture is small, and nothing sits on top of anything else. */
+  @media (max-width:640px) {
+    body.fp { --me:50px; }
+    body.fp.fplog #logWrap { position:fixed !important; left:6px !important; right:6px !important; top:auto !important; bottom:calc(var(--band, 54px) + 22px + env(safe-area-inset-bottom)) !important; width:auto !important; height:26dvh !important; max-height:26dvh !important; min-height:0 !important; transform:none !important; margin:0 !important; z-index:5; background:rgba(255,251,246,.8); border-radius:16px; }
+    body.fp #fpBar { left:6px; top:calc(5px + env(safe-area-inset-top)); } body.fp #fpBar button { padding:5px 10px; font-size:12.5px; margin:0 4px 0 0; box-shadow:0 2px 5px rgba(0,0,0,.25); }
+    body.fp #fpMoments { left:auto; right:6px; top:calc(48px + env(safe-area-inset-top)); gap:7px; } body.fp #fpMoments button { width:36px; height:36px; font-size:17px; box-shadow:0 2px 0 rgba(0,0,0,.3); } body.fp #fpMoments button.lead { box-shadow:0 0 0 2px #ff8fc0, 0 2px 0 rgba(0,0,0,.3); } body.fp #fpMoments button small { right:-5px; bottom:-4px; min-width:15px; padding:0 4px; font-size:9.5px; }
+    body.fp #meBox { position:fixed !important; right:6px !important; left:auto !important; top:auto !important; bottom:calc(var(--band, 54px) + 26px + env(safe-area-inset-bottom)) !important; width:50px !important; height:50px !important; transform:none !important; z-index:6; opacity:.92; } body.fp.fplog #meBox { bottom:calc(var(--band, 54px) + 30px + 26dvh + env(safe-area-inset-bottom)) !important; }
+    body.fp #fpHint { font-size:13.5px; padding:4px 10px; }
+  }
   #fpChoices { position:fixed; left:68px; top:34%; z-index:7; display:flex; flex-direction:column; gap:8px; max-width:min(300px, calc(100vw - 84px)); } #fpChoices[hidden] { display:none; }
   #fpChoices button { text-align:left; border:0; border-radius:16px; padding:10px 14px; background:#fff; color:#3a2a5c; font-family:"Patrick Hand","Fredoka",sans-serif; font-size:17px; line-height:1.2; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); }
   #bondPop { position:fixed; left:50%; top:22%; z-index:48; transform:translateX(-50%); font-family:"Bangers","Fredoka",sans-serif; font-size:34px; color:#fff; text-shadow:0 3px 0 #a8327a, 0 0 12px rgba(0,0,0,.6); pointer-events:none; opacity:0; } #bondPop.go { animation:bondPop 1.8s ease-out; }
