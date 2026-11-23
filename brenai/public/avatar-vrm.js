@@ -77,6 +77,18 @@ export async function create(url, opts = {}) {
   if (window.WIZRA_BUILD != null) setBuild(window.WIZRA_BUILD);
   // Her skirt and coat tails as real cloth (bonecloth.js): one weighted sheet that rests on her legs and the seat, instead of
   // the model's own separate springy strips. Hair stays with the spring bone code. Its reset follows the spring bones' reset.
+  // 3D glasses (VITURE and other side-by-side displays): the scene is drawn twice, once for each eye, left and right halves of the
+  // picture. 'full' = each half keeps its true shape (the glasses show a 32:9 picture); 'half' = each half is squeezed to half
+  // width (the glasses stretch a normal 16:9 picture). The two eyes meet at her distance, so she sits at the depth of the screen
+  // and the room goes back behind her. head(yaw, pitch, roll) turns the view on top of whatever camera is in charge: that is
+  // where a head tracker plugs in (see VITURE.md).
+  const sbs = { mode: '', eye: 0.064, head: new THREE.Euler(0, 0, 0, 'YXZ'), headOn: false, rig: new THREE.StereoCamera(), q: new THREE.Quaternion(), keep: new THREE.Quaternion(), v2: new THREE.Vector2(), hv: new THREE.Vector3() };
+  function renderView() { if (!sbs.mode) { renderer.render(scene, camera); return; }
+    const sz = renderer.getSize(sbs.v2), W = sz.x, H = sz.y, half = W / 2; sbs.keep.copy(camera.quaternion); if (sbs.headOn) { camera.quaternion.multiply(sbs.q.setFromEuler(sbs.head)); }
+    let focus = 1.6; try { head.getWorldPosition(sbs.hv); focus = Math.max(0.45, Math.min(5, sbs.hv.distanceTo(camera.position))); } catch {}
+    camera.aspect = W / H; camera.focus = focus; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); sbs.rig.aspect = sbs.mode === 'full' ? 0.5 : 1; sbs.rig.eyeSep = sbs.eye * Math.min(1, focus / 0.9); sbs.rig.update(camera);   /* very close up the eyes are brought together a little, or it is hard to look at */
+    renderer.setScissorTest(true); renderer.setViewport(0, 0, half, H); renderer.setScissor(0, 0, half, H); renderer.render(scene, sbs.rig.cameraL); renderer.setViewport(half, 0, half, H); renderer.setScissor(half, 0, half, H); renderer.render(scene, sbs.rig.cameraR);
+    renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H); camera.quaternion.copy(sbs.keep); }
   let cloth = null; try { cloth = boneCloth(THREE, vrm); if (cloth && vrm.springBoneManager) { const man = vrm.springBoneManager, r0 = man.reset.bind(man); man.reset = () => { r0(); try { cloth.reset(); } catch {} }; } } catch (e) { console.warn('bone cloth', e); }
   const clothTick = dt => { if (cloth) { try { cloth.tick(dt, build.v); } catch (e) { console.warn('bone cloth', e); cloth = null; } } };
   // Her mouth: this model's inside-of-the-mouth picture is plain grey (teeth, a grey cavity, a grey tongue), which shows as a grey
@@ -1101,11 +1113,13 @@ export async function create(url, opts = {}) {
     bonusOrbit(dx, dy, dz) { bz.yaw -= dx * 0.008; bz.pitch = Math.max(-0.05, Math.min(1.25, bz.pitch + dy * 0.006)); bz.dist = Math.max(0.5, Math.min(2.8, bz.dist * (1 + dz))); },
     bonusHit, hang, hangView, hangZone, hangMouth, movieMode, movieLook, dndMode, dndSurprise, setBuild,
     snapshot, focus(k) { focusWant = Math.max(0, Math.min(1, k)); }, tears(on) { tearsWant = on ? 1 : 0; },
+    stereo(mode, o) { if (mode !== undefined) { sbs.mode = mode === 'full' || mode === 'half' ? mode : ''; size = ''; } if (o) Object.assign(sbs, o); return sbs.mode; },
+    head(yaw, pitch, roll) { sbs.head.set(pitch || 0, yaw || 0, roll || 0, 'YXZ'); sbs.headOn = !!(yaw || pitch || roll); },
     draw(s) {
       if (snapReq) { const q = snapReq; snapReq = null; let url = ''; try { url = takeSnap(q.spec); } catch (e) { console.error('snapshot', e); } size = ''; q.done(url); }
       const W = el.clientWidth, H = el.clientHeight, key = W + 'x' + H;
       if (key !== size && W && H) { size = key; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
-      if (frozen) { bonusCamera(s.t); renderer.render(scene, camera); return; }   // time stands still: nothing about her moves, only the view
+      if (frozen) { bonusCamera(s.t); renderView(); return; }   // time stands still: nothing about her moves, only the view
       routine(s);                               // where she is and what she is holding
       applyGesture(hpose.on ? null : s.gesture, s.faceName, s.dt); // body first: a gesture can also ask for a face (a yawn opens her mouth)
       // expressions ease toward the face the controller picked; blinking and talking are immediate
@@ -1150,7 +1164,7 @@ export async function create(url, opts = {}) {
       const blushWant = (s.face.blush || 0) * (fwd.dot(toCam) > 0.25 ? 0.42 : 0); blushNow += (blushWant - blushNow) * Math.min(1, s.dt * 4); blushMat.opacity = blushNow;
       // the close camera stays on her face wherever she goes
       head.getWorldPosition(tmpA); tmpA.y += eyeUp; eye.lerp(tmpA, Math.min(1, s.dt * 8)); near.set(eye.x, eye.y - 0.035, eye.z);
-      renderer.render(scene, camera);
+      renderView();
       if (thumbCb && !fp.on && zoom < 0.03 && rt.act === 'sit' && rt.stand < 0.01 && !rt.glow && !s.gesture && !s.blink) { const cb = thumbCb; thumbCb = null; try { cb(renderer.domElement.toDataURL('image/webp', 0.85)); } catch {} } // straight after a draw, while the picture is still in the canvas
     },
     dispose() { clearInterval(dayTimer); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', keysOff); el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
