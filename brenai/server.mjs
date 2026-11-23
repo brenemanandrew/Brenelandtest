@@ -293,8 +293,8 @@ const TOUCH = { pointshelf: ['points her to the bookshelf', 'points her to the b
 // (each player's own list: cur().touches)
 function takeTouches() {
   const fresh = cur().touches.filter(t => Date.now() - t.at < 15 * 60000); cur().touches = [];
-  const n = {}; for (const t of fresh) n[t.kind] = (n[t.kind] || 0) + 1;
-  return Object.keys(n).map(k => (TOUCH[k][n[k] > 1 ? 1 : 0] || TOUCH[k][0]).replace('%n', n[k])).join(', ');
+  const n = {}, art = fresh.filter(t => t.kind === 'art').pop(); for (const t of fresh) if (TOUCH[t.kind]) n[t.kind] = (n[t.kind] || 0) + 1;
+  return [...Object.keys(n).map(k => (TOUCH[k][n[k] > 1 ? 1 : 0] || TOUCH[k][0]).replace('%n', n[k])), ...(art ? [`has stopped in front of "${art.what}"${art.by ? ' by ' + art.by : ''} and is looking at it`] : [])].join(', ');
 }
 // a log entry as the model sees it: the silent cur().touches ride in front of his words as an action
 const withPre = e => (e.pre ? `*${e.pre}* ` : '') + picNote(e.pic) + e.text;
@@ -623,7 +623,8 @@ function placeNote() { const n = placeNote1(); return db.agree ? (n ? n + ' ' : 
 function placeNote1() { if (db.place === 'house' && db.solo) return `Right now ${USER_NAME} is at home in his own room. You are not with him: you are at your place, messaging him as usual.`; if (db.place && db.solo) return `Right now ${USER_NAME} is out at ${placeLabel(db.place)} on his own. You are not with him: you are at home, messaging him as usual. You could ask what he is up to, or decide to go and join him.`; const base = placeNote0(); return base && db.movie ? base + movieNote() : base; }
 function placeNote0() {
   if (db.place === 'house') return `Right now you are at ${USER_NAME}'s house, in his living room, with him in person: his couch (you are on it), a coffee table, his TV, a bookshelf and a kitchen counter. You are physically together, not messaging. You can touch things, look around, comment on his place.`;
-  if (customMap(db.place)) { const m = customMap(db.place); return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.`; }
+  if (customMap(db.place)) { const m = customMap(db.place), art = (m.items || []).filter(i => i.kind === 'artwork' && i.title);
+    return `Right now you and ${USER_NAME} are together in person at ${m.name}${m.about ? ': ' + m.about : ''}. You are physically together, not messaging.` + (art.length ? ` What is on show here (what each one is, for you to look at and talk about; you have not studied them, you are seeing them tonight like he is. Have real reactions: love some, be bored or unconvinced by others, be puzzled, change your mind, or simply have nothing to say about one. Never recite these notes or list the works; talk about the one in front of you both, or one that catches your eye): ` + art.map(i => `"${i.title}" by ${i.by || 'an unknown maker'}${i.date ? ', ' + i.date : ''}${i.what ? ' (' + i.what + ')' : ''}` + (i.id === db.artNow ? `: ${i.about || ''} [this is the one ${USER_NAME} is standing in front of]` : '')).join('; ') + '.' + (db.artNow ? '' : ' When he stops in front of one you will be told which, and what it looks like.') : ''); }
   if (db.place === 'dorm') return `Right now ${USER_NAME} is in your dorm room with you, in person: your armchair, your bed, your desk, your posters and fairy lights. You are physically together, not messaging. It is your space and he is the guest.`;
   return canVisit() ? `You and ${USER_NAME} are close enough now to hang out in person. Now and then, when it fits, you can invite him over to your dorm room or ask to come over to his place, in plain words.` : '';
 }
@@ -1191,8 +1192,9 @@ async function handle(req, res) {
       }
 
       if (url.pathname === '/api/touch' && req.method === 'POST') {
-        const { kind } = await readBody(req);
-        if (TOUCH[kind] && cur().touches.length < 40) cur().touches.push({ kind, at: Date.now() });
+        const { kind, id } = await readBody(req);
+        if (kind === 'art') { const m = db.place && customMap(db.place), it = m && (m.items || []).find(i => i.kind === 'artwork' && i.id === String(id || '')); if (it) { db.artNow = it.id; cur().touches = cur().touches.filter(t => t.kind !== 'art'); cur().touches.push({ kind: 'art', at: Date.now(), what: String(it.title || '').slice(0, 80), by: String(it.by || '').slice(0, 60) }); } }   /* which work of art he has stopped in front of (only the latest counts) */
+        else if (TOUCH[kind] && cur().touches.length < 40) cur().touches.push({ kind, at: Date.now() });
         return json(res, 200, { ok: true });
       }
 

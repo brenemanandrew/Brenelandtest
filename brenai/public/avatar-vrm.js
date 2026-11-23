@@ -91,6 +91,13 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     camera.aspect = W / H; camera.focus = focus; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); sbs.rig.aspect = sbs.mode === 'full' ? 0.5 : 1; sbs.rig.eyeSep = sbs.eye * Math.min(1, focus / 0.9); sbs.rig.update(camera);   /* very close up the eyes are brought together a little, or it is hard to look at */
     renderer.setScissorTest(true); renderer.setViewport(0, 0, half, H); renderer.setScissor(0, 0, half, H); renderer.render(scene, sbs.rig.cameraL); renderer.setViewport(half, 0, half, H); renderer.setScissor(half, 0, half, H); renderer.render(scene, sbs.rig.cameraR);
     renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H); camera.quaternion.copy(sbs.keep); }
+  // Works of art in a room (the 'artwork' prop): which one you have walked up to and are facing. After a moment in front of one, the page is told
+  // (it shows the label and lets her know); walking off tells it null.
+  const artW = { cb: null, key: '', list: [], cur: null, since: 0, told: null, next: 0, v: new THREE.Vector3(), f: new THREE.Vector3() };
+  function artLook(t) { if (!artW.cb || t < artW.next) return; artW.next = t + 300; if (!fp.on) { if (artW.told) { artW.told = null; artW.cb(null); } return; } const g = places.groups[here]; if (!g) return; const key = here + g.children.length;
+    if (key !== artW.key) { artW.key = key; artW.list = []; g.traverse(o => { if (o.userData && o.userData.item && o.userData.item.kind === 'artwork' && o.userData.item.img) artW.list.push(o); }); }
+    camera.getWorldDirection(artW.f); let best = null, bd = 9; for (const o of artW.list) { o.getWorldPosition(artW.v); artW.v.y += (o.userData.item.stand ? 1.3 : (+o.userData.item.ah || 0.7) / 2); artW.v.sub(camera.position); const d = artW.v.length(); if (d > 2.8) continue; if (artW.v.normalize().dot(artW.f) < 0.86) continue; if (d < bd) { bd = d; best = o.userData.item; } }
+    if (best !== artW.cur) { artW.cur = best; artW.since = t; } if (artW.cur !== artW.told && (t - artW.since > (artW.cur ? 900 : 1500))) { artW.told = artW.cur; artW.cb(artW.cur); } }
   const ph = { on: false, liveUntil: 0, fov0: 0, c: { tx: 0, ty: 1.2, tz: 0, yaw: 0, pitch: 0.1, dist: 2.5, roll: 0, fov: 30 } }, PH_BONES = ['head', 'neck', 'chest', 'spine', 'hips', 'leftShoulder', 'rightShoulder', 'leftUpperArm', 'rightUpperArm', 'leftLowerArm', 'rightLowerArm', 'leftHand', 'rightHand', 'leftUpperLeg', 'rightUpperLeg', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot'],
     PH_LIMIT = { head: 0.9, neck: 0.6, chest: 0.6, spine: 0.7, hips: 3.2, Shoulder: 0.5, UpperArm: 2.6, LowerArm: 2.6, Hand: 1.3, UpperLeg: 2.2, LowerLeg: 2.5, Foot: 1 };
   const phMats = []; let phFadeNow = 1;
@@ -1193,6 +1200,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     photoPose(name, secs) { ph.liveUntil = performance.now() + (secs || 1.5) * 1000; },   /* let her move for a moment (a gesture, a pose), then time stops again where she is */
     photoFace(name, v) { try { if (name === 'reset') { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blink', 'blinkLeft', 'blinkRight', 'aa', 'ih', 'ou', 'ee', 'oh']) vrm.expressionManager.setValue(n, 0); } else vrm.expressionManager.setValue(name, Math.max(0, Math.min(1, +v))); } catch {} },
     photoShot(scale) { const pr = renderer.getPixelRatio(), W = el.clientWidth, H = el.clientHeight; renderer.setPixelRatio(Math.max(1, Math.min(4, (scale || 2)))); renderer.setSize(W, H, false); photoCamApply(); vrm.scene.updateMatrixWorld(true); renderView(); const url = renderer.domElement.toDataURL('image/png'); renderer.setPixelRatio(pr); renderer.setSize(W, H, false); size = ''; return url; },
+    artWatch(cb) { artW.cb = cb; },
     stereo(mode, o) { if (mode !== undefined) { sbs.mode = mode === 'full' || mode === 'half' ? mode : ''; size = ''; } if (o) Object.assign(sbs, o); return sbs.mode; },
     head(yaw, pitch, roll) { sbs.head.set(pitch || 0, yaw || 0, roll || 0, 'YXZ'); sbs.headOn = !!(yaw || pitch || roll); },
     draw(s) {
@@ -1217,7 +1225,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
         if (clipFace) { const useFine = fine.has && clipFace.mFun !== undefined; if (useFine) { fine.set(clipFace); fineOn = true; } for (const k in clipFace) if (em.getExpression(k) && !(useFine && WHOLE.includes(k))) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.7 - tearMat.opacity) * Math.min(1, s.dt * 4);
-      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt); dndCamera(s.dt, s.t);
+      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt); dndCamera(s.dt, s.t); artLook(s.t);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp && !(mv.on && mv.view === 'toss');   // the TV is on and nobody is talking
