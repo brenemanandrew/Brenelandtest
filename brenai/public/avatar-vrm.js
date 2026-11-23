@@ -154,6 +154,7 @@ export async function create(url, opts = {}) {
   };
   // where her arms rest while she is seated and her hands are free: she changes between these now and then
   const ARMS = window.WIZRA_ARMS || {
+    rest: { leftUpperArm: [-0.15, 0.3, -0.72], leftLowerArm: [0, -1.3, 0], leftHand: [0, 0, -0.05], rightUpperArm: [-0.15, -0.3, 0.72], rightLowerArm: [0, 1.3, 0], rightHand: [0, 0, 0.05] },   /* forearms along the arms of her armchair (only used in her own chair: nowhere else has arms to rest on) */
     lap: { leftUpperArm: [-0.12, -0.3, -1.3], leftLowerArm: [0, -1.1, 0], leftHand: [0, 0, -0.15], rightUpperArm: [-0.12, 0.3, 1.3], rightLowerArm: [0, 1.1, 0], rightHand: [0, 0, 0.15] },
     folded: { leftUpperArm: [-0.12, -0.5, -1.3], leftLowerArm: [0, -1.2, 0], leftHand: [0, 0, -0.15], rightUpperArm: [-0.14, 0.5, 1.3], rightLowerArm: [0, 1.25, 0], rightHand: [0, 0, 0.15] },
     side: { leftUpperArm: [-0.12, -0.3, -1.3], leftLowerArm: [0, -1.1, 0], leftHand: [0, 0, -0.15], rightUpperArm: [0.12, 0, 1.22], rightLowerArm: [0, 0.5, 0], rightHand: [0, 0, 0.1] },
@@ -426,7 +427,7 @@ export async function create(url, opts = {}) {
   const stride = c => (c.hips ? Math.abs(c.hips[c.hips.length - 1] - c.hips[2]) * hipY0 : 0) || 1.3;   // metres one loop of a walking clip covers, at her size
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
   const rt = { act: 'sit', until: 0, nextAt: performance.now() + 60000 + Math.random() * 60000, lastTalk: 0, self: false, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
-    legs: 'up', arms: 'lap', ar: {}, armsAt: performance.now() + 40000, lg: { crossed: 0, floor: 0, hair: 0, drape: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
+    legs: 'up', arms: 'rest', ar: {}, armsAt: performance.now() + 40000, lg: { crossed: 0, floor: 0, hair: 0, drape: 0 }, legsAt: performance.now() + 30000, steps: [], i: 0, stepT: 0, label: '', after: '', hold: 0, carry: null, carryW: { book: 0, mug: 0, phone: 0 }, walkT: 0, talkW: 0, lie: 0, lieWant: 0, bookHome: 'shelf', head: [0, 0], zoom: 0, gazeProp: null };
   const go = p => ({ go: p }), face = yaw => ({ face: yaw }), wait = sec => ({ wait: sec }), stay = sec => ({ wait: sec, idle: true }), run = fn => ({ run: fn });
   // ---- finding her way: a grid of the room with the furniture (and you) blocked out, so she walks round things, not through them ----
   const CELL = 0.1, PAD = 0.17, navs = {};
@@ -601,7 +602,7 @@ export async function create(url, opts = {}) {
       if (Math.abs(rt.yaw) < 0.08 && rt.stand <= 0.001) { rt.act = 'sit'; rt.sneak = false; rt.self = false; rt.nextAt = now + 70000 + Math.random() * 110000; const then = rt.after; rt.after = ''; if (rt.carry === 'book' && then !== 'read') rt.bookHome = 'table'; rt.carry = null; if (then) startActivity(then); }
     }
     // how her legs are resting: she changes it now and then, and it only applies while she is properly sat
-    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !inTalk && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', 'drape', ...Object.keys(SEATED).filter(n => CLIPS[SEATED[n]._clip])]; rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 150000 + Math.random() * 200000; }
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.legsAt && !inTalk && !window.WIZRA_STILL) { const pool = ['up', 'up', 'crossed', 'crossed', 'floor', 'drape'];   /* (the recorded 'hair' pose, hands up in her hair with her elbows out, is no longer picked on its own: it read as her arms being put on wrong. It can still be asked for by name.) */ rt.legs = pool[Math.random() * pool.length | 0]; rt.legsAt = now + 150000 + Math.random() * 200000; }
     let scoot = 0, perch = 0, sideways = 0, slide = 0; const seatClips = [];
     for (const name in LEGS) {
       rt.lg[name] += ((rt.legs === name ? 1 : 0) - rt.lg[name]) * Math.min(1, dt * 2.2); const v = rt.lg[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
@@ -611,7 +612,8 @@ export async function create(url, opts = {}) {
       for (const n in LEGS[name]) { if (n[0] === '_') continue; const q = LEGS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; }
     }
     // where her free arms rest (see ARMS); a held thing or a gesture goes over the top
-    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.armsAt && !window.WIZRA_STILL) { const names = Object.keys(ARMS); rt.arms = names[Math.random() * names.length | 0]; rt.armsAt = now + 45000 + Math.random() * 70000; }
+    if (rt.act !== 'up' && rt.act !== 'sitdown' && now > rt.armsAt && !window.WIZRA_STILL) { const names = ARMS.rest && here === 'dorm' ? ['rest', 'rest', 'rest', ...Object.keys(ARMS).filter(n => n !== 'rest')] : Object.keys(ARMS).filter(n => n !== 'rest'); rt.arms = names[Math.random() * names.length | 0]; rt.armsAt = now + 45000 + Math.random() * 70000; }
+    if (rt.arms === 'rest' && (here !== 'dorm' || mv.on || dn.on)) rt.arms = 'lap';   /* on a couch, a stool or a bed there are no chair arms */
     for (const name in ARMS) { rt.ar[name] = (rt.ar[name] || 0) + ((rt.arms === name ? 1 : 0) - (rt.ar[name] || 0)) * Math.min(1, dt * 1.6); const v = rt.ar[name] * (1 - ka), wgt = v * v * (3 - 2 * v); if (wgt < 0.002) continue;
       for (const n in ARMS[name]) { const q = ARMS[name][n], c = CUR[n]; c[0] += (q[0] - c[0]) * wgt; c[1] += (q[1] - c[1]) * wgt; c[2] += (q[2] - c[2]) * wgt; } }
     // what she is holding while seated
