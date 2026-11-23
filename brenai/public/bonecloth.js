@@ -81,7 +81,8 @@ export function boneCloth(THREE, vrm) {
   // Where a point would be if the garment simply kept its cut. Standing, that is straight down from the waist. Sitting, the front and
   // sides of a skirt are laid along the thigh instead (toward the knee), because that is where the cloth has to go: without this the
   // points were all lifted onto the same spot of the thigh and the strip stood up in front of her like a tent.
-  for (const c of chains) { c.f = 0; if (c.anchor === hips) { const l = c.p[0].clone().applyMatrix4(hips.matrixWorld.clone().invert()); c.f = Math.max(0, Math.min(1, (l.z + 0.035) / 0.07)); c.leg = l.x >= 0 ? 0 : 1; c.q = new THREE.Quaternion(); } }
+  const humanSet = new Set(Object.keys(vrm.humanoid.humanBones || {}).map(raw).filter(Boolean)), heldBy = o => { while (o && !humanSet.has(o)) o = o.parent; return o; };
+  for (const c of chains) { c.f = 0; if (heldBy(c.anchor) === hips) { const l = c.p[0].clone().applyMatrix4(hips.matrixWorld.clone().invert()); c.f = Math.max(0, Math.min(1, (l.z + 0.035) / 0.07)); c.leg = l.x >= 0 ? 0 : 1; c.q = new THREE.Quaternion(); } }
   const target = (c, i, out) => { out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld); if (i && c.f > 0 && legLevel[c.leg]) { t0v.copy(c.rest[0]).applyMatrix4(c.anchor.matrixWorld); out.sub(t0v).applyQuaternion(c.q).add(t0v); } return out; };
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
