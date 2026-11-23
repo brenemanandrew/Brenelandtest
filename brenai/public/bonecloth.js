@@ -52,7 +52,7 @@ export function boneCloth(THREE, vrm) {
   { const hi = hips.matrixWorld.clone().invert(), by = {}; for (const c of chains) (by[c.layer] = by[c.layer] || []).push(c);
     for (const ring of Object.values(by)) { if (ring.length < 2) continue; for (const c of ring) { const l = c.p[0].clone().applyMatrix4(hi); c.ang = Math.atan2(l.x, l.z); } ring.sort((a, b) => a.ang - b.ang);
       for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length]; if (ring.length === 2 && k === 1) break; for (let i = 1; i < Math.min(a.n, b.n); i++) a.links.push({ b, i, d: a.p[i].distanceTo(b.p[i]) }); } } }
-  const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true;
+  const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true, keepK = 0.09;
   const target = (c, i, out) => out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld);
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
@@ -66,10 +66,11 @@ export function boneCloth(THREE, vrm) {
     caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR, level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
     wp(chains[0].bones[0], a); if (first || a.distanceTo(lastRoot) > 0.35) { reset(); first = false; } lastRoot.copy(a);   /* she was moved in one go (a cut, a teleport): start the cloth at rest there */
+    keepK += ((seated ? KEEP : (T.keepUp ?? 0.09)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
     const steps = dt > 1 / 45 ? 2 : 1, h = dt / steps;
     for (let s = 0; s < steps; s++) {
       for (const c of chains) { wp(c.bones[0], c.p[0]); c.prev[0].copy(c.p[0]);
-        for (let i = 1; i < c.n; i++) { const p = c.p[i], pv = c.prev[i]; a.copy(p).sub(pv).multiplyScalar(DAMP); pv.copy(p); p.add(a); p.y -= G * h * h; target(c, i, b); p.addScaledVector(b.sub(p), KEEP); } }   /* a little of the tailored shape is kept, so standing she still has a skirt and not a rag */
+        for (let i = 1; i < c.n; i++) { const p = c.p[i], pv = c.prev[i]; a.copy(p).sub(pv).multiplyScalar(DAMP); pv.copy(p); p.add(a); p.y -= G * h * h; target(c, i, b); p.addScaledVector(b.sub(p), keepNow); } }   /* a little of the tailored shape is kept, so standing she still has a skirt and not a rag */
       for (let it = 0; it < ITERS; it++) {
         for (const c of chains) { for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; if (i === 0) B.addScaledVector(d, (c.len[i] - l) / l); else { const k = 0.5 * (c.len[i] - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } }
           for (const L of c.links) { const A = c.p[L.i], B = L.b.p[L.i]; d.copy(B).sub(A); const l = d.length() || 1e-6, want = l > L.d * 1.04 ? L.d * 1.04 : l < L.d * 0.55 ? L.d * 0.55 : l; if (want !== l) { const k = 0.5 * (want - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } } }
