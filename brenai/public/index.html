@@ -913,7 +913,7 @@ function syncPlace(arriving) {
 }
 function setPlace(d, arriving) {
   if (!d || d.place === undefined) return;
-  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { noZones: d.noZones || [], key: !!d.key, keyable: !!d.keyable, solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
+  const was = visitInfo.place, old = visitInfo.bond || {}; visitInfo = { dndSaved: d.dndSaved || null, dndAdvs: d.dndAdvs || [], noZones: d.noZones || [], key: !!d.key, keyable: !!d.keyable, solo: !!d.solo, inviteName: d.inviteName || '', movie: d.movie || null, films: d.films || visitInfo.films || [], due: d.due || null, place: d.place, canVisit: d.canVisit, rapport: d.rapport, visitAt: d.visitAt || 90, invite: d.invite || '', bond: d.bond || {}, path: d.path || '', rules: d.rules || visitInfo.rules, outfit: d.outfit || null, level: d.level || 0, need: d.need || 100 };
   if (was !== undefined && !d.key && visitInfo.level > (setPlace.level ?? visitInfo.level)) { const pop = $('bondPop'); pop.textContent = 'ROMANCE LV ' + visitInfo.level + '!'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); WizraSound.fx('bond'); addSys('Romance reached level ' + visitInfo.level + '. New outfits may have opened up.'); }
   setPlace.level = visitInfo.level;
   const fitKey = (visitInfo.outfit && visitInfo.outfit.key) || ''; if (setPlace.fit !== undefined && fitKey !== setPlace.fit) { const swap = () => { if (speaker.busy() || EV.busy || heartGame.state.on || phoneCall.on || sendBtn.disabled) return setTimeout(swap, 4000); applyAvatar(); }; swap(); }   // she has changed: load that model once nothing is going on
@@ -937,7 +937,7 @@ function showInvite() {
   c.dataset.for = inv; c.textContent = '';
   const other = inv !== 'dorm' && inv !== 'house', yes = el('button', { textContent: inv === 'house' ? 'Sure, come over' : 'Go' }), no = el('button', { className: 'no', textContent: 'Not now' });
   c.append(el('b', { textContent: inv === 'house' ? 'She wants to come over' : 'She invited you' }), inv === 'dorm' ? 'Wizra is asking you over to her dorm room.' : inv === 'house' ? 'Wizra is asking to come hang out at your place.' : `Wizra is asking you to come to ${visitInfo.inviteName || 'a place'}.`, el('div', {}, yes, no));
-  yes.onclick = async () => { try { const r = await api('/api/visit', { place: inv }); const d = await r.json(); if (r.ok && !other) addSys(inv === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.'); setPlace(d, true); } catch {} };
+  yes.onclick = async () => { try { const r = await api('/api/visit', { place: inv }); const d = await r.json(); if (r.ok && !other) addSys(inv === 'dorm' ? "You went over to Wizra's dorm." : 'Wizra came over to your place.'); setPlace(d, true); if (d.soloDnd) setTimeout(() => { try { WizraDnd.walkIn(); } catch {} }, 3500); } catch {} };
   no.onclick = async () => { c.hidden = true; try { const r = await api('/api/visit', { decline: true }); setPlace(await r.json()); } catch {} };
 }
 // ---- the house button: a wheel of where you can go. Asking her over (or to her place) goes through the chat, like a text; a place of
