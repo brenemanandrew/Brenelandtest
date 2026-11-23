@@ -77,7 +77,12 @@ export function boneCloth(THREE, vrm) {
     for (const ring of Object.values(by)) { if (ring.length < 2) continue; for (const c of ring) { if (c.ang !== undefined) continue; const l = c.p[0].clone().applyMatrix4(hi); c.ang = Math.atan2(l.x, l.z); } ring.sort((a, b) => a.ang - b.ang);
       for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length]; if (ring.length === 2 && k === 1) break; for (let i = 1; i < Math.min(a.n, b.n); i++) a.links.push({ b, i, d: a.p[i].distanceTo(b.p[i]) }); } } }
   const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true, keepK = 0.045;
-  const target = (c, i, out) => out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld);
+  const DOWN = new THREE.Vector3(0, -1, 0), ID = new THREE.Quaternion(), legDir = [V(), V()], legLevel = [false, false], t0v = V();
+  // Where a point would be if the garment simply kept its cut. Standing, that is straight down from the waist. Sitting, the front and
+  // sides of a skirt are laid along the thigh instead (toward the knee), because that is where the cloth has to go: without this the
+  // points were all lifted onto the same spot of the thigh and the strip stood up in front of her like a tent.
+  for (const c of chains) { c.f = 0; if (c.anchor === hips) { const l = c.p[0].clone().applyMatrix4(hips.matrixWorld.clone().invert()); c.f = Math.max(0, Math.min(1, (l.z + 0.035) / 0.07)); c.leg = l.x >= 0 ? 0 : 1; c.q = new THREE.Quaternion(); } }
+  const target = (c, i, out) => { out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld); if (i && c.f > 0 && legLevel[c.leg]) { t0v.copy(c.rest[0]).applyMatrix4(c.anchor.matrixWorld); out.sub(t0v).applyQuaternion(c.q).add(t0v); } return out; };
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
   function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t);
@@ -91,6 +96,7 @@ export function boneCloth(THREE, vrm) {
     // her legs as capsules, and the seat: a flat surface just under her hip joints whenever a thigh is nearer level than upright
     caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR, level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
     for (const [f2, h2] of arms) { f2.updateWorldMatrix(true, false); h2.updateWorldMatrix(true, false); caps.push([wp(f2), wp(h2), 0.04 + PR]); }
+    for (let k = 0; k < Math.min(2, legs.length); k++) { legDir[k].copy(caps[k * 2][1]).sub(caps[k * 2][0]).normalize(); legLevel[k] = !!caps[k * 2][3]; } for (const c of chains) if (c.f > 0 && legLevel[c.leg]) c.q.setFromUnitVectors(DOWN, legDir[c.leg]).slerp(ID, 1 - c.f);
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
     wp(chains[0].bones[0], a); if (first || a.distanceTo(lastRoot) > 0.35) { reset(); first = false; } lastRoot.copy(a);   /* she was moved in one go (a cut, a teleport): start the cloth at rest there */
     keepK += ((seated ? KEEP : (T.keepUp ?? 0.045)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
