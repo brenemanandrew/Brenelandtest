@@ -14,3 +14,9 @@ The rules that matter most, repeated here so they are never missed:
 - Do not read the owner's chat text or her notes about him.
 - One change at a time. After each, say what you changed, what you tested, and what you could not test.
 - Pushing to `main` deploys the live game within a minute and restarts its server. Do not push unless the owner has asked you to.
+
+Also in this folder:
+- `MASTERFILE.md`: everything in one file (rules, architecture, data, every route, features, current state, open work). Section 10 is the current state. Keep it current when you ship something.
+- `skills/*/SKILL.md`: seven skills: making a change, headless testing, writing her character, her 3D body, reporting to the owner, assets, and building a server-run activity. Read the one that fits the job before starting.
+
+Standing rule from the owner (2026-11-23): whenever a skill or `MASTERFILE.md` is changed, (1) push it to `main`, (2) tell the Brenebase session ("Multi-agent work distribution system") exactly which files changed, and (3) check that Brenebase has the new version loaded before calling it done. If you cannot confirm step 3, say so plainly in your report.

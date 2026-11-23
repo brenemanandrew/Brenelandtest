@@ -974,7 +974,7 @@ export async function create(url, opts = {}) {
     mv.bucket.visible = true;
     const seat = places.seat.house; man.visible = mv.view === 'couch'; man.position.set(seat.at[0], seat.h + 0.05, seat.at[1] - 0.16); man.rotation.y = 0.08;
     camera.position.copy(mvPos); camera.lookAt(mvTgt); camera.rotateY(mv.lx); camera.rotateX(mv.ly);
-    if (mv.view === 'couch') mv.bucket.position.set(man.position.x, seat.h - 0.42, man.position.z + 0.24); else { camera.updateMatrixWorld(); tmpA.set(0, 0, -1).applyQuaternion(camera.quaternion); tmpA.y = 0; tmpA.normalize(); mv.bucket.position.set(mvPos.x + tmpA.x * 0.5 - tmpA.z * 0.13, mvPos.y - 0.25, mvPos.z + tmpA.z * 0.5 + tmpA.x * 0.13); } mv.bucket.rotation.set(0, 0, 0);
+    if (mv.view === 'couch') mv.bucket.position.set(man.position.x, seat.h - 0.42, man.position.z + 0.24); else { camera.updateMatrixWorld(); tmpA.set(0, 0, -1).applyQuaternion(camera.quaternion); tmpA.y = 0; tmpA.normalize(); mv.bucket.position.set(mvPos.x + tmpA.x * 0.42 - tmpA.z * 0.2, mvPos.y - 0.34, mvPos.z + tmpA.z * 0.42 + tmpA.x * 0.2); } mv.bucket.rotation.set(0, 0, 0);
     /* the closer you are, the closer she sits: she shifts over toward you, and as a couple she leans in */
     if (rt.act === 'sit') { const lv = mv.level | 0, toward = Math.sign(seat.at[0] - vrm.scene.position.x) || -1; vrm.scene.position.x += toward * mv.pose * [0, 0.04, 0.1, 0.16, 0.2][lv]; vrm.scene.rotation.z = -toward * mv.pose * [0, 0, 0.03, 0.09, 0.13][lv]; } }
   const hg = { on: false, yaw: 0, lookX: 0, lookY: 0, dist: 1.9, b: 0 };

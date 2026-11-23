@@ -1,6 +1,6 @@
 # Brenai masterfile
 
-One file with everything a development tool needs to carry Brenai forward. Written 2026-11-21 from the working repository.
+One file with everything a development tool needs to carry Brenai forward. Written 2026-11-21, updated 2026-11-23, from the working repository.
 Source of truth is the code in `brenemanandrew/Brenelandtest`, folder `brenai/`. If this file and the code disagree, the code wins.
 
 Contents
@@ -86,28 +86,36 @@ Most routes return `placeView()` (where everyone is, bond, level, outfit, flags)
 - Deploy: push to `main`, about a minute, then check the live file contains the change.
 - Storage: `/api/disk`. `.github/workflows/brenai-volume.yml` grows the volume by hand.
 
-## 10. State of things on 2026-11-21
-Done today and live:
-- The game was reset: 2 saves backed up to `/data/backups/reset-1795300445100` and removed. Nobody has a save. Owner PINs keep owner rights. Each player sets up again on first login (PIN, name, matching questions, first meeting).
-- New core character and defaults as in section 7.
-- Robot panel, master key, puppet lines, touch zone toggles, D&D seating (everyone sits, Dungeon Master centred, player at eye level), D&D die no longer waits for narration, cloth weight on skirts.
+## 10. State of things on 2026-11-23
+Added since the reset on 2026-11-21, all live:
+- Bone cloth (`public/bonecloth.js`): skirts and coat tails are simulated as one weighted sheet that rests on her legs and the seat. Tops whose tail has no bones get cloth strips made at load. Pictures let the cloth settle before the shot.
+- Body build slider (robot panel, -60 to 250, game-wide): thickens or slims her on any outfit.
+- 3D glasses mode (VITURE, side by side) with a head tracking hook; phones lock sideways. See `VITURE.md`.
+- Robot panel additions: liked and not liked touch zones, safe for work, bleep, reply length, "fresh start from here" (she stops reading back the earlier conversation), how she has changed.
+- Safe for work off now carries a plain instruction near the end of her prompt.
+- Voice: noises are respelled for the voice (`soundify`), and real sound clips are joined into her speech when they exist in `/data/sounds` (`/api/sounds`). No clips have been uploaded yet.
+- D&D night: everyone sits, the Dungeon Master is centred, the die answers at once, two adventures to choose from, pack away and carry on later, and walking in on her playing alone (evenings, at most once a day).
+- Movie night: she stays on the couch for the whole film, sits closer and leans in as romance level rises, a popcorn bucket sits in the player's lap, leaving asks first.
+- Phone menu bar is smaller. An owner typing `Wizra: line` puts the line down as hers.
+- Skills for agents: `brenai/skills/*/SKILL.md` (seven). Rule: when a skill or this file changes, tell the Brenebase session and make sure Brenebase has the new version (see `AGENTS.md`).
 
-Not verified with the real PC model (nothing here could be, the model was not reachable from the build session):
-- How the new character actually talks, and whether the growth lines and trait nudges come back in valid JSON from a 12B model.
-- Whether she stands by puppet lines, follows the "right now" note, and stays agreeable with the switch on.
-- D&D narration format, character voices, emoji-only replies.
+Not verified with the real PC model (it is not reachable from the cloud build session):
+- How the new character talks, whether she still pushes back with safe for work off, and whether growth lines and trait nudges come back as valid JSON.
+- Whether she stands by puppet lines and follows the "right now" note.
+- D&D narration format, the join and resume wording, character voices.
+- Sound clips joined to real speech (only the clip-alone path was tested).
 
-Not verified on a real screen:
-- Robot button in the settings wheel, zone chips, the pull-away reaction, seated reactions at the D&D table, the last camera tilt.
-- Cloth weight: measured working (cloth ends rest on the seat) but looked almost unchanged in renders; the hem flare is part of the outfit mesh.
+Not verified on a real screen or device:
+- 3D glasses mode on real glasses. Bone cloth standing and walking, and on outfits other than the Lv1 and Lv4 D&D ones. The D&D chooser and walk-in. Movie night lean and bucket after the last adjustment.
 
 Open work:
-- D&D stage 2: her playing alone with bots, more adventures, saving mid-adventure.
-- Mixamo batch: 79 clips chosen, script given to Andrew, files not yet fetched; then convert with `tools/clipconv.mjs` and wire in (lounging, dice, sitting, dances).
-- Movie night: real player model, lounging pose, her walking to switch the TV on.
-- Self-collision (`bodyfix.js`) off behind `window.WIZRA_FIX`; room clipping reported, not investigated.
-- Mocap on a real camera is largely untested.
-- Pictures (`takeSnap`) still use the stiff cloth shape.
+- Wide sleeves still hang rigidly: they need the same made-at-load strips as coat tails.
+- The picture pack was rendered before bone cloth: pictures showing a stiff skirt or coat hoop need rendering again (`tools/picpack/gen2.cjs`, a long job against the live site).
+- Room clipping: the scenery outside the windows, and newer furniture placements. Not investigated.
+- Sound clips: someone has to make them (in her voice) and upload them.
+- Head tracking for the glasses needs a helper app and VITURE's SDK; the owner does not want players to install anything, so it is parked.
+- Movie night: a real model for the player, her walking over to switch the TV on, a proper lying-against-him pose.
+- Mixamo batch (79 clips chosen, not fetched), self-collision off behind `window.WIZRA_FIX`, mocap largely untested on a real camera.
 
 ## 11. Appendix A: CODING.md
 
@@ -535,6 +543,19 @@ The round button on the right edge is a robot for owners, shown everywhere (it s
 
 #### Putting words in her mouth (owner only)
 An owner who types `Wizra: some line` in the chat box puts that line down as hers (`/api/puppet`): it shows, is spoken and acted like any reply, and is stored as her own turn (`put: true` in the log), so her model sees it as something she said. While such a line is among the last 40 log entries her instructions add that she stands by everything in her earlier turns and never denies or retracts it.
+
+#### Body build
+`setBuild(pct)` in `avatar-vrm.js` (`avatar.build(pct)` from the page): at load, every skinned vertex gets a push direction out from the bone it hangs on (hips, waist, chest a little, thighs, calves, upper and lower arms), weighted by its skin weights; skirt and coat bones count as the hips. The slider blends that in on the rest shape, so body and clothes thicken together on any outfit and in any pose. Range -60 (slimmer) to 250 (very heavy); 0 is the model as made. The value is game-wide (`shared.build`), sent in `placeView()` as `build`, set in the robot panel under Body build. Test hook: `window.WIZRA_BUILD` holds one value. It stretches the mesh rather than sculpting it: a real body change belongs in VRoid Studio.
+
+#### Bone cloth (skirts, coat tails, long tops)
+`public/bonecloth.js`, used by `avatar-vrm.js` (`boneCloth(THREE, vrm)`, ticked after `vrm.update`). It replaces the earlier "cloth weight" colliders. Every skirt bone becomes a weighted point, tied along its strip and across to the neighbouring strip, pulled by gravity, kept off her thighs and shins (capsules), the seat (a level under her hip joints while a thigh is nearer level than upright) and the floor; the bones are then turned to follow the points. Seated, cloth caught under a thigh comes out on top so it lies in her lap. On her feet the garment keeps most of its cut (`keepUp`), sitting it lets go (`keep`).
+Tops whose tail has no bones (most coats and tunics here: the part below the waist is skinned to hips and thighs, and VRoid's CoatSkirt bones sit unused at shin height) get strips made at load: a ring of 12 new bones chains under the hips that follows the garment from waist to hem, added to the skeleton, and every tail vertex is re-weighted to the nearest two strips. Counters: `window.WIZRA_T.cloth.dbg` (`tail`, `made`, `reskinned`). Tuning: `window.WIZRA_CLOTH = { off, notails, g, keep, keepUp, damp, thigh, shin, seat, tilt, iters, strips, waist }`. `off` gives the model's own springs back. Pictures (`takeSnap`) reset the cloth to its rest shape. Not handled: wide sleeves.
+
+#### 3D glasses mode (VITURE, side by side)
+Settings wheel, 🥽. `renderView()` in `avatar-vrm.js` draws the scene once per eye with `THREE.StereoCamera`, converged at her distance; `avatar.stereo('half' | 'full' | '')` switches it, `avatar.head(yaw, pitch, roll)` (radians) turns the view on top of any camera. `public/stereo.js` (`WizraStereo`) is the screen around it: full-screen stage, subtitle, input and buttons drawn in both halves, and a listener on `ws://127.0.0.1:8766` for head tracking from a helper app. Full notes, the helper's message format and what is unchecked on real glasses: `VITURE.md`.
+
+#### Sound clips for her noises
+`voiced()` in `server.mjs`: when a spoken line holds a noise (`NOISES`: mhm, hum, hmm, giggle, laugh, gasp, sigh, ahh, ooh, ohh, aww, ugh, shh, eep, pfft, grr, yawn) and a clip for it exists in `/data/sounds/`, the line is cut into speech and noises, the speech goes to the voice engine, the clip is read from disk, and the pieces are joined into one WAV (`soundParts`, `voicedMixed`). Anything wrong (no clip, formats differ) and she says it the old way through `soundify`. Clips: `GET /api/sounds` lists, `POST /api/sounds?name=hum` with a raw WAV body adds one (16 bit or 32 bit float, one channel, 24000 Hz; up to six per name, picked at random), `DELETE /api/sounds?file=hum-2.wav` removes one. Owner cookie or `x-brain-token`. Lines spoken in a character's voice do not use clips. Pictures: `settleCloth()` in `avatar-vrm.js` lets the cloth fall for 90 steps before a picture is taken.
 
 ## 13. Appendix C: WISHLIST.md
 
