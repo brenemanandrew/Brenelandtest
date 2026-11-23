@@ -56,12 +56,14 @@ export function boneCloth(THREE, vrm) {
   const target = (c, i, out) => out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld);
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
-  function outOf(p, A, B, r) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t); d.copy(p).sub(e); const l = d.length(); if (l < r && l > 1e-5) p.addScaledVector(d, (r - l) / l); }
-  function collide(p) { for (const k of caps) outOf(p, k[0], k[1], k[2]); if (p.y < seatY) p.y = seatY; if (p.y < floor) p.y = floor; }
+  function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t);
+    if (lap) { const hd = Math.hypot(p.x - e.x, p.z - e.z); if (hd < r) { const topY = e.y + Math.sqrt(r * r - hd * hd); if (p.y < topY) p.y = topY; } return; }   /* seated: cloth caught in or under a thigh comes out on top of it, so it lies in her lap and not beneath her */
+    d.copy(p).sub(e); const l = d.length(); if (l < r && l > 1e-5) p.addScaledVector(d, (r - l) / l); }
+  function collide(p) { for (const k of caps) outOf(p, k[0], k[1], k[2], k[3]); if (p.y < seatY) p.y = seatY; if (p.y < floor) p.y = floor; }
   function tick(dt, build) { dt = Math.max(1 / 240, Math.min(1 / 30, dt || 1 / 60)); const fat = 1 + 0.22 * (build || 0);
     hips.updateWorldMatrix(true, false); for (const l of legs) for (const o of l) o.updateWorldMatrix(true, false); for (const c of chains) c.anchor.updateWorldMatrix(true, false);
     // her legs as capsules, and the seat: a flat surface just under her hip joints whenever a thigh is nearer level than upright
-    caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
+    caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR, level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
     wp(chains[0].bones[0], a); if (first || a.distanceTo(lastRoot) > 0.35) { reset(); first = false; } lastRoot.copy(a);   /* she was moved in one go (a cut, a teleport): start the cloth at rest there */
     const steps = dt > 1 / 45 ? 2 : 1, h = dt / steps;
