@@ -35,6 +35,7 @@
   #dock button { position:static !important; width:42px !important; height:42px !important; border-radius:50% !important; background:rgba(255,255,255,.12) !important; color:#fff !important; opacity:1 !important; filter:none !important; padding:0 !important; font-size:25px !important; line-height:1 !important; display:grid; place-items:center; transition:background .15s, transform .12s; }
   #dock button:hover { background:rgba(255,255,255,.24) !important; } #dock button:active { transform:scale(.9); } #dock button svg { width:24px; height:24px; display:block; } 
   #dock button[hidden] { display:none !important; } body.calling #dock, body.intro #dock { display:none; } body.fp #dock { top:calc(8px + env(safe-area-inset-top)); }
+  @media (max-width:640px) { #dock { right:6px; top:calc(5px + env(safe-area-inset-top)); gap:3px; padding:3px; background:rgba(24,14,48,.45); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1); } #dock button { width:30px !important; height:30px !important; font-size:17px !important; background:rgba(255,255,255,.08) !important; } #dock button svg { width:17px; height:17px; } }   /* phones: the menu bar stays out of the way */
   /* behind everything: the player's own room, out of focus */
   body.hasroom { background:none !important; }
   body::before { content:""; position:fixed; inset:-40px; z-index:-1; background:var(--roombg, none) center/cover no-repeat; filter:blur(16px) brightness(.5) saturate(1.25); pointer-events:none; }
