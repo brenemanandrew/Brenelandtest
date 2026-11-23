@@ -140,7 +140,32 @@ const SOUNDS = [[/\bm+h+m+\b/gi, 'mm-hmm'], [/\bu+h+[- ]?h+u+h+\b/gi, 'uh-huh'],
   [/\bu+g+h+\b/gi, 'ugh'], [/\bu+h{2,}\b|\bu{2,}h+\b/gi, 'uh'], [/\bu+m{2,}\b|\bu{2,}m+\b/gi, 'um'], [/\be+h{2,}\b|\be{2,}h+\b/gi, 'eh'], [/\bs+h{2,}\b|\bs{2,}h+\b/gi, 'shh'], [/\ba+w{2,}\b|\ba{2,}w+\b/gi, 'aww'], [/\be{2,}k+\b/gi, 'eek'], [/\by+a+y+\b/gi, 'yay'],
   [/\b(?:ha){2,}h?\b|\bhah+a*\b/gi, 'ha ha'], [/\b(?:he){2,}h?\b/gi, 'heh heh'], [/\bg+r{2,}\b/gi, 'grr'], [/\bb+r{2,}\b/gi, 'brr'], [/\bp+f+t+\b/gi, 'pfft'], [/\bn+g+h+\b/gi, 'ngh'], [/\bz{3,}\b/gi, 'zzz'], [/\bw+h+e+w+\b/gi, 'whew'], [/\bo{2,}f+\b/gi, 'oof']];
 const soundify = t => { let s = String(t); for (const [re, to] of SOUNDS) s = s.replace(re, m => (m[0] === m[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to)); return s.replace(/([a-z])\1{2,}/gi, '$1'); };   /* what is left with a letter three or more times over is a stretched word */
-function voiced(line, cast, pitch) { line = soundify(line);
+// Real sounds. A voice engine cannot hum, sigh or giggle, however it is spelled. If a recorded clip exists for a noise she
+// writes (DATA_DIR/sounds/<name>.wav, or <name>-2.wav ... for variety), that clip is played at that point in the line and the
+// engine only speaks the words around it. No clip: the noise goes to the engine as before, respelled by soundify.
+// Clips must be WAV, 16 bit, one channel, the same rate the voice engine gives (24000), or they cannot be joined to speech.
+const SOUND_DIR = path.join(DATA_DIR, 'sounds'), NOISES = [['mhm', /\bm+h+m+\b|\bm+-h+m+\b|\buh+[- ]huh+\b/i], ['hum', /\bm{2,}h?\b/i], ['hmm', /\bh+m{2,}\b/i], ['giggle', /\b(?:he){2,}h?\b|\bt?e+h+e+h?e*\b/i], ['laugh', /\b(?:ha){2,}h?\b|\bhah+a*\b/i], ['gasp', /\b\*?gasp\*?\b/i], ['sigh', /\bh+a+h{2,}\b|\bw+h+e+w+\b|\bp+h+e+w+\b/i],
+  ['ahh', /\ba+h{2,}\b|\ba{2,}h+\b/i], ['ooh', /\bo{2,}h+\b/i], ['ohh', /\bo+h{2,}\b|\bo{3,}\b/i], ['aww', /\ba+w{2,}\b|\ba{2,}w+\b/i], ['ugh', /\bu+g+h+\b/i], ['shh', /\bs+h{2,}\b|\bs{2,}h+\b/i], ['eep', /\be+p+\b|\be{2,}k+\b/i], ['pfft', /\bp+f+t+\b/i], ['grr', /\bg+r{2,}\b/i], ['yawn', /\b\*?yawn\*?\b/i]];
+const SOUND_NAMES = NOISES.map(n => n[0]);
+let soundList = null; const sounds = () => { if (!soundList) { soundList = {}; try { for (const f of fs.readdirSync(SOUND_DIR)) { const m = /^([a-z]+)(?:-\d+)?\.wav$/.exec(f); if (m) (soundList[m[1]] = soundList[m[1]] || []).push(f); } } catch {} } return soundList; };
+// the PCM inside a WAV, and what kind it is
+const wavInfo = buf => { if (buf.length < 44 || buf.toString('latin1', 0, 4) !== 'RIFF' || buf.toString('latin1', 8, 12) !== 'WAVE') return null; let o = 12, fmt = null; while (o + 8 <= buf.length) { const id = buf.toString('latin1', o, o + 4), len = buf.readUInt32LE(o + 4); if (id === 'fmt ') fmt = { tag: buf.readUInt16LE(o + 8), ch: buf.readUInt16LE(o + 10), rate: buf.readUInt32LE(o + 12), bits: buf.readUInt16LE(o + 22) }; else if (id === 'data') return fmt && pcm16({ ...fmt, pcm: buf.subarray(o + 8, Math.min(buf.length, o + 8 + len)) }); o += 8 + len + (len & 1); } return null; };
+// 32 bit float sound (what some voice engines give) as plain 16 bit, so everything joins
+const pcm16 = w => { if (w.tag !== 3 || w.bits !== 32) return w; const n = w.pcm.length >> 2, out = Buffer.alloc(n * 2); for (let i = 0; i < n; i++) out.writeInt16LE(Math.round(Math.max(-1, Math.min(1, w.pcm.readFloatLE(i * 4))) * 32767), i * 2); return { ...w, tag: 1, bits: 16, pcm: out }; };
+const wavOf = (pcm, f) => { const h = Buffer.alloc(44); h.write('RIFF', 0, 'latin1'); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVEfmt ', 8, 'latin1'); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(f.ch, 22); h.writeUInt32LE(f.rate, 24); h.writeUInt32LE(f.rate * f.ch * f.bits / 8, 28); h.writeUInt16LE(f.ch * f.bits / 8, 32); h.writeUInt16LE(f.bits, 34); h.write('data', 36, 'latin1'); h.writeUInt32LE(pcm.length, 40); return Buffer.concat([h, pcm]); };
+// a line cut into speech and noises that have a clip:  "Mmm, that is nice. Haha."  ->  [clip hum] ["that is nice."] [clip laugh]
+function soundParts(line) { const have = sounds(), parts = []; let rest = String(line); if (!Object.keys(have).length) return null;
+  for (let guard = 0; guard < 8 && rest; guard++) { let best = null; for (const [name, re] of NOISES) { if (!have[name]) continue; const m = re.exec(rest); if (m && (!best || m.index < best.i)) best = { i: m.index, len: m[0].length, name }; } if (!best) break;
+    const before = rest.slice(0, best.i); if (ttsKey(before)) parts.push({ text: before }); parts.push({ clip: best.name }); rest = rest.slice(best.i + best.len).replace(/^[\s.,!?~…-]+/, ''); }
+  if (!parts.some(x => x.clip)) return null; if (ttsKey(rest)) parts.push({ text: rest }); return parts; }
+async function voicedMixed(parts, voice) { const bufs = []; let fmt = null;
+  for (const part of parts) { let info; if (part.clip) { const list = sounds()[part.clip], f = list[Math.random() * list.length | 0]; info = wavInfo(fs.readFileSync(path.join(SOUND_DIR, f))); } else info = wavInfo(Buffer.from(await ttsJob(soundify(part.text), voice, 1), 'base64'));
+    if (!info || info.tag !== 1) throw new Error('sound format'); if (!fmt) fmt = info; else if (info.rate !== fmt.rate || info.ch !== fmt.ch || info.bits !== fmt.bits) throw new Error('sound format differs');
+    bufs.push(info.pcm, Buffer.alloc(Math.round(fmt.rate * 0.09) * fmt.ch * fmt.bits / 8)); }   /* a breath of silence between the pieces */
+  return wavOf(Buffer.concat(bufs), fmt).toString('base64'); }
+function voiced(line, cast, pitch) { if (!cast) { const parts = soundParts(line); if (parts) { const voice = db.settings.ttsVoice || 'af_heart', key = 'mix|' + voice + '|' + ttsKey(line), hit = ttsCache.get(key); if (hit && Date.now() - hit.at < 90000) return hit.p;
+      const plain = soundify(line), p = voicedMixed(parts, voice).catch(e => { console.warn('[sounds]', e.message); return ttsJob(plain, voice, 1); }); ttsCache.set(key, { p, at: Date.now() }); return p; } }   /* anything wrong with a clip: she just says it the old way */
+  line = soundify(line);
   const cv = cast ? castVoice(cast, pitch) : null, voice = cv ? cv.voice : db.settings.ttsVoice || 'af_heart', words = ttsKey(line); if (!words) return Promise.reject(new Error('empty'));
   const key = voice + '|' + (cv ? cv.speed.toFixed(2) + '|' : '') + words;                       // the same words in another voice are a different recording
   const hit = ttsCache.get(key); if (hit && Date.now() - hit.at < 90000) return hit.p;
@@ -798,7 +823,7 @@ async function handle(req, res) {
         fs.writeFileSync(path.join(dir, name + '.fbx'), buf); res.writeHead(200, { ...cors, 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, name, kb: Math.round(size / 1000) }));
       }
       /* the PC that runs her brain may also load her outfit models: it proves itself with the brain token instead of a login, and acts as the owner, for the outfit routes only */
-      const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk'].includes(url.pathname);
+      const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk', '/api/sounds'].includes(url.pathname);
       if (byToken && !als.getStore()) { const u = shared.owner && playerOf(shared.owner); if (!u) return json(res, 409, { error: 'This game has no owner yet.' }); return als.run(u, () => handle(req, res)); }
       if (!byToken && !authed(req)) return json(res, 401, { error: 'login' });
       // which player: a PIN opens your own save. A new PIN makes a new one (only when asked to: a typo should not).
@@ -1125,6 +1150,15 @@ async function handle(req, res) {
         }
       }
 
+      // Sound clips for her noises (owner, or the PC with the brain token): GET lists what is there and what names are used; POST ?name=hum adds
+      // one (raw WAV body, 16 bit mono 24000 Hz, up to 1.5 MB; a name can hold several, played at random); DELETE ?file=hum-2.wav removes one.
+      if (url.pathname === '/api/sounds') { if (!isOwner() && !byToken) return json(res, 403, { error: 'owner only' });
+        if (req.method === 'POST') { const name = String(url.searchParams.get('name') || '').toLowerCase(); if (!SOUND_NAMES.includes(name)) return json(res, 400, { error: 'name must be one of: ' + SOUND_NAMES.join(', ') });
+          const chunks = []; let size = 0; for await (const c of req) { size += c.length; if (size > 1.5e6) return json(res, 413, { error: 'too big (1.5 MB at most)' }); chunks.push(c); } const buf = Buffer.concat(chunks), info = wavInfo(buf);
+          if (!info || info.tag !== 1 || info.bits !== 16 || info.ch !== 1 || info.rate !== 24000) return json(res, 400, { error: 'needs a WAV: 16 bit, one channel, 24000 Hz' + (info ? ` (this one is ${info.bits} bit, ${info.ch} channel, ${info.rate} Hz)` : '') });
+          fs.mkdirSync(SOUND_DIR, { recursive: true }); const have = sounds()[name] || []; let n = 1, file = name + '.wav'; while (have.includes(file)) file = name + '-' + (++n) + '.wav'; if (have.length >= 6) return json(res, 409, { error: 'six clips for one sound is the most' }); fs.writeFileSync(path.join(SOUND_DIR, file), wavOf(info.pcm, info)); soundList = null; return json(res, 200, { ok: true, file, seconds: +(info.pcm.length / 2 / 24000).toFixed(2), have: sounds() }); }
+        if (req.method === 'DELETE') { const file = String(url.searchParams.get('file') || ''); if (!/^[a-z]+(-\d+)?\.wav$/.test(file)) return json(res, 400, { error: 'file?' }); try { fs.unlinkSync(path.join(SOUND_DIR, file)); } catch {} soundList = null; return json(res, 200, { ok: true, have: sounds() }); }
+        return json(res, 200, { names: SOUND_NAMES, inLines: NOISES.map(n => n[0]), have: sounds(), format: 'WAV, 16 bit, one channel, 24000 Hz' }); }
       if (url.pathname === '/api/tts' && req.method === 'POST') {
         const { text, cast, pitch } = await readBody(req);
         const line = String(text || '').trim().slice(0, 800);
