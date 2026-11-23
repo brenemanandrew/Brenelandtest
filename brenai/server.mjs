@@ -133,7 +133,14 @@ const ttsCache = new Map(); const ttsKey = t => String(t).toLowerCase().replace(
 // following (that is what makes it higher or lower), so the clip is made slower or faster here to cancel that out and leave only a
 // small change of pace that belongs to the character.
 function castVoice(name, pitch) { let h = 0; for (const ch of String(name).toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const p = Math.max(0.7, Math.min(1.3, +pitch || 1)), pace = 0.94 + ((h >>> 5) % 5) * 0.03; return { voice: db.settings.ttsVoice || 'af_heart', speed: Math.max(0.6, Math.min(1.6, pace / p)) }; }
-function voiced(line, cast, pitch) {
+// Sounds, for the voice only. A speech engine reads "Mmmmmm" or "Aaaah" as letters ("em em em"). Before a line is spoken, the
+// noises people write are turned into spellings a voice says as a sound, and stretched words ("sooooo", "nooo") are pulled back
+// to the real word. The text on screen is not changed.
+const SOUNDS = [[/\bm+h+m+\b/gi, 'mm-hmm'], [/\bu+h+[- ]?h+u+h+\b/gi, 'uh-huh'], [/\bh+m{2,}\b/gi, 'hmm'], [/\bm{2,}\b(?!-)/gi, 'hmm'], [/\bm{2,}h+\b/gi, 'hmm'], [/\ba+h{2,}\b|\ba{2,}h+\b/gi, 'ahh'], [/\bo{2,}h+\b/gi, 'ooh'], [/\bo+h{2,}\b|\bo{3,}\b/gi, 'ohh'],
+  [/\bu+g+h+\b/gi, 'ugh'], [/\bu+h{2,}\b|\bu{2,}h+\b/gi, 'uh'], [/\bu+m{2,}\b|\bu{2,}m+\b/gi, 'um'], [/\be+h{2,}\b|\be{2,}h+\b/gi, 'eh'], [/\bs+h{2,}\b|\bs{2,}h+\b/gi, 'shh'], [/\ba+w{2,}\b|\ba{2,}w+\b/gi, 'aww'], [/\be{2,}k+\b/gi, 'eek'], [/\by+a+y+\b/gi, 'yay'],
+  [/\b(?:ha){2,}h?\b|\bhah+a*\b/gi, 'ha ha'], [/\b(?:he){2,}h?\b/gi, 'heh heh'], [/\bg+r{2,}\b/gi, 'grr'], [/\bb+r{2,}\b/gi, 'brr'], [/\bp+f+t+\b/gi, 'pfft'], [/\bn+g+h+\b/gi, 'ngh'], [/\bz{3,}\b/gi, 'zzz'], [/\bw+h+e+w+\b/gi, 'whew'], [/\bo{2,}f+\b/gi, 'oof']];
+const soundify = t => { let s = String(t); for (const [re, to] of SOUNDS) s = s.replace(re, m => (m[0] === m[0].toUpperCase() ? to[0].toUpperCase() + to.slice(1) : to)); return s.replace(/([a-z])\1{2,}/gi, '$1'); };   /* what is left with a letter three or more times over is a stretched word */
+function voiced(line, cast, pitch) { line = soundify(line);
   const cv = cast ? castVoice(cast, pitch) : null, voice = cv ? cv.voice : db.settings.ttsVoice || 'af_heart', words = ttsKey(line); if (!words) return Promise.reject(new Error('empty'));
   const key = voice + '|' + (cv ? cv.speed.toFixed(2) + '|' : '') + words;                       // the same words in another voice are a different recording
   const hit = ttsCache.get(key); if (hit && Date.now() - hit.at < 90000) return hit.p;
