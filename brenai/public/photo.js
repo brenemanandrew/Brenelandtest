@@ -1,0 +1,64 @@
+// Photo studio (owner's tool). Time stops for her, the camera is yours, and you pose her and take the picture yourself.
+// Open it from the settings wheel (📷), wherever her 3D model is on screen: her room, your place, any place made in the Studio.
+//   On the picture:  drag = swing the camera round her · two fingers or right-drag = slide the view · pinch or wheel = closer, further
+//   Tools:  Camera (the drag above) · Reach (drag a hand or a foot and the limb follows) · Turn (tap a body part, then turn it with
+//           the sliders) · Move (drag her across the floor)
+//   Poses are the game's own gestures: tap one, she strikes it, and time stops again a moment later so you can adjust it by hand.
+// The renderer side is the photo* functions in avatar-vrm.js. The picture is saved at twice the screen's sharpness, with no interface in it.
+//   WizraPhoto.open()   WizraPhoto.close()
+(function () {
+  const el = (tag, props = {}, ...kids) => { const e = document.createElement(tag); Object.assign(e, props); e.append(...kids.filter(k => k != null)); return e; };
+  document.head.append(el('style', { textContent: `
+  body.photo #stageWrap { position:fixed !important; left:0 !important; top:0 !important; transform:none !important; width:100vw !important; height:100dvh !important; z-index:72; }
+  body.photo #stage { border-radius:0 !important; box-shadow:none !important; }
+  #phLayer { position:fixed; inset:0; z-index:73; display:none; touch-action:none; } body.photo #phLayer { display:block; }
+  #phUI { position:fixed; left:0; right:0; bottom:0; z-index:74; display:none; font-family:"Fredoka",system-ui,sans-serif; color:#fff; pointer-events:none; } body.photo #phUI { display:block; } body.photo.phclean #phUI .sheet, body.photo.phclean #phTop { display:none; }
+  #phUI .sheet { pointer-events:auto; margin:0 auto; width:min(760px,100%); max-height:44dvh; overflow-y:auto; background:rgba(20,12,45,.86); border-radius:18px 18px 0 0; padding:8px 12px calc(10px + env(safe-area-inset-bottom)); backdrop-filter:blur(8px); }
+  #phUI .tabs, #phUI .chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; } #phUI button { border:1px solid rgba(255,255,255,.35); border-radius:12px; background:rgba(255,255,255,.08); color:#fff; font:600 14px inherit; padding:7px 11px; cursor:pointer; } #phUI button.on { background:linear-gradient(135deg,#f59e0b,#ec4899); border-color:#fff; }
+  #phUI .row { display:flex; align-items:center; gap:8px; margin:4px 0; } #phUI .row label { width:92px; font-size:14px; } #phUI .row input[type=range] { flex:1; height:28px; } #phUI .row output { width:44px; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; }
+  #phUI p { margin:2px 0 6px; font-size:13px; opacity:.8; line-height:1.3; }
+  #phTop { position:fixed; right:calc(10px + env(safe-area-inset-right)); top:calc(8px + env(safe-area-inset-top)); z-index:75; display:none; gap:8px; } body.photo #phTop { display:flex; } #phTop button { border:0; border-radius:14px; background:rgba(20,12,45,.75); color:#fff; font:700 15px "Fredoka",sans-serif; padding:9px 14px; cursor:pointer; } #phTop .shoot { background:linear-gradient(135deg,#f59e0b,#ec4899); }
+  #phShow { position:fixed; inset:0; z-index:90; display:none; place-items:center; background:rgba(8,5,18,.9); } #phShow.show { display:grid; } #phShow img { max-width:92vw; max-height:74dvh; border-radius:12px; box-shadow:0 10px 40px #000; } #phShow div { display:flex; gap:12px; margin-top:12px; justify-content:center; } #phShow a, #phShow button { border:0; border-radius:14px; background:#f59e0b; color:#1b1233; font:700 16px "Fredoka",sans-serif; padding:10px 18px; text-decoration:none; cursor:pointer; } #phShow button { background:rgba(255,255,255,.2); color:#fff; }
+  ` }));
+  const layer = el('div', { id: 'phLayer' }), ui = el('div', { id: 'phUI' }), sheet = el('div', { className: 'sheet' }), top = el('div', { id: 'phTop' }), show = el('div', { id: 'phShow' }); ui.append(sheet); document.body.append(layer, ui, top, show);
+  const S = { on: false, tool: 'camera', tab: 'camera', bone: '', grab: '', pts: new Map(), pinch: 0, moved: 0 };
+  const POSES = [['Hands on hips', 'hips'], ['Arms crossed', 'crossarms'], ['Peace', 'peace'], ['Thinking', 'think'], ['Little heart', 'fingerheart'], ['Cheer', 'cheer'], ['Stretch', 'stretch'], ['Bow', 'bow'], ['Wave', 'wave'], ['Shrug', 'shrug'], ['Hands up', 'handsup'], ['Fox', 'fox'], ['Laugh', 'laugh'], ['Dance', 'dance'], ['Tongue out', 'tongue']];
+  const FACES = [['Smile', 'happy'], ['Soft', 'relaxed'], ['Surprised', 'surprised'], ['Sad', 'sad'], ['Cross', 'angry'], ['Eyes shut', 'blink'], ['Wink left', 'blinkLeft'], ['Wink right', 'blinkRight'], ['Mouth: ah', 'aa'], ['Mouth: oh', 'oh']];
+  const NICE = n => n.replace(/([A-Z])/g, ' $1').toLowerCase();
+  const slider = (label, min, max, step, value, on) => { const r = el('input', { type: 'range', min, max, step, value }), o = el('output', { textContent: (+value).toFixed(step < 1 ? 2 : 0) }); r.oninput = () => { o.textContent = (+r.value).toFixed(step < 1 ? 2 : 0); on(+r.value); }; return el('div', { className: 'row' }, el('label', { textContent: label }), r, o); };
+  const chips = (list, on, isOn) => { const row = el('div', { className: 'chips' }); for (const [label, v] of list) { const b = el('button', { textContent: label, className: isOn && isOn(v) ? 'on' : '' }); b.onclick = e => { e.stopPropagation(); on(v, b); }; row.append(b); } return row; };
+  function draw() { sheet.textContent = ''; const c = avatar.photoCam() || {};
+    sheet.append(chips([['📷 Camera', 'camera'], ['🧍 Pose', 'pose'], ['😊 Face', 'face'], ['🚶 Place her', 'her']], v => { S.tab = v; S.tool = v === 'camera' || v === 'face' ? 'camera' : v === 'her' ? 'move' : S.tool === 'turn' ? 'turn' : 'reach'; draw(); }, v => v === S.tab));
+    if (S.tab === 'camera') { sheet.append(el('p', { textContent: 'Drag to swing round her. Two fingers (or right-drag) slide the view. Pinch or scroll to move in and out.' }),
+        slider('Zoom lens', 8, 90, 1, c.fov || 30, v => avatar.photoCam({ fov: v })), slider('Tilt', -1.57, 1.57, 0.01, c.roll || 0, v => avatar.photoCam({ roll: v })), slider('Distance', 0.2, 12, 0.01, c.dist || 2, v => avatar.photoCam({ dist: v })),
+        chips([['Aim: face', 'head'], ['Aim: chest', 'chest'], ['Aim: hips', 'hips'], ['Aim: feet', 'feet'], ['Level the tilt', 'level']], v => { if (v === 'level') avatar.photoCam({ roll: 0 }); else avatar.photoAim(v); draw(); })); }
+    if (S.tab === 'pose') { sheet.append(el('p', { textContent: 'Pick a pose to start from, then adjust by hand. Reach: drag a hand or a foot. Turn: tap any body part, then use the sliders.' }), chips(POSES, v => { try { avatar.gesture(v, 9); avatar.photoPose(v, 1.6); } catch {} }),
+        chips([['✋ Reach', 'reach'], ['🔄 Turn', 'turn'], ['📷 Camera', 'camera']], v => { S.tool = v; draw(); }, v => v === S.tool));
+      if (S.tool === 'turn') { if (!S.bone) sheet.append(el('p', { textContent: 'Tap a body part on the picture.' })); else { const r = avatar.photoBone(S.bone) || [0, 0, 0], set = () => avatar.photoBone(S.bone, r); sheet.append(el('p', { textContent: 'Turning: ' + NICE(S.bone) }), slider('Bend', -3.2, 3.2, 0.01, r[0], v => { r[0] = v; set(); }), slider('Twist', -3.2, 3.2, 0.01, r[1], v => { r[1] = v; set(); }), slider('Lean', -3.2, 3.2, 0.01, r[2], v => { r[2] = v; set(); }), chips([['Straighten this part', 'zero']], () => { avatar.photoBone(S.bone, [0, 0, 0]); draw(); })); } } }
+    if (S.tab === 'face') { sheet.append(el('p', { textContent: 'Tap to add an expression; tap again to take it off. They mix.' }), chips(FACES, (v, b) => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); avatar.photoFace(v, on ? 1 : 0); }), chips([['Plain face', 'reset']], () => { avatar.photoFace('reset'); draw(); })); }
+    if (S.tab === 'her') { sheet.append(el('p', { textContent: 'Drag on the picture to slide her across the floor.' }), chips([['Stand her where the camera aims', 'stand'], ['Back to her seat', 'sit'], ['⟲ Turn left', 'l'], ['⟳ Turn right', 'r'], ['▲ Raise', 'u'], ['▼ Lower', 'd']], v => { if (v === 'stand') avatar.photoHer({ stand: true }); else if (v === 'sit') avatar.photoHer({ sit: true }); else if (v === 'l' || v === 'r') avatar.photoHer({ turn: v === 'l' ? 0.2 : -0.2 }); else avatar.photoHer({ lift: v === 'u' ? 0.03 : -0.03 }); })); } }
+  // ---- the picture itself: pointers ----
+  const ENDS = ['leftHand', 'rightHand', 'leftFoot', 'rightFoot'];
+  layer.addEventListener('pointerdown', e => { e.preventDefault(); layer.setPointerCapture(e.pointerId); S.pts.set(e.pointerId, { x: e.clientX, y: e.clientY, b: e.button }); S.moved = 0; S.grab = '';
+    if (S.pts.size === 2) { const [a, b] = [...S.pts.values()]; S.pinch = Math.hypot(a.x - b.x, a.y - b.y); return; }
+    if (S.tool === 'reach') { const n = avatar.photoPick(e.clientX, e.clientY); S.grab = ENDS.includes(n) ? n : /LowerArm/.test(n) ? n.replace('LowerArm', 'Hand') : /LowerLeg/.test(n) ? n.replace('LowerLeg', 'Foot') : ''; } });
+  layer.addEventListener('pointermove', e => { const p = S.pts.get(e.pointerId); if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; S.moved += Math.abs(dx) + Math.abs(dy);
+    if (S.pts.size === 2) { const [a, b] = [...S.pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y); avatar.photoCam({ pan: [dx / 2, dy / 2], dolly: (S.pinch - d) * 2.2 }); S.pinch = d; return; }
+    if (p.b === 2 || p.b === 1 || e.shiftKey) return void avatar.photoCam({ pan: [dx, dy] });
+    if (S.grab) return void avatar.photoReach(S.grab, e.clientX, e.clientY);
+    if (S.tool === 'move') return void avatar.photoHer({ move: [dx, dy] });
+    avatar.photoCam({ orbit: [dx, dy] }); });
+  const lift = e => { const p = S.pts.get(e.pointerId); S.pts.delete(e.pointerId); if (p && S.moved < 8 && S.tool === 'turn') { const n = avatar.photoPick(e.clientX, e.clientY); if (n) { S.bone = n; draw(); } } S.grab = ''; };
+  layer.addEventListener('pointerup', lift); layer.addEventListener('pointercancel', lift); layer.addEventListener('contextmenu', e => e.preventDefault());
+  layer.addEventListener('wheel', e => { e.preventDefault(); avatar.photoCam({ dolly: e.deltaY }); }, { passive: false });
+  // ---- top buttons ----
+  const shoot = el('button', { className: 'shoot', textContent: '📸 Take picture' }), clean = el('button', { textContent: '👁 Hide tools' }), out = el('button', { textContent: '✕' }); top.append(shoot, out);
+  const back = el('button', { textContent: 'Show tools' }); back.style.cssText = 'position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top));z-index:76;border:0;border-radius:14px;background:rgba(20,12,45,.6);color:#fff;font:600 13px Fredoka,sans-serif;padding:7px 11px;display:none'; document.body.append(back);
+  top.prepend(clean); clean.onclick = () => { document.body.classList.add('phclean'); back.style.display = 'block'; }; back.onclick = () => { document.body.classList.remove('phclean'); back.style.display = 'none'; };
+  shoot.onclick = () => { let url = ''; try { url = avatar.photoShot(2); } catch {} if (!url) return; const name = 'wizra-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png'; show.textContent = ''; const no = el('button', { textContent: 'Back' }); no.onclick = () => show.classList.remove('show'); show.append(el('div', { style: 'display:block;text-align:center' }, el('img', { src: url }), el('div', {}, el('a', { href: url, download: name, textContent: '⬇ Save picture' }), no))); show.classList.add('show'); try { WizraSound.fx('pop'); } catch {} };
+  function open() { if (S.on) return; let ok = false; try { ok = avatar.photo(true); } catch {} if (!ok) { try { addSys('The photo studio needs her 3D model on screen.'); } catch {} return; } S.on = true; S.tab = 'camera'; S.tool = 'camera'; S.bone = ''; document.body.classList.add('photo'); document.body.classList.remove('phclean'); back.style.display = 'none'; draw(); window.dispatchEvent(new Event('resize')); }
+  function close() { if (!S.on) return; S.on = false; try { avatar.photo(false); } catch {} document.body.classList.remove('photo', 'phclean'); back.style.display = 'none'; show.classList.remove('show'); window.dispatchEvent(new Event('resize')); }
+  out.onclick = close; document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.on) close(); });
+  for (const ev of ['pointerdown', 'pointerup', 'click', 'wheel', 'touchstart', 'touchmove', 'keydown', 'keyup']) for (const n of [ui, top, show]) n.addEventListener(ev, e => e.stopPropagation());
+  window.WizraPhoto = { open, close, get on() { return S.on; } };
+})();
