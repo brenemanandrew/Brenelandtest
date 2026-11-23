@@ -414,6 +414,11 @@
     body.fp #fpMoments { left:auto; right:6px; top:calc(48px + env(safe-area-inset-top)); gap:7px; } body.fp #fpMoments button { width:36px; height:36px; font-size:17px; box-shadow:0 2px 0 rgba(0,0,0,.3); } body.fp #fpMoments button.lead { box-shadow:0 0 0 2px #ff8fc0, 0 2px 0 rgba(0,0,0,.3); } body.fp #fpMoments button small { right:-5px; bottom:-4px; min-width:15px; padding:0 4px; font-size:9.5px; }
     body.fp #meBox { position:fixed !important; right:6px !important; left:auto !important; top:auto !important; bottom:calc(var(--band, 54px) + 26px + env(safe-area-inset-bottom)) !important; width:50px !important; height:50px !important; transform:none !important; z-index:6; opacity:.92; } body.fp.fplog #meBox { bottom:calc(var(--band, 54px) + 30px + 26dvh + env(safe-area-inset-bottom)) !important; }
     body.fp #fpHint { font-size:13.5px; padding:4px 10px; }
+    /* the chat sheet itself: packed. Smaller text and pictures, tight lines, no empty band at the bottom, and only as tall as what is in it */
+    body.fp.fplog #logWrap { height:auto !important; max-height:27dvh !important; display:flex; flex-direction:column; }
+    body.fp #log { height:auto; max-height:27dvh; padding:5px 9px 6px !important; font-size:15.5px !important; line-height:1.25 !important; }
+    body.fp #log * { line-height:1.22; } body.fp #log .msg .body, body.fp #log .msg .body * { font-size:15px !important; } body.fp #log .msg { --pic:24px; grid-template-columns:24px 1fr; column-gap:7px; margin:4px 0; } body.fp #log .msg .body { padding-top:2px; font-size:15.5px; } body.fp #log .pic { width:24px !important; height:24px !important; }
+    body.fp #log .line.sys { margin:3px 0; font-size:11.5px; } body.fp #log .msg .unsend { width:20px; height:20px; font-size:10px; }
   }
   #fpChoices { position:fixed; left:68px; top:34%; z-index:7; display:flex; flex-direction:column; gap:8px; max-width:min(300px, calc(100vw - 84px)); } #fpChoices[hidden] { display:none; }
   #fpChoices button { text-align:left; border:0; border-radius:16px; padding:10px 14px; background:#fff; color:#3a2a5c; font-family:"Patrick Hand","Fredoka",sans-serif; font-size:17px; line-height:1.2; cursor:pointer; box-shadow:0 4px 0 rgba(0,0,0,.3); }
