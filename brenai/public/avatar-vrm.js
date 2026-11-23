@@ -3,10 +3,11 @@
 //   const r = await create(url)   ->  { el, locate(e), draw(state), dispose() }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRMUtils, VRMSpringBoneCollider, VRMSpringBoneColliderShapeCapsule, VRMSpringBoneColliderShapePlane } from '@pixiv/three-vrm';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { buildPlaces, cel } from './places.js';
 import { bodyFix } from './bodyfix.js';
 import { addTongue } from './tongue.js';
+import { boneCloth } from './bonecloth.js';
 import { fineFace, WHOLE } from './fineface.js';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
@@ -74,21 +75,10 @@ export async function create(url, opts = {}) {
       if (any) build.parts.push({ pos, orig, D }); }); } catch (e) { console.warn('build', e); }
   function setBuild(pct) { if (window.WIZRA_BUILD != null) pct = window.WIZRA_BUILD;   /* test hook: hold one value */ const b = Math.max(-60, Math.min(250, +pct || 0)) / 100; if (b === build.v) return; build.v = b; for (const { pos, orig, D } of build.parts) { const a = pos.array; for (let i = 0; i < a.length; i++) a[i] = orig[i] + D[i] * b; pos.needsUpdate = true; } }
   if (window.WIZRA_BUILD != null) setBuild(window.WIZRA_BUILD);
-  // Cloth weight: VRoid skirts and coat tails come with no gravity and nothing to collide with, so they hold their standing bell
-  // shape in the air when she sits. Here they are given weight (softer, pulled down, damped), her legs become things the cloth
-  // rests on, and while she is seated a flat surface sits just under her hips so the cloth lies on the seat, not through it.
-  const cloth = { plane: null, legs: null };
-  try { const man = vrm.springBoneManager, T = window.WIZRA_CLOTH || {}, raw = n => vrm.humanoid.getRawBoneNode(n), skirt = man ? [...man.joints].filter(j => /skirt/i.test(j.bone.name)) : [];
-    if (skirt.length && !T.off) { const cols = [], cap = (bone, child, r) => { const a = raw(bone), b = raw(child); if (!a || !b) return; const c = new VRMSpringBoneCollider(new VRMSpringBoneColliderShapeCapsule({ offset: new THREE.Vector3(), tail: b.position.clone(), radius: r })); a.add(c); cols.push(c); };
-      for (const sd of ['left', 'right']) { cap(sd + 'UpperLeg', sd + 'LowerLeg', T.thigh ?? 0.078); cap(sd + 'LowerLeg', sd + 'Foot', T.shin ?? 0.052); }
-      cloth.plane = new VRMSpringBoneCollider(new VRMSpringBoneColliderShapePlane({ offset: new THREE.Vector3(), normal: new THREE.Vector3(0, 1, 0) })); cloth.plane.position.y = -50; vrm.scene.add(cloth.plane); cols.push(cloth.plane);
-      cloth.legs = ['left', 'right'].map(sd => [raw(sd + 'UpperLeg'), raw(sd + 'LowerLeg')]).filter(p => p[0] && p[1]);
-      cloth.cols = cols; const group = { colliders: cols, name: 'cloth' }; for (const j of skirt) { const st = j.settings; st.stiffness *= T.k ?? 0.28; st.gravityPower = T.g ?? 0.55; st.dragForce = Math.max(st.dragForce || 0, T.d ?? 0.45); j.colliderGroups = [...(j.colliderGroups || []), group]; }
-      man.setInitState(); man.reset(); } } catch (e) { console.warn('cloth weight', e); }
-  // every frame: the seat surface follows her hips while they are low (any seated pose), and is far below otherwise
-  const clothTick = () => { if (!cloth.plane || !cloth.legs) return; let seated = false, top = 1e9; for (const [a, b] of cloth.legs) { a.getWorldPosition(_clothV); b.getWorldPosition(_clothV2); const len = _clothV.distanceTo(_clothV2) || 1; if ((_clothV.y - _clothV2.y) / len < (window.WIZRA_CLOTH?.tilt ?? 0.72)) seated = true; top = Math.min(top, _clothV.y); }   /* a thigh that is nearer level than upright: she is sitting, kneeling or lying */
-    const sc = vrm.scene.scale.y || 1, base = vrm.scene.getWorldPosition(_clothV2).y; cloth.plane.position.y = seated ? (top - base) / sc - (window.WIZRA_CLOTH?.seat ?? 0.085) : -50; cloth.plane.quaternion.copy(vrm.scene.quaternion).invert(); for (const c of cloth.cols) c.updateWorldMatrix(true, false); };   /* the spring bone code only refreshes colliders it was loaded with, so these are refreshed here */
-  const _clothV = new THREE.Vector3(), _clothV2 = new THREE.Vector3();
+  // Her skirt and coat tails as real cloth (bonecloth.js): one weighted sheet that rests on her legs and the seat, instead of
+  // the model's own separate springy strips. Hair stays with the spring bone code. Its reset follows the spring bones' reset.
+  let cloth = null; try { cloth = boneCloth(THREE, vrm); if (cloth && vrm.springBoneManager) { const man = vrm.springBoneManager, r0 = man.reset.bind(man); man.reset = () => { r0(); try { cloth.reset(); } catch {} }; } } catch (e) { console.warn('bone cloth', e); }
+  const clothTick = dt => { if (cloth) { try { cloth.tick(dt, build.v); } catch (e) { console.warn('bone cloth', e); cloth = null; } } };
   // Her mouth: this model's inside-of-the-mouth picture is plain grey (teeth, a grey cavity, a grey tongue), which shows as a grey
   // mouth whenever she smiles wide or talks. Repaint it as it is drawn here: dark red inside, a pink tongue, the teeth left white.
   // (Only the picture used on screen changes; her model file is untouched.)
@@ -794,7 +784,7 @@ export async function create(url, opts = {}) {
   let zoomWant = Number(localStorage.getItem('brenai.zoom')) || 0, zoom = 0, camYaw = 0;
   const aim = new THREE.Vector3();
   // ---- visiting: you are in the room with her and see it through your own eyes. Drag to look, tap the floor (or WASD) to walk. ----
-  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 }; if (window.WIZRA_STILL) window.WIZRA_T = { fp, vrm };   /* test hook: lets a headless check place the first-person camera */
+  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 }; if (window.WIZRA_STILL) window.WIZRA_T = { fp, vrm, cloth };   /* test hook: lets a headless check place the first-person camera */
   let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0; daylight();
   const mugDorm = REST_AT.mug[0].clone();
   function setPlace(name) {
@@ -1152,7 +1142,7 @@ export async function create(url, opts = {}) {
       if (!touchedBones.includes('leftShoulder')) { set('leftShoulder', 0, 0, body[4] + s.breathe * 0.01); set('rightShoulder', 0, 0, -body[4] - s.breathe * 0.01); }
       if (hipsNode) hipsNode.position.y = hipY0 + gx.hipY + clipHip;
       if (window.WIZRA_FIX) { let soft = Math.max(rt.lie || 0, hpose.on ? 1 : 0); for (const n in SEATED) soft = Math.max(soft, rt.lg[n] || 0); fixBody(1 - Math.min(1, soft)); }   // her arms and legs keep out of her own body (not in the recorded curled-up and lying poses, which fold her on purpose)
-      clothTick(); vrm.update(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
+      vrm.update(s.dt); clothTick(s.dt); if (hpose.settle && --hpose.settle === 0 && vrm.springBoneManager) vrm.springBoneManager.reset(); // spring bones: hair and clothes swing with the head
       placeProps(); lampTick(s.dt); places.tick(night, s.t); places.live(here, s.t, night); stormTick(performance.now()); quality(performance.now());
       if (cinema && places.power) { const f = 0.5 + 0.5 * Math.sin(s.t / 140) * Math.sin(s.t / 370); screenLight.color.set(cinema); screenLight.intensity = 1.2 + 1.3 * f; if (here === 'house') screenLight.position.copy(places.tv.at).add(tmpB.set(0, 0, 0.35)); else screenLight.position.set(0.2, floorY + 1.25, hip.z + 2.4); } else screenLight.intensity = 0;
       // flushed cheeks, only from the front
