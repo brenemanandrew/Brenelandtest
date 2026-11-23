@@ -89,14 +89,14 @@ export function boneCloth(THREE, vrm) {
   function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t);
     if (lap) { const hd = Math.hypot(p.x - e.x, p.z - e.z); if (hd < r) { const topY = e.y + Math.sqrt(r * r - hd * hd); if (p.y < topY) p.y = topY; } return; }   /* seated: cloth caught in or under a thigh comes out on top of it, so it lies in her lap and not beneath her */
     d.copy(p).sub(e); const l = d.length(); if (l < r && l > 1e-5) p.addScaledVector(d, (r - l) / l); }
-  function collide(p) { for (const k of caps) outOf(p, k[0], k[1], k[2], k[3]); if (p.y < seatY) p.y = seatY; if (surface) { const h = surface(p.x, p.z) + 0.014; if (p.y < h && p.y > h - (T.sink ?? 0.16)) p.y = h; }   /* furniture: cloth that has sunk a little into the top of something is lifted back onto it; cloth well below a top is beside or under the thing and is left alone */
+  function collide(p, sleeve) { for (const k of caps) { if (k[4] && !sleeve) continue;   /* her forearms are solid to her sleeves only: a hand resting in her lap must not shove the skirt up round it */ outOf(p, k[0], k[1], k[2], k[3]); } if (p.y < seatY) p.y = seatY; if (surface) { const h = surface(p.x, p.z) + 0.014; if (p.y < h && p.y > h - (T.sink ?? 0.16)) p.y = h; }   /* furniture: cloth that has sunk a little into the top of something is lifted back onto it; cloth well below a top is beside or under the thing and is left alone */
     if (p.y < floor) p.y = floor; }
   let surface = null;
   function tick(dt, build, surfaceAt) { surface = surfaceAt || null; dt = Math.max(1 / 240, Math.min(1 / 30, dt || 1 / 60)); const fat = 1 + 0.22 * (build || 0);
     hips.updateWorldMatrix(true, false); for (const l of legs) for (const o of l) o.updateWorldMatrix(true, false); for (const c of chains) c.anchor.updateWorldMatrix(true, false);
     // her legs as capsules, and the seat: a flat surface just under her hip joints whenever a thigh is nearer level than upright
     caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR, level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
-    for (const [f2, h2] of arms) { f2.updateWorldMatrix(true, false); h2.updateWorldMatrix(true, false); caps.push([wp(f2), wp(h2), 0.04 + PR]); }
+    for (const [f2, h2] of arms) { f2.updateWorldMatrix(true, false); h2.updateWorldMatrix(true, false); caps.push([wp(f2), wp(h2), 0.04 + PR, false, true]); }
     for (let k = 0; k < Math.min(2, legs.length); k++) { legDir[k].copy(caps[k * 2][1]).sub(caps[k * 2][0]).normalize(); legLevel[k] = !!caps[k * 2][3]; } for (const c of chains) if (c.f > 0 && legLevel[c.leg]) c.q.setFromUnitVectors(DOWN, legDir[c.leg]).slerp(ID, 1 - c.f);
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
     wp(chains[0].bones[0], a); if (first || a.distanceTo(lastRoot) > 0.35) { reset(); first = false; } lastRoot.copy(a);   /* she was moved in one go (a cut, a teleport): start the cloth at rest there */
@@ -108,7 +108,7 @@ export function boneCloth(THREE, vrm) {
       for (let it = 0; it < ITERS; it++) {
         for (const c of chains) { for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; if (i === 0) B.addScaledVector(d, (c.len[i] - l) / l); else { const k = 0.5 * (c.len[i] - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } }
           for (const L of c.links) { const A = c.p[L.i], B = L.b.p[L.i]; d.copy(B).sub(A); const l = d.length() || 1e-6, want = l > L.d * 1.04 ? L.d * 1.04 : l < L.d * 0.55 ? L.d * 0.55 : l; if (want !== l) { const k = 0.5 * (want - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } } }
-        for (const c of chains) for (let i = 1; i < c.n; i++) collide(c.p[i]); }
+        for (const c of chains) { const sl = c.keep !== undefined; for (let i = 1; i < c.n; i++) collide(c.p[i], sl); } }
       for (const c of chains) for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; B.copy(A).addScaledVector(d, c.len[i] / l); }   /* strips never stretch */
     }
     // turn each bone so it points at the next point down its strip
