@@ -84,6 +84,7 @@ export function boneCloth(THREE, vrm) {
   const humanSet = new Set(Object.keys(vrm.humanoid.humanBones || {}).map(raw).filter(Boolean)), heldBy = o => { while (o && !humanSet.has(o)) o = o.parent; return o; };
   /* which way is forward for her, read from her own hips at load (left hip minus right hip, crossed with up): the model can be facing either way along z at that moment */
   const SIDE = legs.length > 1 ? wp(legs[0][0]).sub(wp(legs[1][0])).setY(0).normalize() : new THREE.Vector3(1, 0, 0), FWD = new THREE.Vector3().crossVectors(SIDE, new THREE.Vector3(0, 1, 0)).normalize();
+  { const hw9 = wp(hips); for (const c of chains) if (c.keep === undefined) c.back = c.p[c.n - 1].clone().sub(hw9).dot(FWD) < -0.03; }   /* a strip that ends behind her is the back of the garment, whatever bone it hangs from (a skirt's back strips hang from her thighs) */
   for (const c of chains) { c.f = 0; if (heldBy(c.anchor) === hips) { const hw = wp(hips), l = c.p[c.n - 1].clone().sub(hw), fz = l.dot(FWD), sx = l.dot(SIDE); c.f = Math.max(0, Math.min(1, (fz + 0.06) / 0.05)); c.leg = sx >= 0 ? 0 : 1;   /* the sides count as front: seated they run forward beside her thigh, between it and the chair arm, and only what is truly behind her stays down */   /* front or back is read from where the strip ENDS: the strips of a skirt all start close together under her waist */ c.q = new THREE.Quaternion(); } }
   const target = (c, i, out) => { out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld); if (i && c.f > 0 && legLevel[c.leg]) { t0v.copy(c.rest[0]).applyMatrix4(c.anchor.matrixWorld); out.sub(t0v).applyQuaternion(c.q).add(t0v); } return out; };
   // A dress can have several layers of skirt (a panel over pleats over a lining), each with its own copy of the same strips in the same
@@ -120,7 +121,7 @@ export function boneCloth(THREE, vrm) {
           for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; if (i === 0) B.addScaledVector(d, (c.len[i] - l) / l); else { const k = 0.5 * (c.len[i] - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } }
           for (const L of c.links) { const A = c.p[L.i], B = L.b.p[L.i]; d.copy(B).sub(A); const l = d.length() || 1e-6, want = l > L.d * 1.04 ? L.d * 1.04 : l < L.d * 0.55 ? L.d * 0.55 : l; if (want !== l) { const k = 0.5 * (want - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } } }
         for (const c of sim) { const sl = c.keep !== undefined; const cap = c.q ? c.p[0].y - (T.tuck ?? 0.22) : 1e9;   /* a skirt or coat tail only comes to rest on things well below her waist (the seat, a low table). An armrest beside her hip is too high: the cloth goes down past it, between her and the arm, as if tucked in, instead of spreading over it */
-          for (let i = 1; i < c.n; i++) collide(c.p[i], sl, c.prev[i], cap, c.q && c.f < 0.3); } }
+          for (let i = 1; i < c.n; i++) collide(c.p[i], sl, c.prev[i], cap, c.back); } }
       for (const c of sim) for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; B.copy(A).addScaledVector(d, c.len[i] / l); }   /* strips never stretch */
     }
     // turn each bone so it points at the next point down its strip
