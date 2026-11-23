@@ -38,7 +38,8 @@
     const acts = el('div', { className: 'chips' }), agree = el('button', { textContent: D.agree ? '🤝 Agreeable: ON' : '🤝 Agreeable: off', className: D.agree ? 'on' : '' });
     agree.onclick = async () => { const d = await post('/api/agree', { on: !D.agree }); Object.assign(D, d); place(d); draw(); };
     const clear = el('button', { textContent: '🧽 Clear her mood' }); clear.onclick = () => { put({ clearMood: true }, true); setTimeout(reload, 500); };
-    acts.append(agree, clear); if (D.away) { const home = el('button', { textContent: '🏠 Bring her home' }); home.onclick = () => { put({ home: true }, true); setTimeout(reload, 500); }; acts.append(home); } body.append(acts);
+    const fresh = el('button', { textContent: '🌱 Fresh start from here' }); fresh.title = 'She stops reading back the conversation so far, so its tone cannot pull her back. Your chat stays on screen; her notes and memories stay.'; fresh.onclick = () => { put({ fresh: true }, true); fresh.textContent = '🌱 Started fresh'; };
+    acts.append(agree, clear, fresh); if (D.away) { const home = el('button', { textContent: '🏠 Bring her home' }); home.onclick = () => { put({ home: true }, true); setTimeout(reload, 500); }; acts.append(home); } body.append(acts);
     H('How she feels about you', 'What she is carrying from your last conversations. Empty means nothing in particular.');
     body.append(area(D.feeling, v => put({ feeling: v }), '', 'e.g. Still glowing from last night. / A little hurt that you forgot her birthday.'));
     H('One-on-one zones', 'Where she likes being touched in one-on-one time. Tap to switch a place between liked and not liked. Her chest, hips and thighs are always off limits.');
