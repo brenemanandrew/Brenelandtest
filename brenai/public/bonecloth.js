@@ -82,7 +82,7 @@ export function boneCloth(THREE, vrm) {
   // sides of a skirt are laid along the thigh instead (toward the knee), because that is where the cloth has to go: without this the
   // points were all lifted onto the same spot of the thigh and the strip stood up in front of her like a tent.
   const humanSet = new Set(Object.keys(vrm.humanoid.humanBones || {}).map(raw).filter(Boolean)), heldBy = o => { while (o && !humanSet.has(o)) o = o.parent; return o; };
-  for (const c of chains) { c.f = 0; if (heldBy(c.anchor) === hips) { const l = c.p[0].clone().applyMatrix4(hips.matrixWorld.clone().invert()); c.f = Math.max(0, Math.min(1, (l.z + 0.035) / 0.07)); c.leg = l.x >= 0 ? 0 : 1; c.q = new THREE.Quaternion(); } }
+  for (const c of chains) { c.f = 0; if (heldBy(c.anchor) === hips) { const hi2 = hips.matrixWorld.clone().invert(), l0 = c.p[0].clone().applyMatrix4(hi2), l = c.p[c.n - 1].clone().applyMatrix4(hi2); c.f = Math.max(0, Math.min(1, (l.z + 0.02) / 0.08)); c.leg = (Math.abs(l.x) > 0.02 ? l.x : l0.x) >= 0 ? 0 : 1;   /* front or back is read from where the strip ENDS: the strips of a skirt all start close together under her waist */ c.q = new THREE.Quaternion(); } }
   const target = (c, i, out) => { out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld); if (i && c.f > 0 && legLevel[c.leg]) { t0v.copy(c.rest[0]).applyMatrix4(c.anchor.matrixWorld); out.sub(t0v).applyQuaternion(c.q).add(t0v); } return out; };
   // A dress can have several layers of skirt (a panel over pleats over a lining), each with its own copy of the same strips in the same
   // place. Simulated one by one they pass through each other and the dress looks torn. So only the first layer is simulated; every other
@@ -91,8 +91,9 @@ export function boneCloth(THREE, vrm) {
   const sim = chains.filter(c => !c.lead); for (const c of sim) c.links = c.links.filter(l => !l.b.lead);
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
-  function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t);
-    if (lap) { d.copy(p).sub(e); const l0 = d.length(); if (l0 >= r) return; const hd = Math.hypot(d.x, d.z);
+  function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const traw = e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()), t = Math.max(0, Math.min(1, traw)); e.copy(A).addScaledVector(d, t);
+    if (lap) { if (traw < 0.12) return;   /* at the hip end of the thigh the cloth is under or behind her: that is the seat's business. (Without this the back of a skirt was hauled up through her and onto her lap.) */
+      d.copy(p).sub(e); const l0 = d.length(); if (l0 >= r) return; const hd = Math.hypot(d.x, d.z);
       if (hd < r * 0.45) { p.y = e.y + Math.sqrt(r * r - hd * hd); return; }   /* through the middle of the thigh, or under it: out on top, into her lap */
       if (d.y < 0) d.y = 0; const l = d.length() || 1e-6; p.copy(e).addScaledVector(d, r / l); return; }   /* off to one side of it: out sideways, so the cloth goes down over the outside of her thigh to the seat and not up on top */   /* seated: cloth caught in or under a thigh comes out on top of it, so it lies in her lap and not beneath her */
     d.copy(p).sub(e); const l = d.length(); if (l < r && l > 1e-5) p.addScaledVector(d, (r - l) / l); }
@@ -102,7 +103,7 @@ export function boneCloth(THREE, vrm) {
   function tick(dt, build, surfaceAt) { surface = surfaceAt || null; dt = Math.max(1 / 240, Math.min(1 / 30, dt || 1 / 60)); const fat = 1 + 0.22 * (build || 0);
     hips.updateWorldMatrix(true, false); for (const l of legs) for (const o of l) o.updateWorldMatrix(true, false); for (const c of chains) c.anchor.updateWorldMatrix(true, false);
     // her legs as capsules, and the seat: a flat surface just under her hip joints whenever a thigh is nearer level than upright
-    caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR, level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
+    caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.072) * fat + (level ? 0.012 : PR), level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
     for (const [f2, h2] of arms) { f2.updateWorldMatrix(true, false); h2.updateWorldMatrix(true, false); caps.push([wp(f2), wp(h2), 0.04 + PR, false, true]); }
     for (let k = 0; k < Math.min(2, legs.length); k++) { legDir[k].copy(caps[k * 2][1]).sub(caps[k * 2][0]).normalize(); legLevel[k] = !!caps[k * 2][3]; } for (const c of chains) if (c.f > 0 && legLevel[c.leg]) c.q.setFromUnitVectors(DOWN, legDir[c.leg]).slerp(ID, 1 - c.f);
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
