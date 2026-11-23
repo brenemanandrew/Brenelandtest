@@ -37,3 +37,6 @@ The PC version is in `F:\Projects\Brenai\viture` on Andrew's PC (`viture_head.py
 - Which of Half and Full matches, and whether the eyes are the right way round.
 - Whether the helper can read the sensor while SpaceWalker is running.
 - Comfort: text size, eye spacing, and how close she can get before it is hard to look at.
+
+## Head tracking with nothing installed (experimental, not working yet)
+Andrew does not want players to install anything. The only install-free route is the browser reading the glasses over USB itself (WebHID), which exists in Chrome and Edge on a PC and not on phones. `WizraStereo.probe()` (run it from the console with the glasses plugged into the PC) asks for the VITURE device, listens to every report it sends and keeps the last 400 in `WizraStereo.hidLog` as hex. The next step needs real glasses: move the head in one direction at a time, read the log, and find which bytes are the angles (and whether a command has to be sent first to switch the motion data on). When the format is known, turning it into `WizraStereo.head(yaw, pitch, roll)` is a few lines. On a phone there is no install-free route: a web page there cannot reach the glasses' sensor.

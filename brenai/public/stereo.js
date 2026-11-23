@@ -46,6 +46,13 @@
     S.mode = api.mode = mode; document.body.classList.toggle('sbs', !!mode); ui.classList.toggle('half', mode === 'half'); for (const e of eyes) e.mode.textContent = mode === 'half' ? 'Half ⇄' : 'Full ⇄'; try { localStorage.setItem('brenai.sbs', mode); } catch {}
     if (mode) { listen(); goFull(); } else { say(''); S.zero = null; try { avatar.head(0, 0, 0); } catch {} if (S.ws) { try { S.ws.close(); } catch {} S.ws = null; } unlockSideways(); try { document.fullscreenElement && document.exitFullscreen(); } catch {} }
     window.dispatchEvent(new Event('resize')); return mode; }
-  const api = window.WizraStereo = { set, cycle: () => set(S.mode === '' ? 'half' : S.mode === 'half' ? 'full' : ''), head, mode: '' };
+  // Head tracking with nothing installed (experimental, PC Chrome or Edge only: phones do not have WebHID). The glasses are a USB device the
+  // browser can be allowed to read. probe() asks for them (USB vendor 0x35ca, VITURE), listens to everything they send and keeps the last
+  // reports in WizraStereo.hidLog as hex, so the data format can be worked out with real glasses on the desk. It does not turn the view yet:
+  // the format of their motion data is not published and nobody building this had a pair to read.
+  async function probe() { if (!navigator.hid) return 'This browser cannot read USB devices (needs Chrome or Edge on a PC).'; let devs = []; try { devs = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x35ca }] }); } catch (e) { return 'Not allowed: ' + e.message; } if (!devs.length) return 'No VITURE glasses were picked.';
+    api.hidLog = []; let n = 0; for (const dv of devs) { try { if (!dv.opened) await dv.open(); n++; dv.addEventListener('inputreport', ev => { const b = new Uint8Array(ev.data.buffer, ev.data.byteOffset, ev.data.byteLength); api.hidLog.push({ t: Math.round(performance.now()), dev: dv.productName, id: ev.reportId, hex: [...b].map(x => x.toString(16).padStart(2, '0')).join(' ') }); if (api.hidLog.length > 400) api.hidLog.shift(); }); } catch {} }
+    return `Listening to ${n} of ${devs.length} interface(s): ${devs.map(d => d.productName).join(', ')}. Move your head, then read WizraStereo.hidLog in the console.`; }
+  const api = window.WizraStereo = { probe, hidLog: [], set, cycle: () => set(S.mode === '' ? 'half' : S.mode === 'half' ? 'full' : ''), head, mode: '' };
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.mode) set(''); });
 })();
