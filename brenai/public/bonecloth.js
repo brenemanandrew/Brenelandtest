@@ -76,7 +76,7 @@ export function boneCloth(THREE, vrm) {
   { const hi = hips.matrixWorld.clone().invert(), by = {}; for (const c of chains) (by[c.layer] = by[c.layer] || []).push(c);
     for (const ring of Object.values(by)) { if (ring.length < 2) continue; const hw0 = wp(hips); for (const c of ring) { if (c.ang !== undefined) continue; const l = c.p[c.n - 1].clone().sub(hw0); c.ang = Math.atan2(l.x, l.z); }   /* order round her by where each strip ENDS: a skirt's strips all start close together under her waist, so their starts say nothing */ ring.sort((a, b) => a.ang - b.ang);
       for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length]; if (ring.length === 2 && k === 1) break; for (let i = 1; i < Math.min(a.n, b.n); i++) a.links.push({ b, i, d: a.p[i].distanceTo(b.p[i]) }); } } }
-  const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true, keepK = 0.045;
+  const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true, keepK = 0.01;
   const DOWN = new THREE.Vector3(0, -1, 0), ID = new THREE.Quaternion(), legDir = [V(), V()], legLevel = [false, false], t0v = V();
   // Where a point would be if the garment simply kept its cut. Standing, that is straight down from the waist. Sitting, the front and
   // sides of a skirt are laid along the thigh instead (toward the knee), because that is where the cloth has to go: without this the
@@ -111,7 +111,7 @@ export function boneCloth(THREE, vrm) {
     for (let k = 0; k < Math.min(2, legs.length); k++) { legDir[k].copy(caps[k * 2][1]).sub(caps[k * 2][0]).normalize(); legLevel[k] = !!caps[k * 2][3]; } for (const c of chains) if (c.f > 0 && legLevel[c.leg]) c.q.setFromUnitVectors(DOWN, legDir[c.leg]).slerp(ID, 1 - c.f);
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
     wp(chains[0].bones[0], a); if (first || a.distanceTo(lastRoot) > 0.35) { reset(); first = false; } lastRoot.copy(a);   /* she was moved in one go (a cut, a teleport): start the cloth at rest there */
-    keepK += ((seated ? KEEP : (T.keepUp ?? 0.045)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
+    keepK += ((seated ? KEEP : (T.keepUp ?? 0.01)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
     const steps = dt > 1 / 45 ? 2 : 1, h = dt / steps;
     for (let s = 0; s < steps; s++) {
       for (const c of sim) { wp(c.bones[0], c.p[0]); c.prev[0].copy(c.p[0]);
@@ -119,7 +119,7 @@ export function boneCloth(THREE, vrm) {
       for (let it = 0; it < ITERS; it++) {
         for (const c of sim) { for (let i = 0; i + 2 < c.n; i++) { const A = c.p[i], B = c.p[i + 2]; d.copy(B).sub(A); const l = d.length() || 1e-6, min = (c.len[i] + c.len[i + 1]) * (T.stiff ?? 0.8); if (l < min) { const k = (min - l) / l; if (i === 0) B.addScaledVector(d, k); else { A.addScaledVector(d, -k / 2); B.addScaledVector(d, k / 2); } } }   /* a strip does not fold back on itself: lying on a seat it used to crumple into a zigzag and the garment showed its lining */
           for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; if (i === 0) B.addScaledVector(d, (c.len[i] - l) / l); else { const k = 0.5 * (c.len[i] - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } }
-          for (const L of c.links) { const A = c.p[L.i], B = L.b.p[L.i]; d.copy(B).sub(A); const l = d.length() || 1e-6, want = l > L.d * 1.04 ? L.d * 1.04 : l < L.d * 0.55 ? L.d * 0.55 : l; if (want !== l) { const k = 0.5 * (want - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } } }
+          for (const L of c.links) { const A = c.p[L.i], B = L.b.p[L.i]; d.copy(B).sub(A); const l = d.length() || 1e-6, want = l > L.d * 1.04 ? L.d * 1.04 : l < L.d * (T.gather ?? 0.4) ? L.d * (T.gather ?? 0.4) : l;   /* the hem may gather in to well under half its cut width, so a flared skirt can fall against her legs */ if (want !== l) { const k = 0.5 * (want - l) / l; A.addScaledVector(d, -k); B.addScaledVector(d, k); } } }
         for (const c of sim) { const sl = c.keep !== undefined; const cap = c.q ? c.p[0].y - (T.tuck ?? 0.22) : 1e9;   /* a skirt or coat tail only comes to rest on things well below her waist (the seat, a low table). An armrest beside her hip is too high: the cloth goes down past it, between her and the arm, as if tucked in, instead of spreading over it */
           for (let i = 1; i < c.n; i++) collide(c.p[i], sl, c.prev[i], cap, c.back); } }
       for (const c of sim) for (let i = 0; i < c.n - 1; i++) { const A = c.p[i], B = c.p[i + 1]; d.copy(B).sub(A); const l = d.length() || 1e-6; B.copy(A).addScaledVector(d, c.len[i] / l); }   /* strips never stretch */
