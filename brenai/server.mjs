@@ -824,7 +824,7 @@ async function handle(req, res) {
         fs.writeFileSync(path.join(dir, name + '.fbx'), buf); res.writeHead(200, { ...cors, 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, name, kb: Math.round(size / 1000) }));
       }
       /* the PC that runs her brain may also load her outfit models: it proves itself with the brain token instead of a login, and acts as the owner, for the outfit routes only */
-      const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk', '/api/sounds'].includes(url.pathname);
+      const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk', '/api/sounds', '/api/inbox', '/api/anims', '/api/extra'].includes(url.pathname);
       if (byToken && !als.getStore()) { const u = shared.owner && playerOf(shared.owner); if (!u) return json(res, 409, { error: 'This game has no owner yet.' }); return als.run(u, () => handle(req, res)); }
       if (!byToken && !authed(req)) return json(res, 401, { error: 'login' });
       // which player: a PIN opens your own save. A new PIN makes a new one (only when asked to: a typo should not).
@@ -1043,6 +1043,12 @@ async function handle(req, res) {
         if (old && !Object.values(o.slots).some(x => x.file === old.file)) fs.rmSync(path.join(OUTFITS, old.file), { force: true });
         save(); return json(res, 200, { ok: true, slot: key, ...o.slots[key] });
       }
+      // Extra models (owner, or the PC with the brain token, to add; any player to load): for now one, 'man', the figure who sits in for the
+      // player on the couch on movie night. POST /api/extra?name=man with the raw .vrm as the body (up to 40 MB). GET /api/extra lists them.
+      if (url.pathname === '/api/extra') { const dir = path.join(DATA_DIR, 'extra'); if (req.method === 'POST') { if (!isOwner() && !byToken) return json(res, 403, { error: 'owner only' }); const name = String(url.searchParams.get('name') || ''); if (!['man'].includes(name)) return json(res, 400, { error: 'name must be: man' });
+          const chunks = []; let size = 0; for await (const c of req) { size += c.length; if (size > 40e6) return json(res, 413, { error: 'too big (40 MB at most)' }); chunks.push(c); } const buf = Buffer.concat(chunks); if (buf.toString('latin1', 0, 4) !== 'glTF') return json(res, 400, { error: 'that is not a .vrm file' }); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, name + '.vrm'), buf); return json(res, 200, { ok: true, name, mb: +(buf.length / 1e6).toFixed(1) }); }
+        let files = []; try { files = fs.readdirSync(dir).map(n => ({ name: n, mb: +(fs.statSync(path.join(dir, n)).size / 1e6).toFixed(1), v: Math.round(fs.statSync(path.join(dir, n)).mtimeMs) })); } catch {} return json(res, 200, { files }); }
+      if (url.pathname.startsWith('/api/extra/') && req.method === 'GET') { const f = url.pathname.slice(11), file = path.join(DATA_DIR, 'extra', f); if (!/^[a-z]+\.vrm$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such model' }); res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=3600' }); return fs.createReadStream(file).pipe(res); }
       if (url.pathname.startsWith('/api/outfit/') && req.method === 'GET') {
         const f = url.pathname.slice(12), file = path.join(OUTFITS, f); if (!/^o[a-z0-9]{6,10}\.vrm$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such outfit' });
         res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=31536000, immutable' }); return fs.createReadStream(file).pipe(res);
