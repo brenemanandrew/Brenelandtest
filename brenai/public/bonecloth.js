@@ -60,7 +60,7 @@ export function boneCloth(THREE, vrm) {
         for (let k = 0; k < K; k++) { const ang = -Math.PI + (k + 0.5) * TAU / K, pts = []; for (let l = 0; l <= S; l++) { const t = t0 + L * l / S; let sr = 0, sn = 0, mx = 0; for (const q of sl) { let da = Math.abs(q.a - ang); if (da > Math.PI) da = TAU - da; if (da > TAU / K * 0.75 || Math.abs(q.t - t) > L / S * 0.6) continue; sr += q.r; sn++; mx = Math.max(mx, q.r); }
               const r = sn ? (sr / sn + mx) / 2 : (pts.length ? pts[pts.length - 1].r : 0.08); pts.push({ r, v: O.clone().addScaledVector(u, t).addScaledVector(e1, Math.cos(ang) * r).addScaledVector(e2, Math.sin(ang) * r) }); }
           let parent = fore; const bones = []; for (let l = 0; l <= S; l++) { const b = l < S ? new THREE.Bone() : new THREE.Object3D(); b.name = 'Sleeve_' + side[0] + k + '_' + l; parent.add(b); parent.updateWorldMatrix(true, false); b.position.copy(parent.worldToLocal(pts[l].v.clone())); b.updateMatrix(); b.updateWorldMatrix(false, false); if (l < S) bones.push(b); parent = b; }
-          const nodes = [...bones, parent], inv = fore.matrixWorld.clone().invert(), c = { bones, anchor: fore, n: nodes.length, p: nodes.map(o => wp(o)), prev: nodes.map(o => wp(o)), rest: nodes.map(o => wp(o).applyMatrix4(inv)), len: [], q0: bones.map(o => o.quaternion.clone()), axis: [], layer: 'Sleeve' + side, links: [], ang, keep: T.sleeveKeep ?? 0.02 };
+          const nodes = [...bones, parent], inv = fore.matrixWorld.clone().invert(), c = { bones, anchor: fore, n: nodes.length, p: nodes.map(o => wp(o)), prev: nodes.map(o => wp(o)), rest: nodes.map(o => wp(o).applyMatrix4(inv)), len: [], q0: bones.map(o => o.quaternion.clone()), axis: [], layer: 'Sleeve' + side, links: [], ang, keep: T.sleeveKeep ?? 0.012 };
           for (let l = 0; l < bones.length; l++) { c.len.push(c.p[l].distanceTo(c.p[l + 1])); c.axis.push(nodes[l + 1].position.clone().normalize()); } made.push(c); }
         const skels = new Map(), all = []; vrm.scene.traverse(m => { if (m.isSkinnedMesh) all.push(m); }); const newBones = made.flatMap(c => c.bones);
         for (const m of meshes) if (!skels.has(m.skeleton)) skels.set(m.skeleton, { base: m.skeleton.bones.length, sk: new THREE.Skeleton([...m.skeleton.bones, ...newBones], [...m.skeleton.boneInverses, ...newBones.map(b => b.matrixWorld.clone().invert())]) });
@@ -76,22 +76,24 @@ export function boneCloth(THREE, vrm) {
   { const hi = hips.matrixWorld.clone().invert(), by = {}; for (const c of chains) (by[c.layer] = by[c.layer] || []).push(c);
     for (const ring of Object.values(by)) { if (ring.length < 2) continue; for (const c of ring) { if (c.ang !== undefined) continue; const l = c.p[0].clone().applyMatrix4(hi); c.ang = Math.atan2(l.x, l.z); } ring.sort((a, b) => a.ang - b.ang);
       for (let k = 0; k < ring.length; k++) { const a = ring[k], b = ring[(k + 1) % ring.length]; if (ring.length === 2 && k === 1) break; for (let i = 1; i < Math.min(a.n, b.n); i++) a.links.push({ b, i, d: a.p[i].distanceTo(b.p[i]) }); } } }
-  const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true, keepK = 0.09;
+  const G = T.g ?? 9.8, KEEP = T.keep ?? 0.012, DAMP = T.damp ?? 0.9, ITERS = T.iters ?? 5, PR = 0.028, a = V(), b = V(), d = V(), e = V(), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), caps = [], lastRoot = V(); let seatY = -1e9, floor = -1e9, first = true, keepK = 0.045;
   const target = (c, i, out) => out.copy(c.rest[i]).applyMatrix4(c.anchor.matrixWorld);
   function reset() { for (const c of chains) for (let i = 0; i < c.n; i++) { target(c, i, c.p[i]); c.prev[i].copy(c.p[i]); } }
   // push a point out of a capsule (a thigh or a shin)
   function outOf(p, A, B, r, lap) { d.copy(B).sub(A); const t = Math.max(0, Math.min(1, e.copy(p).sub(A).dot(d) / Math.max(1e-6, d.lengthSq()))); e.copy(A).addScaledVector(d, t);
     if (lap) { const hd = Math.hypot(p.x - e.x, p.z - e.z); if (hd < r) { const topY = e.y + Math.sqrt(r * r - hd * hd); if (p.y < topY) p.y = topY; } return; }   /* seated: cloth caught in or under a thigh comes out on top of it, so it lies in her lap and not beneath her */
     d.copy(p).sub(e); const l = d.length(); if (l < r && l > 1e-5) p.addScaledVector(d, (r - l) / l); }
-  function collide(p) { for (const k of caps) outOf(p, k[0], k[1], k[2], k[3]); if (p.y < seatY) p.y = seatY; if (p.y < floor) p.y = floor; }
-  function tick(dt, build) { dt = Math.max(1 / 240, Math.min(1 / 30, dt || 1 / 60)); const fat = 1 + 0.22 * (build || 0);
+  function collide(p) { for (const k of caps) outOf(p, k[0], k[1], k[2], k[3]); if (p.y < seatY) p.y = seatY; if (surface) { const h = surface(p.x, p.z) + 0.014; if (p.y < h && p.y > h - (T.sink ?? 0.16)) p.y = h; }   /* furniture: cloth that has sunk a little into the top of something is lifted back onto it; cloth well below a top is beside or under the thing and is left alone */
+    if (p.y < floor) p.y = floor; }
+  let surface = null;
+  function tick(dt, build, surfaceAt) { surface = surfaceAt || null; dt = Math.max(1 / 240, Math.min(1 / 30, dt || 1 / 60)); const fat = 1 + 0.22 * (build || 0);
     hips.updateWorldMatrix(true, false); for (const l of legs) for (const o of l) o.updateWorldMatrix(true, false); for (const c of chains) c.anchor.updateWorldMatrix(true, false);
     // her legs as capsules, and the seat: a flat surface just under her hip joints whenever a thigh is nearer level than upright
     caps.length = 0; let seated = false, top = 1e9; for (const [u, l, f] of legs) { const A = wp(u), B = wp(l), C = wp(f); const level = (A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72); caps.push([A, B, (T.thigh ?? 0.08) * fat + PR, level], [B, C, (T.shin ?? 0.054) * (1 + 0.1 * (build || 0)) + PR]); if ((A.y - B.y) / Math.max(1e-6, A.distanceTo(B)) < (T.tilt ?? 0.72)) seated = true; top = Math.min(top, A.y); }
     for (const [f2, h2] of arms) { f2.updateWorldMatrix(true, false); h2.updateWorldMatrix(true, false); caps.push([wp(f2), wp(h2), 0.04 + PR]); }
     seatY = seated ? top - (T.seat ?? 0.085) * fat + PR : -1e9; floor = wp(vrm.scene, a).y + 0.02;
     wp(chains[0].bones[0], a); if (first || a.distanceTo(lastRoot) > 0.35) { reset(); first = false; } lastRoot.copy(a);   /* she was moved in one go (a cut, a teleport): start the cloth at rest there */
-    keepK += ((seated ? KEEP : (T.keepUp ?? 0.09)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
+    keepK += ((seated ? KEEP : (T.keepUp ?? 0.045)) - keepK) * Math.min(1, dt * 3); const keepNow = keepK;   /* on her feet the garment holds most of its cut; sitting, it lets go and drapes */
     const steps = dt > 1 / 45 ? 2 : 1, h = dt / steps;
     for (let s = 0; s < steps; s++) {
       for (const c of chains) { wp(c.bones[0], c.p[0]); c.prev[0].copy(c.p[0]);
