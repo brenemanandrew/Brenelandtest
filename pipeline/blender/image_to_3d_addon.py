@@ -209,6 +209,9 @@ if bpy:
                                                ("meshy", "Meshy (online)", "Needs a Meshy API key and uses credits")])
         server: bpy.props.StringProperty(name="Hunyuan3D address", default="http://127.0.0.1:8081",
                                          description="Where Hunyuan3D's api_server.py is listening")
+        listen: bpy.props.BoolProperty(name="Take jobs from other tools (Brenebase)", default=False, update=lambda self, context: _listen_changed(self, context),
+                                       description="Let tools on this computer send pictures to be made into models while Blender is open")
+        listen_port: bpy.props.IntProperty(name="Port", default=8082, min=1024, max=65535)
         api_key: bpy.props.StringProperty(name="Meshy API key", subtype="PASSWORD",
                                           description="From meshy.ai > API. Kept in Blender's preferences on this computer")
 
@@ -220,6 +223,9 @@ if bpy:
             else:
                 self.layout.prop(self, "api_key")
                 self.layout.label(text="Each model uses Meshy credits from this key's account.")
+            row = self.layout.row()
+            row.prop(self, "listen")
+            row.prop(self, "listen_port")
 
     class I3D_Settings(bpy.types.PropertyGroup):
         image: bpy.props.StringProperty(name="Picture", subtype="FILE_PATH", description="A .png or .jpg of the thing to make")
@@ -341,9 +347,154 @@ if bpy:
             elif JOB["text"]:
                 for i in range(0, len(JOB["text"]), 46):
                     col.label(text=JOB["text"][i:i + 46])
+            if prefs.listen:
+                col.label(text="Taking jobs on port %d%s" % (prefs.listen_port, ": %d waiting" % len(LISTEN["queue"]) if LISTEN["queue"] else ""), icon="LINKED")
+                cur = LISTEN["jobs"].get(LISTEN["current"] or "")
+                if cur:
+                    col.label(text=("%s: %s" % (cur["name"], cur["text"]))[:60])
             if not local and not prefs.api_key.strip():
                 col.label(text="Add your Meshy API key in", icon="ERROR")
                 col.label(text="Preferences > Add-ons > this add-on.")
+
+    # ------------------------------------------------------------ jobs from outside (Brenebase or any tool on this computer)
+    # With "Take jobs from other tools" ticked, Blender listens on this computer only (127.0.0.1, port 8082 unless changed):
+    #   GET  /            -> {"ok": true, "busy": bool, "service": "local" | "meshy"}
+    #   POST /job  JSON   -> {"id": "..."}   body: {"image_base64": "..."} or {"image_path": "C:\\..."}, plus optional
+    #                        "name", "texture" (bool), "detail" ("draft" | "normal" | "fine"), "seed", "polycount", "pose" (Meshy only)
+    #   GET  /job/<id>    -> {"status": "queued" | "working" | "importing" | "done" | "error", "text": "...", "objects": [...]}
+    # One job runs at a time; the rest wait in line. The finished model is brought into the open scene.
+    import http.server
+    import uuid
+
+    LISTEN = {"server": None, "jobs": {}, "queue": [], "current": None}
+
+    def _json(handler, code, obj):
+        body = json.dumps(obj).encode("utf-8")
+        handler.send_response(code)
+        handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.end_headers()
+        handler.wfile.write(body)
+
+    class _JobHandler(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            if self.path.startswith("/job/"):
+                j = LISTEN["jobs"].get(self.path[5:])
+                return _json(self, 200 if j else 404, {k: j[k] for k in ("status", "text", "objects")} if j else {"error": "no such job"})
+            _json(self, 200, {"ok": True, "busy": bool(LISTEN["current"] or LISTEN["queue"]), "service": LISTEN.get("service", "local")})
+
+        def do_POST(self):
+            if self.path != "/job":
+                return _json(self, 404, {"error": "POST /job"})
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > 60 * 1024 * 1024:
+                    return _json(self, 413, {"error": "too large"})
+                d = json.loads(self.rfile.read(n).decode("utf-8"))
+                jid = uuid.uuid4().hex[:12]
+                if d.get("image_base64"):
+                    raw = base64.b64decode(d["image_base64"].split(",")[-1])
+                    ext = ".jpg" if raw[:2] == b"\xff\xd8" else ".png"
+                    path = os.path.join(tempfile.gettempdir(), "i3d_job_%s%s" % (jid, ext))
+                    with open(path, "wb") as f:
+                        f.write(raw)
+                else:
+                    path = str(d.get("image_path") or "")
+                    if not os.path.isfile(path):
+                        return _json(self, 400, {"error": "give image_base64, or image_path to a picture on this computer"})
+                name = "".join(c for c in str(d.get("name") or "") if c.isalnum() or c in " _-")[:40] or os.path.splitext(os.path.basename(path))[0]
+                LISTEN["jobs"][jid] = {"status": "queued", "text": "Waiting in line", "objects": [], "path": path, "name": name, "glb": "",
+                                       "texture": bool(d.get("texture", True)), "detail": str(d.get("detail") or "normal"), "seed": int(d.get("seed") or 1234),
+                                       "polycount": int(d.get("polycount") or 0), "pose": str(d.get("pose") or "")}
+                LISTEN["queue"].append(jid)
+                _json(self, 200, {"id": jid})
+            except Exception as e:
+                _json(self, 400, {"error": str(e)})
+
+    def _job_tick():
+        """Runs on Blender's own thread about once a second: starts the next job and brings finished models in."""
+        if not LISTEN["server"]:
+            return None
+        try:
+            prefs = bpy.context.preferences.addons[__name__].preferences
+            LISTEN["service"] = prefs.service
+            cur = LISTEN["current"]
+            if cur:
+                j = LISTEN["jobs"][cur]
+                if j["status"] == "importing":
+                    before = set(bpy.data.objects)
+                    try:
+                        bpy.ops.import_scene.gltf(filepath=j["glb"])
+                        new = [o for o in bpy.data.objects if o not in before]
+                        for o in new:
+                            if o.parent is None:
+                                o.name = j["name"] or o.name
+                        j["objects"] = [o.name for o in new]
+                        j["status"], j["text"] = "done", "Done: %d object(s) added." % len(new)
+                    except Exception as e:
+                        j["status"], j["text"] = "error", "Made but could not be brought in: %s. Saved at %s" % (e, j["glb"])
+                if j["status"] in ("done", "error"):
+                    LISTEN["current"] = None
+            if not LISTEN["current"] and LISTEN["queue"] and not (JOB["thread"] and JOB["thread"].is_alive()):
+                jid = LISTEN["queue"].pop(0)
+                j = LISTEN["jobs"][jid]
+                LISTEN["current"] = jid
+                j["status"], j["text"] = "working", "Starting..."
+                key, local, server = prefs.api_key.strip(), prefs.service == "local", prefs.server.strip()
+
+                def work(j=j):
+                    try:
+                        def say(text, pct):
+                            j["text"] = text
+                        if local:
+                            j["glb"] = make_model_local(server, j["path"], j["texture"], j["polycount"], j["detail"], j["seed"], say, lambda: not LISTEN["server"])
+                        elif key:
+                            j["glb"] = make_model(key, j["path"], j["pose"], j["texture"], j["polycount"], say, lambda: not LISTEN["server"])
+                        else:
+                            raise RuntimeError("No Meshy API key is set in the add-on's preferences.")
+                        j["status"] = "importing"
+                    except Exception as e:
+                        j["status"], j["text"] = "error", str(e)
+
+                threading.Thread(target=work, daemon=True).start()
+        except Exception as e:
+            print("Image to 3D: job tick failed:", e)
+        return 1.0
+
+    def listen_start(port):
+        if LISTEN["server"]:
+            return
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", int(port)), _JobHandler)
+        LISTEN["server"] = srv
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        bpy.app.timers.register(_job_tick, first_interval=1.0, persistent=True)
+
+    def listen_stop():
+        srv, LISTEN["server"] = LISTEN["server"], None
+        if srv:
+            srv.shutdown()
+            srv.server_close()
+
+    def _listen_changed(self, context):
+        try:
+            if self.listen:
+                listen_start(self.listen_port)
+            else:
+                listen_stop()
+        except OSError as e:
+            print("Image to 3D: could not listen on port %s: %s" % (self.listen_port, e))
+
+    def _listen_at_startup():
+        try:
+            prefs = bpy.context.preferences.addons[__name__].preferences
+            if prefs.listen:
+                listen_start(prefs.listen_port)
+        except Exception as e:
+            print("Image to 3D: could not start listening:", e)
+        return None
 
     CLASSES = (I3D_Prefs, I3D_Settings, I3D_OT_make, I3D_OT_stop, I3D_PT_panel)
 
@@ -351,8 +502,10 @@ if bpy:
         for c in CLASSES:
             bpy.utils.register_class(c)
         bpy.types.Scene.i3d = bpy.props.PointerProperty(type=I3D_Settings)
+        bpy.app.timers.register(_listen_at_startup, first_interval=2.0)
 
     def unregister():
+        listen_stop()
         del bpy.types.Scene.i3d
         for c in reversed(CLASSES):
             bpy.utils.unregister_class(c)
