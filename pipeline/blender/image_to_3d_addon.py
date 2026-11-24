@@ -4,6 +4,8 @@
 #   1. Hunyuan3D running on this computer (free, needs a strong graphics card). Tencent's open source Hunyuan3D-2 or 2.1 comes with a
 #      small server, api_server.py. Start it first, for example:   python api_server.py --host 127.0.0.1 --port 8081
 #      (Hunyuan3D-2: add --enable_tex for colours.) This add-on sends the picture to it and waits for the model.
+#      On Andrew's PC: F:\Projects\Hunyuan3D\start_hunyuan3d.bat. It needs the whole graphics card, so close Wizra's model first.
+#      Hunyuan3D's licence is non-commercial.
 #   2. Meshy's online service (meshy.ai). Needs a Meshy API key and uses Meshy credits for each model.
 #
 # Install: Blender > Edit > Preferences > Add-ons > Install from Disk (the arrow at the top right in Blender 4.2+, or the
@@ -131,7 +133,10 @@ def make_model(key, image_path, pose, texture, polycount, say, stop):
 
 # ---------------------------------------------------------------- talking to Hunyuan3D on this computer (api_server.py)
 
-DETAIL = {"draft": (196, 20), "normal": (256, 30), "fine": (380, 50)}      # (octree_resolution, num_inference_steps)
+# (octree_resolution, num_inference_steps). Set for the "turbo" shape model api_server.py loads by default, which wants about 5 steps.
+# Measured on Andrew's PC (RTX 5060 Ti 16 GB, Hunyuan3D-2mini turbo, 256 and 5 steps): 36 s for shape, 65 s with colours, and the
+# card was full with colours on, so "fine" is only a small step up.
+DETAIL = {"draft": (196, 5), "normal": (256, 5), "fine": (320, 8)}
 
 
 def _local(method, url, body=None, timeout=120):
@@ -171,8 +176,8 @@ def make_model_local(server, image_path, texture, polycount, detail, seed, say, 
         if stop():
             raise RuntimeError("Stopped waiting. (Hunyuan3D may still be working.)")
         waited = int(time.time() - began)
-        if waited > 60 * 60:
-            raise RuntimeError("Gave up after an hour.")
+        if waited > 15 * 60:        # this server never reports a failure: a job that broke just stays "processing"
+            raise RuntimeError("No model after 15 minutes, so it most likely failed. Look at the Hunyuan3D window for the reason (often: out of graphics memory).")
         st = _local("GET", server + "/status/" + uid, timeout=300)
         status = st.get("status", "")
         if status == "completed" and st.get("model_base64"):
