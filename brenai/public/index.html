@@ -462,7 +462,11 @@
   @keyframes eyeSweep { from { transform:translateX(-45%); } to { transform:translateX(45%); } } @keyframes eyePop { 0% { transform:scale(.3) rotate(-8deg); opacity:0; } 35% { transform:scale(1.15) rotate(-4deg); opacity:1; } 100% { transform:scale(1) rotate(-4deg); opacity:1; } }
   #heartExit { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:49; border:0; border-radius:999px; padding:13px 36px; font:400 24px "Bangers","Fredoka",sans-serif; letter-spacing:.08em; color:#fff; background:linear-gradient(135deg,#a855f7,#ec4899); box-shadow:0 5px 0 rgba(90,10,60,.5), 0 8px 22px rgba(0,0,0,.4); cursor:pointer; } #heartExit[hidden] { display:none; }
   #rom30 { position:fixed; right:10px; top:10px; z-index:9; border:0; border-radius:999px; padding:6px 13px; font:700 14px "Fredoka",sans-serif; color:#fff; background:linear-gradient(135deg,#a855f7,#ec4899); box-shadow:0 3px 10px rgba(0,0,0,.35); cursor:pointer; } body.calling #rom30, body.fp #rom30, body.big #rom30 { display:none; }
-  #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
+  #whiteOut { position:fixed; inset:0; z-index:47; background:#fff; opacity:0; pointer-events:none; transition:opacity .9s ease; } #whiteOut.hold { opacity:1; transition:opacity .45s ease; pointer-events:auto; }
+  #heartPause { border:0; border-radius:999px; width:34px; height:34px; margin-left:4px; font-size:16px; cursor:pointer; background:#ffe3f1; color:#b81f74; } #heartHud { pointer-events:auto; }
+  #heartPose, #beachLeave { position:fixed; z-index:49; border:0; border-radius:999px; padding:13px 26px; font:400 22px "Bangers","Fredoka",sans-serif; letter-spacing:.06em; color:#fff; background:linear-gradient(135deg,#38bdf8,#a855f7); box-shadow:0 5px 0 rgba(30,20,90,.45), 0 8px 22px rgba(0,0,0,.3); cursor:pointer; }
+  #heartPose { left:50%; bottom:84px; transform:translateX(-50%); } #beachLeave { left:calc(10px + env(safe-area-inset-left)); top:calc(8px + env(safe-area-inset-top)); z-index:77; padding:9px 16px; font-size:17px; }
+  #pausePad { position:absolute; inset:0; z-index:3; pointer-events:auto; cursor:grab; touch-action:none; display:grid; place-items:start center; } #pausePad b { margin-top:64px; font:400 26px "Bangers","Fredoka",sans-serif; color:#fff; text-shadow:0 2px 0 #a8327a, 0 0 10px rgba(0,0,0,.4); letter-spacing:.08em; pointer-events:none; } #whiteOut.go { animation:whiteOut 1.3s ease-out; } @keyframes whiteOut { 0% { opacity:0; } 18% { opacity:1; } 100% { opacity:0; } }
   #herWrap { display:none !important; }   /* her words are in the chat area and spoken: no balloon up top */
   /* pictures she sends */
   .msg { position:relative; } .msg .unsend { position:absolute; right:2px; top:2px; width:24px; height:24px; border-radius:50%; border:0; background:rgba(60,40,90,.14); color:#6a5a8a; font-size:12px; line-height:1; cursor:pointer; } .msg .unsend:hover { background:#e0445a; color:#fff; }
@@ -545,7 +549,7 @@
   </div>
 </div>
 <div id="stageBack"></div>
-<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 10</span><i id="heartMiss"></i></div><div id="whiteOut"></div><button id="heartExit" hidden>Exit</button>
+<div id="vig"></div><div id="heartHud"><span id="heartN">0 / 30</span><i id="heartMiss"></i><button id="heartPause" title="Pause: then drag to look around">⏸</button></div><div id="whiteOut"></div><button id="heartExit" hidden>Exit</button><button id="heartPose" hidden>📷 Pose her here</button><button id="beachLeave" hidden>🏖 Leave the beach</button>
 <div id="picView" hidden><img alt="Picture from Wizra"></div>
 <div id="visitMenu" hidden></div>
 <div id="inviteCard" hidden></div>
@@ -729,38 +733,68 @@ const heartGame = (() => {
   // an eyecatch: a beat where everything holds and a band of light sweeps across, before the view cuts
   function eyecatch(label, then) { const c = el('div', { className: 'eyec' }, el('b', { textContent: label })); ensure().append(c); setTimeout(() => { c.remove(); then(); }, 430); }
   function spawn(starter) {
-    cancelAnimationFrame(g.raf); const L = ensure(), W = L.clientWidth, H = L.clientHeight, base = Math.max(34, Math.min(W, H) * 0.17), size = base * (1.35 - g.n * 0.06) * (0.75 + Math.random() * 0.4);
+    cancelAnimationFrame(g.raf); const L = ensure(), W = L.clientWidth, H = L.clientHeight, base = Math.max(34, Math.min(W, H) * 0.17), size = base * Math.max(0.62, 1.35 - g.n * 0.035) * (0.75 + Math.random() * 0.4);
     const h = el('div', { className: 'hrt' }); h.innerHTML = HEART; h.style.width = h.style.height = size + 'px';
     let x = Math.random() * (W - size), y = (starter ? 0.05 : 0.06 + Math.random() * 0.8) * (H - size), born = performance.now(), prev = born;
-    const sp = !starter && g.n >= 4 ? 55 + (g.n - 3) * 38 : 0; let a = Math.random() * 6.28, vx = Math.cos(a) * sp, vy = Math.sin(a) * sp;   // no clock: it waits for you, but from the fifth on it will not hold still
+    const sp = !starter && g.n >= 4 ? Math.min(360, 55 + (g.n - 3) * 16) : 0; let a = Math.random() * 6.28, vx = Math.cos(a) * sp, vy = Math.sin(a) * sp;   // no clock: it waits for you, but from the fifth on it will not hold still
     const put = () => { h.style.left = x + 'px'; h.style.top = y + 'px'; }; put(); L.append(h); g.cur = h;
-    const tick = t => { if (g.cur !== h) return; const dt = Math.min(0.05, (t - prev) / 1000); prev = t;
+    const tick = t => { if (g.cur !== h) return; const dt = g.paused ? 0 : Math.min(0.05, (t - prev) / 1000); prev = t; h.style.visibility = g.paused ? 'hidden' : '';
       if (sp) { x += vx * dt; y += vy * dt; if (x < 0 || x > W - size) { vx = -vx; x = Math.max(0, Math.min(W - size, x)); } if (y < 0 || y > H - size) { vy = -vy; y = Math.max(0, Math.min(H - size, y)); } put(); }
       g.raf = requestAnimationFrame(tick); };
     g.raf = requestAnimationFrame(tick);
-    h.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (g.cur !== h) return; g.cur = null; cancelAnimationFrame(g.raf); sparkle(x + size / 2, y + size / 2); h.classList.add('gone'); setTimeout(() => h.remove(), 260); starter ? start() : pop(); });
+    h.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (g.cur !== h || g.paused) return; g.cur = null; cancelAnimationFrame(g.raf); sparkle(x + size / 2, y + size / 2); h.classList.add('gone'); setTimeout(() => h.remove(), 260); starter ? start() : pop(); });
   }
-  function hud() { $('heartN').textContent = g.n + ' / ' + RU().heartPops; $('heartMiss').textContent = '♥'.repeat(Math.max(0, RU().heartTries - g.miss)) + '♡'.repeat(Math.min(RU().heartTries, g.miss)); }
-  function start() {
-    if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, wasBig: document.body.classList.contains('big') }); document.body.classList.add('hg');   /* hg: only the game is on screen */
+  function hud() { $('heartN').textContent = g.n + ' / ' + BEACH.pops; $('heartMiss').textContent = '♥'.repeat(Math.max(0, RU().heartTries - g.miss)) + '♡'.repeat(Math.min(RU().heartTries, g.miss)); }
+  // The round itself, on the beach. A fade to white, and when it clears she is in her beach outfit running along the water's edge. Each heart popped cuts to
+  // another close view of her. Three misses end it, or 30 hearts. The pause button stops her and the hearts; while paused, drag to look round her, and the
+  // view goes back when you carry on. End with 20 or more and you may stay and pose her for pictures (the photo studio, here on the beach).
+  const BEACH = { pops: 30, unlock: 20 }, wait = ms => new Promise(r => setTimeout(r, ms));
+  async function beachDress(on) { // into her beach outfit for the round, and back out of it afterwards (a model of your own is left as it is)
+    if (customModel) return; let file = '';
+    if (on) try { const d = await (await fetch('/api/outfits')).json(), found = []; (function walk(o) { if (!o || typeof o !== 'object') return; if (typeof o.file === 'string' && typeof o.name === 'string') found.push(o); for (const k in o) walk(o[k]); })(d);
+      const lv = d.level | 0, pick = found.find(o => new RegExp('L' + lv + ' Beach', 'i').test(o.name)) || found.find(o => /Beach/i.test(o.name)); if (pick && /^o[a-z0-9]{6,10}\.vrm$/.test(pick.file)) file = pick.file; } catch {}
+    const next = on && file ? { url: '/api/outfit/' + file, key: 'beach-' + file } : null; if ((beachFit && beachFit.key) === (next && next.key)) return; beachFit = next; await applyAvatar();
+    for (let i = 0; i < 60 && !avatar.canVisit(); i++) await wait(300); }
+  async function start() {
+    if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, paused: false, done: false, wasBig: document.body.classList.contains('big') }); document.body.classList.add('hg');   /* hg: only the game is on screen */
     if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
+    const w = $('whiteOut'); w.classList.remove('go'); w.classList.add('hold'); WizraSound.fx('sparkle'); await wait(520);
+    try { await beachDress(true); } catch {} try { avatar.beach(true); avatar.beachView(0); avatar.flash('joy', 9000); } catch {}
     const pad = el('div', { id: 'missPad' }); ensure().prepend(pad);                              // a tap that is not on the heart costs one of your three tries
-    pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (!g.cur) return; const r = pad.getBoundingClientRect(), f = el('span', { className: 'pts p0', textContent: '✕' }); f.style.left = e.clientX - r.left + 'px'; f.style.top = e.clientY - r.top + 'px'; ensure().append(f); setTimeout(() => f.remove(), 800); missed(); });
-    vig().classList.remove('bad'); vig().classList.add('on'); $('heartHud').classList.add('on'); avatar.routine('sit'); avatar.flash('surprised', 900); avatar.heartStage(0); avatar.heartPose(0); avatar.focus(0.02); hud(); setTimeout(() => { if (g.on) pop(); }, 900);   // the view swings round in front of her first
+    pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (!g.cur || g.paused) return; const r = pad.getBoundingClientRect(), f = el('span', { className: 'pts p0', textContent: '✕' }); f.style.left = e.clientX - r.left + 'px'; f.style.top = e.clientY - r.top + 'px'; ensure().append(f); setTimeout(() => f.remove(), 800); missed(); });
+    vig().classList.remove('bad'); vig().classList.add('on'); vig().style.setProperty('--deep', 0.12); $('heartHud').classList.add('on'); $('heartPause').textContent = '⏸'; hud();
+    await wait(700); w.classList.remove('hold'); setTimeout(() => { if (g.on && !g.done) spawn(false); }, 1100);
   }
+  function pause(on) { if (!g.on || g.done) return; g.paused = !!on; $('heartPause').textContent = g.paused ? '▶' : '⏸'; try { avatar.beachPause(g.paused); } catch {} const old = $('pausePad'); if (old) old.remove(); if (!g.paused) return;
+    const pp = el('div', { id: 'pausePad' }, el('b', { textContent: 'PAUSED: DRAG TO LOOK' })); ensure().append(pp); const fingers = new Map(); let gap = 0;
+    pp.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); fingers.set(e.pointerId, [e.clientX, e.clientY]); try { pp.setPointerCapture(e.pointerId); } catch {} if (fingers.size === 2) { const [a, b] = [...fingers.values()]; gap = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
+    pp.addEventListener('pointermove', e => { const was = fingers.get(e.pointerId); if (!was) return; fingers.set(e.pointerId, [e.clientX, e.clientY]); if (fingers.size === 2) { const [a, b] = [...fingers.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (gap) avatar.beachOrbit(0, 0, (gap - d) * 0.004); gap = d; return; } avatar.beachOrbit(e.clientX - was[0], e.clientY - was[1], 0); });
+    const up = e => { fingers.delete(e.pointerId); gap = 0; }; pp.addEventListener('pointerup', up); pp.addEventListener('pointercancel', up); pp.addEventListener('wheel', e => { e.preventDefault(); avatar.beachOrbit(0, 0, e.deltaY * 0.0012); }, { passive: false }); }
+  $('heartPause').onclick = e => { e.stopPropagation(); pause(!g.paused); };
   function pop() {
-    g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.squirm(g.n >= 7);
-    if (g.n >= 4) avatar.flash(g.n >= 7 ? 'joy' : 'blush', 4000); if (g.n >= 4) avatar.emote(g.n >= 7 ? '💦' : '💗', 900); if (g.n >= 7) avatar.tears(true);
-    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.heartPose(g.n); avatar.heartStage(g.n / RU().heartPops); avatar.focus(g.n / RU().heartPops); vig().style.setProperty('--deep', (g.n / RU().heartPops).toFixed(2)); bubbles(g.n * 3); if (g.n >= RU().heartPops) return win(); spawn(false); });   // hold, then cut
+    g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.flash('joy', 6000); if (g.n % 5 === 0) avatar.emote(g.n >= BEACH.unlock ? '✨' : '💗', 900);
+    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.beachView(g.n); vig().style.setProperty('--deep', (0.12 + 0.3 * g.n / BEACH.pops).toFixed(2)); if (g.n >= BEACH.pops) return finish(); spawn(false); });   // hold, then cut to another view of her
   }
-  function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= RU().heartTries) { cancelAnimationFrame(g.raf); if (g.cur) g.cur.remove(); g.cur = null; lose(); } }
+  function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= RU().heartTries) { cancelAnimationFrame(g.raf); if (g.cur) g.cur.remove(); g.cur = null; finish(); } }
+  // the round is over: with enough hearts it counts as a win and you may stay and pose her; otherwise it ends there
+  function finish() { if (g.done) return; g.done = true; pause(false); const mp = $('missPad'); if (mp) mp.remove(); cancelAnimationFrame(g.raf); if (g.cur) { g.cur.remove(); g.cur = null; } const won = g.n >= BEACH.unlock, L = ensure();
+    if (!won) { WizraSound.fx('sweat'); $('heartN').textContent = g.n + ' HEARTS'; $('heartMiss').textContent = 'need ' + BEACH.unlock; score('lose'); return void close(1800); }
+    for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); WizraSound.fx('sparkle'); WizraSound.fx('bond'); avatar.emote('✨', 2200); avatar.flash('joy', 8000);
+    try { localStorage.setItem('brenai.beachPose', '1'); } catch {} $('heartN').textContent = g.n + ' HEARTS'; $('heartMiss').textContent = 'POSE MODE UNLOCKED'; $('heartPause').style.display = 'none'; score('win', Math.min(10, g.n - BEACH.unlock)); $('heartExit').hidden = false; $('heartPose').hidden = false; }
+  // stay on the beach and pose her: the game's own screen is put away, she stops running, and the photo studio opens. "Leave the beach" ends it.
+  function poseMode() { if (!g.on) return; g.on = false; g.posing = true; g.last = Date.now(); $('heartExit').hidden = true; $('heartPose').hidden = true; if (layer) layer.textContent = ''; vig().classList.remove('on'); vig().textContent = ''; $('heartHud').classList.remove('on'); $('heartPause').style.display = ''; document.body.classList.remove('hg');
+    try { avatar.beachPose(true); } catch {} setTimeout(() => { try { WizraPhoto.open(); } catch {} $('beachLeave').hidden = false; }, 500); }
+  $('heartPose').onclick = () => poseMode(); $('beachLeave').onclick = () => { $('beachLeave').hidden = true; try { WizraPhoto.close(); } catch {} g.posing = false; g.on = true; close(0); };
   async function score(result, bonusPts = 0) { // tell the server how it went; show what it was worth
     g.last = Date.now();
     try { const r = await api('/api/hearts', { result, bonus: bonusPts }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+' + (RU().heartWin + bonusPts) + ' 💗' : '-' + RU().heartLose + ' 💗'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
   }
-  function close(after = 0) { // out of the game: the view, the edges of the screen and her face all go back to normal
-    g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true; document.body.classList.remove('hg');
-    setTimeout(() => { if (layer) layer.textContent = ''; avatar.bonus(false); avatar.heartPose(null); avatar.heartStage(null); avatar.focus(0); vig().classList.remove('on'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); avatar.tears(false); if (!g.wasBig) document.body.classList.remove('big'); }, after);
+  async function close(after = 0) { // out of the game: a fade to white, and behind it the beach goes, she changes back, and the room returns
+    g.on = false; g.paused = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true; $('heartPose').hidden = true;
+    await wait(after); const w = $('whiteOut'); w.classList.remove('go'); w.classList.add('hold'); await wait(520);
+    if (layer) layer.textContent = ''; try { avatar.beach(false); avatar.bonus(false); avatar.heartPose(null); avatar.heartStage(null); avatar.focus(0); } catch {} vig().classList.remove('on', 'bad'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); $('heartPause').style.display = ''; avatar.tears(false);
+    document.body.classList.remove('hg'); if (!g.wasBig) document.body.classList.remove('big');
+    try { await beachDress(false); } catch {} await wait(300); w.classList.remove('hold');
   }
   function win() { const L = ensure(); const mp = $('missPad'); if (mp) mp.remove(); for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); WizraSound.fx('sparkle'); WizraSound.fx('bond'); avatar.emote('✨', 2200); avatar.flash('joy', 5000);
     const w = $('whiteOut'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); cancelAnimationFrame(g.raf); g.cur = null; setTimeout(bonus, 650); }
@@ -1165,7 +1199,7 @@ let avatarShown = 'puppet', avatarNote = '', myExtras = { dorm: [], house: [], v
 const mapsNow = () => { const m = dev.maps || {}; return { ...m, dorm: { ...(m.dorm || {}), items: [...((m.dorm || {}).items || []), ...(myExtras.dorm || [])] }, house: { ...(m.house || {}), items: [...((m.house || {}).items || []), ...(myExtras.house || [])] } }; };
 // A model of your own in her place (photo studio): a .vrm file from this device, shown only here and only until the page is reloaded
 // or it is put back. Nothing is uploaded. useCustomModel(file) resolves to '' when it is up, or to what went wrong; useCustomModel(null) puts hers back.
-let customModel = null, customN = 0;
+let customModel = null, customN = 0, beachFit = null;   /* beachFit: her beach outfit, worn for the beach round of the heart game */
 async function useCustomModel(file) { const before = customModel; if (before && before.url) setTimeout(() => { try { URL.revokeObjectURL(before.url); } catch {} }, 60000);
   customModel = file ? { url: URL.createObjectURL(file), key: 'custom' + (++customN) } : null; await applyAvatar();
   if (file && avatarShown === 'puppet') { const why = avatarNote || 'It could not be shown.'; customModel = null; await applyAvatar(); return why; } return ''; }
@@ -1176,8 +1210,8 @@ async function useCustomModel(file) { const before = customModel; if (before && 
   document.body.append(dot); check(); setInterval(check, 20000); document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); }); })();
 async function applyAvatar() {
   const wearQ = /^o[a-z0-9]{6,10}\.vrm$/.exec(new URLSearchParams(location.search).get('wear') || '');   /* ?wear=<outfit file>: look at one outfit model (used to make her picture pack) */
-  const fit = customModel ? customModel : wearQ ? { url: '/api/outfit/' + wearQ[0], key: wearQ[0] } : visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
-  const want = customModel || (settings.avatarKind === 'vrm' && settings.avatarV) ? 'vrm:' + (fit ? fit.key : settings.avatarV) + ':' + (myExtras.v || '') : 'puppet';   // (your own gifts and decor are part of the rooms, so a new one rebuilds them)
+  const fit = customModel ? customModel : beachFit ? beachFit : wearQ ? { url: '/api/outfit/' + wearQ[0], key: wearQ[0] } : visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
+  const want = customModel || beachFit || (settings.avatarKind === 'vrm' && settings.avatarV) ? 'vrm:' + (fit ? fit.key : settings.avatarV) + ':' + (myExtras.v || '') : 'puppet';   // (your own gifts and decor are part of the rooms, so a new one rebuilds them)
   if (want === avatarShown) return; avatarShown = want; avatarNote = '';
   if (want === 'puppet') return avatar.setRenderer(null);
   try {

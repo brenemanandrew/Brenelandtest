@@ -8,6 +8,7 @@ import { buildPlaces, cel } from './places.js';
 import { bodyFix } from './bodyfix.js';
 import { addTongue } from './tongue.js';
 import { boneCloth } from './bonecloth.js';
+import { buildBeach, RUN_Z } from './beach.js';
 import { fineFace, WHOLE } from './fineface.js';
 
 // controller face name -> VRM expression weights (+ blink for heavy lids)
@@ -616,6 +617,17 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   const turnTo = (want, dt, rate) => { const d = Math.atan2(Math.sin(want - rt.yaw), Math.cos(want - rt.yaw)); rt.yaw += d * Math.min(1, dt * rate); rt.yaw = Math.atan2(Math.sin(rt.yaw), Math.cos(rt.yaw)); return Math.abs(d); }; // kept within half a turn either way, so "facing front" is always 0
   function routine(s) {
     clipHip = 0;
+    if (bh.on) { // the beach (the heart game): she runs along the water's edge; in pose mode she stands there instead
+      for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
+      const run = ['jogging', 'running', 'happy_walk'].find(haveClip) || (CLIPS.walking ? 'walking' : ''), c = CLIPS[run], rate = run === 'walking' ? 1.3 : 0.85;   /* a touch slow, like a dream */
+      if (bh.pose) { playClip(CLIPS.happy_idle ? 'happy_idle' : 'idle', 1, s.t / 1000); haveClip('happy_idle'); }
+      else if (c) { if (!bh.paused) { bh.t += s.dt * rate; bh.x += stride(c) / c.dur * s.dt * rate; } playClip(run, 1, bh.t); } else if (!bh.paused) bh.x += 2.2 * s.dt;
+      const bob = bh.pose || bh.paused ? 0 : 0.012 * Math.abs(Math.sin(bh.t / (c ? c.dur : 1) * Math.PI * 2));
+      vrm.scene.position.set(bh.x, floorY + bob, RUN_Z); vrm.scene.rotation.set(0, Math.PI / 2, 0); rt.k = 1; rt.gazeProp = null; rt.zoom = 0;
+      if (bh.settle && --bh.settle === 0 && vrm.springBoneManager) { vrm.scene.updateMatrixWorld(true); vrm.springBoneManager.reset(); try { cloth && cloth.reset && cloth.reset(); } catch {} }   /* she arrived here in one jump: her hair and clothes start at rest */
+      { const fl = B('leftFoot'), fr = B('rightFoot'); beach.tick(s.t / 1000, bh.x, fl && fr ? [fl.getWorldPosition(bhFeet[0]), fr.getWorldPosition(bhFeet[1])] : null, !bh.pose && !bh.paused); } sun.intensity = Math.PI * 1.05; sun.color.set('#fffaf0'); amb.intensity = 0.62;
+      return;
+    }
     if (hpose.on) { // the heart game: no room, just her, in whatever pose the last heart left her in
       for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
       const pose = HPOSE[hpose.i % HPOSE.length], have = CLIPS[pose[0]]; if (have) playClip(pose[0], 1, pose[1]); else playClip('idle', 1, 2);
@@ -958,6 +970,23 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   // ---- the heart game's camera. While it is on you cannot move or look: the view goes straight in front of her, then drifts
   // slowly and cuts to a new angle with every heart (her face, a shoulder, her hand...), a little closer each time, until the
   // last one puts it right up against her heart. hc.b blends between the ordinary view and this one at the start and the end.
+  // ---- the beach round of the heart game. bh.view picks one of BVIEW: close views of her at different heights and from different sides, each
+  // following her as she runs. `side` is the angle round her from straight ahead (0 = in front of her, PI/2 = on her sea side... measured toward her left).
+  // While paused the view can be dragged round (bh.oy, bh.op, bh.od); taking the pause off puts it back.
+  const bhFeet = [new THREE.Vector3(), new THREE.Vector3()]; let beach = null; const bh = { on: false, pose: false, paused: false, t: 0, x: 0, view: 0, since: 0, oy: 0, op: 0, od: 0, tgt: new THREE.Vector3(), has: false, fov: 0 };
+  const BVIEW = [{ at: 'head', side: 0.5, up: 0.06, d: 0.95, dy: 0.02 }, { at: 'upperChest', side: -1.25, up: 0.1, d: 1.3, dy: 0.08 }, { at: 'leftLowerLeg', side: -1.45, up: 0.06, d: 1.0, dy: -0.16 }, { at: 'head', side: -0.4, up: -0.08, d: 0.8, dy: 0 },
+    { at: 'spine', side: -1.1, up: 0.14, d: 1.25, dy: 0.12 }, { at: 'leftFoot', side: -0.9, up: 0.16, d: 0.9, dy: 0.06 }, { at: 'upperChest', side: 2.75, up: 0.18, d: 1.3, dy: 0.14 }, { at: 'hips', side: -0.5, up: 0.1, d: 3.1, dy: 0.2 },
+    { at: 'rightHand', side: -0.9, up: 0.2, d: 0.85, dy: 0.05 }, { at: 'head', side: -1.5, up: 0.04, d: 0.9, dy: 0 }, { at: 'rightLowerLeg', side: 1.3, up: 0.1, d: 1.0, dy: -0.16 }, { at: 'chest', side: 0.0, up: 0.08, d: 1.5, dy: 0.1 }, { at: 'hips', side: -2.6, up: 0.3, d: 2.6, dy: 0.3 }, { at: 'head', side: -0.9, up: 0.5, d: 1.6, dy: -0.05 }];
+  function beachMode(on) { on = !!on; if (on === bh.on) return on; if (on && !beach) { beach = buildBeach(THREE, { ...kit, floorY }); scene.add(beach.group); }
+    bh.on = on; Object.assign(bh, { pose: false, paused: false, t: 0, x: 0, view: 0, since: performance.now(), oy: 0, op: 0, od: 0, has: false });
+    if (on) { heartStage(0); el.style.background = beach.skyColor; beach.group.visible = true; bh.fov = camera.fov; fp.locked = true; bh.settle = 3; }
+    else { if (beach) beach.group.visible = false; heartStage(null); if (bh.fov) { camera.fov = bh.fov; camera.updateProjectionMatrix(); } fp.locked = false; vrm.scene.rotation.set(0, 0, 0); for (const n of KEYS) { const q = POSE[n] || [0, 0, 0]; CUR[n][0] = q[0]; CUR[n][1] = q[1]; CUR[n][2] = q[2]; } }
+    return on; }
+  function beachCamera(dt, t) { if (!bh.on) return; fp.locked = true; if (ph.on) return; const v = BVIEW[bh.view % BVIEW.length], b = B(v.at) || hipsNode; b.getWorldPosition(tmpA); tmpA.y += v.dy;
+    if (!bh.has) { bh.tgt.copy(tmpA); bh.has = true; } bh.tgt.x = tmpA.x; bh.tgt.z += (tmpA.z - bh.tgt.z) * Math.min(1, dt * 6); bh.tgt.y += (tmpA.y - bh.tgt.y) * Math.min(1, dt * 3);   /* keeps up with her along the beach at once; up and down it follows softly, so her bounce shows instead of shaking the picture */
+    const age = (t - bh.since) / 1000, a = Math.PI / 2 + v.side + bh.oy + (bh.paused ? 0 : 0.05 * Math.sin(age * 0.6)), elev = Math.max(-0.5, Math.min(1.3, v.up + bh.op)), d = Math.max(0.35, Math.min(7, v.d * Math.exp(bh.od) * (1 - 0.02 * Math.min(age, 4))));
+    let cy = bh.tgt.y + Math.sin(elev) * d; if (cy < floorY + 0.09) cy = floorY + 0.09;
+    camera.position.set(bh.tgt.x + Math.sin(a) * Math.cos(elev) * d, cy, bh.tgt.z + Math.cos(a) * Math.cos(elev) * d); camera.lookAt(bh.tgt); if (camera.fov !== 34) { camera.fov = 34; camera.updateProjectionMatrix(); } }
   const HSHOT = [{ yaw: 0, up: 0.04, at: 'face' }, { yaw: 0.55, up: 0.1, at: 'face' }, { yaw: -0.5, up: 0.08, at: 'shoulder' }, { yaw: 0.3, up: 0.3, at: 'face' }, { yaw: -0.35, up: 0.14, at: 'face' }, { yaw: 0.6, up: 0.16, at: 'shoulder' },
     { yaw: -0.3, up: 0.1, at: 'face' }, { yaw: 0.4, up: 0.12, at: 'heart' }, { yaw: -0.45, up: 0.2, at: 'face' }, { yaw: 0.2, up: 0.1, at: 'heart' }, { yaw: 0.06, up: 0.06, at: 'heart' }];
   // her heart itself: a soft glowing heart over her chest that brightens and beats faster as the view closes in
@@ -1243,6 +1272,11 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     /* move all of her so that one joint sits under a point on the screen, at the distance from the camera it already has (she is never put below the floor) */
     photoPlace(name, x, y) { const b = B(name); if (!b) return false; b.updateWorldMatrix(true, false); camera.updateMatrixWorld(); const r = renderer.domElement.getBoundingClientRect(), J = b.getWorldPosition(tmpA), n = tmpB.copy(J).project(camera), P = tmpB.set((x - r.left) / r.width * 2 - 1, 1 - (y - r.top) / r.height * 2, n.z).unproject(camera).sub(J);
       const dy = Math.max(floorY - vrm.scene.position.y, P.y); vrm.scene.position.x += P.x; vrm.scene.position.y += dy; vrm.scene.position.z += P.z; ph.off.x += P.x; ph.off.y += dy; ph.off.z += P.z; vrm.scene.updateMatrixWorld(true); return true; },
+    /* the beach round: beach(on) shows it and starts her running; beachView(n) cuts to view n; beachPause(on) stops her (the view can then be dragged with
+       beachOrbit(dx, dy, zoom) and goes back when the pause comes off); beachPose(on) has her stop and stand there, for the photo studio */
+    beach(on) { return beachMode(on); }, beachView(n) { if (!bh.on) return; bh.view = Math.max(0, n | 0); bh.since = performance.now(); bh.has = false; bh.oy = bh.op = bh.od = 0; },
+    beachPause(on) { if (!bh.on) return false; bh.paused = !!on; if (!on) bh.oy = bh.op = bh.od = 0; return bh.paused; }, beachOrbit(dx, dy, dz) { if (!bh.on || !bh.paused) return; bh.oy -= (dx || 0) * 0.006; bh.op = Math.max(-0.7, Math.min(1.2, bh.op + (dy || 0) * 0.005)); bh.od = Math.max(-1.2, Math.min(1.6, bh.od + (dz || 0))); },
+    beachPose(on) { if (!bh.on) return false; bh.pose = !!on; bh.paused = false; bh.oy = bh.op = bh.od = 0; return bh.pose; }, beachOn: () => bh.on, beachViews: BVIEW.length,
     photoWhere() { return { pos: vrm.scene.position.toArray().map(v => +v.toFixed(3)), ry: +vrm.scene.rotation.y.toFixed(3), off: { ...ph.off }, act: rt.act, k: +rt.k.toFixed(2), live: performance.now() < ph.liveUntil }; },   /* for tests: where she is and what the studio remembers */
     photoAt(name) { const b = B(name); if (!b) return null; const r = renderer.domElement.getBoundingClientRect(); b.getWorldPosition(tmpA).project(camera); return [(tmpA.x + 1) / 2 * r.width + r.left, (1 - tmpA.y) / 2 * r.height + r.top]; },
     /* how long a part would look on screen, in pixels, if it lay flat to the camera */
@@ -1308,7 +1342,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
         if (clipFace) { const useFine = fine.has && clipFace.mFun !== undefined; if (useFine) { fine.set(clipFace); fineOn = true; } for (const k in clipFace) if (em.getExpression(k) && !(useFine && WHOLE.includes(k))) em.setValue(k, clipFace[k]); if (clipFace.blinkLeft !== undefined && has('blink')) em.setValue('blink', 0); clipFace = null; } }
       placeCamera(s.dt);
       focusNow += (focusWant - focusNow) * Math.min(1, s.dt * 3.5); tearMat.opacity += (tearsWant * 0.7 - tearMat.opacity) * Math.min(1, s.dt * 4);
-      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt); dndCamera(s.dt, s.t); artLook(s.t);
+      heartCamera(s.dt, s.t); hangCamera(s.dt); movieCamera(s.dt); dndCamera(s.dt, s.t); artLook(s.t); beachCamera(s.dt, s.t);
       // she looks at the camera (that is you), nudged by the same gaze as the cartoon (-3..3); the head follows a little,
       // turns toward you when you are off to the side, and takes the springs from touches
       const watching = fp.on && places.tv.on && rt.act === 'sit' && !rt.attending && !rt.gazeProp && !(mv.on && mv.view === 'toss');   // the TV is on and nobody is talking
