@@ -18,7 +18,7 @@
 bl_info = {
     "name": "Image to 3D",
     "author": "Breneland tools",
-    "version": (1, 0, 0),
+    "version": (1, 2, 0),
     "blender": (3, 6, 0),
     "location": "3D View > Sidebar (N) > Image to 3D",
     "description": "Make a 3D model from a picture (Hunyuan3D on this computer, or Meshy) and bring it into the scene",
@@ -329,6 +329,7 @@ if bpy:
             prefs = context.preferences.addons[__name__].preferences
             local = prefs.service == "local"
             col.label(text="Made by: " + ("Hunyuan3D on this computer" if local else "Meshy (online)"))
+            col.label(text="(change in Preferences > Add-ons)   v%d.%d" % bl_info["version"][:2])
             col.prop(s, "image")
             if local:
                 col.prop(s, "detail")
