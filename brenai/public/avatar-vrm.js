@@ -633,7 +633,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     clipHip = 0;
     if (bh.on) { // the beach (the heart game): she runs along the water's edge; in pose mode she stands there instead
       for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
-      const run = ['slow_run', 'running', 'jogging'].find(haveClip) || 'beach_run', c = CLIPS[run], rate = 0.56;   /* slow motion: the whole run is shown at a little over half speed */
+      const run = (window.WIZRA_BEACH_RUN && haveClip(window.WIZRA_BEACH_RUN) && window.WIZRA_BEACH_RUN) || BEACH_RUNS.find(haveClip) || 'beach_run', c = CLIPS[run], rate = 0.56;   /* (WIZRA_BEACH_RUN: try one clip by name, for tests) */   /* slow motion: the whole run is shown at a little over half speed */
       const ot = bh.outro ? bhOutT() : -1, ok = ot < 0 ? 0 : Math.min(1, ot / 0.55), oe = ok * ok * (3 - 2 * ok);   /* the goodbye: she slows to a stop, turns to the sun (or the moon) and shades her eyes */
       if (bh.pose || ot >= 0) { playClip(CLIPS.happy_idle ? 'happy_idle' : 'idle', 1, s.t / 1000); haveClip('happy_idle'); }
       else if (c) { if (window.WIZRA_BEACH_T != null) bh.t = +window.WIZRA_BEACH_T; else if (!bh.paused) { bh.t += s.dt * rate; bh.x += stride(c) / c.dur * s.dt * rate; } playClip(run, 1, bh.t); } else if (!bh.paused) bh.x += 2.2 * s.dt;
@@ -990,6 +990,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   // ---- the beach round of the heart game. bh.view picks one of BVIEW: close views of her at different heights and from different sides, each
   // following her as she runs. `side` is the angle round her from straight ahead (0 = in front of her, PI/2 = on her sea side... measured toward her left).
   // While paused the view can be dragged round (bh.oy, bh.op, bh.od); taking the pause off puts it back.
+  const BEACH_RUNS = ['female_run', 'slow_run', 'running', 'jogging'];   /* recorded runs in the clip library, best first; without any, the hand-made beach_run */
   const bhOutT = () => window.WIZRA_OUTRO_T != null ? +window.WIZRA_OUTRO_T : (performance.now() - bh.outro) / 1000;   /* seconds into the goodbye (WIZRA_OUTRO_T holds it at a moment, for tests) */
   const bhFeet = [new THREE.Vector3(), new THREE.Vector3()], bhV = new THREE.Vector3(), bhV2 = new THREE.Vector3(), bhQ1 = new THREE.Quaternion(), bhQ2 = new THREE.Quaternion(); let bhUp = 0; let beach = null; const bh = { on: false, pose: false, paused: false, t: 0, x: 0, view: 0, since: 0, oy: 0, op: 0, od: 0, tgt: new THREE.Vector3(), has: false, fov: 0 };
   const BVIEW = [{ at: 'head', side: 0.5, up: 0.06, d: 0.95, dy: 0.02 }, { at: 'upperChest', side: -1.25, up: 0.1, d: 1.3, dy: 0.08 }, { at: 'leftLowerLeg', side: -1.45, up: 0.06, d: 1.0, dy: -0.16 }, { at: 'head', side: -0.4, up: -0.08, d: 0.8, dy: 0 },
