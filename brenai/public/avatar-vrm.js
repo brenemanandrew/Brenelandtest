@@ -380,7 +380,20 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
       yoga_warrior: pose(0.76, { leftUpperLeg: [-1.1, 1.5, 0], rightUpperLeg: [0, -0.3, -0.72] }, { leftLowerLeg: [1.1, 0, 0], leftFoot: [0, 0, 0], rightLowerLeg: [0, 0, 0], rightFoot: [0, 0, 0.72], leftUpperArm: [0, 0, 0], rightUpperArm: [0, 0, 0], leftLowerArm: [0, 0, 0], rightLowerArm: [0, 0, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0, 1.1, 0] }),
       yoga_moon: pose(1, { leftUpperLeg: [0, 0, 0], rightUpperLeg: [0, 0, 0] }, { ...UP, leftLowerLeg: [0, 0, 0], rightLowerLeg: [0, 0, 0], spine: [0, 0, 0.22], chest: [0, 0, 0.2], head: [0, 0, 0.12] }),
       yoga_sit: pose(0.13, { leftUpperLeg: [-1.45, 0.08, 0], rightUpperLeg: [-1.45, -0.08, 0] }, { leftLowerLeg: [2.6, 0, 0], rightLowerLeg: [2.6, 0, 0], leftFoot: [0.6, 0, 0], rightFoot: [0.6, 0, 0], leftUpperArm: [-0.32, -0.3, -1.15], rightUpperArm: [-0.32, 0.3, 1.15], leftLowerArm: [0, -1.85, 0], rightLowerArm: [0, 1.85, 0], spine: [0, 0, 0], chest: [0, 0, 0], head: [0.08, 0, 0] }),   // kneeling, sitting back on her heels, palms together
-    }); }
+    });
+    // A run made by hand for the beach: one stride cycle, built from sines. Big and loose, the kind that is shown in slow motion: knees come up high, the back
+    // leg kicks up behind, the arms swing wide from the shoulder with soft elbows, the chest turns against the hips, the head is up, and she rises twice a cycle.
+    // The beach plays it slowly. A recorded run in the clip library (slow_run, running, jogging) is used instead when there is one.
+    { const N = 36, dur = 0.84, T = Math.PI * 2, bones = {}, hips = [], add = (n, q) => (bones[n] || (bones[n] = [])).push(...q), sm = x => x * x * (3 - 2 * x);
+      for (let i = 0; i < N; i++) { const p = i / (N - 1), a = p * T, legOf = ph => { const sw = Math.sin(a + ph), fwd = Math.cos(a + ph);   /* sw > 0: this leg is swinging forward through the air */
+          const thigh = -0.34 - 0.86 * Math.sin(a + ph + 0.35), knee = 0.22 + 1.5 * sm(Math.max(0, Math.min(1, 0.5 + 0.62 * Math.sin(a + ph + 1.9)))), foot = 0.35 * Math.max(0, -fwd) - 0.18 * Math.max(0, sw); return [thigh, knee, foot]; };
+        const L = legOf(0), R = legOf(Math.PI), armL = 0.78 * Math.sin(a + 0.2), armR = -armL, twist = 0.2 * Math.sin(a), bob = 1 + 0.045 * Math.abs(Math.sin(a + 0.5)) - 0.02;
+        add('leftUpperLeg', leg([L[0], 0.05, 0.03])); add('rightUpperLeg', leg([R[0], -0.05, -0.03])); add('leftLowerLeg', eul([L[1], 0, 0])); add('rightLowerLeg', eul([R[1], 0, 0])); add('leftFoot', eul([L[2], 0, 0])); add('rightFoot', eul([R[2], 0, 0]));
+        add('hips', eul([0.1, -twist * 0.7, 0.05 * Math.sin(a)])); add('spine', eul([0.07, twist * 0.5, -0.03 * Math.sin(a)])); add('chest', eul([0.02, twist * 0.9, 0])); add('upperChest', eul([-0.04, twist * 0.5, 0])); add('neck', eul([-0.06, -twist * 0.5, 0])); add('head', eul([-0.1, -twist * 0.5, 0.03 * Math.sin(a)]));
+        add('leftShoulder', eul([0, 0, -0.06])); add('rightShoulder', eul([0, 0, 0.06])); add('leftUpperArm', eul([armL, -0.12, -1.12])); add('rightUpperArm', eul([armR, 0.12, 1.12]));
+        add('leftLowerArm', eul([0, -(0.95 + 0.4 * Math.max(0, -Math.sin(a + 0.2))), 0])); add('rightLowerArm', eul([0, 0.95 + 0.4 * Math.max(0, Math.sin(a + 0.2)), 0])); add('leftHand', eul([0, 0, -0.1])); add('rightHand', eul([0, 0, 0.1]));
+        hips.push(0, bob, p * 2.5 / (hipY0 || 0.9)); }   /* (the last number: how far one cycle carries her, 2.5 m) */
+      CLIPS.beach_run = { name: 'beach_run', dur, fps: (N - 1) / dur, n: N, bones, hips, made: true }; } }
   const cq = new THREE.Quaternion(), cq2 = new THREE.Quaternion(), fixBody = bodyFix(THREE, vrm), tongue = addTongue(THREE, vrm), fine = fineFace(vrm); let fineOn = false, clipHip = 0, clipFace = null;
   function playClip(name, weight, t, skip) { // blend one clip in at time t (seconds, loops); skip(bone) -> 0..1 of the weight to hold back
     const c = CLIPS[name]; if (!c || weight < 0.003) return false;
@@ -620,10 +633,10 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     clipHip = 0;
     if (bh.on) { // the beach (the heart game): she runs along the water's edge; in pose mode she stands there instead
       for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
-      const run = ['jogging', 'running', 'happy_walk'].find(haveClip) || (CLIPS.walking ? 'walking' : ''), c = CLIPS[run], rate = run === 'walking' ? 1.3 : 0.85;   /* a touch slow, like a dream */
+      const run = ['slow_run', 'running', 'jogging'].find(haveClip) || 'beach_run', c = CLIPS[run], rate = 0.56;   /* slow motion: the whole run is shown at a little over half speed */
       const ot = bh.outro ? bhOutT() : -1, ok = ot < 0 ? 0 : Math.min(1, ot / 0.55), oe = ok * ok * (3 - 2 * ok);   /* the goodbye: she slows to a stop, turns to the sun (or the moon) and shades her eyes */
       if (bh.pose || ot >= 0) { playClip(CLIPS.happy_idle ? 'happy_idle' : 'idle', 1, s.t / 1000); haveClip('happy_idle'); }
-      else if (c) { if (!bh.paused) { bh.t += s.dt * rate; bh.x += stride(c) / c.dur * s.dt * rate; } playClip(run, 1, bh.t); } else if (!bh.paused) bh.x += 2.2 * s.dt;
+      else if (c) { if (window.WIZRA_BEACH_T != null) bh.t = +window.WIZRA_BEACH_T; else if (!bh.paused) { bh.t += s.dt * rate; bh.x += stride(c) / c.dur * s.dt * rate; } playClip(run, 1, bh.t); } else if (!bh.paused) bh.x += 2.2 * s.dt;
       bhUp = -0.5 * oe;
       const bob = bh.pose || bh.paused || ot >= 0 ? 0 : 0.012 * Math.abs(Math.sin(bh.t / (c ? c.dur : 1) * Math.PI * 2));
       vrm.scene.position.set(bh.x, floorY + bob * (1 - oe), RUN_Z); vrm.scene.rotation.set(0, Math.PI / 2 + (beach.sunYaw - Math.PI / 2) * oe, 0); rt.k = 1; rt.gazeProp = null; rt.zoom = 0;
