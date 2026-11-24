@@ -759,7 +759,7 @@ const heartGame = (() => {
     if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, paused: false, done: false, wasBig: document.body.classList.contains('big') }); document.body.classList.add('hg');   /* hg: only the game is on screen */
     if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
     const w = $('whiteOut'); w.classList.remove('go'); w.classList.add('hold'); WizraSound.fx('sparkle'); await wait(520);
-    try { await beachDress(true); } catch {} try { avatar.beach(true); avatar.beachView(0); avatar.flash('joy', 9000); } catch {}
+    try { await beachDress(true); } catch {} try { avatar.beach(true); avatar.flash('joy', 9000); } catch {}
     const pad = el('div', { id: 'missPad' }); ensure().prepend(pad);                              // a tap that is not on the heart costs one of your three tries
     pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (!g.cur || g.paused) return; const r = pad.getBoundingClientRect(), f = el('span', { className: 'pts p0', textContent: '✕' }); f.style.left = e.clientX - r.left + 'px'; f.style.top = e.clientY - r.top + 'px'; ensure().append(f); setTimeout(() => f.remove(), 800); missed(); });
     vig().classList.remove('bad'); vig().classList.add('on'); vig().style.setProperty('--deep', 0.12); $('heartHud').classList.add('on'); $('heartPause').textContent = '⏸'; hud();
@@ -773,7 +773,8 @@ const heartGame = (() => {
   $('heartPause').onclick = e => { e.stopPropagation(); pause(!g.paused); };
   function pop() {
     g.n++; hud(); WizraSound.fx(g.n % 3 ? 'pop' : 'heart'); avatar.flash('joy', 6000); if (g.n % 5 === 0) avatar.emote(g.n >= BEACH.unlock ? '✨' : '💗', 900);
-    eyecatch('♥ ' + g.n, () => { if (!g.on) return; avatar.beachView(g.n); vig().style.setProperty('--deep', (0.12 + 0.3 * g.n / BEACH.pops).toFixed(2)); if (g.n >= BEACH.pops) return finish(); spawn(false); });   // hold, then cut to another view of her
+    eyecatch('♥ ' + g.n, () => { if (!g.on) return; const hold = avatar.beachView(g.n) || 0; vig().style.setProperty('--deep', 0.62); bubbles(Math.min(34, 8 + g.n)); setTimeout(() => { if (g.on) vig().style.setProperty('--deep', (0.12 + 0.3 * g.n / BEACH.pops).toFixed(2)); }, Math.max(0, hold - 500));   /* a close look at one part of her, time held still, bubbles and a soft pink edge; then back out */
+      if (g.n >= BEACH.pops) return setTimeout(() => { if (g.on) finish(); }, hold); setTimeout(() => { if (g.on && !g.done) spawn(false); }, hold); });
   }
   function missed() { g.miss++; hud(); WizraSound.fx('sweat'); if (g.miss >= RU().heartTries) { cancelAnimationFrame(g.raf); if (g.cur) g.cur.remove(); g.cur = null; finish(); } }
   // the round is over: with enough hearts it counts as a win and you may stay and pose her; otherwise it ends there
