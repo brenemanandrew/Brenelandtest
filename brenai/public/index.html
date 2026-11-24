@@ -1158,10 +1158,16 @@ sendBtn.onclick = () => send();
 let avatarShown = 'puppet', avatarNote = '', myExtras = { dorm: [], house: [], v: '' };
 // the rooms as this player has them: the shared maps plus their own gifts (in her dorm) and decor (in their house)
 const mapsNow = () => { const m = dev.maps || {}; return { ...m, dorm: { ...(m.dorm || {}), items: [...((m.dorm || {}).items || []), ...(myExtras.dorm || [])] }, house: { ...(m.house || {}), items: [...((m.house || {}).items || []), ...(myExtras.house || [])] } }; };
+// A model of your own in her place (photo studio): a .vrm file from this device, shown only here and only until the page is reloaded
+// or it is put back. Nothing is uploaded. useCustomModel(file) resolves to '' when it is up, or to what went wrong; useCustomModel(null) puts hers back.
+let customModel = null, customN = 0;
+async function useCustomModel(file) { const before = customModel; if (before && before.url) setTimeout(() => { try { URL.revokeObjectURL(before.url); } catch {} }, 60000);
+  customModel = file ? { url: URL.createObjectURL(file), key: 'custom' + (++customN) } : null; await applyAvatar();
+  if (file && avatarShown === 'puppet') { const why = avatarNote || 'It could not be shown.'; customModel = null; await applyAvatar(); return why; } return ''; }
 async function applyAvatar() {
   const wearQ = /^o[a-z0-9]{6,10}\.vrm$/.exec(new URLSearchParams(location.search).get('wear') || '');   /* ?wear=<outfit file>: look at one outfit model (used to make her picture pack) */
-  const fit = wearQ ? { url: '/api/outfit/' + wearQ[0] } : visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
-  const want = settings.avatarKind === 'vrm' && settings.avatarV ? 'vrm:' + (fit ? fit.key : settings.avatarV) + ':' + (myExtras.v || '') : 'puppet';   // (your own gifts and decor are part of the rooms, so a new one rebuilds them)
+  const fit = customModel ? customModel : wearQ ? { url: '/api/outfit/' + wearQ[0], key: wearQ[0] } : visitInfo.outfit && visitInfo.outfit.url ? visitInfo.outfit : null;   // what she is wearing right now (a model of its own), if one is set for this level and moment
+  const want = customModel || (settings.avatarKind === 'vrm' && settings.avatarV) ? 'vrm:' + (fit ? fit.key : settings.avatarV) + ':' + (myExtras.v || '') : 'puppet';   // (your own gifts and decor are part of the rooms, so a new one rebuilds them)
   if (want === avatarShown) return; avatarShown = want; avatarNote = '';
   if (want === 'puppet') return avatar.setRenderer(null);
   try {

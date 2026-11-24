@@ -58,7 +58,12 @@ export async function create(url, opts = {}) {
   const loader = new GLTFLoader(); loader.register(p => new VRMLoaderPlugin(p));
   const gltf = await loader.loadAsync(url);
   const vrm = gltf.userData.vrm; if (!vrm) throw new Error('That file is not a VRM model.');
-  VRMUtils.rotateVRM0(vrm); // older (0.x) models face the other way
+  // Older (0.x) models are built facing the other way, which also turns every forward bend into a backward one. Everything here is written
+  // for the newer kind, so an older model is made to look like one: its picture is turned round inside a holder, the posing skeleton's
+  // joints are moved to where a newer model has them, and each time the pose is handed to the picture the bends are mirrored.
+  if (vrm.meta && vrm.meta.metaVersion === '0') { const hu = vrm.humanoid, rig = hu.normalizedHumanBonesRoot, inner = new THREE.Group(); inner.rotation.y = Math.PI; for (const c of [...vrm.scene.children]) if (c !== rig) inner.add(c); vrm.scene.add(inner);
+    const nodes = Object.keys(hu.humanBones).map(n => hu.getNormalizedBoneNode(n)).filter(Boolean); for (const b of nodes) { b.position.x *= -1; b.position.z *= -1; }
+    const flip = () => { for (const b of nodes) { b.quaternion.x *= -1; b.quaternion.z *= -1; } }, base = hu.update.bind(hu); hu.update = () => { flip(); try { base(); } finally { flip(); } }; }
   vrm.scene.traverse(o => { o.frustumCulled = false; });
   scene.add(vrm.scene);
   // Build: a heavier or lighter set for her, on whatever outfit is loaded. Every vertex is moved out from the bone it hangs on (thigh,
