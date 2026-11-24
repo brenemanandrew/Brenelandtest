@@ -97,7 +97,7 @@ Added since the reset on 2026-11-21, all live:
 - D&D night: everyone sits, the Dungeon Master is centred, the die answers at once, two adventures to choose from, pack away and carry on later, and walking in on her playing alone (evenings, at most once a day).
 - Movie night: she stays on the couch for the whole film, sits closer and leans in as romance level rises, a popcorn bucket sits in the player's lap, leaving asks first.
 - Phone menu bar is smaller. An owner typing `Wizra: line` puts the line down as hers.
-- Photo studio (settings wheel, owner only): free orbit camera, pose presets, drag hands and feet (IK), turn any joint, expressions, move her, take the picture as a PNG. The camera goes anywhere; she fades out as it sinks below her hip level. `public/photo.js`.
+- Photo studio (settings wheel, owner only): free orbit camera, pose presets, drag hands and feet (IK), turn any joint, expressions, move her, take the picture as a PNG. The camera goes anywhere and she stays solid (the fade below hip level was removed 2026-11-24). `public/photo.js`.
 - Rooms: one scenery panel per windowed wall meeting at the corners (no more panels cutting through each other or flickering); furniture placed through a wall is slid back inside at build time.
 - Wide sleeves hang under gravity (bone cloth strips made at load, like coat tails).
 - Skills for agents: `brenai/skills/*/SKILL.md` (seven). Rule: when a skill or this file changes, tell the Brenebase session and make sure Brenebase has the new version (see `AGENTS.md`).
