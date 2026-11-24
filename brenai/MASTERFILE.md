@@ -119,7 +119,9 @@ Open work:
 - Sound clips: someone has to make them (in her voice) and upload them.
 - Head tracking for the glasses needs a helper app and VITURE's SDK; the owner does not want players to install anything, so it is parked.
 - Movie night: a real model for the player, her walking over to switch the TV on, a proper lying-against-him pose.
-- Mixamo batch (79 clips chosen, not fetched), self-collision off behind `window.WIZRA_FIX`, mocap largely untested on a real camera.
+- Mixamo batch: done 2026-11-24. 79 clips are in the clip library (`/data/clips`, `/api/clips`), fetched one at a time; about 30 are wired to gestures standing and sitting (`STAND_G`, `SEAT_G` in `avatar-vrm.js`), the rest are stored but unused (lying, dice, idles, phone, typing; list in README, Recorded motion). Standing gestures with the new clips were not looked at in a browser.
+- Head tracking on the VITURE Pro 2 works in the browser on a PC with nothing installed (WebHID, 🧭 button in 3D mode; confirmed by the owner). Phones still have no install-free route.
+- Self-collision off behind `window.WIZRA_FIX`, mocap largely untested on a real camera.
 
 ## 11. Appendix A: CODING.md
 

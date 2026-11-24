@@ -129,6 +129,7 @@
     [/wiggl|kick(s|ing)? her (feet|foot|boots?)|taps? her (foot|boot)|swing(s|ing)? her (feet|legs)|bounces her (foot|leg)/i, 'feet', 2.8], [/shift(s|ed|ing)? in her (seat|chair)|squirms?|fidget/i, 'shift', 3],
     [/tilt(s|ed|ing)? her head|cock(s|ed)? her head/i, 'tilt', 2.2], [/headbang|bangs her head|bobs her head/i, 'headbang', 2.6], [/flips? her hair|toss(es)? her hair|hair flip/i, 'flip', 1.6],
     [/looks? away|glances? away|turns? away|averts?|looks? (off )?to the side/i, 'lookaway', 2.6], [/looks? down|stares? at (her|the) (lap|boots|floor|table)|hangs her head/i, 'lookdown', 2.4], [/looks? up|stares? at the ceiling|rolls her eyes/i, 'lookup', 1.8],
+    [/thumbs?[- ]up/i, 'thumbsup', 3.8], [/points? (at|to|toward|a finger)/i, 'point', 3], [/rubs? her (arm|shoulder|elbow)/i, 'rubarm', 5], [/whispers?|leans? in (close|conspirator)|behind her hand/i, 'whisper', 5],
     [/laugh|giggl|snicker|cackl|snort|chuckl/i, 'laugh', 2.2], [/\bsigh|exhales|huffs?/i, 'sigh', 2.2], [/bounc(es|ing)|bops|hops in her seat/i, 'bounce', 2], [/\bdanc|sways? to|grooves?|shimm/i, 'dance', 3.5],
     [/cring|winc|recoil|shudder|shrinks? back/i, 'cringe', 2], [/jumps? (up|for joy|up and down|in excitement)|hops? up/i, 'jump', 1.6], [/blows? (him |you )?a kiss|kiss(es|ed)? (him|his|you|your)|gives? (him|you) a (quick |soft |little )?kiss/i, 'kiss', 6.5], [/jumps?|startl|flinch|jolts?/i, 'jolt', 1.4],
   ];

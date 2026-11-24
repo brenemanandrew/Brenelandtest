@@ -1130,6 +1130,19 @@ async function handle(req, res) {
 
       // Her 3D model (.vrm): kept on the volume, served only to someone logged in, replaceable from the wheel.
       // one clip in or out of the game's set (the motion capture page): { name, clip } or { remove: name }
+      /* The bigger library of recorded motion: one file a clip in /data/clips, fetched one at a time when the page wants it (anims.json above is the small set every page loads whole).
+         GET /api/clips -> { clips: { name: seconds } }   GET /api/clips/<name> -> the clip   POST /api/clips?name=<name> (owner) with the clip as the body   POST /api/clips?remove=<name> */
+      if (url.pathname === '/api/clips' || url.pathname.startsWith('/api/clips/')) { const dir = path.join(DATA_DIR, 'clips'), idx = path.join(dir, '_index.json'); let index = {}; try { index = JSON.parse(fs.readFileSync(idx, 'utf8')); } catch {}
+        if (req.method === 'GET') { const f = url.pathname.slice(11); if (!f) return json(res, 200, { clips: index }); const file = path.join(dir, f + '.json'); if (!/^[a-z0-9_]{1,40}$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such clip' }); res.writeHead(200, { 'content-type': 'application/json', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=86400' }); return fs.createReadStream(file).pipe(res); }
+        if (req.method !== 'POST') return json(res, 405, { error: 'GET or POST' }); if (!isOwner()) return json(res, 403, { error: 'owner only' }); fs.mkdirSync(dir, { recursive: true });
+        const gone = String(url.searchParams.get('remove') || ''); if (gone) { if (/^[a-z0-9_]{1,40}$/.test(gone)) { fs.rmSync(path.join(dir, gone + '.json'), { force: true }); delete index[gone]; fs.writeFileSync(idx, JSON.stringify(index)); } return json(res, 200, { ok: true, clips: Object.keys(index).length }); }
+        const name = String(url.searchParams.get('name') || ''); if (!/^[a-z0-9_]{1,40}$/.test(name)) return json(res, 400, { error: 'name: small letters, digits and _' });
+        const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 6e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
+        let c; try { c = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }
+        if (!c || !(c.n >= 1 && c.n <= 3600) || typeof c.bones !== 'object' || !(c.fps > 0)) return json(res, 400, { error: 'That is not a clip.' });
+        const bones = {}; for (const k of Object.keys(c.bones).slice(0, 80)) { const v = c.bones[k]; if (!/^[a-zA-Z]{3,30}$/.test(k) || !Array.isArray(v) || v.length !== c.n * 4 || v.some(x => typeof x !== 'number' || !Number.isFinite(x))) return json(res, 400, { error: 'The clip has a bad bone track: ' + k }); bones[k] = v; }
+        const clip = { name, dur: Math.max(0.03, +c.dur || c.n / c.fps), fps: +c.fps, n: c.n, bones, ...(Array.isArray(c.hips) && c.hips.length === c.n * 3 && c.hips.every(Number.isFinite) ? { hips: c.hips } : {}) };
+        fs.writeFileSync(path.join(dir, name + '.json'), JSON.stringify(clip)); index[name] = Math.round(clip.dur * 100) / 100; fs.writeFileSync(idx, JSON.stringify(index)); return json(res, 200, { ok: true, clips: Object.keys(index).length }); }
       if (url.pathname === '/api/anims/clip' && req.method === 'POST') {
         const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 12e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
         let b; try { b = JSON.parse(Buffer.concat(parts).toString('utf8')); } catch { return json(res, 400, { error: 'not JSON' }); }

@@ -262,6 +262,8 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     out._face = face; return out;
   }
   const GESTURE = {
+    /* these four have recorded clips (STAND_G, SEAT_G); until one is loaded they borrow a hand-made gesture */
+    thumbsup: t => GESTURE.peace(t), point: t => GESTURE.fingerwave(t), rubarm: t => GESTURE.shift(t), whisper: t => GESTURE.lean(t),
     peace: t => sign('peace', t, { happy: 0.3, relaxed: 0.5 }), oksign: t => sign('oksign', t, { happy: 0.25, relaxed: 0.4 }), fox: t => sign('fox', t, { happy: 0.3, relaxed: 0.4 }), fingerheart: t => sign('fingerheart', t, { happy: 0.35, relaxed: 0.5 }),
     crossed: t => sign('crossed', t, { relaxed: 0.4 }), flipoff: t => sign('flipoff', t, { angry: 0.4 }),
     fingerwave: t => { const o = sign('peace', t, { happy: 0.3, relaxed: 0.4 }); FN.forEach((f, i) => { const c = 0.32 + 0.32 * Math.sin(t * 9 - i * 0.9); o['right' + f + 'Proximal'] = [0, (0.14 - i * 0.1), c * 1.2]; o['right' + f + 'Intermediate'] = [0, 0, c * 0.9]; o['right' + f + 'Distal'] = [0, 0, c * 0.5]; }); o.rightThumbMetacarpal = [0, -0.2, 0]; o.rightThumbProximal = [0, 0, 0]; return o; },
@@ -326,8 +328,14 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   function applyGesture(g, faceName, dt) {
     for (const n of touchedBones) if (!CUR[n]) set(n, 0, 0, 0); touchedBones = []; gestureZoom = 0; gx.head = [0, 0, 0]; gx.hipY = 0; gx.face = null; gx.k = 0; gx.eyes[0] = gx.eyes[1] = 0; gx.tongue[0] = gx.tongue[1] = gx.tongue[2] = 0;
     const want = BODY[faceName] || [0, 0, 0, 0, 0]; for (let i = 0; i < 5; i++) body[i] += (want[i] - body[i]) * Math.min(1, dt * 5);
-    if (!g || !GESTURE[g.name]) return;
-    if (CLIP_GEST[g.name] && CLIPS[CLIP_GEST[g.name]] && rt.k > 0.9) { const c = CLIPS[CLIP_GEST[g.name]]; playClip(CLIP_GEST[g.name], g.w * g.w * (3 - 2 * g.w), Math.min(g.t, c.dur - 0.04)); return; } // a recorded one, when she is on her feet
+    // a recorded gesture, when there is one for how she is right now (on her feet, or sitting): it runs for its own length, not the hand-made one's
+    const nowS = performance.now() / 1000, up = rt.k > 0.9, sat = rt.k < 0.05 && !(rt.lie > 0.05) && rt.act !== 'gone';
+    if (g && GESTURE[g.name] && (g.name !== clipG.gname || g.t < clipG.gt)) { clipG.gname = g.name; clipG.used = ''; const list = ((up ? STAND_G : sat ? SEAT_G : {})[g.name] || []).filter(haveClip), pick = list.length ? list[Math.floor(Math.random() * list.length)] : '';
+      if (pick) Object.assign(clipG, { clip: pick, t0: nowS, seat: !up, dur: Math.max(0.5, Math.min(CLIPS[pick].dur - 0.05, CLIP_CAP[g.name] || 9)), used: g.name }); }
+    if (g) clipG.gt = g.t; else { clipG.gname = ''; clipG.gt = -1; }
+    if (clipG.clip) { const t = nowS - clipG.t0; if (t >= clipG.dur || !CLIPS[clipG.clip] || (clipG.seat ? !sat : !up)) clipG.clip = ''; else { const w = Math.max(0, Math.min(1, t / 0.35, (clipG.dur - t) / 0.45)), arms = clipG.seat ? Math.min(1, Math.max(rt.ov.read, rt.ov.phone, rt.ov.sip) * 1.5) : 0;
+        playClip(clipG.clip, w * w * (3 - 2 * w), t, clipG.seat ? n => SEAT_HOLD.test(n) ? 1 : arms && ARM.test(n) ? arms : 0 : null); return; } }
+    if (!g || !GESTURE[g.name] || clipG.used === g.name) return;   /* (the recorded one has played: the hand-made one is not added after it) */
     const tg = GESTURE[g.name](g.t), k0 = g.w * g.w * (3 - 2 * g.w), k = k0 * (1 + 0.13 * Math.exp(-5 * g.t) * Math.sin(17 * g.t)); gx.k = k0; // every gesture arrives a little past its mark and settles
     for (const n in tg) {
       const q = tg[n];
@@ -340,6 +348,18 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   // there are any; without them everything falls back to the hand-made motion. A clip is { dur, fps, n, bones: { name: [x,y,z,w per frame] }, hips }.
   const snd = n => window.dispatchEvent(new CustomEvent('wizra-sound', { detail: n }));   // sound.js listens for these
   const CLIPS = {}; fetch('/api/anims').then(r => r.ok ? r.json() : null).then(d => { if (d && d.clips) Object.assign(CLIPS, d.clips); }).catch(() => {});
+  // The bigger library (/api/clips): recorded gestures, fetched one at a time. haveClip(name) says whether one is ready and, if it is in the
+  // library but not here yet, sends for it, so the first time a gesture is wanted she does it the hand-made way and the recorded one is there next time.
+  // The ones gestures use are brought in quietly a little after the page opens.
+  const LIB = { names: {}, asked: {} };
+  const haveClip = name => { if (CLIPS[name]) return true; if (LIB.names[name] && !LIB.asked[name]) { LIB.asked[name] = 1; fetch('/api/clips/' + name).then(r => r.ok ? r.json() : null).then(c => { if (c && c.bones) CLIPS[name] = c; }).catch(() => {}); } return false; };
+  // which recorded clip a gesture uses, on her feet and sitting down (sitting: only from the waist up, her legs and seat stay as they are)
+  const STAND_G = { kiss: ['kiss'], jump: ['jump'], laugh: ['laughing'], yawn: ['yawn'], stretch: ['arm_stretching', 'neck_stretching'], clap: ['standing_clap'], cheer: ['standing_cheering'], think: ['thinking'], nod: ['hard_head_nod'], shake: ['shaking_head_no', 'annoyed_head_shake', 'thoughtful_head_shake'], sigh: ['disappointed'], bow: ['thankful'], thumbsup: ['standing_thumbs_up'], whisper: ['telling_a_secret'],
+    dance: ['dancing', 'hip_hop_dancing', 'house_dancing', 'macarena_dance', 'northern_soul_dance', 'robot_hip_hop_dance', 'twist_dance', 'chicken_dance', 'thriller_part_2'] },
+    SEAT_G = { laugh: ['sitting_laughing'], clap: ['sitting_clap'], cheer: ['cheering_while_sitting', 'sitting_victory'], thumbsup: ['sitting_thumbs_up'], point: ['sitting_and_pointing'], shake: ['sitting_disapproval'], yawn: ['yawn'], stretch: ['arm_stretching'], rubarm: ['sitting_rubbing_arm'] },
+    CLIP_CAP = { dance: 12, laugh: 5, yawn: 6, stretch: 7, sigh: 4.2, whisper: 6, rubarm: 5, clap: 4.5 }, clipG = { gname: '', gt: -1, clip: '', t0: 0, dur: 0, seat: false, used: '' };
+  fetch('/api/clips').then(r => r.ok ? r.json() : null).then(d => { if (!d || !d.clips) return; LIB.names = d.clips; const all = [...new Set([...Object.values(STAND_G), ...Object.values(SEAT_G)].flat())].filter(n => LIB.names[n]); let i = 0; const next = () => { if (i < all.length) { haveClip(all[i++]); setTimeout(next, 1500); } }; setTimeout(next, 12000); }).catch(() => {});
+  const SEAT_HOLD = /Leg|Foot|Toes|^hips$/;
   // Poses made by hand, in the same shape as a recorded clip (one frame), so she can hold them on her feet: the yoga set.
   // leg: [bend at the hip (forward is negative), turn the knee out (her left is positive), lift sideways]; the rest are plain bone turns.
   { const E = new THREE.Euler(), qx = new THREE.Quaternion(), qy = new THREE.Quaternion(), qz = new THREE.Quaternion(), X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
@@ -361,7 +381,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
       const v = c.bones[n], p = i0 * 4, q = i1 * 4; cq.set(v[p], v[p + 1], v[p + 2], v[p + 3]); cq2.set(v[q], v[q + 1], v[q + 2], v[q + 3]); cq.slerp(cq2, a); bone.quaternion.slerp(cq, w);
     }
     if (c.face && weight > 0.5) { clipFace = clipFace || {}; for (const k in c.face) clipFace[k] = c.face[k][i0]; }   // a recorded take can carry her expression too
-    if (c.hips) clipHip += ((c.hips[i0 * 3 + 1] * (1 - a) + c.hips[i1 * 3 + 1] * a) - 1) * hipY0 * weight;   // how far the clip lifts or drops her hips
+    if (c.hips && !(skip && skip('hips') >= 1)) clipHip += ((c.hips[i0 * 3 + 1] * (1 - a) + c.hips[i1 * 3 + 1] * a) - 1) * hipY0 * weight;   // how far the clip lifts or drops her hips
     return true;
   }
   const base = { head: [0, 0, 0], neck: POSE.neck || [0, 0, 0], chest: (B('upperChest') ? [0, 0, 0] : POSE.chest) || [0, 0, 0] };
@@ -470,7 +490,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   const EXIT = [0.95, standZ];                                                // then steps out to the side past the armrest
   const R_BACK = [0.95, hip.z - 0.72], L_BACK = [-0.78, hip.z - 0.72];             // round the back of the chair
   const AT_SHELF = [SHELF.x + 0.12, SHELF.z + 0.5], AT_COUNTER = [COUNTER.x - 0.05, COUNTER.z + 0.52];
-  const WALK_ARM = { rightUpperArm: 1, rightLowerArm: 1, rightHand: 1 }, CLIP_GEST = { kiss: 'kiss', jump: 'jump' };
+  const WALK_ARM = { rightUpperArm: 1, rightLowerArm: 1, rightHand: 1 };
   const stride = c => (c.hips ? Math.abs(c.hips[c.hips.length - 1] - c.hips[2]) * hipY0 : 0) || 1.3;   // metres one loop of a walking clip covers, at her size
   const DOING = { read: 'reading her book', phone: 'looking at her phone', sip: 'sipping her drink' };
   const rt = { act: 'sit', until: 0, nextAt: performance.now() + 60000 + Math.random() * 60000, lastTalk: 0, self: false, stand: 0, ov: { read: 0, phone: 0, sip: 0 }, x: STAND_AT[0], z: STAND_AT[1], yaw: 0, phase: 0, leg: 0,
