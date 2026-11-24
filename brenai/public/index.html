@@ -791,7 +791,8 @@ const heartGame = (() => {
   }
   async function close(after = 0) { // out of the game: a fade to white, and behind it the beach goes, she changes back, and the room returns
     g.on = false; g.paused = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true; $('heartPose').hidden = true;
-    await wait(after); const w = $('whiteOut'); w.classList.remove('go'); w.classList.add('hold'); await wait(520);
+    await wait(after); if (layer) layer.textContent = ''; $('heartHud').classList.remove('on'); let bye = 0; try { bye = avatar.beachOutro() || 0; } catch {} if (bye) { try { avatar.flash('happy', bye + 800); WizraSound.fx('sparkle'); } catch {} await wait(bye); }   /* she looks up and shades her eyes, the view flies up to the sun or the moon, and that is where the white comes from */
+    const w = $('whiteOut'); w.classList.remove('go'); w.classList.add('hold'); await wait(520);
     if (layer) layer.textContent = ''; try { avatar.beach(false); avatar.bonus(false); avatar.heartPose(null); avatar.heartStage(null); avatar.focus(0); } catch {} vig().classList.remove('on', 'bad'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); $('heartPause').style.display = ''; avatar.tears(false);
     document.body.classList.remove('hg'); if (!g.wasBig) document.body.classList.remove('big');
     try { await beachDress(false); } catch {} await wait(300); w.classList.remove('hold');

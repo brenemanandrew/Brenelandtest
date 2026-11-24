@@ -18,7 +18,9 @@ export function buildBeach(THREE, { toon, outline, floorY }) {
     vertexShader: 'varying float h; void main() { h = normalize(position).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 low; varying float h; void main() { vec3 c = h > 0.5 ? top : h > 0.34 ? mix(mid, top, 0.5) : h > 0.2 ? mid : h > 0.09 ? mix(low, mid, 0.5) : low; gl_FragColor = vec4(c, 1.0); }' }));
   sky.renderOrder = -10; follow.add(sky);
-  const sun = new THREE.Mesh(new THREE.CircleGeometry(9, 32), new THREE.MeshBasicMaterial({ color: '#fff6c9', fog: false })); sun.position.set(-60, 70, -130); sun.lookAt(0, 0, 0); follow.add(sun);
+  const sun = new THREE.Mesh(new THREE.CircleGeometry(9, 32), new THREE.MeshBasicMaterial({ color: '#fff6c9', fog: false })); sun.position.set(95, 62, -112); sun.lookAt(0, 0, 0); follow.add(sun);   /* ahead of her and out over the sea */
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(15, 32), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.28, fog: false, depthWrite: false })); halo.position.copy(sun.position).multiplyScalar(1.01); halo.lookAt(0, 0, 0); follow.add(halo);
+  const starGeo = new THREE.BufferGeometry(), sp = new Float32Array(260 * 3); for (let i = 0; i < 260; i++) { const a = Math.random() * 6.283, e = 0.12 + Math.random() * 1.3; sp[i * 3] = Math.cos(a) * Math.cos(e) * 160; sp[i * 3 + 1] = Math.sin(e) * 160; sp[i * 3 + 2] = Math.sin(a) * Math.cos(e) * 160; } starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3)); const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: '#ffffff', size: 1.1, sizeAttenuation: true, fog: false, depthWrite: false })); stars.visible = false; follow.add(stars);
   const cloudMat = new THREE.MeshBasicMaterial({ color: '#ffffff', fog: false }), clouds = [];
   for (let i = 0; i < 7; i++) { const c = new THREE.Group(); for (let k = 0; k < 4; k++) { const p = new THREE.Mesh(new THREE.CircleGeometry(5 + Math.random() * 5, 20), cloudMat); p.position.set(k * 6 - 9 + Math.random() * 3, Math.random() * 2.5, 0); p.scale.y = 0.55; c.add(p); }
     c.position.set(-140 + i * 45 + Math.random() * 20, 32 + Math.random() * 26, -150); c.userData.sp = 0.4 + Math.random() * 0.5; follow.add(c); clouds.push(c); }
@@ -91,5 +93,9 @@ export function buildBeach(THREE, { toon, outline, floorY }) {
     for (const c of clouds) c.position.x = ((c.position.x + 150 + c.userData.sp * 0.016) % 300) - 150;
     for (const o of props) o.position.x = o.userData.x0 + Math.round((x - o.userData.x0) / SPAN) * SPAN;   // each thing sits in whichever copy of the stretch is nearest her
   }
-  return { group, tick, splash, water, skyColor: '#c7b9ff' };
+  // night: a dark sky with stars, and the sun becomes the moon
+  const api = { group, tick, splash, water, skyColor: '#c7b9ff', night: false, sunYaw: Math.atan2(sun.position.x, sun.position.z), sunAt: (x, v) => v.copy(sun.position).setX(sun.position.x + x),
+    setNight(on) { api.night = !!on; const u = sky.material.uniforms; u.top.value.set(on ? '#141a44' : '#79b6ff'); u.mid.value.set(on ? '#2b2f6e' : '#c7b9ff'); u.low.value.set(on ? '#5a4a8c' : '#ffdbe9'); sun.material.color.set(on ? '#eef2ff' : '#fff6c9'); sun.scale.setScalar(on ? 0.62 : 1); halo.material.opacity = on ? 0.16 : 0.28; halo.scale.setScalar(on ? 0.7 : 1); stars.visible = !!on; cloudMat.color.set(on ? '#8f92c4' : '#ffffff'); api.skyColor = on ? '#2b2f6e' : '#c7b9ff';
+      const w = water.material.uniforms; w.deep.value.set(on ? '#1b2a6b' : '#4f8fe6'); w.shallow.value.set(on ? '#4a63b8' : '#9fe8f2'); sand.material.color.set(on ? '#8f8aa6' : '#f3dfa6'); wet.material.color.set(on ? '#77729a' : '#d8c088'); } };
+  return api;
 }
