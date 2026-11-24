@@ -1,21 +1,25 @@
-# Image to 3D (Meshy) - a Blender add-on.
-# Pick a picture, press the button, and a textured 3D model made from it is brought into the scene.
-# The model is made by Meshy's online service (meshy.ai), so it needs a Meshy API key and uses Meshy credits for each model.
+# Image to 3D - a Blender add-on.
+# Pick a picture, press the button, and a 3D model made from it is brought into the scene.
+# Two ways to make the model, chosen in the add-on's preferences:
+#   1. Hunyuan3D running on this computer (free, needs a strong graphics card). Tencent's open source Hunyuan3D-2 or 2.1 comes with a
+#      small server, api_server.py. Start it first, for example:   python api_server.py --host 127.0.0.1 --port 8081
+#      (Hunyuan3D-2: add --enable_tex for colours.) This add-on sends the picture to it and waits for the model.
+#   2. Meshy's online service (meshy.ai). Needs a Meshy API key and uses Meshy credits for each model.
 #
 # Install: Blender > Edit > Preferences > Add-ons > Install from Disk (the arrow at the top right in Blender 4.2+, or the
-# "Install..." button in older ones) > pick this file > tick it on. Open its entry there and paste your Meshy API key
-# (meshy.ai > API). Then in the 3D view press N and open the "Image to 3D" tab.
+# "Install..." button in older ones) > pick this file > tick it on. Open its entry there to choose the service. Then in the 3D
+# view press N and open the "Image to 3D" tab.
 #
-# Made for Blender 3.6 and newer. Written without a copy of Blender to try it in: the part that talks to Meshy was checked
-# on its own, the Blender panel was not.
+# Made for Blender 3.6 and newer. Written without a copy of Blender to try it in: the parts that talk to Hunyuan3D and Meshy were
+# checked on their own (Hunyuan3D against a stand-in server that follows api_server.py), the Blender panel was not.
 
 bl_info = {
-    "name": "Image to 3D (Meshy)",
+    "name": "Image to 3D",
     "author": "Breneland tools",
     "version": (1, 0, 0),
     "blender": (3, 6, 0),
     "location": "3D View > Sidebar (N) > Image to 3D",
-    "description": "Make a 3D model from a picture with Meshy and bring it into the scene",
+    "description": "Make a 3D model from a picture (Hunyuan3D on this computer, or Meshy) and bring it into the scene",
     "category": "Import-Export",
 }
 
@@ -125,6 +129,64 @@ def make_model(key, image_path, pose, texture, polycount, say, stop):
         time.sleep(5)
 
 
+# ---------------------------------------------------------------- talking to Hunyuan3D on this computer (api_server.py)
+
+DETAIL = {"draft": (196, 20), "normal": (256, 30), "fine": (380, 50)}      # (octree_resolution, num_inference_steps)
+
+
+def _local(method, url, body=None, timeout=120):
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method)
+    if data is not None:
+        req.add_header("Content-Type", "application/json")
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))      # this computer: never through a proxy
+    try:
+        with opener.open(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError("Hunyuan3D said no (%d): %s" % (e.code, e.read().decode("utf-8", "replace")[:300]))
+    except (urllib.error.URLError, OSError) as e:
+        raise RuntimeError("Could not reach Hunyuan3D at %s. Is api_server.py running? (%s)" % (url.split("/send")[0].split("/status")[0], getattr(e, "reason", e)))
+
+
+def make_model_local(server, image_path, texture, polycount, detail, seed, say, stop):
+    """Hunyuan3D's own server: POST /send starts the work and gives a uid, GET /status/<uid> says processing, texturing, completed
+    (with the .glb as base64) or error. Returns the .glb path."""
+    server = (server or "http://127.0.0.1:8081").rstrip("/")
+    size = os.path.getsize(image_path)
+    if size > 30 * 1024 * 1024:
+        raise RuntimeError("That picture is over 30 MB. Use a smaller one.")
+    with open(image_path, "rb") as f:
+        picture = base64.b64encode(f.read()).decode("ascii")
+    octree, steps = DETAIL.get(detail, DETAIL["normal"])
+    body = {"image": picture, "texture": bool(texture), "seed": int(seed), "octree_resolution": octree, "num_inference_steps": steps, "guidance_scale": 5.0, "type": "glb"}
+    if polycount:
+        body["face_count"] = int(polycount)
+    say("Sending the picture to Hunyuan3D...", 0)
+    uid = _local("POST", server + "/send", body).get("uid")
+    if not uid:
+        raise RuntimeError("Hunyuan3D gave no job number back.")
+    began = time.time()
+    while True:
+        if stop():
+            raise RuntimeError("Stopped waiting. (Hunyuan3D may still be working.)")
+        waited = int(time.time() - began)
+        if waited > 60 * 60:
+            raise RuntimeError("Gave up after an hour.")
+        st = _local("GET", server + "/status/" + uid, timeout=300)
+        status = st.get("status", "")
+        if status == "completed" and st.get("model_base64"):
+            name = os.path.splitext(os.path.basename(image_path))[0] or "model"
+            path = os.path.join(tempfile.gettempdir(), "hunyuan_%s_%s.glb" % (name, uid[:8]))
+            with open(path, "wb") as f:
+                f.write(base64.b64decode(st["model_base64"]))
+            return path
+        if status == "error":
+            raise RuntimeError("Hunyuan3D could not make the model: %s" % (st.get("message") or "no reason given"))
+        say("Hunyuan3D is %s... %d:%02d" % ("adding colours" if status == "texturing" else "making the shape", waited // 60, waited % 60), -1)
+        time.sleep(4)
+
+
 # ---------------------------------------------------------------- the Blender side
 
 try:
@@ -137,12 +199,22 @@ if bpy:
 
     class I3D_Prefs(bpy.types.AddonPreferences):
         bl_idname = __name__
+        service: bpy.props.EnumProperty(name="Made by", default="local",
+                                        items=[("local", "Hunyuan3D on this computer", "Free. Needs Hunyuan3D's api_server.py running"),
+                                               ("meshy", "Meshy (online)", "Needs a Meshy API key and uses credits")])
+        server: bpy.props.StringProperty(name="Hunyuan3D address", default="http://127.0.0.1:8081",
+                                         description="Where Hunyuan3D's api_server.py is listening")
         api_key: bpy.props.StringProperty(name="Meshy API key", subtype="PASSWORD",
                                           description="From meshy.ai > API. Kept in Blender's preferences on this computer")
 
         def draw(self, context):
-            self.layout.prop(self, "api_key")
-            self.layout.label(text="Each model uses Meshy credits from this key's account.")
+            self.layout.prop(self, "service")
+            if self.service == "local":
+                self.layout.prop(self, "server")
+                self.layout.label(text="Start Hunyuan3D first: python api_server.py --host 127.0.0.1 --port 8081")
+            else:
+                self.layout.prop(self, "api_key")
+                self.layout.label(text="Each model uses Meshy credits from this key's account.")
 
     class I3D_Settings(bpy.types.PropertyGroup):
         image: bpy.props.StringProperty(name="Picture", subtype="FILE_PATH", description="A .png or .jpg of the thing to make")
@@ -150,7 +222,10 @@ if bpy:
                                      items=[("", "As drawn", "Keep the pose in the picture"),
                                             ("a-pose", "A-pose", "Arms down at an angle"),
                                             ("t-pose", "T-pose", "Arms straight out")])
-        texture: bpy.props.BoolProperty(name="With colours", default=True, description="Make the textures too (costs more credits)")
+        texture: bpy.props.BoolProperty(name="With colours", default=True, description="Make the textures too (slower; on Meshy it costs more credits)")
+        detail: bpy.props.EnumProperty(name="Detail", default="normal", description="Hunyuan3D only: finer takes longer and more graphics memory",
+                                       items=[("draft", "Draft", "Quick look"), ("normal", "Normal", ""), ("fine", "Fine", "Slowest, most detail")])
+        seed: bpy.props.IntProperty(name="Seed", default=1234, min=0, description="Hunyuan3D only: change it to get a different attempt from the same picture")
         polycount: bpy.props.IntProperty(name="Triangles", default=0, min=0, max=300000,
                                          description="Ask for about this many triangles. 0 leaves it to Meshy")
 
@@ -165,22 +240,26 @@ if bpy:
                 self.report({"WARNING"}, "One is already being made.")
                 return {"CANCELLED"}
             s = context.scene.i3d
-            key = context.preferences.addons[__name__].preferences.api_key.strip()
+            prefs = context.preferences.addons[__name__].preferences
+            key, local, server = prefs.api_key.strip(), prefs.service == "local", prefs.server.strip()
             path = bpy.path.abspath(s.image)
-            if not key:
+            if not local and not key:
                 self.report({"ERROR"}, "Put your Meshy API key in this add-on's preferences first.")
                 return {"CANCELLED"}
             if not path or not os.path.isfile(path):
                 self.report({"ERROR"}, "Pick a picture first.")
                 return {"CANCELLED"}
             JOB.update(text="Starting...", pct=0, glb="", error="", stop=False, name=os.path.splitext(os.path.basename(path))[0])
-            pose, texture, polycount = s.pose, s.texture, s.polycount
+            pose, texture, polycount, detail, seed = s.pose, s.texture, s.polycount, s.detail, s.seed
 
             def work():
                 try:
                     def say(text, pct):
                         JOB["text"], JOB["pct"] = text, pct
-                    JOB["glb"] = make_model(key, path, pose, texture, polycount, say, lambda: JOB["stop"])
+                    if local:
+                        JOB["glb"] = make_model_local(server, path, texture, polycount, detail, seed, say, lambda: JOB["stop"])
+                    else:
+                        JOB["glb"] = make_model(key, path, pose, texture, polycount, say, lambda: JOB["stop"])
                 except Exception as e:      # shown in the panel
                     JOB["error"] = str(e)
 
@@ -236,8 +315,15 @@ if bpy:
 
         def draw(self, context):
             s, col = context.scene.i3d, self.layout.column()
+            prefs = context.preferences.addons[__name__].preferences
+            local = prefs.service == "local"
+            col.label(text="Made by: " + ("Hunyuan3D on this computer" if local else "Meshy (online)"))
             col.prop(s, "image")
-            col.prop(s, "pose")
+            if local:
+                col.prop(s, "detail")
+                col.prop(s, "seed")
+            else:
+                col.prop(s, "pose")
             col.prop(s, "texture")
             col.prop(s, "polycount")
             busy = bool(JOB["thread"] and JOB["thread"].is_alive())
@@ -245,12 +331,12 @@ if bpy:
             row.enabled = not busy
             row.operator("i3d.make", icon="MESH_MONKEY")
             if busy:
-                col.label(text="%s %d%%" % (JOB["text"], JOB["pct"]))
+                col.label(text=JOB["text"] + (" %d%%" % JOB["pct"] if JOB["pct"] >= 0 else ""))
                 col.operator("i3d.stop", icon="CANCEL")
             elif JOB["text"]:
                 for i in range(0, len(JOB["text"]), 46):
                     col.label(text=JOB["text"][i:i + 46])
-            if not context.preferences.addons[__name__].preferences.api_key.strip():
+            if not local and not prefs.api_key.strip():
                 col.label(text="Add your Meshy API key in", icon="ERROR")
                 col.label(text="Preferences > Add-ons > this add-on.")
 
