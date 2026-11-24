@@ -3,7 +3,7 @@
 //   const r = await create(url)   ->  { el, locate(e), draw(state), dispose() }
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { VRMLoaderPlugin, VRMUtils, VRMHumanoid, VRMExpressionManager } from '@pixiv/three-vrm';
 import { buildPlaces, cel } from './places.js';
 import { bodyFix } from './bodyfix.js';
 import { addTongue } from './tongue.js';
@@ -20,6 +20,23 @@ const EXPR = {
 };
 const NAMES = ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blink', 'aa', 'oh'];
 
+// A plain model (.glb with a skeleton but no VRM data, for example exported from Blender or Mixamo) made usable here: its bones are
+// matched to the standard body parts by name, and the parts of a VRM it does not have (expressions, eye aim, hair springs) are left empty.
+// It should be standing in a T or A pose. Names understood: Mixamo's (LeftArm, LeftForeArm, LeftUpLeg...), Blender-style (upper_arm.L,
+// forearm.L, thigh.L, shin.L), Unreal-style (upperarm_l, lowerarm_l, thigh_l, calf_l) and VRM's own (leftUpperArm...).
+function plainModel(gltf) { const bones = []; gltf.scene.traverse(o => { if (o.isBone) bones.push(o); }); if (!bones.length) throw new Error('That model has no skeleton, so it cannot be posed.');
+  const info = bones.map(b => { let n = b.name.replace(/^.*[:|]/, '').replace(/mixamorig\d*/i, '').replace(/^(def|org|bip\d*|bn|b|j|jnt|joint)[-_. ]/i, ''); let side = ''; const lr = /(^|[-_. ])(l|left)([-_. ]|$)|left/i.test(n) ? 'left' : /(^|[-_. ])(r|right)([-_. ]|$)|right/i.test(n) ? 'right' : ''; if (lr) { side = lr; n = n.replace(/left|right/i, '').replace(/(^|[-_. ])(l|r)(?=[-_. ]|$)/i, '$1'); } return { b, side, key: n.toLowerCase().replace(/[^a-z0-9]/g, '') }; });
+  const pick = (side, ...res) => { for (const re of res) { const hit = info.find(i => i.side === side && re.test(i.key) && !i.used); if (hit) { hit.used = true; return hit.b; } } return null; }, H = {};
+  const set = (name, b) => { if (b) H[name] = { node: b }; };
+  set('hips', pick('', /^(hips?|pelvis)$/, /^(root|hip|pelvis)/)); set('spine', pick('', /^spine(0|00|000|01)?$/, /^(spine|abdomen|waist)/)); set('chest', pick('', /^(spine(1|001|02)|chest)$/, /^(spine|chest)/)); set('upperChest', pick('', /^(spine(2|002|03)|upperchest)$/)); set('neck', pick('', /^neck(0|01)?$/, /^neck/)); set('head', pick('', /^head$/, /^head/));
+  for (const sd of ['left', 'right']) { set(sd + 'Shoulder', pick(sd, /^(shoulder|clavicle|collar)/)); set(sd + 'UpperArm', pick(sd, /^(upperarm|arm|uparm)(01)?$/, /^(upperarm|arm)/)); set(sd + 'LowerArm', pick(sd, /^(lowerarm|forearm|elbow)(01)?$/, /^(lowerarm|forearm)/)); set(sd + 'Hand', pick(sd, /^(hand|wrist)$/, /^hand/));
+    set(sd + 'UpperLeg', pick(sd, /^(upperleg|upleg|thigh)(01)?$/, /^(upperleg|upleg|thigh)/)); set(sd + 'LowerLeg', pick(sd, /^(lowerleg|leg|shin|calf|knee)(01)?$/, /^(lowerleg|shin|calf|leg)/)); set(sd + 'Foot', pick(sd, /^(foot|ankle)$/, /^foot/)); set(sd + 'Toes', pick(sd, /^(toes?|toebase|ball)(01)?$/)); }
+  const need = ['hips', 'spine', 'head', 'leftUpperArm', 'leftLowerArm', 'leftHand', 'rightUpperArm', 'rightLowerArm', 'rightHand', 'leftUpperLeg', 'leftLowerLeg', 'leftFoot', 'rightUpperLeg', 'rightLowerLeg', 'rightFoot'], miss = need.filter(n => !H[n]);
+  if (miss.length) throw new Error('Could not find these body parts in the model by bone name: ' + miss.join(', ') + '.');
+  gltf.scene.updateMatrixWorld(true); const humanoid = new VRMHumanoid(H, { autoUpdateHumanBones: true }); gltf.scene.add(humanoid.normalizedHumanBonesRoot);
+  /* size: a model made in centimetres (or any odd scale) is brought to about her height */
+  const box = new THREE.Box3().setFromObject(gltf.scene), tall = box.max.y - box.min.y; if (tall > 0.01 && (tall > 2.6 || tall < 0.9)) { const hold = new THREE.Group(), k = 1.6 / tall; for (const c of [...gltf.scene.children]) hold.add(c); hold.scale.setScalar(k); hold.position.y = -box.min.y * k; gltf.scene.add(hold); gltf.scene.updateMatrixWorld(true); }
+  return { scene: gltf.scene, humanoid, meta: { metaVersion: '1', name: 'plain model' }, plain: true, expressionManager: new VRMExpressionManager(), lookAt: null, springBoneManager: { joints: new Set(), colliderGroups: [], colliders: [], reset() {}, update() {}, setInitState() {} }, update() { humanoid.update(); } }; }
 export async function create(url, opts = {}) {
   const el = document.createElement('div');
   el.style.cssText = 'width:100%;height:100%;background:radial-gradient(circle at 50% 35%, #8a5bb8, #4a2d7a 55%, #2a1b4d 100%)';
@@ -57,7 +74,7 @@ export async function create(url, opts = {}) {
 
   const loader = new GLTFLoader(); loader.register(p => new VRMLoaderPlugin(p));
   const gltf = await loader.loadAsync(url);
-  const vrm = gltf.userData.vrm; if (!vrm) throw new Error('That file is not a VRM model.');
+  const vrm = gltf.userData.vrm || plainModel(gltf);
   // Older (0.x) models are built facing the other way, which also turns every forward bend into a backward one. Everything here is written
   // for the newer kind, so an older model is made to look like one: its picture is turned round inside a holder, the posing skeleton's
   // joints are moved to where a newer model has them, and each time the pose is handed to the picture the bends are mirrored.
