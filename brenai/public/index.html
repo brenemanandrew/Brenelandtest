@@ -439,6 +439,11 @@
   @keyframes rays { 0% { transform:scale(.82) rotate(0); opacity:1; } 100% { transform:scale(1.12) rotate(18deg); opacity:.55; } }
   #herSide, #meWrap { pointer-events:none; } #herSide .balloon, #meWrap .balloon, #awayNote { pointer-events:auto; }   /* the balloon areas never block what is moved under them */
   /* the heart game: hearts to pop over her picture, a pink vignette that deepens, bubbles round the edge */
+  /* while the heart game is on, everything that is not the game is put away: chat, typing bar, buttons, menus, the online dot */
+  body.hg #dock, body.hg #callBtn, body.hg #visitBtn, body.hg #bigBtn, body.hg #brainBtn, body.hg #outSign, body.hg #herSide, body.hg #rom30, body.hg #onDot, body.hg #agreeBtn, body.hg #keyLv, body.hg #artCap, body.hg #quickRow,
+  body.hg #fpBar, body.hg #fpMoments, body.hg #fpChoices, body.hg #fpLog, body.hg #fpLeave, body.hg #stageBack, body.hg #awayNote { display:none !important; }
+  body.hg #bottom, body.hg #logHead, body.hg #logWrap, body.hg #bar, body.hg #actFan, body.hg #meWrap { visibility:hidden !important; pointer-events:none !important; }
+  body.hg #bar *, body.hg #bottom * { visibility:hidden !important; }
   #heartLayer { position:absolute; inset:0; z-index:6; pointer-events:none; overflow:hidden; border-radius:inherit; }
   .hrt { position:absolute; pointer-events:auto; cursor:pointer; touch-action:none; display:grid; place-items:center; animation:hrtIn .22s cubic-bezier(.3,1.6,.5,1); filter:drop-shadow(0 3px 6px rgba(160,20,80,.5)); }
   .hrt svg { width:100%; height:100%; animation:hrtBeat .5s ease-in-out infinite alternate; } .hrt.gone { animation:hrtOut .25s ease-in forwards; pointer-events:none; }
@@ -737,7 +742,7 @@ const heartGame = (() => {
   }
   function hud() { $('heartN').textContent = g.n + ' / ' + RU().heartPops; $('heartMiss').textContent = '♥'.repeat(Math.max(0, RU().heartTries - g.miss)) + '♡'.repeat(Math.min(RU().heartTries, g.miss)); }
   function start() {
-    if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, wasBig: document.body.classList.contains('big') });
+    if (g.on) return; Object.assign(g, { on: true, n: 0, miss: 0, wasBig: document.body.classList.contains('big') }); document.body.classList.add('hg');   /* hg: only the game is on screen */
     if (!document.body.classList.contains('fp')) document.body.classList.add('big');           // room to play
     const pad = el('div', { id: 'missPad' }); ensure().prepend(pad);                              // a tap that is not on the heart costs one of your three tries
     pad.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (!g.cur) return; const r = pad.getBoundingClientRect(), f = el('span', { className: 'pts p0', textContent: '✕' }); f.style.left = e.clientX - r.left + 'px'; f.style.top = e.clientY - r.top + 'px'; ensure().append(f); setTimeout(() => f.remove(), 800); missed(); });
@@ -754,7 +759,7 @@ const heartGame = (() => {
     try { const r = await api('/api/hearts', { result, bonus: bonusPts }); const d = await r.json(); if (r.ok) { const pop = $('bondPop'); pop.textContent = result === 'win' ? '+' + (RU().heartWin + bonusPts) + ' 💗' : '-' + RU().heartLose + ' 💗'; pop.classList.remove('go'); void pop.offsetWidth; pop.classList.add('go'); setPlace(d); } } catch {}
   }
   function close(after = 0) { // out of the game: the view, the edges of the screen and her face all go back to normal
-    g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true;
+    g.on = false; g.last = Date.now(); cancelAnimationFrame(g.raf); g.cur = null; $('heartExit').hidden = true; document.body.classList.remove('hg');
     setTimeout(() => { if (layer) layer.textContent = ''; avatar.bonus(false); avatar.heartPose(null); avatar.heartStage(null); avatar.focus(0); vig().classList.remove('on'); vig().textContent = ''; vig().style.setProperty('--deep', 0); $('heartHud').classList.remove('on'); avatar.tears(false); if (!g.wasBig) document.body.classList.remove('big'); }, after);
   }
   function win() { const L = ensure(); const mp = $('missPad'); if (mp) mp.remove(); for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); WizraSound.fx('sparkle'); WizraSound.fx('bond'); avatar.emote('✨', 2200); avatar.flash('joy', 5000);
