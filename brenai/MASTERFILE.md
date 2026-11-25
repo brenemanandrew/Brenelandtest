@@ -98,7 +98,7 @@ Added since the reset on 2026-11-21, all live:
 - Movie night: she stays on the couch for the whole film, sits closer and leans in as romance level rises, a popcorn bucket sits in the player's lap, leaving asks first.
 - Phone menu bar is smaller. An owner typing `Wizra: line` puts the line down as hers.
 - Story truths: the player decides what has happened. A message starting `story:` is kept as true from then on (`db.facts`, `/api/story`), every prompt tells her that what he says happened did happen, and she may deny it out loud but cannot make it untrue. Editable in the robot panel.
-- Photo studio (settings wheel, owner only): free orbit camera, pose presets, drag hands and feet (IK), turn any joint, expressions, move her, take the picture as a PNG. The camera goes anywhere and she stays solid (the fade below hip level was removed 2026-11-24). `public/photo.js`.
+- Photo studio (settings wheel, owner only): free orbit camera, pose presets, drag hands and feet (IK), turn any joint, expressions, move her, take the picture as a PNG. The camera goes anywhere and she stays solid (the fade below hip level was removed 2026-11-24). `public/photo.js`. ✋ hand control: pinch in front of your camera to grab and swing the view, both hands to zoom and slide (`hands.js`).
 - Rooms: one scenery panel per windowed wall meeting at the corners (no more panels cutting through each other or flickering); furniture placed through a wall is slid back inside at build time.
 - Wide sleeves hang under gravity (bone cloth strips made at load, like coat tails).
 - Skills for agents: `brenai/skills/*/SKILL.md` (seven). Rule: when a skill or this file changes, tell the Brenebase session and make sure Brenebase has the new version (see `AGENTS.md`).

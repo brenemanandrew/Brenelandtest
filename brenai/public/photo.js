@@ -3,6 +3,7 @@
 //   On the picture:  drag = swing the camera round her · two fingers or right-drag = slide the view · pinch or wheel = closer, further
 //   Tools:  Camera (the drag above) · Reach (drag a hand or a foot and the limb follows) · Turn (tap a body part, then turn it with
 //           the sliders) · Move (drag her across the floor)
+//   ✋ Hand control (hands.js): pinch the air in front of your camera and move = swing round her; pinch both hands = zoom and slide
 //   Poses are the game's own gestures: tap one, she strikes it, and time stops again a moment later so you can adjust it by hand.
 // The renderer side is the photo* functions in avatar-vrm.js. The picture is saved at twice the screen's sharpness, with no interface in it.
 //   WizraPhoto.open()   WizraPhoto.close()
@@ -157,10 +158,14 @@
   // ---- top buttons ----
   const shoot = el('button', { className: 'shoot', textContent: '📸', title: 'Take the picture' }), clean = el('button', { textContent: '👁', title: 'Hide the tools' }), out = el('button', { textContent: '✕', title: 'Leave the photo studio' }); top.append(shoot, out);
   const back = el('button', { textContent: 'Show tools' }); back.style.cssText = 'position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top));z-index:76;border:0;border-radius:14px;background:rgba(20,12,45,.6);color:#fff;font:600 13px Fredoka,sans-serif;padding:7px 11px;display:none'; document.body.append(back);
+  // hand control (hands.js): pinch in the air in front of your camera to grab and swing the view; both hands to zoom and slide
+  const handB = el('button', { textContent: '✋', title: 'Hand control: pinch in front of your camera to grab the view' }); top.prepend(handB);
+  handB.onclick = async () => { const H = window.WizraHands; if (!H) return; if (H.on) { H.stop(); handB.style.background = ''; return; } handB.style.background = 'rgba(125,255,176,.45)';
+    const ok = await H.start(o => { if (S.on) avatar.photoCam(o); }); if (!ok) { handB.style.background = ''; try { addSys(H.error || 'Hand control could not start.'); } catch {} } };
   top.prepend(clean); clean.onclick = () => { document.body.classList.add('phclean'); back.style.display = 'block'; }; back.onclick = () => { document.body.classList.remove('phclean'); back.style.display = 'none'; };
   shoot.onclick = () => { let url = ''; try { url = avatar.photoShot(2); } catch {} if (!url) return; const name = 'wizra-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png'; show.textContent = ''; const no = el('button', { textContent: 'Back' }); no.onclick = () => show.classList.remove('show'); show.append(el('div', { style: 'display:block;text-align:center' }, el('img', { src: url }), el('div', {}, el('a', { href: url, download: name, textContent: '⬇ Save picture' }), no))); show.classList.add('show'); try { WizraSound.fx('pop'); } catch {} };
   function open() { if (S.on) return; let ok = false; try { ok = avatar.photo(true); } catch {} if (!ok) { try { addSys('The photo studio needs her 3D model on screen.'); } catch {} return; } S.on = true; S.tab = 'camera'; S.tool = 'camera'; S.bone = ''; document.body.classList.add('photo'); document.body.classList.remove('phclean'); back.style.display = 'none'; draw(); window.dispatchEvent(new Event('resize')); }
-  function close() { if (!S.on) return; S.on = false; try { avatar.photo(false); } catch {} document.body.classList.remove('photo', 'phclean'); back.style.display = 'none'; show.classList.remove('show'); window.dispatchEvent(new Event('resize')); }
+  function close() { if (!S.on) return; S.on = false; try { if (window.WizraHands && WizraHands.on) { WizraHands.stop(); handB.style.background = ''; } } catch {} try { avatar.photo(false); } catch {} document.body.classList.remove('photo', 'phclean'); back.style.display = 'none'; show.classList.remove('show'); window.dispatchEvent(new Event('resize')); }
   out.onclick = close; document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.on) close(); });
   for (const ev of ['pointerdown', 'pointerup', 'click', 'wheel', 'touchstart', 'touchmove', 'keydown', 'keyup']) for (const n of [ui, top, show]) n.addEventListener(ev, e => e.stopPropagation());
   window.WizraPhoto = { open, close, get on() { return S.on; } };
