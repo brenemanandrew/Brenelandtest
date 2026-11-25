@@ -102,7 +102,23 @@ export function buildBeach(THREE, { toon, outline, floorY }) {
     for (const o of props) o.position.x = o.userData.x0 + Math.round((x - o.userData.x0) / SPAN) * SPAN;   // each thing sits in whichever copy of the stretch is nearest her
   }
   // night: a dark sky with stars, and the sun becomes the moon
-  const api = { group, tick, splash, bubbles, water, skyColor: '#c7b9ff', night: false, sunYaw: Math.atan2(sun.position.x, sun.position.z), sunAt: (x, v) => v.copy(sun.position).setX(sun.position.x + x),
+  // ---- for the two games on the dry sand: a beach chair, a lounger, and sand that can be heaped up
+  const chair = new THREE.Group(), lounger = new THREE.Group(); { const frame = toon('#f8fafc'), cloth = toon('#ff8fb3'), cloth2 = toon('#7bdff2');
+    const seat = outline(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.06, 0.6), cloth)); seat.position.set(0, 0.4, 0); const back = outline(new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.8, 0.06), cloth)); back.position.set(0, 0.76, -0.36); back.rotation.x = -0.3; chair.add(seat, back);
+    for (const [x, z] of [[-0.28, 0.26], [0.28, 0.26], [-0.28, -0.26], [0.28, -0.26]]) { const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 6), frame); leg.position.set(x, 0.2, z); chair.add(leg); }
+    /* the lounger: a folding beach lounger laid fully flat. A mint cloth sling stretched between two metal side rails, a small pillow at the head end, cross bars at
+       each end, and two U-shaped legs of bent tube that splay out under it. It runs from its foot (local z = 0) to its head (z = 1.95); its top is 0.32 above the sand. */
+    const metal = toon('#c9ced6'), sling = toon('#86e8c4'), pillow = toon('#5fcfa8'), TOP = 0.3, W = 0.31, LEN = 1.95;
+    const tube = (x1, y1, z1, x2, y2, z2, r = 0.016) => { const a = new THREE.Vector3(x1, y1, z1), c = new THREE.Vector3(x2, y2, z2), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, a.distanceTo(c), 8), metal); m.position.copy(a).add(c).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize()); lounger.add(m); };
+    tube(-W, TOP, 0, -W, TOP, LEN); tube(W, TOP, 0, W, TOP, LEN); tube(-W, TOP, 0, W, TOP, 0); tube(-W, TOP, LEN, W, TOP, LEN); tube(-W, TOP, 1.42, W, TOP, 1.42, 0.012);   /* side rails, end bars, and the bar where the head section hinges */
+    for (const [zt, zb] of [[0.62, 0.36], [1.3, 1.6]]) { tube(-W, TOP, zt, -W - 0.03, 0.02, zb); tube(W, TOP, zt, W + 0.03, 0.02, zb); tube(-W - 0.03, 0.02, zb, W + 0.03, 0.02, zb); }   /* the two legs */
+    const cloth3 = outline(new THREE.Mesh(new THREE.BoxGeometry(W * 2 - 0.02, 0.018, LEN - 0.04), sling)); cloth3.position.set(0, TOP + 0.008, LEN / 2); lounger.add(cloth3);
+    const pil = outline(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.035, 0.2), pillow)); pil.position.set(0, TOP + 0.03, LEN - 0.2); lounger.add(pil); }
+  chair.visible = lounger.visible = false; group.add(chair, lounger);
+  const prop = (kind, x, z, yaw) => { chair.visible = kind === 'chair'; lounger.visible = kind === 'lounger'; const o = kind === 'chair' ? chair : lounger; o.position.set(x, floorY, z); o.rotation.y = yaw; };   /* the lounger runs from its foot (at x, z) toward its head along the way it faces */
+  const HEAPS = 520, heaps = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 7), toon('#e2c57f'), HEAPS), heapAt = []; heaps.frustumCulled = false; heaps.count = 0; group.add(heaps);
+  const addSand = (p, r) => { if (heapAt.length >= HEAPS) return; sc.set(r, r * 0.55, r); m4.compose(p, q0, sc); heaps.setMatrixAt(heapAt.length, m4); heapAt.push(p.clone()); heaps.count = heapAt.length; heaps.instanceMatrix.needsUpdate = true; }, clearSand = () => { heapAt.length = 0; heaps.count = 0; };
+  const api = { group, tick, splash, bubbles, water, prop, addSand, clearSand, heapAt, topOf: { chair: 0.43, lounger: 0.32 }, skyColor: '#c7b9ff', night: false, sunYaw: Math.atan2(sun.position.x, sun.position.z), sunAt: (x, v) => v.copy(sun.position).setX(sun.position.x + x),
     setNight(on) { api.night = !!on; const u = sky.material.uniforms; u.top.value.set(on ? '#141a44' : '#79b6ff'); u.mid.value.set(on ? '#2b2f6e' : '#c7b9ff'); u.low.value.set(on ? '#5a4a8c' : '#ffdbe9'); sun.material.color.set(on ? '#eef2ff' : '#fff6c9'); sun.scale.setScalar(on ? 0.62 : 1); halo.material.opacity = on ? 0.16 : 0.28; halo.scale.setScalar(on ? 0.7 : 1); stars.visible = !!on; cloudMat.color.set(on ? '#8f92c4' : '#ffffff'); api.skyColor = on ? '#2b2f6e' : '#c7b9ff';
       const w = water.material.uniforms; w.deep.value.set(on ? '#1b2a6b' : '#4f8fe6'); w.shallow.value.set(on ? '#4a63b8' : '#9fe8f2'); sand.material.color.set(on ? '#8f8aa6' : '#f3dfa6'); wet.material.color.set(on ? '#77729a' : '#d8c088'); } };
   return api;

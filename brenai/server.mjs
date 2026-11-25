@@ -1270,6 +1270,11 @@ async function handle(req, res) {
         else { db.sheet.bond.romance = Math.max(0, db.sheet.bond.romance - rule('heartLose')); fixBond(); cur().touches.push({ kind: 'heartlose', at: now }); }
         save(); return json(res, 200, placeView());
       }
+      /* The other two beach games. sand: burying her up to her neck is worth 10 coins. sun: how well she was covered in sunscreen (score 0..1) is worth up to 20 romance and up to 10 coins.
+         One reward per cooldown, shared with the heart game (the master key skips the wait). */
+      if (url.pathname === '/api/beach' && req.method === 'POST') { const { game, score } = await readBody(req), now = Date.now(), sc = Math.max(0, Math.min(1, +score || 0)); if (!KEY() && db.heartsAt && now - db.heartsAt < rule('heartCooldown') * 1000) return json(res, 429, { error: 'too soon', coins: 0, romance: 0, ...placeView() });
+        db.heartsAt = now; fixBond(); let coins = 0, romance = 0; if (game === 'sand') { if (sc >= 0.9) coins = 10; } else if (game === 'sun') { coins = Math.round(10 * sc); romance = Math.round(20 * sc); } else return json(res, 400, { error: 'game?' });
+        if (coins) earn(coins); if (romance) addBond('romance', romance); cur().touches.push({ kind: 'beach' + game, at: now }); save(); return json(res, 200, { coins, romance, ...placeView() }); }
       // a scripted event at work: note that it fired, put a line she says in the log, or have her react in her own words
       if (url.pathname === '/api/event' && req.method === 'POST') {
         const { id, fired, say, react, preview } = await readBody(req), d = devData();
