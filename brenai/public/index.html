@@ -1162,7 +1162,9 @@ async function followUp(ask) {
   } catch { if (body && body.parentElement) body.parentElement.remove(); } finally { sendBtn.disabled = false; avatar.setThinking(false); moreArrow(); }
 }
 async function send(quick, visit, lean) {
-  const text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return; clearTimeout(followTimer);
+  let text = (typeof quick === 'string' ? quick : input.value).trim(); if (!text) return; clearTimeout(followTimer);
+  { const sm = /^(story|fact|truth|canon)\s*:\s*([\s\S]+)/i.exec(text); if (sm) { /* "story: ..." declares that something happened: it is kept as true from now on, and then said to her like any other message so she reacts to it */ text = sm[2].trim(); if (/^(clear|reset|forget all)$/i.test(text)) { try { await api('/api/story', { clear: true }); addSys('The story truths are cleared.'); } catch {} if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); } return; }
+      try { const r = await api('/api/story', { add: text }), d = await r.json(); addSys('Now true in the story: ' + text + ' (' + (d.facts || []).length + ' kept)'); } catch { addSys('Could not save that as a story truth; saying it anyway.'); } } }
   { const pm = visitInfo.keyable && /^wizra\s*:\s*([\s\S]+)/i.exec(text); if (pm) { if (typeof quick !== 'string') { voice.reset(); input.value = ''; autosize(); }   /* an owner typing "Wizra: ..." puts the line in her mouth */
       try { const r = await api('/api/puppet', { text: pm[1].trim() }), d = await r.json(); if (d.error) return addSys(d.error); setPlace(d); const body = addLine('her', ''); try { avatar.act(d.text); } catch {} try { speaker.say(voicedOf(d.text)); } catch {} await typeOut(body, d.text); } catch { addSys('Could not do that right now.'); } return; } }
   if (phoneCall.on) { input.value = ''; voice.reset(); return callSay(text); }               // on a call your words go to the call, not the chat
