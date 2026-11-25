@@ -789,7 +789,7 @@ const heartGame = (() => {
         if (c >= 0.95 && !won) { won = true; g.done = true; show(1); WizraSound.fx('sparkle'); WizraSound.fx('bond'); const L = ensure(); for (let i = 0; i < 5; i++) setTimeout(() => sparkle(Math.random() * L.clientWidth, Math.random() * L.clientHeight, 10), i * 90); reward('sand', c).then(d => { $('heartMiss').textContent = d.coins ? '+' + d.coins + ' coins' : d.soon ? 'no coins this soon after the last game' : ''; }); } },
       () => { if (grab) avatar.beachBody(); grab = ''; }); }
   // Sunscreen: rub it in wherever her skin shows before the sun gets to it. On the lounger she starts on her front and rolls over halfway. How well she was covered decides the reward.
-  function sunGame() { const chair = window.WIZRA_SUN ? window.WIZRA_SUN === 'chair' : Math.random() < 0.35,   /* (WIZRA_SUN: 'chair' or 'lounger', for tests) */
+  function sunGame() { const chair = false,   /* always the lounger, laid flat: the sit-up chair was taken out at Andrew's request (2026-11-25) */
       info = avatar.beachGame('sun', chair ? 'chair' : 'lounger') || { zones: [] }, PART = 14, sides = chair ? 1 : 2, scores = []; let zones = info.zones || [], zi = 0, side = 1, left = PART, over = false, busy = false, lastT = performance.now(), st = { cover: 0, burn: 0, score: 0 }, lastSq = 0;
     /* the view stays close on one part of her at a time and cuts to the next when that part is done (or its time is up). A slider sets how stiff the cream is. */
     let thick = 0.6; try { const v = parseFloat(localStorage.getItem('brenai.cream')); if (v >= 0 && v <= 1) thick = v; } catch {} avatar.beachCream(thick);
