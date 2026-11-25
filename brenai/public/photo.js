@@ -3,7 +3,8 @@
 //   On the picture:  drag = swing the camera round her · two fingers or right-drag = slide the view · pinch or wheel = closer, further
 //   Tools:  Camera (the drag above) · Reach (drag a hand or a foot and the limb follows) · Turn (tap a body part, then turn it with
 //           the sliders) · Move (drag her across the floor)
-//   ✋ Hand control (hands.js): pinch the air in front of your camera and move = swing round her; pinch both hands = zoom and slide
+//   ✋ Hand control (hands.js): Pinch mode = pinch the air and move to swing round her, both hands to zoom and slide;
+//      ✊ Grab mode = close your hand around a part of her and move it (hands and feet reach, limbs turn, body slides her)
 //   Poses are the game's own gestures: tap one, she strikes it, and time stops again a moment later so you can adjust it by hand.
 // The renderer side is the photo* functions in avatar-vrm.js. The picture is saved at twice the screen's sharpness, with no interface in it.
 //   WizraPhoto.open()   WizraPhoto.close()
@@ -158,14 +159,35 @@
   // ---- top buttons ----
   const shoot = el('button', { className: 'shoot', textContent: '📸', title: 'Take the picture' }), clean = el('button', { textContent: '👁', title: 'Hide the tools' }), out = el('button', { textContent: '✕', title: 'Leave the photo studio' }); top.append(shoot, out);
   const back = el('button', { textContent: 'Show tools' }); back.style.cssText = 'position:fixed;left:10px;top:calc(8px + env(safe-area-inset-top));z-index:76;border:0;border-radius:14px;background:rgba(20,12,45,.6);color:#fff;font:600 13px Fredoka,sans-serif;padding:7px 11px;display:none'; document.body.append(back);
-  // hand control (hands.js): pinch in the air in front of your camera to grab and swing the view; both hands to zoom and slide
-  const handB = el('button', { textContent: '✋', title: 'Hand control: pinch in front of your camera to grab the view' }); top.prepend(handB);
-  handB.onclick = async () => { const H = window.WizraHands; if (!H) return; if (H.on) { H.stop(); handB.style.background = ''; return; } handB.style.background = 'rgba(125,255,176,.45)';
-    const ok = await H.start(o => { if (S.on) avatar.photoCam(o); }); if (!ok) { handB.style.background = ''; try { addSys(H.error || 'Hand control could not start.'); } catch {} } };
+  // hand control (hands.js). ✋ cycles: off, then Pinch (pinch the air and move = swing the view; both hands = zoom and slide), then
+  // Grab ✊ (close your hand around a part of her and it follows your hand: her hands and feet are reached for, her head and limbs
+  // turn, her body slides her across the floor; closing on empty space grabs the view and swings it). Each hand grabs on its own.
+  const handB = el('button', { textContent: '✋', title: 'Hand control: off, pinch the view, or grab her with your hands' }); top.prepend(handB);
+  const HG = {}, sideName = n => NICE(n).replace(/^left /, 'her left ').replace(/^right /, 'her right ');
+  const LIMB_END = n => ENDS.includes(n) ? n : /LowerArm$/.test(n) ? n.replace('LowerArm', 'Hand') : /LowerLeg$/.test(n) ? n.replace('LowerLeg', 'Foot') : '';
+  const grabber = {
+    over(x, y) { const n = avatar.photoPick(x, y); return n ? sideName(LIMB_END(n) || n) : ''; },
+    down(id, x, y) { const n = avatar.photoPick(x, y), end = n && LIMB_END(n);
+      HG[id] = end ? { k: 'reach', n: end } : n && /^(hips|spine|chest|upperChest)$/.test(n) ? { k: 'her', n } : n ? { k: 'turn', n } : { k: 'view', n: '' };
+      if (HG[id].k !== 'view') { S.bone = HG[id].n; }
+      return HG[id].k === 'view' ? 'the view' : sideName(HG[id].n); },
+    move(id, x, y, dx, dy, dz) { const g = HG[id]; if (!g || !S.on) return;
+      if (g.k === 'reach') avatar.photoReach(g.n, x, y, Math.max(-0.03, Math.min(0.03, dz * 0.0006)));
+      else if (g.k === 'turn') { avatar.photoNudge(g.n, 'h', dx); avatar.photoNudge(g.n, 'v', -dy); if (Math.abs(dz) > 1) avatar.photoNudge(g.n, 'depth', Math.max(-30, Math.min(30, dz))); }
+      else if (g.k === 'her') avatar.photoHer({ move: [dx, dy] });
+      else avatar.photoCam({ orbit: [dx, dy] }); },
+    up(id) { delete HG[id]; },
+  };
+  const handMode = m => { const H = window.WizraHands; handB.textContent = m === 'grab' ? '✊' : '✋'; handB.style.background = m ? 'rgba(125,255,176,.45)' : ''; if (H && m) H.mode = m; };
+  handB.onclick = async () => { const H = window.WizraHands; if (!H) return;
+    if (H.on && H.mode === 'pinch') { handMode('grab'); return; }
+    if (H.on) { H.stop(); handMode(''); return; }
+    handMode('pinch'); const ok = await H.start(o => { if (S.on) avatar.photoCam(o); }, grabber);
+    if (!ok) { handMode(''); try { addSys(H.error || 'Hand control could not start.'); } catch {} } };
   top.prepend(clean); clean.onclick = () => { document.body.classList.add('phclean'); back.style.display = 'block'; }; back.onclick = () => { document.body.classList.remove('phclean'); back.style.display = 'none'; };
   shoot.onclick = () => { let url = ''; try { url = avatar.photoShot(2); } catch {} if (!url) return; const name = 'wizra-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.png'; show.textContent = ''; const no = el('button', { textContent: 'Back' }); no.onclick = () => show.classList.remove('show'); show.append(el('div', { style: 'display:block;text-align:center' }, el('img', { src: url }), el('div', {}, el('a', { href: url, download: name, textContent: '⬇ Save picture' }), no))); show.classList.add('show'); try { WizraSound.fx('pop'); } catch {} };
   function open() { if (S.on) return; let ok = false; try { ok = avatar.photo(true); } catch {} if (!ok) { try { addSys('The photo studio needs her 3D model on screen.'); } catch {} return; } S.on = true; S.tab = 'camera'; S.tool = 'camera'; S.bone = ''; document.body.classList.add('photo'); document.body.classList.remove('phclean'); back.style.display = 'none'; draw(); window.dispatchEvent(new Event('resize')); }
-  function close() { if (!S.on) return; S.on = false; try { if (window.WizraHands && WizraHands.on) { WizraHands.stop(); handB.style.background = ''; } } catch {} try { avatar.photo(false); } catch {} document.body.classList.remove('photo', 'phclean'); back.style.display = 'none'; show.classList.remove('show'); window.dispatchEvent(new Event('resize')); }
+  function close() { if (!S.on) return; S.on = false; try { if (window.WizraHands && WizraHands.on) { WizraHands.stop(); handMode(''); } } catch {} try { avatar.photo(false); } catch {} document.body.classList.remove('photo', 'phclean'); back.style.display = 'none'; show.classList.remove('show'); window.dispatchEvent(new Event('resize')); }
   out.onclick = close; document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.on) close(); });
   for (const ev of ['pointerdown', 'pointerup', 'click', 'wheel', 'touchstart', 'touchmove', 'keydown', 'keyup']) for (const n of [ui, top, show]) n.addEventListener(ev, e => e.stopPropagation());
   window.WizraPhoto = { open, close, get on() { return S.on; } };

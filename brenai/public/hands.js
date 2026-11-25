@@ -3,13 +3,18 @@
 //   pinch (thumb tip to index tip) and move the hand  = grab the view and swing it round her
 //   pinch with both hands: pull apart / push together = closer / further; move both together = slide the view
 //   let go (open the pinch)                            = release
-// The small picture in the corner shows what the tracker sees: a ring on each hand, filled while it is pinching.
-//   WizraHands.start(onMove)  onMove({ orbit:[dx,dy] } | { dolly:n, pan:[dx,dy] })     WizraHands.stop()
+// Grab mode (WizraHands.mode = 'grab'): no gestures to learn. Each hand puts a ring on the screen; close your hand around a part of
+// her (make a fist, as if holding it) and that part follows your hand until you open it. Moving the hand toward the camera or away
+// carries the part toward you or away. Each hand grabs on its own, so you can hold both of her hands at once.
+// The small picture in the corner shows what the tracker sees: a ring on each hand, filled while it is pinching or closed.
+//   WizraHands.start(onMove, grab)  onMove({ orbit:[dx,dy] } | { dolly:n, pan:[dx,dy] })     WizraHands.stop()
+//   grab = { down(id, x, y) -> label or '', move(id, x, y, dx, dy, dz), up(id), over(x, y) -> label }  (screen pixels; dz > 0 = toward you)
 //   WizraHands.feed(hands)    for tests: hands = [[21 points {x,y,z}], ...] in the picture's 0..1 coordinates
 (function () {
   const LIB = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
   const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
-  let tracker = null, stream = null, video = null, box = null, cv = null, raf = 0, lastT = -1, emit = () => {};
+  let tracker = null, stream = null, video = null, box = null, cv = null, raf = 0, lastT = -1, emit = () => {}, G = null, nextId = 1;
+  const rings = [];   /* on-screen rings, one a hand, in grab mode */
   const st = { hands: [], two: null, error: '' };   /* hands: per tracked hand { x, y, pinch, sx, sy } ; two: last two-hand spread and middle */
   const SPEED = 900;   /* screen pixels of drag for a hand moving the full width of the picture */
 
@@ -18,7 +23,12 @@
     const d = (a, b) => Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y), size = d(0, 9) || 1e-3, gap = d(4, 8) / size;
     const pinch = old && old.pinch ? gap < 0.42 : gap < 0.28;
     const x = 1 - (pts[4].x + pts[8].x) / 2, y = (pts[4].y + pts[8].y) / 2;   /* mirrored: your right is the screen's right */
-    return { x, y, pinch, gap };
+    // grab mode: where the palm is, and whether the hand is closed (fingertips curled back toward the wrist)
+    const curl = [[8, 5], [12, 9], [16, 13], [20, 17]].reduce((a, [t, m]) => a + d(t, 0) / (d(m, 0) || 1e-3), 0) / 4;
+    const closed = old && old.closed ? curl < 1.55 : curl < 1.3;
+    const pxr = [0, 5, 9, 13, 17].reduce((a, i) => a + pts[i].x, 0) / 5, pyr = [0, 5, 9, 13, 17].reduce((a, i) => a + pts[i].y, 0) / 5;
+    const fit = v => Math.max(0, Math.min(1, (v - 0.15) / 0.7));   /* the middle 70% of the picture covers the whole screen */
+    return { x, y, pinch, gap, curl, closed, size, px: fit(1 - pxr), py: fit(pyr) };
   }
   // match this frame's hands to last frame's by nearness, so two hands keep their own state
   function track(list) {
@@ -26,10 +36,16 @@
     for (const p of now) { const r0 = read(p, null); let best = -1, bd = 0.25; st.hands.forEach((h, i) => { if (used.has(i)) return; const dd = Math.hypot(h.x - r0.x, h.y - r0.y); if (dd < bd) { bd = dd; best = i; } });
       const old = best >= 0 ? st.hands[best] : null; if (best >= 0) used.add(best); const r = read(p, old);
       const k = 0.45; r.sx = old ? old.sx + (r.x - old.sx) * k : r.x; r.sy = old ? old.sy + (r.y - old.sy) * k : r.y;   /* smoothed */
-      r.psx = old ? old.sx : r.sx; r.psy = old ? old.sy : r.sy; r.was = !!(old && old.pinch); out.push(r); }
+      r.psx = old ? old.sx : r.sx; r.psy = old ? old.sy : r.sy; r.was = !!(old && old.pinch);
+      const kp = 0.5; r.qx = old ? old.qx + (r.px - old.qx) * kp : r.px; r.qy = old ? old.qy + (r.py - old.qy) * kp : r.py; r.qs = old ? old.qs + (r.size - old.qs) * 0.35 : r.size;
+      r.id = old ? old.id : nextId++; r.held = old ? old.held : ''; r.wasClosed = !!(old && old.closed); r.oqx = old ? old.qx : r.qx; r.oqy = old ? old.qy : r.qy; r.oqs = old ? old.qs : r.qs; out.push(r); }
+    // a hand the tracker missed is kept, still, for a few frames (a blink of the tracker must not drop what you hold); then it lets go
+    st.hands.forEach((h, i) => { if (used.has(i)) return; if ((h.lost || 0) < 8) out.push({ ...h, lost: (h.lost || 0) + 1, was: h.pinch, wasClosed: h.closed, psx: h.sx, psy: h.sy, oqx: h.qx, oqy: h.qy, oqs: h.qs });
+      else if (G && h.held) G.up(h.id); });
     return out;
   }
   function step(list) {
+    if (api.mode === 'grab') return grabStep(list);
     const hs = track(list || []); st.hands = hs; const pin = hs.filter(h => h.pinch && h.was);
     if (pin.length >= 2) { const [a, b] = pin, spread = Math.hypot(a.sx - b.sx, a.sy - b.sy), mx = (a.sx + b.sx) / 2, my = (a.sy + b.sy) / 2;
       if (st.two) emit({ dolly: (st.two.spread - spread) * 2600, pan: [(mx - st.two.mx) * SPEED, (my - st.two.my) * SPEED] });
@@ -37,8 +53,22 @@
     else { st.two = null; if (pin.length === 1) { const h = pin[0], dx = (h.sx - h.psx) * SPEED, dy = (h.sy - h.psy) * SPEED; if (Math.abs(dx) + Math.abs(dy) > 0.4) emit({ orbit: [dx, dy] }); } }
     drawDots();
   }
+  function grabStep(list) {
+    const hs = track(list || []); st.hands = hs; const W = innerWidth, H = innerHeight;
+    for (const h of hs) { const x = h.qx * W, y = h.qy * H;
+      if (h.closed && !h.wasClosed) h.held = (G && G.down(h.id, x, y)) || '';
+      else if (h.closed && h.held && G) G.move(h.id, x, y, (h.qx - h.oqx) * W, (h.qy - h.oqy) * H, (h.qs / (h.oqs || h.qs) - 1) * 900);
+      else if (!h.closed && h.held) { G && G.up(h.id); h.held = ''; }
+      if (!h.closed) h.over = G && G.over ? G.over(x, y) : ''; }
+    drawRings(); drawDots();
+  }
+  function drawRings() { const hs = api.mode === 'grab' && api.on ? st.hands : [];
+    while (rings.length < hs.length) { const r = document.createElement('div'); r.style.cssText = 'position:fixed;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 8px rgba(0,0,0,.6);z-index:78;pointer-events:none;transition:background .1s,transform .1s;font:600 12px Fredoka,sans-serif;color:#fff;text-shadow:0 1px 3px #000'; const t = document.createElement('span'); t.style.cssText = 'position:absolute;left:50px;top:12px;white-space:nowrap'; r.append(t); document.body.append(r); rings.push(r); }
+    rings.forEach((r, i) => { const h = hs[i]; if (!h) { r.style.display = 'none'; return; } r.style.display = 'block'; r.style.left = h.qx * innerWidth + 'px'; r.style.top = h.qy * innerHeight + 'px';
+      r.style.background = h.closed ? 'rgba(125,255,176,.55)' : h.over ? 'rgba(255,255,255,.25)' : 'transparent'; r.style.transform = h.closed ? 'scale(.75)' : 'scale(1)'; r.firstChild.textContent = h.held || h.over || ''; }); }
   function drawDots() { if (!cv) return; const g = cv.getContext('2d'), W = cv.width, H = cv.height; g.clearRect(0, 0, W, H);
-    for (const h of st.hands) { g.beginPath(); g.arc(h.sx * W, h.sy * H, 9, 0, 7); g.lineWidth = 3; g.strokeStyle = h.pinch ? '#7dffb0' : '#fff'; g.stroke(); if (h.pinch) { g.fillStyle = 'rgba(125,255,176,.5)'; g.fill(); } } }
+    g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, H - 16, W, 16); g.fillStyle = '#fff'; g.font = '600 10px Fredoka,sans-serif'; g.fillText(api.mode === 'grab' ? 'Grab: close hand on her' : 'Pinch: swing / 2 hands zoom', 4, H - 5);
+    for (const h of st.hands) { g.beginPath(); g.arc(h.sx * W, h.sy * H, 9, 0, 7); g.lineWidth = 3; g.strokeStyle = (api.mode === 'grab' ? h.closed : h.pinch) ? '#7dffb0' : '#fff'; g.stroke(); if (api.mode === 'grab' ? h.closed : h.pinch) { g.fillStyle = 'rgba(125,255,176,.5)'; g.fill(); } } }
   function loop() { raf = requestAnimationFrame(loop); if (!tracker || !video || video.readyState < 2 || video.currentTime === lastT) return; lastT = video.currentTime;
     let res = null; try { res = tracker.detectForVideo(video, performance.now()); } catch { return; } step((res && res.landmarks) || []); }
   function ui() { if (box) return; box = document.createElement('div'); box.id = 'handBox';
@@ -46,8 +76,8 @@
     video = document.createElement('video'); video.muted = true; video.playsInline = true; video.style.cssText = 'width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.75';
     cv = document.createElement('canvas'); cv.width = 128; cv.height = 96; cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'; box.append(video, cv); document.body.append(box); }
   const api = {
-    on: false, get error() { return st.error; }, get hands() { return st.hands.map(h => ({ x: h.sx, y: h.sy, pinch: h.pinch })); },
-    async start(onMove) { emit = onMove || emit; st.error = ''; if (api.on) return true; ui(); box.style.display = 'block';
+    on: false, mode: 'pinch', get error() { return st.error; }, get hands() { return st.hands.map(h => ({ x: h.sx, y: h.sy, pinch: h.pinch })); },
+    async start(onMove, grab) { emit = onMove || emit; G = grab || G; st.error = ''; if (api.on) return true; ui(); box.style.display = 'block';
       try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }); }
       catch (e) { st.error = e && e.name === 'NotAllowedError' ? 'The camera was not allowed.' : 'No camera could be opened.'; box.style.display = 'none'; return false; }
       video.srcObject = stream; try { await video.play(); } catch {} api.on = true;
@@ -55,8 +85,8 @@
           tracker = await vision.HandLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2 }); } }
       catch (e) { st.error = 'The hand reader could not load (' + (e && e.message ? e.message.slice(0, 60) : 'network') + ').'; api.stop(); return false; }
       if (!api.on) return false; cancelAnimationFrame(raf); loop(); return true; },
-    stop() { api.on = false; cancelAnimationFrame(raf); raf = 0; if (stream) for (const t of stream.getTracks()) t.stop(); stream = null; if (video) video.srcObject = null; if (box) box.style.display = 'none'; st.hands = []; st.two = null; },
-    feed(list, onMove) { if (onMove) emit = onMove; step(list); },
+    stop() { api.on = false; cancelAnimationFrame(raf); raf = 0; if (stream) for (const t of stream.getTracks()) t.stop(); stream = null; if (video) video.srcObject = null; if (box) box.style.display = 'none'; if (G) for (const h of st.hands) if (h.held) G.up(h.id); st.hands = []; st.two = null; drawRings(); },
+    feed(list, onMove, grab) { if (onMove) emit = onMove; if (grab) G = grab; step(list); },
   };
   window.WizraHands = api;
 })();
