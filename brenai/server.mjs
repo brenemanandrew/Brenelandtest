@@ -302,15 +302,19 @@ function takeTouches() {
 // a log entry as the model sees it: the silent cur().touches ride in front of his words as an action
 const withPre = e => (e.pre ? `*${e.pre}* ` : '') + picNote(e.pic) + e.text;
 
-async function replyLocal(userText, onDelta) {
+// How much the model is given. Normally CONTEXT_TOKENS (what the model should be loaded with). If the model on the PC was loaded with less room than that, a full
+// prompt does not fit and it answers with nothing at all: when that happens the size is halved (brain.ctxCap, kept until the server restarts) and the reply is tried again.
+const ctxNow = () => Math.min(CONTEXT_TOKENS, brain.ctxCap || CONTEXT_TOKENS);
+async function replyLocal(userText, onDelta, again) {
   const setup = setupText();
-  let budget = CONTEXT_TOKENS - toks(setup) - REPLY_TOKENS - 200;
+  let budget = ctxNow() - toks(setup) - REPLY_TOKENS - 200;
   const L = LENGTHS[db.settings.length] || LENGTHS.short;
   const turns = [{ role: 'user', content: withPre(db.log[db.log.length - 1]) }];
   budget -= toks(turns[0].content);
   for (let i = db.log.length - 2; i >= 0 && budget > 0; i--) { // the last log entry is this message
     const e = db.log[i]; if (e.at < (db.ctxFrom || 0)) break;   /* a fresh start was asked for (robot panel): she does not see the talk before it, so its tone cannot pull her back */
     if (e.who === 'sys') continue;        // "Wizra left" lines are for the screen, not for her
+    if (e.who === 'her' && !String(e.text || '').trim()) continue;   /* a reply that came back empty teaches her to say nothing: it is left out */
     const t = { role: e.who === 'me' ? 'user' : 'assistant', content: withPre(e) };
     budget -= toks(t.content); if (budget < 0) break;
     if (turns[0].role === t.role) turns[0].content = t.content + '\n' + turns[0].content; // messages he left while she was out arrive as one turn
@@ -324,7 +328,12 @@ async function replyLocal(userText, onDelta) {
   const system = '';
   const text = await brainJob({ system, messages: turns, max_tokens: L.tokens, temperature: tempOf(db.settings.temperature), stream: true,
     repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
-  return dropDangling(trimLength(dropRepeats(dropTags(cleanLocal(text))), L));
+  const out = dropDangling(trimLength(dropRepeats(dropTags(cleanLocal(text))), L));
+  if (!String(out || '').trim()) { /* nothing came back */
+    if (!again && !String(text || '').trim() && ctxNow() > 7000) { brain.ctxCap = Math.max(6000, Math.floor(ctxNow() / 2)); brain.ctxWhy = 'the model answered with nothing; trying with ' + brain.ctxCap + ' tokens of room'; console.warn('[brain] empty reply: context cut to', brain.ctxCap); return replyLocal(userText, onDelta, true); }
+    if (!again) return replyLocal(userText, onDelta, true);
+    throw new Error('She did not get an answer out. Send that again in a moment.'); }
+  return out;
 }
 const LENGTHS = { // tokens: hard cap on the model; say/act: how many spoken sentences and actions survive the trim
   short: { tokens: 130, say: 2, act: 1 },
@@ -811,7 +820,7 @@ async function handle(req, res) {
   const url = new URL(req.url, 'http://x');
   try {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, stuck: !!brain.ws && (brain.badAt || 0) > (brain.okAt || 0), stuckWhy: brain.ws && (brain.badAt || 0) > (brain.okAt || 0) ? brain.badWhy || '' : '', build: BUILD, ttsMs: brain.ttsMs || 0, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
+    if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, ctx: ctxNow(), ctxWhy: brain.ctxWhy || '', stuck: !!brain.ws && (brain.badAt || 0) > (brain.okAt || 0), stuckWhy: brain.ws && (brain.badAt || 0) > (brain.okAt || 0) ? brain.badWhy || '' : '', build: BUILD, ttsMs: brain.ttsMs || 0, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
@@ -1313,6 +1322,7 @@ async function handle(req, res) {
         const msg = String(text || '').trim().slice(0, 20000);
         if (!msg) return json(res, 400, { error: 'empty' });
         if (busy) return json(res, 409, { error: 'She is still answering.' });
+        { const n = db.log.length; db.log = db.log.filter(e => !(e.who === 'her' && !String(e.text || '').trim() && !e.pic)); if (db.log.length !== n) console.warn('[chat] dropped', n - db.log.length, 'empty replies from the log'); }   /* replies that came back empty are cleared out before she is asked again */
         busy = true;
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
         const send = o => res.write(`data: ${JSON.stringify(o)}\n\n`);
