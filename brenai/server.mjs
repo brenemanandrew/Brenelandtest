@@ -330,8 +330,8 @@ async function replyLocal(userText, onDelta, again) {
     repeat_penalty: 1.12, frequency_penalty: 0.35, presence_penalty: 0.25, stop: [`\n${USER_NAME}:`, '\nUser:', '\n['] }, onDelta);
   const out = dropDangling(trimLength(dropRepeats(dropTags(cleanLocal(text))), L));
   if (!String(out || '').trim()) { /* nothing came back */
-    if (!again && !String(text || '').trim() && ctxNow() > 7000) { brain.ctxCap = Math.max(6000, Math.floor(ctxNow() / 2)); brain.ctxWhy = 'the model answered with nothing; trying with ' + brain.ctxCap + ' tokens of room'; console.warn('[brain] empty reply: context cut to', brain.ctxCap); return replyLocal(userText, onDelta, true); }
-    if (!again) return replyLocal(userText, onDelta, true);
+    if ((again | 0) < 2 && !String(text || '').trim() && ctxNow() > 7000) { brain.ctxCap = Math.max(6000, Math.floor(ctxNow() * 0.45));   /* a little under half: 32768 becomes 14745, which fits a model loaded with 16384 with room to spare */ brain.ctxWhy = 'the model answered with nothing; trying with ' + brain.ctxCap + ' tokens of room'; console.warn('[brain] empty reply: context cut to', brain.ctxCap); return replyLocal(userText, onDelta, (again | 0) + 1); }
+    if (!again) return replyLocal(userText, onDelta, 1);
     throw new Error('She did not get an answer out. Send that again in a moment.'); }
   return out;
 }
