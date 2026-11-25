@@ -813,7 +813,7 @@ const heartGame = (() => {
       if (zi < zones.length) return eyecatch(zones[zi].toUpperCase(), () => go(() => avatar.beachZone(zi)));
       if (side < sides) { side++; return eyecatch('ROLL OVER', () => go(() => { avatar.beachRoll(); zi = 0; zones = ['Face and shoulders', 'Arms', 'Tummy', 'Legs']; })); }
       finish(); };
-    const loop = () => { if (!g.on || g.kind !== 'sun' || over || busy) return; const now = performance.now(), dt = Math.min(0.2, (now - lastT) / 1000); lastT = now; st = avatar.beachSunTick(dt, PART * 1.25) || st; left -= dt; show(); if (left <= 0 || st.cover >= 0.985) return next(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+    const loop = () => { if (!g.on || g.kind !== 'sun' || over || busy) return; const now = performance.now(), dt = Math.min(0.2, (now - lastT) / 1000); lastT = now; st = avatar.beachSunTick(dt, PART * 1.25) || st; if (!window.WIZRA_SUN_HOLD) left -= dt; show();   /* (WIZRA_SUN_HOLD stops the clock, for tests) */ if (left <= 0 || st.cover >= 0.985) return next(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
   // which outfit she wears to the beach: asked before the game when it is started from the menu, and remembered
   async function choose() { if (g.on) return; let found = [], lv = 0; try { const d = await (await fetch('/api/outfits')).json(); lv = d.level | 0; (function walk(o) { if (!o || typeof o !== 'object') return; if (typeof o.file === 'string' && typeof o.name === 'string') found.push(o); for (const k in o) walk(o[k]); })(d); } catch {}
     const seen = new Set(); found = found.filter(o => /^o[a-z0-9]{6,10}\.vrm$/.test(o.file) && !seen.has(o.file) && seen.add(o.file)); if (!found.length || customModel) return start();
