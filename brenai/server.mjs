@@ -12,6 +12,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import Anthropic from '@anthropic-ai/sdk';
 import { WebSocketServer } from 'ws';
@@ -783,6 +784,15 @@ async function comeBack(onDelta) {
 // ---------- http ----------
 // changes whenever a new version is deployed: pages left open use it to reload themselves
 const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/bonecloth.js', 'public/places.js', 'public/sound.js', 'pics.mjs', 'public/mapkit.js', 'public/uiedit.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+// Sending text-like files (code, JSON clips) compressed when the browser accepts it: gzip once, kept in memory by file and change time.
+const GZ = new Map();
+function sendFile(req, res, file, type, cache) { let st; try { st = fs.statSync(file); } catch { res.writeHead(404); return res.end('not found'); }
+  const etag = '"' + st.size.toString(36) + '-' + Math.round(st.mtimeMs).toString(36) + '"', h = { 'content-type': type, etag, ...(cache ? { 'cache-control': cache } : {}) };
+  if (req.headers['if-none-match'] === etag) { res.writeHead(304, h); return res.end(); }
+  const zip = /gzip/.test(req.headers['accept-encoding'] || '') && /javascript|json|html|css|svg|text/.test(type) && st.size > 1024;
+  if (!zip) { res.writeHead(200, { ...h, 'content-length': st.size }); return fs.createReadStream(file).pipe(res); }
+  let g = GZ.get(file); if (!g || g.etag !== etag) { g = { etag, buf: zlib.gzipSync(fs.readFileSync(file), { level: 9 }) }; GZ.set(file, g); if (GZ.size > 400) GZ.delete(GZ.keys().next().value); }
+  res.writeHead(200, { ...h, 'content-encoding': 'gzip', vary: 'Accept-Encoding', 'content-length': g.buf.length }); res.end(g.buf); }
 const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.py': 'text/x-python; charset=utf-8', '.bat': 'application/octet-stream' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -854,7 +864,7 @@ async function handle(req, res) {
       const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk', '/api/sounds', '/api/inbox', '/api/anims', '/api/extra'].includes(url.pathname);
       if (byToken && !als.getStore()) { const u = shared.owner && playerOf(shared.owner); if (!u) return json(res, 409, { error: 'This game has no owner yet.' }); return als.run(u, () => handle(req, res)); }
       if (!byToken && !authed(req)) return json(res, 401, { error: 'login' });
-      if (url.pathname === '/api/authcheck') return json(res, 200, { ok: true });   /* past the site password: the page uses it to see that the sign-in was kept */
+      if (url.pathname === '/api/authcheck') return json(res, 200, { ok: true });
       // which player: a PIN opens your own save. A new PIN makes a new one (only when asked to: a typo should not).
       if (url.pathname === '/api/pin' && req.method === 'POST') {
         const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || ''), now = Date.now(), fails = (pinFails.get(ip) || []).filter(t => now - t < 600000);
@@ -896,6 +906,18 @@ async function handle(req, res) {
           shared.owners = [...new Set([...(shared.owners || []), oid])].slice(-8); save(); return json(res, 200, { ok: true, owners: 1 + shared.owners.length }); }
         if (!shared.owner) { shared.owner = cur().id; save(); console.log('[players] the owner is set'); } return json(res, 200, { owner: isOwner() }); }
       if (req.method !== 'GET' && ['/api/dev', '/api/outfits', '/api/outfit/slot', '/api/anims', '/api/anims/clip', '/api/avatar', '/api/pack'].includes(url.pathname) && !isOwner()) return json(res, 403, { error: 'Only the owner of this game can change that.' });
+      // What an install keeps on the device (see install.js): the game's files, her moves, and her outfits. small: what she is wearing now;
+      // large: every outfit she can wear at her level, her beach outfits, the beach and village pieces, and hand tracking. Sizes in bytes
+      // (null for files that come from elsewhere).
+      if (url.pathname === '/api/assets') { const big = url.searchParams.get('size') === 'large', list = [], seen = new Set(), add = (u, f) => { if (seen.has(u)) return; seen.add(u); let n = null; try { if (f) n = fs.statSync(f).size; } catch {} list.push({ url: u, size: n, group: g }); }; let g = 'game';
+        const walk = (dir, rel) => { for (const e of fs.readdirSync(dir, { withFileTypes: true })) { const f = path.join(dir, e.name), r = rel + e.name; if (e.isDirectory()) { if (!/^(apk|tmp)$/.test(e.name)) walk(f, r + '/'); } else if (/\.(js|mjs|css|woff2|webp|jpg|png|svg)$/.test(e.name) && !/^viture-bridge|^start-viture/.test(e.name)) add('/' + r, f); } };
+        add('/', path.join(here, 'public', 'index.html')); walk(path.join(here, 'public'), '');
+        g = 'moves'; const cdir = path.join(DATA_DIR, 'clips'); try { for (const f of fs.readdirSync(cdir)) if (f.endsWith('.json')) add('/api/clips/' + f.slice(0, -5), path.join(cdir, f)); } catch {} if (fs.existsSync(ANIMS)) add('/api/anims', ANIMS);
+        g = 'her'; const now = outfitNow(); if (now.url) add(now.url, path.join(OUTFITS, now.url.split('/').pop().split('?')[0]));
+        if (big) { const o = outfitData(), lvl = db.sheet.romLevel; for (const [k, slot] of Object.entries(o.slots)) { const l = +k.split('|')[0], sit = k.split('|')[1]; if (!slot || !slot.file || !fs.existsSync(path.join(OUTFITS, slot.file))) continue; if (sit === 'Beach') add('/api/outfit/' + slot.file, path.join(OUTFITS, slot.file)); else if (l <= lvl) add('/api/outfit/' + slot.file + '?v=' + slot.v, path.join(OUTFITS, slot.file)); }
+          g = 'places'; const xd = path.join(DATA_DIR, 'extra'); try { for (const f of fs.readdirSync(xd)) if (/^set_[a-z0-9]+\.glb$/.test(f) && !/raw\.glb$/.test(f)) add('/api/extra/' + f, path.join(xd, f)); } catch {}
+          g = 'hands'; const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14'; for (const u of [MP + '/vision_bundle.mjs', MP + '/wasm/vision_wasm_internal.js', MP + '/wasm/vision_wasm_internal.wasm', 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task']) add(u, null); }
+        return json(res, 200, { size: big ? 'large' : 'small', files: list, bytes: list.reduce((a, x) => a + (x.size || 0), 0) }); }   /* past the site password: the page uses it to see that the sign-in was kept */
       if (url.pathname === '/api/state') { const z = String(url.searchParams.get('tz') || '').slice(0, 60); if (z && z !== db.tz && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){1,2}$/.test(z) && okZone(z)) { db.tz = z; save(); } }
       if (url.pathname === '/api/state') return json(res, 200, { owner: isOwner(), hang: hangView(), extras: extrasView(), coins: db.coins | 0, wx: db.wx || shared.wx || null, tz: TZ, voiceMod: voiceMod(), log: db.log.filter(e => !e.hidden).map(({ pre, ...e }) => e), name: USER_NAME, intro: db.intro === 'todo', me: db.meAvatar || '', settings: db.settings, depart: planDue(), away: awayView(), glow: glowView(), plan: planView(), ...placeView() });
 
@@ -1189,7 +1211,7 @@ async function handle(req, res) {
       /* The bigger library of recorded motion: one file a clip in /data/clips, fetched one at a time when the page wants it (anims.json above is the small set every page loads whole).
          GET /api/clips -> { clips: { name: seconds } }   GET /api/clips/<name> -> the clip   POST /api/clips?name=<name> (owner) with the clip as the body   POST /api/clips?remove=<name> */
       if (url.pathname === '/api/clips' || url.pathname.startsWith('/api/clips/')) { const dir = path.join(DATA_DIR, 'clips'), idx = path.join(dir, '_index.json'); let index = {}; try { index = JSON.parse(fs.readFileSync(idx, 'utf8')); } catch {}
-        if (req.method === 'GET') { const f = url.pathname.slice(11); if (!f) return json(res, 200, { clips: index }); const file = path.join(dir, f + '.json'); if (!/^[a-z0-9_]{1,40}$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such clip' }); res.writeHead(200, { 'content-type': 'application/json', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=86400' }); return fs.createReadStream(file).pipe(res); }
+        if (req.method === 'GET') { const f = url.pathname.slice(11); if (!f) return json(res, 200, { clips: index }); const file = path.join(dir, f + '.json'); if (!/^[a-z0-9_]{1,40}$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such clip' }); return sendFile(req, res, file, 'application/json', 'private, max-age=86400'); }
         if (req.method !== 'POST') return json(res, 405, { error: 'GET or POST' }); if (!isOwner()) return json(res, 403, { error: 'owner only' }); fs.mkdirSync(dir, { recursive: true });
         const gone = String(url.searchParams.get('remove') || ''); if (gone) { if (/^[a-z0-9_]{1,40}$/.test(gone)) { fs.rmSync(path.join(dir, gone + '.json'), { force: true }); delete index[gone]; fs.writeFileSync(idx, JSON.stringify(index)); } return json(res, 200, { ok: true, clips: Object.keys(index).length }); }
         const name = String(url.searchParams.get('name') || ''); if (!/^[a-z0-9_]{1,40}$/.test(name)) return json(res, 400, { error: 'name: small letters, digits and _' });
@@ -1212,8 +1234,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/anims') {
         if (req.method === 'GET') {
           if (!fs.existsSync(ANIMS)) return json(res, 200, { clips: {} });
-          res.writeHead(200, { 'content-type': 'application/json', 'content-length': fs.statSync(ANIMS).size, 'cache-control': 'private, no-cache' });
-          return fs.createReadStream(ANIMS).pipe(res);
+          return sendFile(req, res, ANIMS, 'application/json', 'private, no-cache');
         }
         if (req.method === 'POST') { // the whole set at once: { clips: { name: clip } }
           const parts = []; let size = 0; await new Promise((resolve, reject) => { req.on('data', c => { size += c.length; if (size > 30e6) req.destroy(); else parts.push(c); }); req.on('end', resolve); req.on('error', reject); });
@@ -1527,11 +1548,8 @@ async function handle(req, res) {
     if (!p) p = 'index.html';
     const file = path.join(here, 'public', p);
     if (!file.startsWith(path.join(here, 'public'))) return json(res, 403, { error: 'no' });
-    fs.readFile(file, (err, data) => {
-      if (err) { res.writeHead(404); return res.end('not found'); }
-      res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream', ...(p.startsWith('vendor') || p.startsWith('fonts') ? { 'cache-control': 'public, max-age=604800' } : {}) });
-      res.end(data);
-    });
+    /* the 3D engine and fonts change rarely: kept a week; the game's own files are checked each time (a quick "not changed" answer when they have not) */
+    return sendFile(req, res, file, TYPES[path.extname(file)] || 'application/octet-stream', p.startsWith('vendor') || p.startsWith('fonts') ? 'public, max-age=604800' : p.startsWith('art/') ? 'public, max-age=86400' : 'no-cache');
   } catch (e) {
     console.error('[http]', e.message);
     if (!res.headersSent) json(res, 500, { error: e.message }); else res.end();
