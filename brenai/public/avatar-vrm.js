@@ -115,6 +115,10 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   async function xrStart(kind) { if (XR.on) return ''; if (!navigator.xr) return 'This browser has no WebXR.'; kind = kind === 'ar' ? 'immersive-ar' : 'immersive-vr';
     try { if (!(await navigator.xr.isSessionSupported(kind))) return 'This browser cannot do ' + kind + '.'; } catch {}
     let ses; try { ses = await navigator.xr.requestSession(kind, { optionalFeatures: ['local-floor', 'hand-tracking'] }); } catch (e) { return 'The headset view could not start: ' + (e.message || e.name); }
+    /* three draws into WebXR "projection layers" when a browser offers them; the neckband's Chrome offers them but shows only a sliver of
+       the picture. So, unless asked otherwise (localStorage brenai.xrLayers = 1), the browser is made to look as if it had none, and the
+       older, plain way (one XRWebGLLayer) is used, which every WebXR browser shows. */
+    if (localStorage.getItem('brenai.xrLayers') !== '1' && window.XRWebGLBinding && 'createProjectionLayer' in XRWebGLBinding.prototype) { try { XR.cpl = XRWebGLBinding.prototype.createProjectionLayer; delete XRWebGLBinding.prototype.createProjectionLayer; } catch {} }   /* (three looks for createProjectionLayer to decide) */
     renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); try { await renderer.xr.setSession(ses); } catch (e) { renderer.xr.enabled = false; try { ses.end(); } catch {} return 'The headset view could not start: ' + (e.message || e.name); }
     XR.on = true; XR.session = ses; XR.was = sbs.mode; sbs.mode = '';
     XR.st = { frames: 0, errs: [], views: null }; const ce = console.error; console.error = (...a) => { if (XR.on && XR.st.errs.length < 8) XR.st.errs.push(a.map(x => String(x && x.message || x)).join(' ').slice(0, 200)); ce.apply(console, a); };
