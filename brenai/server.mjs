@@ -854,6 +854,7 @@ async function handle(req, res) {
       const byToken = !!BRAIN_TOKEN && req.headers['x-brain-token'] === BRAIN_TOKEN && ['/api/outfit/slot', '/api/outfits', '/api/disk', '/api/sounds', '/api/inbox', '/api/anims', '/api/extra'].includes(url.pathname);
       if (byToken && !als.getStore()) { const u = shared.owner && playerOf(shared.owner); if (!u) return json(res, 409, { error: 'This game has no owner yet.' }); return als.run(u, () => handle(req, res)); }
       if (!byToken && !authed(req)) return json(res, 401, { error: 'login' });
+      if (url.pathname === '/api/authcheck') return json(res, 200, { ok: true });   /* past the site password: the page uses it to see that the sign-in was kept */
       // which player: a PIN opens your own save. A new PIN makes a new one (only when asked to: a typo should not).
       if (url.pathname === '/api/pin' && req.method === 'POST') {
         const ip = String(req.headers['fly-client-ip'] || req.socket.remoteAddress || ''), now = Date.now(), fails = (pinFails.get(ip) || []).filter(t => now - t < 600000);

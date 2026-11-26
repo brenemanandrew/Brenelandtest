@@ -1493,7 +1493,7 @@ window.__booted = 1;
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
   const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
-  if (r.ok) { const chk = await fetch('/api/online').catch(() => null);   /* the password was right: is the sign-in kept? (a browser that refuses cookies forgets it at once) */
+  if (r.ok) { const chk = await fetch('/api/authcheck').catch(() => null);   /* the password was right: is the sign-in kept? (a browser that refuses cookies forgets it at once) */
     if (chk && chk.status === 401) { $('pwMsg').textContent = 'The password was right, but this browser did not keep the sign-in: it is blocking cookies. In Chrome: Settings > Site settings > Cookies (or Third-party cookies) > allow, or add brenai.fly.dev as allowed. Not in Incognito.'; try { navigator.sendBeacon('/api/clientlog', JSON.stringify({ err: 'login ok but cookie not kept', ua: navigator.userAgent, cookies: navigator.cookieEnabled })); } catch {} return; }
     $('login').style.display = 'none'; load().then(() => voice.start()).catch(() => {}); } else { try { navigator.sendBeacon('/api/clientlog', JSON.stringify({ err: 'site password refused (' + r.status + ')', len: $('pw').value.length, ua: navigator.userAgent })); } catch {} $('pw').value = ''; $('pwMsg').textContent = r.status === 429 ? 'Too many tries. Wait a minute and try again.' : 'That is not the site password. (Your PIN goes on the next screen.)'; }
 };
