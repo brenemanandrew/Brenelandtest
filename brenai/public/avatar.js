@@ -325,7 +325,7 @@
       visit(name) { if (R.visit) R.visit(name || ''); return !!R.visit; }, canVisit() { return !!R.visit; },
       routine(name) { if (R.doActivity) R.doActivity(name); },
       // swap the picture live; null goes back to the cartoon
-      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); stage.appendChild(em); askThumb(); if (R.glow) R.glow(state); if (opts.onRenderer) opts.onRenderer(); },
+      setRenderer(r) { R.dispose(); if (r) stage.insertBefore(r.el, em); R = r || puppet(stage); if (R.xrHook) R.xrHook(frame, () => requestAnimationFrame(frame));   /* the 3D model arrives after the stand-in: the headset view's frames must drive this one */ stage.appendChild(em); askThumb(); if (R.glow) R.glow(state); if (opts.onRenderer) opts.onRenderer(); },
     };
   }
   window.WizraAvatar = { mount };
