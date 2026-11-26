@@ -203,5 +203,6 @@
   function close() { if (!S.on) return; S.on = false; S.spray = ''; sbar.style.display = 'none'; sprayB.style.background = ''; try { if (window.WizraHands && WizraHands.on) { WizraHands.stop(); handMode(''); } } catch {} try { avatar.photo(false); } catch {} document.body.classList.remove('photo', 'phclean'); back.style.display = 'none'; show.classList.remove('show'); window.dispatchEvent(new Event('resize')); }
   out.onclick = close; document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.on) close(); });
   for (const ev of ['pointerdown', 'pointerup', 'click', 'wheel', 'touchstart', 'touchmove', 'keydown', 'keyup']) for (const n of [ui, top, show]) n.addEventListener(ev, e => e.stopPropagation());
+  window.addEventListener('wizra-xr-pose', () => { if (!S.on) open(); });   /* grabbing her in the headset view switches the studio on, so her pose holds */
   window.WizraPhoto = { open, close, get on() { return S.on; } };
 })();

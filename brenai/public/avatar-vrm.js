@@ -111,7 +111,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   // WebXR (a headset browser, such as Chrome on the VITURE neckband): the browser draws both eyes and moves the view with your head itself.
   // The game still decides where the camera is; each frame the XR rig is put there (level, facing the same way) and your head's pose
   // is added on top. The game's frame is driven by the XR session while it runs (see avatar.js).
-  const XR = { on: false, session: null, rig: new THREE.Group(), frame: null, onEnd: null, p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') }; scene.add(XR.rig);
+  const XR = { on: false, session: null, rig: new THREE.Group(), frame: null, onEnd: null, off: new THREE.Vector3(), grabs: new Map(), vis: [], selects: 0, p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') }; scene.add(XR.rig);
   async function xrStart(kind) { if (XR.on) return ''; if (!navigator.xr) return 'This browser has no WebXR.'; kind = kind === 'ar' ? 'immersive-ar' : 'immersive-vr';
     try { if (!(await navigator.xr.isSessionSupported(kind))) return 'This browser cannot do ' + kind + '.'; } catch {}
     let ses; try { ses = await navigator.xr.requestSession(kind, { optionalFeatures: ['local-floor', 'hand-tracking'] }); } catch (e) { return 'The headset view could not start: ' + (e.message || e.name); }
@@ -119,16 +119,39 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
        the picture. So, unless asked otherwise (localStorage brenai.xrLayers = 1), the browser is made to look as if it had none, and the
        older, plain way (one XRWebGLLayer) is used, which every WebXR browser shows. */
     if (localStorage.getItem('brenai.xrLayers') !== '1' && window.XRWebGLBinding && 'createProjectionLayer' in XRWebGLBinding.prototype) { try { XR.cpl = XRWebGLBinding.prototype.createProjectionLayer; delete XRWebGLBinding.prototype.createProjectionLayer; } catch {} }   /* (three looks for createProjectionLayer to decide) */
-    renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); try { await renderer.xr.setSession(ses); } catch (e) { renderer.xr.enabled = false; try { ses.end(); } catch {} return 'The headset view could not start: ' + (e.message || e.name); }
-    XR.on = true; XR.session = ses; XR.was = sbs.mode; sbs.mode = '';
+    renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); try { renderer.xr.setFramebufferScaleFactor(+localStorage.getItem('brenai.xrScale') || 1.5); } catch {}   /* a sharper picture than the headset's default (1.5x; brenai.xrScale changes it) */ try { await renderer.xr.setSession(ses); } catch (e) { renderer.xr.enabled = false; try { ses.end(); } catch {} return 'The headset view could not start: ' + (e.message || e.name); }
+    XR.on = true; XR.session = ses; XR.was = sbs.mode; sbs.mode = ''; XR.off.set(0, 0, 0); xrInputs(ses);
     XR.st = { frames: 0, errs: [], views: null }; const ce = console.error; console.error = (...a) => { if (XR.on && XR.st.errs.length < 8) XR.st.errs.push(a.map(x => String(x && x.message || x)).join(' ').slice(0, 200)); ce.apply(console, a); };
     renderer.setAnimationLoop((t, xf) => { XR.st.frames++; if (xf && !XR.st.views) { try { const pose = xf.getViewerPose(renderer.xr.getReferenceSpace()), bl = ses.renderState.baseLayer; if (pose) XR.st.views = pose.views.map(v => { const vp = bl && bl.getViewport(v); return { eye: v.eye, vp: vp ? [vp.x, vp.y, vp.width, vp.height] : null, pos: [v.transform.position.x, v.transform.position.y, v.transform.position.z].map(n => +n.toFixed(2)) }; }); XR.st.layer = bl ? [bl.framebufferWidth, bl.framebufferHeight] : null; } catch (e) { XR.st.errs.push('pose: ' + e.message); } }
-      try { XR.frame && XR.frame(t); } catch (e) { XR.st.errs.push(String(e.message || e)); } });
-    setTimeout(() => { try { const r = renderer.info.render; navigator.sendBeacon('/api/clientlog', JSON.stringify({ xr: kind, ...XR.st, cam: camera.position.toArray().map(n => +n.toFixed(2)), rig: XR.rig.position.toArray().map(n => +n.toFixed(2)), calls: r.calls, tris: r.triangles, near: camera.near, far: camera.far, here, bh: bh.on, ua: navigator.userAgent })); } catch {} }, 4000);   /* a report on the first seconds, for working out a headset that shows nothing */
-    ses.addEventListener('end', () => { console.error = ce; XR.on = false; XR.session = null; renderer.setAnimationLoop(null); renderer.xr.enabled = false; size = ''; if (XR.onEnd) XR.onEnd(); });
+      try { xrPoint(xf); } catch (e) { if (XR.st.errs.length < 8) XR.st.errs.push('input: ' + e.message); } try { XR.frame && XR.frame(t); } catch (e) { XR.st.errs.push(String(e.message || e)); } });
+    setTimeout(() => { try { const r = renderer.info.render; navigator.sendBeacon('/api/clientlog', JSON.stringify({ xr: kind, ...XR.st, cam: camera.position.toArray().map(n => +n.toFixed(2)), feats: ses.enabledFeatures ? [...ses.enabledFeatures] : null, inputs: [...ses.inputSources].map(x => ({ mode: x.targetRayMode, hand: !!x.hand, side: x.handedness, prof: (x.profiles || []).slice(0, 2) })), selects: XR.selects, rig: XR.rig.position.toArray().map(n => +n.toFixed(2)), calls: r.calls, tris: r.triangles, near: camera.near, far: camera.far, here, bh: bh.on, ua: navigator.userAgent })); } catch {} }, 4000);   /* a report on the first seconds, for working out a headset that shows nothing */
+    ses.addEventListener('end', () => { console.error = ce; XR.on = false; for (const v of XR.vis) v.visible = false; XR.grabs.clear(); XR.session = null; renderer.setAnimationLoop(null); renderer.xr.enabled = false; size = ''; if (XR.onEnd) XR.onEnd(); });
     return ''; }
+  // Posing in the headset view. Anything that points (a tracked hand's pinch, the neckband's touch, a controller) is a WebXR input
+  // source with a ray. Each shows a thin ray and a dot on the part of her it is pointing at. Pinch or press (select) to grab: her hands
+  // and feet reach for where your ray is (at the grab's distance), her head looks there, her other limbs and body turn toward it, her
+  // hips carry her along; grabbing empty space pulls the room past you (how you move about). Letting go leaves her pose as it is; the
+  // first grab of her switches the photo studio on (it keeps a pose from being undone).
+  const XR_END = n => /Hand$|Foot$/.test(n) ? n : /LowerArm$/.test(n) ? n.replace('LowerArm', 'Hand') : /LowerLeg$/.test(n) ? n.replace('LowerLeg', 'Foot') : '';
+  const xrM = new THREE.Matrix4(), xrO = new THREE.Vector3(), xrD = new THREE.Vector3(), xrT = new THREE.Vector3(), xrP = new THREE.Vector3(), xrQ = new THREE.Quaternion(), xrQ2 = new THREE.Quaternion();
+  function xrVis(i) { while (XR.vis.length <= i) { const g = new THREE.Group(), line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: '#7dffb0', transparent: true, opacity: 0.7, depthTest: false })), dot = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 8), new THREE.MeshBasicMaterial({ color: '#7dffb0', depthTest: false, transparent: true, opacity: 0.9 })); line.renderOrder = dot.renderOrder = 995; g.add(line); scene.add(g, dot); g.line = line; g.dot = dot; g.visible = false; dot.visible = false; XR.vis.push(g); } return XR.vis[i]; }
+  function xrInputs(ses) { ses.addEventListener('selectstart', e => { XR.selects++; const g = { src: e.inputSource, n: '', d: 0, last: new THREE.Vector3() }; const hit = xrPick(e.inputSource); if (hit) { g.n = hit.n; g.d = hit.d; if (!ph.on) window.dispatchEvent(new Event('wizra-xr-pose')); } else { g.n = ''; g.d = 1.2; } g.started = false; XR.grabs.set(e.inputSource, g); });
+    ses.addEventListener('selectend', e => XR.grabs.delete(e.inputSource)); }
+  XR.rays = new Map();
+  function xrRay(src, xf) { const pose = xf.getPose(src.targetRaySpace, renderer.xr.getReferenceSpace()); if (!pose) return null; xrM.fromArray(pose.transform.matrix).premultiply(XR.rig.matrixWorld); const o = new THREE.Vector3().setFromMatrixPosition(xrM), d = new THREE.Vector3(0, 0, -1).transformDirection(xrM); return { o, d }; }
+  function xrPick(src) { const r = XR.rays.get(src); if (!r) return null; let best = null; for (const n of PH_BONES) { const b = B(n); if (!b) continue; b.getWorldPosition(xrP); const t = xrP.clone().sub(r.o).dot(r.d); if (t < 0.05) continue; const off = xrP.distanceTo(xrT.copy(r.o).addScaledVector(r.d, t)), lim = 0.07 + 0.03 * t; if (off < lim && (!best || off / lim < best.s)) best = { n, d: t, s: off / lim }; } return best; }
+  function xrAim(n, target, useForward) { const b = B(n); if (!b || !b.parent) return; b.updateWorldMatrix(true, true); b.getWorldPosition(xrP); let from; if (useForward) from = new THREE.Vector3(0, 0, 1).applyQuaternion(b.getWorldQuaternion(xrQ)); else { const kid = b.children.find(c => c.position.lengthSq() > 1e-4); if (!kid) return; from = kid.getWorldPosition(new THREE.Vector3()).sub(xrP).normalize(); }
+    const to = target.clone().sub(xrP).normalize(), qW = new THREE.Quaternion().setFromUnitVectors(from, to); const lim = useForward ? 1 : 0.35; if (2 * Math.acos(Math.min(1, Math.abs(qW.w))) > lim) qW.slerp(new THREE.Quaternion(), 1 - lim / (2 * Math.acos(Math.min(1, Math.abs(qW.w)))));   /* turns a little at a time: the part follows your hand smoothly */
+    b.parent.getWorldQuaternion(xrQ); b.getWorldQuaternion(xrQ2); b.quaternion.copy(xrQ.invert()).multiply(qW).multiply(xrQ2); b.updateWorldMatrix(false, true); phTouched(); }
+  function xrPoint(xf) { if (!xf || !XR.session) return; let i = 0; XR.rays.clear(); vrm.scene.updateMatrixWorld(true);
+    for (const src of XR.session.inputSources) { const r = xrRay(src, xf); if (!r) continue; XR.rays.set(src, r); const v = xrVis(i++), g = XR.grabs.get(src), hit = g ? null : xrPick(src); v.visible = true; v.position.copy(r.o); v.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), r.d); const len = g ? g.d : hit ? hit.d : 3; v.line.scale.setScalar(len);
+      v.dot.visible = !!(g ? g.n : hit); v.dot.position.copy(r.o).addScaledVector(r.d, len); v.line.material.color.set(g ? '#ffd166' : '#7dffb0'); v.dot.material.color.copy(v.line.material.color);
+      if (!g) continue; const tgt = r.o.clone().addScaledVector(r.d, g.d); if (!g.started) { g.started = true; g.last.copy(tgt); continue; } const dl = tgt.clone().sub(g.last); g.last.copy(tgt);
+      if (!g.n) { dl.y = 0; XR.off.sub(dl); continue; }   /* empty space: pull the room past you */
+      const end = XR_END(g.n); if (end) API.photoReach(end, 0, 0, 0, tgt); else if (g.n === 'hips') { dl.y = 0; vrm.scene.position.add(dl); ph.off.x += dl.x; ph.off.z += dl.z; phTouched(); } else xrAim(g.n, tgt, g.n === 'head' || g.n === 'neck'); }
+    for (let k = i; k < XR.vis.length; k++) { XR.vis[k].visible = false; XR.vis[k].dot.visible = false; } }
   function renderView() { if (XR.on) { const par = camera.parent; XR.p.copy(camera.position); XR.q.copy(camera.quaternion); XR.e.setFromQuaternion(XR.q, 'YXZ'); XR.e.x = XR.e.z = 0;
-      XR.rig.position.copy(XR.p); XR.rig.quaternion.setFromEuler(XR.e); XR.rig.updateMatrixWorld(true); XR.rig.add(camera); renderer.render(scene, camera);
+      XR.rig.position.copy(XR.p).add(XR.off); XR.rig.quaternion.setFromEuler(XR.e); XR.rig.updateMatrixWorld(true); XR.rig.add(camera); renderer.render(scene, camera);
       XR.rig.remove(camera); if (par) par.add(camera); camera.position.copy(XR.p); camera.quaternion.copy(XR.q); camera.updateMatrixWorld(); return; }
     if (!sbs.mode) { renderer.render(scene, camera); return; }
     const sz = renderer.getSize(sbs.v2), W = sz.x, H = sz.y, half = W / 2; sbs.keep.copy(camera.quaternion); sbs.keepP.copy(camera.position); if (sbs.posOn) { sbs.pe.setFromQuaternion(camera.quaternion, 'YXZ'); sbs.pe.x = sbs.pe.z = 0; camera.position.add(sbs.pv.copy(sbs.pos).applyQuaternion(sbs.pq.setFromEuler(sbs.pe))); }   /* 6DOF glasses: where your head has moved since you set straight ahead, turned with the view's heading (so stepping forward goes the way you look) */ if (sbs.headOn) { camera.quaternion.multiply(sbs.q.setFromEuler(sbs.head)); }
@@ -1526,7 +1549,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   const project = (x, y, z) => { const r = renderer.domElement.getBoundingClientRect(); v3.set(x, y, z).project(camera); return { x: r.left + (v3.x + 1) / 2 * r.width, y: r.top + (1 - v3.y) / 2 * r.height, behind: v3.z > 1 }; };
   const UNIT = 0.0027; // metres per puppet-space unit (her face is about 80 units tall there)
 
-  return {
+  const API = {
     el,
     thumb(cb) { thumbCb = cb; },
     // her routine: what she is doing now (for the chat), and a way to tell her to do something
@@ -1676,12 +1699,12 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
       const wq = b.getWorldQuaternion(N.q1), pq = b.parent.getWorldQuaternion(N.q2); b.quaternion.copy(N.q3.setFromUnitVectors(d, v).multiply(wq)).premultiply(pq.invert()); b.updateWorldMatrix(false, true); return true; },
     photoBone(name, rot, free) { const b = B(name); if (!b) return null; if (rot) { phTouched(); const L = free ? 99 : PH_LIMIT[name.replace(/^(left|right)/, '')] || 1.6; b.rotation.set(...rot.map(v => Math.max(-L, Math.min(L, +v || 0)))); } return [b.rotation.x, b.rotation.y, b.rotation.z]; },
     // drag a hand or a foot: the limb is solved to reach the point under the pointer, on the plane facing the camera at the limb's own depth
-    photoReach(end, x, y, toward = 0) { phTouched();   /* toward: metres to carry the hand or foot toward the camera (or away, below 0) on top of following x, y */
+    photoReach(end, x, y, toward = 0, worldT = null) { phTouched();   /* worldT: a point in the world to reach for instead of x, y (the headset view) */   /* toward: metres to carry the hand or foot toward the camera (or away, below 0) on top of following x, y */
       const ch = { leftHand: ['leftUpperArm', 'leftLowerArm', 'leftHand'], rightHand: ['rightUpperArm', 'rightLowerArm', 'rightHand'], leftFoot: ['leftUpperLeg', 'leftLowerLeg', 'leftFoot'], rightFoot: ['rightUpperLeg', 'rightLowerLeg', 'rightFoot'] }[end]; if (!ch) return; const [A, Bn, C] = ch.map(B); if (!A || !Bn || !C) return;
       const r = renderer.domElement.getBoundingClientRect(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), t = new THREE.Vector3(), q = new THREE.Quaternion(), pq = new THREE.Quaternion(), bq = new THREE.Quaternion();
       const turn = (bone, qW) => { bone.parent.getWorldQuaternion(pq); bone.getWorldQuaternion(bq); bone.quaternion.copy(pq.invert()).multiply(qW).multiply(bq); bone.updateWorldMatrix(false, true); };
       A.updateWorldMatrix(true, true); A.getWorldPosition(a); Bn.getWorldPosition(b); C.getWorldPosition(c);
-      const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2((x - r.left) / r.width * 2 - 1, -((y - r.top) / r.height * 2 - 1)), camera); const n = camera.getWorldDirection(new THREE.Vector3()), plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, c); if (!ray.ray.intersectPlane(plane, t)) return; if (toward) t.addScaledVector(n, -toward);
+      if (worldT) t.copy(worldT); else { const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2((x - r.left) / r.width * 2 - 1, -((y - r.top) / r.height * 2 - 1)), camera); const n = camera.getWorldDirection(new THREE.Vector3()), plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, c); if (!ray.ray.intersectPlane(plane, t)) return; if (toward) t.addScaledVector(n, -toward); }
       const l1 = a.distanceTo(b), l2 = b.distanceTo(c), d = Math.max(Math.abs(l1 - l2) + 0.02, Math.min(l1 + l2 - 0.004, a.distanceTo(t))), u = a.clone().sub(b), w = c.clone().sub(b), phi = u.angleTo(w), theta = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + l2 * l2 - d * d) / (2 * l1 * l2))));
       let ax = new THREE.Vector3().crossVectors(u, w); if (ax.lengthSq() < 1e-8) ax.set(1, 0, 0).applyQuaternion(Bn.getWorldQuaternion(bq)); ax.normalize(); turn(Bn, q.setFromAxisAngle(ax, theta - phi)); C.getWorldPosition(c);
       turn(A, q.setFromUnitVectors(c.clone().sub(a).normalize(), t.clone().sub(a).normalize())); },
@@ -1759,4 +1782,5 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     },
     dispose() { clearInterval(dayTimer); window.removeEventListener('keydown', keyDown); window.removeEventListener('keyup', keyUp); window.removeEventListener('blur', keysOff); el.remove(); try { VRMUtils.deepDispose(vrm.scene); renderer.dispose(); renderer.forceContextLoss(); } catch {} },
   };
+  return API;
 }
