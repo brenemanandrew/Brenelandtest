@@ -825,9 +825,9 @@ async function handle(req, res) {
 
     // Pages on devices that will not start report what went wrong here, before anyone has signed in: the browser's name and the error
     // text only (no chat, no PINs). Kept in clientlog.txt on the volume, newest last, at most about 200 KB; the owner reads it with GET.
-    if (url.pathname === '/api/clientlog') { const file = path.join(DATA_DIR, 'clientlog.txt');
+    if (url.pathname === '/api/clientlog' && req.method === 'POST') { const file = path.join(DATA_DIR, 'clientlog.txt');
       if (req.method === 'POST') { let body = ''; for await (const c of req) { body += c; if (body.length > 4000) break; } let old = ''; try { old = fs.readFileSync(file, 'utf8'); } catch {} const line = new Date().toISOString() + ' ' + body.slice(0, 4000).replace(/\s+/g, ' ') + '\n'; fs.writeFileSync(file, (old + line).slice(-200000)); res.writeHead(204); return res.end(); }
-      if (!isOwner()) return json(res, 403, { error: 'owner only' }); let t = ''; try { t = fs.readFileSync(file, 'utf8'); } catch {} res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); return res.end(t.slice(-20000)); }
+    }
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
       if (!PASSWORD || String(password || '').trim().toLowerCase() === String(PASSWORD).trim().toLowerCase()) {   /* phone keyboards capitalise the first letter and add a space after a word: neither counts */
@@ -1080,6 +1080,7 @@ async function handle(req, res) {
       /* A small note the page can leave for whoever is fixing a device problem (USB details of the 3D glasses). Owner only, one note, overwritten each time. */
       /* Is her mind reachable right now? True while the bridge on the PC is connected. */
       if (url.pathname === '/api/online') { const stuck = !!brain.ws && (brain.badAt || 0) > (brain.okAt || 0); return json(res, 200, { online: !!brain.ws, stuck, why: stuck ? String(brain.badWhy || '') : '', model: brain.ws ? String(brain.model || '') : '', voice: !!(brain.ws && brain.tts) }); }   /* stuck: the PC is connected but its last job failed (usually the model is not loaded) */
+      if (url.pathname === '/api/clientlog') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); let t = ''; try { t = fs.readFileSync(path.join(DATA_DIR, 'clientlog.txt'), 'utf8'); } catch {} res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); return res.end(t.slice(-20000)); }
       if (url.pathname === '/api/diag') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const file = path.join(DATA_DIR, 'diag.json'); if (req.method === 'POST') { const d = await readBody(req), t = JSON.stringify({ at: Date.now(), d }); if (t.length > 300000) return json(res, 400, { error: 'too large' }); fs.writeFileSync(file, t); return json(res, 200, { ok: true }); } return json(res, 200, fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {}); }
       /* small pictures of her outfits, for choosers. POST /api/thumb?file=<outfit file> (owner) with a JPEG or PNG as the body; GET /api/thumb/<outfit file> gives it back. Kept on the volume. */
       if (url.pathname === '/api/thumb' && req.method === 'POST') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const f = String(url.searchParams.get('file') || ''); if (!/^o[a-z0-9]{6,10}\.vrm$/.test(f)) return json(res, 400, { error: 'file?' }); const chunks = []; let size = 0; for await (const c of req) { size += c.length; if (size > 1.5e6) return json(res, 413, { error: 'too big' }); chunks.push(c); } const buf = Buffer.concat(chunks), png = buf[0] === 0x89 && buf[1] === 0x50, jpg = buf[0] === 0xff && buf[1] === 0xd8; if (!png && !jpg) return json(res, 400, { error: 'a JPEG or PNG' });
