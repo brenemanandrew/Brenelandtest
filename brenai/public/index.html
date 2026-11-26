@@ -6,7 +6,10 @@
   window.addEventListener('error', function (e) { tell({ err: String(e.message || (e.target && (e.target.src || e.target.href)) || 'error'), src: String(e.filename || '').split('/').pop(), line: e.lineno, col: e.colno }); }, true);
   window.addEventListener('unhandledrejection', function (e) { tell({ err: 'promise: ' + String(e.reason && (e.reason.message || e.reason)) }); });
   tell({ boot: 1, modules: 'noModule' in document.createElement('script'), importmap: !!(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')) });
-  setTimeout(function () { if (!window.__booted) tell({ err: 'the game did not start within 12 s' }); }, 12000); })();
+  setTimeout(function () { if (!window.__booted) tell({ err: 'the game did not start within 12 s' }); }, 12000);
+  /* inside the Android app: a fuller report once the game has had time to load (is 3D available, did her model come up, what went wrong) */
+  var errs = []; var ce = console.error; console.error = function () { try { if (errs.length < 10) errs.push([].slice.call(arguments).map(function (x) { return String(x && x.message || x).slice(0, 200); }).join(' ')); } catch (e) {} return ce.apply(console, arguments); };
+  if (/BrenaiApp/.test(navigator.userAgent)) setTimeout(function () { var c = document.createElement('canvas'), g2 = !!c.getContext('webgl2'), g1 = !!document.createElement('canvas').getContext('webgl'); var vis = null; try { vis = window.avatar && avatar.canVisit ? avatar.canVisit() : 'no avatar'; } catch (e) { vis = 'err ' + e.message; } tell({ app: 1, webgl2: g2, webgl: g1, model3d: vis, signedIn: !document.getElementById('login') || document.getElementById('login').style.display === 'none', errs: errs }); }, 30000); })();
 </script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
