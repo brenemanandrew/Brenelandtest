@@ -118,7 +118,7 @@ if args.fake:
     def fake():
         t0 = time.time()
         while running:
-            t = time.time() - t0; a = math.radians(30 * math.sin(t)); put_quat(math.cos(a / 2), 0.0, math.sin(a / 2), 0.0); time.sleep(1 / 120)
+            t = time.time() - t0; a = math.radians(30 * math.sin(t)) * (0 if args.six else 1); put_quat(math.cos(a / 2), 0.0, math.sin(a / 2), 0.0, [0.4 * math.sin(t * 0.7), 0.0, 0.0] if args.six else None); time.sleep(1 / 120)   # 6DOF: sways side to side instead of turning
     threading.Thread(target=fake, daemon=True).start(); print('Fake head turn (no glasses)')
 else:
     start_glasses()
