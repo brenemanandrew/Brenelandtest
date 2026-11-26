@@ -631,6 +631,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   const turnTo = (want, dt, rate) => { const d = Math.atan2(Math.sin(want - rt.yaw), Math.cos(want - rt.yaw)); rt.yaw += d * Math.min(1, dt * rate); rt.yaw = Math.atan2(Math.sin(rt.yaw), Math.cos(rt.yaw)); return Math.abs(d); }; // kept within half a turn either way, so "facing front" is always 0
   function routine(s) {
     clipHip = 0;
+    if (bh.on && bh.mode === 'chase') return chaseFrame(s);
     if (bh.on) { // the beach (the heart game): she runs along the water's edge; in pose mode she stands there instead
       for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
       const run = (window.WIZRA_BEACH_RUN && haveClip(window.WIZRA_BEACH_RUN) && window.WIZRA_BEACH_RUN) || BEACH_RUNS.find(haveClip) || 'beach_run', c = CLIPS[run], rate = 0.4, cut = performance.now() < bh.cutUntil;   /* slow motion; cut: a heart has just been popped and time is holding still for a close look */   /* (WIZRA_BEACH_RUN: try one clip by name, for tests) */   /* slow motion: the whole run is shown at a little over half speed */
@@ -1164,6 +1165,41 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     try { vrm.update(Math.min(0.05, s.dt || 0.016)); } catch {} try { cloth && cloth.reset && cloth.reset(); } catch {}   /* her coat tails and skirt are held still here: let loose on someone lying down they look wrong */
     if (bh.mode === 'sand') { if (!bg.sandOn) { bg.sandOn = true; const h = B('spine') || hipsNode; h.getWorldPosition(tmpA); beach.sandStart(tmpA.x, tmpA.z); bgBody(); } beach.sandStep(Math.min(0.05, s.dt || 0.016)); } else if (bg.sandOn) { bg.sandOn = false; beach.sandStop(); }
     bgBlobsTick(Math.min(0.05, s.dt || 0.016)); beachCamera(s.dt, s.t); bgUnify(Math.min(0.05, s.dt || 0.016)); bgSprites(); renderView(); }
+  // ---- the chase (water fight on the beach). She runs off along the water's edge, laughing, weaving from side to side and looking
+  // back over her shoulder; you follow in first person with a toy water pistol in your hand. A hit makes her stumble (she slows, so you
+  // gain on her); chaseFall() trips her onto her back on the sand, where she lies laughing and then gets up and sprints off again.
+  const CH = { x: 4, me: 0, z: RUN_Z, mz: RUN_Z, wt: 0, t: 0, step: 0, slow: 0, boost: 0, jolt: 0, fall: -1, look: 0, lookT: 2, side: 1, kick: 0, gun: null, look3: new THREE.Vector3(), has: false };
+  const CH_DOWN = 0.75, CH_LIE = 2.8, CH_UP = 2.4;   /* seconds: falling back onto the sand, lying there laughing, getting up */
+  function chaseGun() { if (CH.gun) return CH.gun; const g = new THREE.Group(), M = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.45 }), box = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c)); m.position.set(x, y, z); g.add(m); return m; };
+    box(0.05, 0.055, 0.16, '#ff8a2a', 0, 0, 0); box(0.04, 0.09, 0.045, '#ff8a2a', 0, -0.065, 0.05).rotation.x = -0.25; box(0.012, 0.03, 0.03, '#2b6cff', 0, -0.03, 0.005);
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.09, 14), new THREE.MeshStandardMaterial({ color: '#4fc3ff', roughness: 0.15, transparent: true, opacity: 0.8 })); tank.rotation.x = Math.PI / 2; tank.position.set(0, 0.05, 0.0); g.add(tank);
+    const nz = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.012, 0.06, 10), M('#2b6cff')); nz.rotation.x = Math.PI / 2; nz.position.set(0, 0.005, -0.105); g.add(nz);
+    g.traverse(o => { o.renderOrder = 60; if (o.material) { o.material.depthTest = false; o.material.depthWrite = false; } }); g.scale.setScalar(0.8); g.visible = false; scene.add(g); return CH.gun = g; }
+  function chaseFrame(s) { const dt = Math.min(0.05, s.dt || 0.016);
+    for (const n of KEYS) set(n, ...standOf(n)); for (const n of ['head', 'neck', 'chest', 'upperChest', 'spine', 'hips']) set(n, 0, 0, 0);
+    const run = ['female_run', 'running', 'standard_run', 'slow_run', 'jogging'].find(haveClip) || 'beach_run', c = CLIPS[run], rate = 0.85, v0 = c ? stride(c) / c.dur * rate : 2.6;
+    CH.slow = Math.max(0, CH.slow - dt); CH.boost = Math.max(0, CH.boost - dt); CH.jolt *= Math.exp(-dt * 5); CH.kick *= Math.exp(-dt * 12);
+    let herV = 0, yaw = Math.PI / 2;
+    if (CH.fall >= 0) { CH.fall += dt; const f = CH.fall, up = haveClip('getting_up');
+      if (f < CH_DOWN) { const k = f / CH_DOWN, e = k * k; herV = v0 * (1 - k) * 0.8; if (up) playClip('getting_up', 1, 5.6 - 2.5 * e); }   /* the clip of getting up, played backwards and fast: she goes over onto her back */
+      else if (f < CH_DOWN + CH_LIE) { if (up) playClip('getting_up', 1, 1.0 + 0.25 * Math.sin((f - CH_DOWN) * 2.2)); const sp = B('spine'); if (sp) sp.rotateX(0.05 * Math.sin((f - CH_DOWN) * 18) * Math.max(0, 1 - (f - CH_DOWN) / CH_LIE)); }   /* lying there, shaking with laughter */
+      else if (f < CH_DOWN + CH_LIE + CH_UP) { const k = (f - CH_DOWN - CH_LIE) / CH_UP; if (up) playClip('getting_up', 1, 3.1 + 3.6 * k); }
+      else { CH.fall = -1; CH.boost = 2.2; CH.t = 0; } }
+    if (CH.fall < 0) { const pace = (CH.slow > 0 ? 0.5 : 1) * (CH.boost > 0 ? 1.3 : 1); herV = v0 * pace; CH.t += dt * rate * pace; if (c) playClip(run, 1, CH.t);
+      CH.wt += dt * 0.8; const zWant = RUN_Z - 0.35 + 0.6 * Math.sin(CH.wt) + 0.25 * Math.sin(CH.wt * 2.3 + 1); const dz = (zWant - CH.z); CH.z += dz * Math.min(1, dt * 2); yaw = Math.atan2(herV, dz * 2);
+      CH.lookT -= dt; if (CH.lookT <= 0) { CH.look = CH.look > 0 ? 0 : 1; CH.lookT = CH.look ? 0.9 + Math.random() * 0.6 : 2 + Math.random() * 3; if (CH.look) CH.side = Math.random() < 0.5 ? -1 : 1; } }
+    CH.lk = (CH.lk || 0) + ((CH.fall < 0 ? CH.look : 0) - (CH.lk || 0)) * Math.min(1, dt * 6);
+    CH.x += herV * dt; bh.x = CH.x;
+    const gap = CH.x - CH.me, want = CH.fall >= 0 ? 1.5 : 3.4 + 0.7 * Math.sin(CH.wt * 0.5), meV = CH.fall >= 0 ? Math.max(0, (gap - want) * 1.5) : v0 * 0.98 + (gap - want) * 0.45; CH.me += Math.max(0, meV) * dt; CH.meV = meV; CH.mz += (CH.z - CH.mz) * Math.min(1, dt * 1.2); CH.step += dt * Math.min(9, 3.2 * Math.max(0, meV));
+    vrm.scene.position.set(CH.x, floorY, CH.z); vrm.scene.rotation.set(0, yaw, 0, 'XYZ'); rt.k = 1; rt.gazeProp = null; rt.zoom = 0;
+    if (CH.lk > 0.01) { const a = CH.lk * CH.side; for (const [n, v] of [['spine', 0.25], ['chest', 0.3], ['upperChest', 0.25], ['neck', 0.35], ['head', 0.6]]) { const b = B(n); if (b) b.rotateY(a * v); } }   /* a laughing look back over her shoulder */
+    if (CH.jolt > 0.02) { const b = B('chest') || B('spine'); if (b) b.rotateX(-0.35 * CH.jolt); const h = B('head'); if (h) h.rotateX(-0.25 * CH.jolt); }   /* a hit: she flinches and arches away */
+    if (bh.settle && --bh.settle === 0 && vrm.springBoneManager) { vrm.scene.updateMatrixWorld(true); vrm.springBoneManager.reset(); try { cloth && cloth.reset && cloth.reset(); } catch {} }
+    { const fl = B('leftFoot'), fr = B('rightFoot'); beach.tick(s.t / 1000, CH.x, fl && fr ? [fl.getWorldPosition(bhFeet[0]), fr.getWorldPosition(bhFeet[1])] : null, CH.fall < 0, false); } if (beach.night) { sun.intensity = Math.PI * 0.42; sun.color.set('#b9c8ff'); amb.intensity = 0.34; } else { sun.intensity = Math.PI * 1.05; sun.color.set('#fffaf0'); amb.intensity = 0.62; } }
+  function chaseCamera(dt) { const g = chaseGun(); g.visible = true; const bob = 0.03 * Math.abs(Math.sin(CH.step)), sway = 0.02 * Math.sin(CH.step * 0.5);
+    camera.position.set(CH.me, floorY + 1.52 + bob, CH.mz + sway); const at = (CH.fall >= 0 ? B('hips') : B('upperChest') || B('chest')) || hipsNode; at.getWorldPosition(tmpA); if (CH.fall >= 0) tmpA.y += 0.1;
+    if (!CH.has) { CH.look3.copy(tmpA); CH.has = true; } else CH.look3.lerp(tmpA, Math.min(1, dt * 5)); camera.lookAt(CH.look3); camera.rotateZ(sway * 0.6); if (camera.fov !== 58) { camera.fov = 58; camera.updateProjectionMatrix(); }
+    camera.updateMatrixWorld(); g.position.set(0.19, -0.17 + bob * 0.3, -0.42 + 0.035 * CH.kick).applyMatrix4(camera.matrixWorld); g.quaternion.copy(camera.quaternion); g.rotateX(0.06 + 0.25 * CH.kick); g.rotateY(0.1); }
   function beachMode(on) { on = !!on; if (on === bh.on) return on; if (on && !beach) { beach = buildBeach(THREE, { ...kit, floorY }); scene.add(beach.group);
       /* the water's reflection draws the whole beach a second time. On a phone it is drawn smaller, and in the still games (sand,
          sunscreen), where the camera barely moves, only every third frame */
@@ -1174,7 +1210,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     return on; }
   // between hearts the view stands well back and takes all of her in (BWIDE, a different one each time); a popped heart cuts to one of the close views for a moment
   const BWIDE = [{ at: 'hips', side: -0.6, up: 0.08, d: 4.4, dy: 0.25 }, { at: 'hips', side: -1.2, up: 0.1, d: 4.9, dy: 0.25 }, { at: 'hips', side: 0.25, up: 0.12, d: 4.6, dy: 0.3 }, { at: 'hips', side: -0.95, up: 0.22, d: 5.4, dy: 0.2 }];
-  function beachCamera(dt, t) { if (!bh.on) return; fp.locked = true; if (ph.on) return;
+  function beachCamera(dt, t) { if (CH.gun && bh.mode !== 'chase') CH.gun.visible = false; if (!bh.on) return; fp.locked = true; if (ph.on) return; if (bh.mode === 'chase') return chaseCamera(dt);
     if (bh.mode === 'sun') { /* sunscreen: a close look at the part being done. The view sits above and to one side of the middle of that part's spots, and cuts when the part changes */ let n = 0; const mid = bg.mid || (bg.mid = new THREE.Vector3()); mid.set(0, 0, 0); for (const pt of bg.pts) if (bgUses(pt) && bgPoint(pt)) { mid.add(pt.p); n++; } if (n) mid.multiplyScalar(1 / n); else (B('spine') || hipsNode).getWorldPosition(mid);
       if (!bg.has) { bg.look.copy(mid); bg.has = true; } else bg.look.lerp(mid, Math.min(1, dt * 6)); const c = bg.cam, sit = bh.pose === 'chair', spread = Math.min(1.2, 0.55 + 0.13 * n), d = (sit ? 1.15 : 1.05) * (0.8 + spread * 0.5) * c.zoom;
       camera.position.set(bg.look.x + Math.sin(c.yaw) * Math.cos(c.pitch) * d, Math.max(floorY + 0.15, bg.look.y + Math.sin(c.pitch) * d), bg.look.z + Math.cos(c.yaw) * Math.cos(c.pitch) * d); camera.lookAt(bg.look); if (camera.fov !== 34) { camera.fov = 34; camera.updateProjectionMatrix(); } return; }
@@ -1480,7 +1516,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
        beachSand(x, y) heaps sand where the pointer is and answers how much of her is under it (0..1). beachRub(x, y, amount) rubs sunscreen in near the pointer.
        beachSunTick(dt, secondsToBurn) lets the sun work on what is not covered and answers { cover, burn, score }. beachRoll() turns her over (lounger only).
        beachReach(x, y) says which hand or foot is under the pointer, for dragging it. beachTurn(dyaw, dpitch, zoom) moves the view. */
-    beachGame(mode, how) { if (!bh.on) return null; bh.mode = mode === 'sand' || mode === 'sun' ? mode : 'run'; bh.inited = false; bh.outro = 0; bh.cutUntil = 0; bg.side = mode === 'sun' && how !== 'chair' ? 'b' : 'f'; bg.done = {}; bg.hurtWant = 0; bh.want = mode === 'sand' ? 'back' : how === 'chair' ? 'chair' : 'front'; beach.clearSand(); beach.sandStop(); bg.sandOn = false; bg.zone = 0; bg.has = false; bgClearBlobs();
+    beachGame(mode, how) { if (!bh.on) return null; if (mode === 'chase') { bh.mode = 'chase'; bh.inited = false; bh.outro = 0; bh.cutUntil = 0; Object.assign(CH, { x: 3.2, me: 0, z: RUN_Z, mz: RUN_Z, wt: 0, t: 0, slow: 0, boost: 1.5, jolt: 0, fall: -1, look: 1, lookT: 1.2, side: 1, lk: 0, has: false }); bh.settle = 3; return { chase: true }; } bh.mode = mode === 'sand' || mode === 'sun' ? mode : 'run'; bh.inited = false; bh.outro = 0; bh.cutUntil = 0; bg.side = mode === 'sun' && how !== 'chair' ? 'b' : 'f'; bg.done = {}; bg.hurtWant = 0; bh.want = mode === 'sand' ? 'back' : how === 'chair' ? 'chair' : 'front'; beach.clearSand(); beach.sandStop(); bg.sandOn = false; bg.zone = 0; bg.has = false; bgClearBlobs();
       Object.assign(bg.cam, mode === 'sand' ? { yaw: 0.45, pitch: 0.95, dist: 3.5 } : how === 'chair' ? { yaw: 0.25, pitch: 0.42, dist: 3.0, zoom: 1 } : { yaw: 0.8, pitch: 0.95, dist: 3.1, zoom: 1 }); return { mode: bh.mode, pose: bh.want, zones: (SUNZ[bg.side] || SUNZ.f).map(z => z[0]) }; },
     /* sand is poured where the pointer points on the ground (or on her): beach.js keeps the heap and lets it slump. beachBuried says how much of her is under it. */
     beachSand(x, y) { if (!bh.on || bh.mode !== 'sand') return 0; const r = renderer.domElement.getBoundingClientRect(); tmpA.set((x - r.left) / r.width * 2 - 1, 1 - (y - r.top) / r.height * 2, 0.5).unproject(camera).sub(camera.position).normalize(); const k = (floorY + 0.1 - camera.position.y) / (tmpA.y || -1e-6); if (k < 0 || k > 30) return this.beachBuried();
@@ -1520,12 +1556,15 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
       if (hit) bg.glad = Math.min(1, bg.glad + amount * 0.6); return { hit, done }; },
     beachLotion() { if (window.__lsdbg) return { ok: bg.stickOk || 0, fail: bg.stickFail || 0, still: bg.blobs.filter(d => d.still).length, moving: bg.blobs.filter(d => !d.still && !d.bead && !d.trailBead && d.v > 0.0005).length, n: bg.blobs.length }; const tr = bg.blobs.filter(d => d.trailBead && d.of).map(d => [+(d.of.p.distanceTo(d.p) * 100).toFixed(1), +(d.r * 1000).toFixed(1)]).sort((a, b) => a[0] - b[0]); return { trail: tr.filter((_, i) => i % Math.max(1, Math.floor(tr.length / 8)) === 0), blobs: bg.blobs.length, pools: bg.blobs.filter(d => d.pool).map(d => ({ r: +(d.r * 1000).toFixed(1), ran: +(d.ran * 100).toFixed(1), falling: !!d.falling, fell: +((d.fell || 0) * 100).toFixed(1) })) }; },   /* for tests: how many lumps there are and what the pools are doing (mm, cm) */
     waterShot(x, y) { wfInit(); const r = renderer.domElement.getBoundingClientRect(), ndc = tmpA.set((x - r.left) / r.width * 2 - 1, 1 - (y - r.top) / r.height * 2, 0); WF.ray.setFromCamera(ndc, camera); const hit = WF.ray.intersectObject(vrm.scene, true).find(h => h.object.isMesh && h.object.visible);
-      camera.updateMatrixWorld(); WF.from.set(0.55, -0.5, -0.4).applyMatrix4(camera.matrixWorld); const to = hit ? hit.point.clone() : WF.ray.ray.at(6, new THREE.Vector3()), dir = to.clone().sub(WF.from), dist = dir.length(); dir.normalize();
-      const skip = Math.min(0.35, dist * 0.4); for (let i = 0; i < 26; i++) { const sp = 7 + Math.random() * 1.5; wfDrop(WF.from.clone().addScaledVector(dir, skip - i * 0.04), dir.clone().multiplyScalar(sp).add(tmpB.set((Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.12 + 0.08, (Math.random() - 0.5) * 0.12)), Math.max(0.02, (dist - skip) / sp) + 0.02, 0.004 + Math.random() * 0.004, 1.2); }   /* (the jet starts a little way out, so it does not fill a close view) */   /* the jet */
+      camera.updateMatrixWorld(); const chase = bh.on && bh.mode === 'chase'; if (chase) { CH.kick = 1; WF.from.set(0.17, -0.15, -0.55).applyMatrix4(camera.matrixWorld); } else WF.from.set(0.55, -0.5, -0.4).applyMatrix4(camera.matrixWorld); const to = hit ? hit.point.clone() : WF.ray.ray.at(6, new THREE.Vector3()), dir = to.clone().sub(WF.from), dist = dir.length(); dir.normalize();
+      const skip = chase ? 0 : Math.min(0.35, dist * 0.4); for (let i = 0; i < 26; i++) { const sp = 7 + Math.random() * 1.5; wfDrop(WF.from.clone().addScaledVector(dir, skip - i * 0.04), dir.clone().multiplyScalar(sp).add(tmpB.set((Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.12 + 0.08, (Math.random() - 0.5) * 0.12)), Math.max(0.02, (dist - skip) / sp) + 0.02, 0.004 + Math.random() * 0.004, 1.2); }   /* (the jet starts a little way out, so it does not fill a close view) */   /* the jet */
       if (!hit) return { hit: '' }; const n = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld) : dir.clone().negate();
       setTimeout(() => { for (let i = 0; i < 34; i++) wfDrop(to, n.clone().multiplyScalar(0.5 + Math.random() * 1.2).add(tmpB.set(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).multiplyScalar(1.2)), 0.3 + Math.random() * 0.4, 0.003 + Math.random() * 0.006, 6); WF.wet = Math.min(1, WF.wet + 0.035); }, Math.min(300, dist / 7 * 1000));   /* the splash, when the water gets there */
       let part = 'body', best = 9; for (const [nm, bn] of [['face', 'head'], ['chest', 'upperChest'], ['tummy', 'spine'], ['arm', 'leftLowerArm'], ['arm', 'rightLowerArm'], ['legs', 'leftLowerLeg'], ['legs', 'rightLowerLeg'], ['hips', 'hips']]) { const b = B(bn); if (!b) continue; const d = b.getWorldPosition(tmpB).distanceTo(to); if (d < best) { best = d; part = nm; } }
       return { hit: part, wet: WF.wet }; },
+    chaseHit(part) { if (bh.mode !== 'chase') return null; if (CH.fall < 0) { CH.slow = 0.6; CH.jolt = part === 'face' ? 1 : 0.7; } return { down: CH.fall >= 0, gap: +(CH.x - CH.me).toFixed(2) }; },
+    chaseFall() { if (bh.mode !== 'chase' || CH.fall >= 0) return 0; CH.fall = 0; CH.look = 0; return CH_DOWN + CH_LIE + CH_UP; },   /* she trips onto her back; answers how many seconds until she is running again */
+    chaseState() { return bh.mode === 'chase' ? { x: CH.x, me: CH.me, gap: CH.x - CH.me, down: CH.fall >= 0, fall: CH.fall } : null; },
     waterWet(v) { wfInit(); if (Number.isFinite(+v)) WF.wet = Math.max(0, Math.min(1, +v)); return WF.wet; },
     beachJump(v) { bg.jump = Math.max(bg.jump || 0, Math.max(0, Math.min(1, +v || 0))); },   /* she flinches: 1 a big jump, 0.1 barely */
     beachCream(v) { if (Number.isFinite(+v)) bg.thick = Math.max(0, Math.min(1, +v)); return bg.thick; },
@@ -1589,7 +1628,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
       const W = el.clientWidth, H = el.clientHeight, key = W + 'x' + H;
       if (key !== size && W && H) { size = key; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); }
       if (ph.on && performance.now() >= ph.liveUntil) { if (ph.restore) { ph.restore = false; phGiveBack(); } photoCamApply(); try { vrm.update(Math.min(0.05, s.dt || 0.016)); } catch {} clothTick(s.dt); renderView(); return; }   /* photo studio: she holds still, only cloth and hair settle */
-      if (bh.on && bh.mode !== 'run' && !ph.on) return void beachStill(s);   /* a still game on the beach: her body holds its pose */
+      if (bh.on && bh.mode !== 'run' && bh.mode !== 'chase' && !ph.on) return void beachStill(s);   /* a still game on the beach: her body holds its pose */
       if (frozen) { bonusCamera(s.t); renderView(); return; }   // time stands still: nothing about her moves, only the view
       routine(s);                               // where she is and what she is holding
       applyGesture(hpose.on ? null : s.gesture, s.faceName, s.dt); // body first: a gesture can also ask for a face (a yawn opens her mouth)
