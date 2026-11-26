@@ -793,6 +793,14 @@ function sendFile(req, res, file, type, cache) { let st; try { st = fs.statSync(
   if (!zip) { res.writeHead(200, { ...h, 'content-length': st.size }); return fs.createReadStream(file).pipe(res); }
   let g = GZ.get(file); if (!g || g.etag !== etag) { g = { etag, buf: zlib.gzipSync(fs.readFileSync(file), { level: 9 }) }; GZ.set(file, g); if (GZ.size > 400) GZ.delete(GZ.keys().next().value); }
   res.writeHead(200, { ...h, 'content-encoding': 'gzip', vary: 'Accept-Encoding', 'content-length': g.buf.length }); res.end(g.buf); }
+// Model files (.vrm, .glb) sent compressed: most of a model is mesh and face-shape numbers, which gzip shrinks a lot. The compressed copy
+// is made once, beside the file (file + '.gz'), the first time it is asked for (sent plain that time), and remade when the file changes.
+const GZING = new Set();
+function sendModel(req, res, file, cache) { let st; try { st = fs.statSync(file); } catch { res.writeHead(404); return res.end('no such file'); } const gz = file + '.gz', h = { 'content-type': 'model/gltf-binary', 'cache-control': cache, vary: 'Accept-Encoding' };
+  let gst = null; try { gst = fs.statSync(gz); } catch {} const fresh = gst && gst.mtimeMs >= st.mtimeMs;
+  if (fresh && /gzip/.test(req.headers['accept-encoding'] || '')) { res.writeHead(200, { ...h, 'content-encoding': 'gzip', 'content-length': gst.size }); return fs.createReadStream(gz).pipe(res); }
+  if (!fresh && !GZING.has(gz)) { GZING.add(gz); const tmp = gz + '.part'; fs.createReadStream(file).pipe(zlib.createGzip({ level: 6 })).pipe(fs.createWriteStream(tmp)).on('finish', () => { try { fs.renameSync(tmp, gz); } catch {} GZING.delete(gz); }).on('error', () => GZING.delete(gz)); }
+  res.writeHead(200, { ...h, 'content-length': st.size }); return fs.createReadStream(file).pipe(res); }
 const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.py': 'text/x-python; charset=utf-8', '.bat': 'application/octet-stream' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -1140,11 +1148,17 @@ async function handle(req, res) {
         } catch (e) { return json(res, 502, { error: e.message }); } }
       if (url.pathname === '/api/extra') { const dir = path.join(DATA_DIR, 'extra'); if (req.method === 'POST') { if (!isOwner() && !byToken) return json(res, 403, { error: 'owner only' }); const name = String(url.searchParams.get('name') || ''); if (!['man', 'beach', 'beachsrc'].includes(name) && !/^set_[a-z0-9]{1,24}$/.test(name)) return json(res, 400, { error: 'name must be: man, beach, beachsrc or set_<name> (a set piece)' }); const big = name !== 'man';   /* set_<name>: a building or prop for a place, as a .glb */   /* man: the stand-in on movie night. beachsrc: a model as it was made, sent up to be worked on. beach: the finished model for the beach round. */
           const chunks = []; let size = 0; for await (const c of req) { size += c.length; if (size > (big ? 300e6 : 40e6)) return json(res, 413, { error: 'too big (' + (big ? 300 : 40) + ' MB at most)' }); chunks.push(c); } const buf = Buffer.concat(chunks); if (buf.toString('latin1', 0, 4) !== 'glTF') return json(res, 400, { error: 'that is not a .vrm file' }); fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, name + (big ? '.glb' : '.vrm')), buf); return json(res, 200, { ok: true, name, mb: +(buf.length / 1e6).toFixed(1) }); }
-        let files = []; try { files = fs.readdirSync(dir).map(n => ({ name: n, mb: +(fs.statSync(path.join(dir, n)).size / 1e6).toFixed(1), v: Math.round(fs.statSync(path.join(dir, n)).mtimeMs) })); } catch {} return json(res, 200, { files }); }
-      if (url.pathname.startsWith('/api/extra/') && req.method === 'GET') { const f = url.pathname.slice(11), file = path.join(DATA_DIR, 'extra', f); if (!/^[a-z0-9_]+\.(vrm|glb)$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such model' }); res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=3600' }); return fs.createReadStream(file).pipe(res); }
+        let files = []; try { files = fs.readdirSync(dir).filter(n => !/\.(gz|part)$/.test(n)).map(n => ({ name: n, mb: +(fs.statSync(path.join(dir, n)).size / 1e6).toFixed(1), v: Math.round(fs.statSync(path.join(dir, n)).mtimeMs) })); } catch {}   /* (not the compressed copies) */ return json(res, 200, { files }); }
+      if (url.pathname.startsWith('/api/extra/') && req.method === 'GET') { const f = url.pathname.slice(11), file = path.join(DATA_DIR, 'extra', f); if (!/^[a-z0-9_]+\.(vrm|glb)$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such model' }); return sendModel(req, res, file, 'private, max-age=3600'); }
+      // Owner: swap an outfit's file for a lighter copy of the same outfit (smaller textures), keeping its name and place. The original
+      // goes to /data/outfits-orig the first time, so it can be put back. The body is the new .vrm.
+      if (url.pathname.startsWith('/api/outfit-lite/') && req.method === 'POST') { if (!isOwner()) return json(res, 403, { error: 'owner only' }); const f = url.pathname.slice(17), file = path.join(OUTFITS, f); if (!/^o[a-z0-9]{6,10}\.vrm$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such outfit' });
+        const chunks = []; let n = 0; for await (const c of req) { n += c.length; if (n > 80e6) return json(res, 413, { error: 'too big' }); chunks.push(c); } const buf = Buffer.concat(chunks); if (buf.readUInt32LE(0) !== 0x46546C67) return json(res, 400, { error: 'not a glb/vrm' });
+        const keep = path.join(DATA_DIR, 'outfits-orig'); fs.mkdirSync(keep, { recursive: true }); if (!fs.existsSync(path.join(keep, f))) fs.copyFileSync(file, path.join(keep, f)); fs.writeFileSync(file + '.part', buf); fs.renameSync(file + '.part', file); try { fs.unlinkSync(file + '.gz'); } catch {}
+        return json(res, 200, { ok: true, was: fs.statSync(path.join(keep, f)).size, now: buf.length }); }
       if (url.pathname.startsWith('/api/outfit/') && req.method === 'GET') {
         const f = url.pathname.slice(12), file = path.join(OUTFITS, f); if (!/^o[a-z0-9]{6,10}\.vrm$/.test(f) || !fs.existsSync(file)) return json(res, 404, { error: 'no such outfit' });
-        res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(file).size, 'cache-control': 'private, max-age=31536000, immutable' }); return fs.createReadStream(file).pipe(res);
+        return sendModel(req, res, file, 'private, max-age=31536000, immutable');
       }
       // the picture pack: GET one image; POST the whole pack at once { manifest: [...], files: { name: base64 } }
       if (url.pathname.startsWith('/api/pack')) {
@@ -1247,8 +1261,7 @@ async function handle(req, res) {
       if (url.pathname === '/api/avatar') {
         if (req.method === 'GET') {
           if (!fs.existsSync(AVATAR)) return json(res, 404, { error: 'no model' });
-          res.writeHead(200, { 'content-type': 'model/gltf-binary', 'content-length': fs.statSync(AVATAR).size, 'cache-control': 'private, max-age=31536000, immutable' });
-          return fs.createReadStream(AVATAR).pipe(res);
+          return sendModel(req, res, AVATAR, 'private, max-age=31536000, immutable');
         }
         if (req.method === 'POST') {
           const tmp = AVATAR + '.upload'; let size = 0, magic = null, tooBig = false;
