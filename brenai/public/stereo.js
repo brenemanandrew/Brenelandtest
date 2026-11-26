@@ -40,9 +40,14 @@
   // 6DOF (the Luma Ultra through the helper): where the head is, in metres (x right, y up, z back), taken from where straight ahead was set.
   // The first reading after ⌖ is the zero. Each axis is held within 1.5 m so a lost track cannot throw the view across the room.
   function move(p) { if (!S.mode) return; if (!S.zeroP) S.zeroP = p.slice(); const c = v => Math.max(-1.5, Math.min(1.5, v)); try { avatar.headPos(c(p[0] - S.zeroP[0]), c(p[1] - S.zeroP[1]), c(p[2] - S.zeroP[2])); } catch {} }
+  // Backup: the device's own motion sensor (on the VITURE neckband this reports the glasses turning). Used only while 3D mode is on and
+  // neither the glasses over USB nor a helper app has sent anything for 2 seconds. Turning only, no moving. The flip buttons fix a
+  // direction that goes the wrong way.
+  function motion(e) { if (!S.mode || e.alpha == null) return; const fresh = Date.now() - Math.max(S.hidAt || 0, S.wsAt || 0) < 2000; if (fresh) return; S.motionAt = Date.now(); if (!S.motionN) { S.motionN = 1; say('Head tracking from the motion sensor (turning only). ⌖ sets straight ahead.'); } head(e.alpha, e.beta, e.gamma); }   /* (straight ahead is taken from the first reading, so a sensor's fixed tilt does not matter) */
+  addEventListener('deviceorientation', motion);
   function head(yaw, pitch, roll) { S.last = { yaw: +yaw || 0, pitch: +pitch || 0, roll: +roll || 0 }; if (!S.zero) S.zero = { ...S.last }; if (!S.mode) return; const r = Math.PI / 180; let dy = S.last.yaw - S.zero.yaw; dy = ((dy + 540) % 360) - 180; try { avatar.head(F.yaw * dy * r, F.pitch * Math.max(-70, Math.min(70, S.last.pitch - S.zero.pitch)) * r, F.roll * (S.last.roll - S.zero.roll) * r); } catch {} }
   function listen() { clearTimeout(S.wsT); if (!S.mode || S.ws) return; let ws; try { ws = new WebSocket('ws://127.0.0.1:8766'); } catch { return; } S.ws = ws;
-    ws.onmessage = m => { try { const d = JSON.parse(m.data); if (d && typeof d.yaw === 'number') { head(d.yaw, d.pitch, d.roll); if (Array.isArray(d.pos)) move(d.pos); } } catch {} }; ws.onclose = ws.onerror = () => { if (S.ws === ws) S.ws = null; if (S.mode) S.wsT = setTimeout(listen, 6000); }; }
+    ws.onmessage = m => { try { const d = JSON.parse(m.data); if (d && typeof d.yaw === 'number') { S.wsAt = Date.now(); head(d.yaw, d.pitch, d.roll); if (Array.isArray(d.pos)) move(d.pos); } } catch {} }; ws.onclose = ws.onerror = () => { if (S.ws === ws) S.ws = null; if (S.mode) S.wsT = setTimeout(listen, 6000); }; }
   const touch = () => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } };
   const lockSideways = () => { try { if (touch() && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch {} };
   const unlockSideways = () => { try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch {} };
