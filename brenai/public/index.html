@@ -582,7 +582,7 @@
 </div>
 <div id="wheel"><div id="ringWrap"><button id="closeWheel" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"><path d="M6.500 6.500l11 11M17.500 6.500l-11 11"/></svg></button><div id="ring"></div></div><div id="panel"></div></div>
 <div id="login">
-  <form id="loginForm"><div>Site password</div><input id="pw" type="password" autocomplete="current-password"><button>Enter</button><small id="pwMsg" style="display:block;margin-top:8px;min-height:1.2em;color:#ffd1e0;font-size:13px">This is the site password. Your PIN comes next.</small></form>
+  <form id="loginForm"><div>Site password</div><input id="pw" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false"><button>Enter</button><small id="pwMsg" style="display:block;margin-top:8px;min-height:1.2em;color:#ffd1e0;font-size:13px">This is the site password. Your PIN comes next.</small></form>
   <form id="pinForm" hidden><div id="pinTitle">Your PIN</div><input id="pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" placeholder="4 to 8 digits">
     <input id="pinName" type="text" maxlength="24" placeholder="What should she call you?" hidden><input id="pinWord" type="text" maxlength="40" autocomplete="off" placeholder="Recovery word" hidden><button id="pinGo">Enter</button><button type="button" id="pinNew" class="quiet">I am new here</button><button type="button" id="pinLost" class="quiet">I forgot my PIN</button><div id="pinMsg"></div></form>
   <div id="brainBox" hidden><div id="brainState">Her brain (your PC) is offline.</div><a id="brainStart" href="brenai-brain://start">Start her brain on this PC</a>

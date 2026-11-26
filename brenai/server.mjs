@@ -825,7 +825,7 @@ async function handle(req, res) {
 
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
-      if (!PASSWORD || password === PASSWORD) {
+      if (!PASSWORD || String(password || '').trim().toLowerCase() === String(PASSWORD).trim().toLowerCase()) {   /* phone keyboards capitalise the first letter and add a space after a word: neither counts */
         res.writeHead(200, { 'set-cookie': `brenai=${token()}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : ''}`, 'content-type': 'application/json' });
         return res.end('{"ok":true}');
       }
