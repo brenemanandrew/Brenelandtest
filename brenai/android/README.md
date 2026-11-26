@@ -11,4 +11,5 @@ To rebuild (done in a cloud session, 2026-11-26):
 4. Android SDK 36, build-tools 36.0.0, NDK 27.3.13750724, CMake 3.22.1, Java 21; `./gradlew assembleDebug`.
 5. Upload: `POST /api/apk` (owner) with the APK as the body; the neckband downloads it from `/api/apk`. It is signed with the build machine's debug key: a build from another machine will not install over it (uninstall first).
 
-6. The launcher icon is Wizra's face (`wizra-icon.png` here, rendered from her model in the photo studio): `mipmap-*/ic_launcher(_round).png` at 48 to 192 px, and the adaptive icon uses `drawable-nodpi/wizra_icon.png` (432 px, her face on a dark purple edge) as its background with a transparent foreground; the demo's .webp icons are removed.
+6. Play without glasses: a "Play without glasses" button on the setup screen opens the game; if no glasses are found within 3.5 s of opening the app, the game opens by itself (back returns to setup).
+7. The launcher icon is Wizra's face (straight on, the room hidden, on dark purple) (`wizra-icon.png` here, rendered from her model in the photo studio): `mipmap-*/ic_launcher(_round).png` at 48 to 192 px, and the adaptive icon uses `drawable-nodpi/wizra_icon.png` (432 px, her face on a dark purple edge) as its background with a transparent foreground; the demo's .webp icons are removed.
