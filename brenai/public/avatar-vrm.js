@@ -108,7 +108,22 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   // and the room goes back behind her. head(yaw, pitch, roll) turns the view on top of whatever camera is in charge: that is
   // where a head tracker plugs in (see VITURE.md).
   const sbs = { mode: '', eye: 0.064, head: new THREE.Euler(0, 0, 0, 'YXZ'), headOn: false, pos: new THREE.Vector3(), posOn: false, keepP: new THREE.Vector3(), pv: new THREE.Vector3(), pe: new THREE.Euler(0, 0, 0, 'YXZ'), pq: new THREE.Quaternion(), rig: new THREE.StereoCamera(), q: new THREE.Quaternion(), keep: new THREE.Quaternion(), v2: new THREE.Vector2(), hv: new THREE.Vector3() };
-  function renderView() { if (!sbs.mode) { renderer.render(scene, camera); return; }
+  // WebXR (a headset browser, such as Chrome on the VITURE neckband): the browser draws both eyes and moves the view with your head itself.
+  // The game still decides where the camera is; each frame the XR rig is put there (level, facing the same way) and your head's pose
+  // is added on top. The game's frame is driven by the XR session while it runs (see avatar.js).
+  const XR = { on: false, session: null, rig: new THREE.Group(), frame: null, onEnd: null, p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') }; scene.add(XR.rig);
+  async function xrStart(kind) { if (XR.on) return ''; if (!navigator.xr) return 'This browser has no WebXR.'; kind = kind === 'ar' ? 'immersive-ar' : 'immersive-vr';
+    try { if (!(await navigator.xr.isSessionSupported(kind))) return 'This browser cannot do ' + kind + '.'; } catch {}
+    let ses; try { ses = await navigator.xr.requestSession(kind, { optionalFeatures: ['local-floor', 'hand-tracking'] }); } catch (e) { return 'The headset view could not start: ' + (e.message || e.name); }
+    renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); try { await renderer.xr.setSession(ses); } catch (e) { renderer.xr.enabled = false; try { ses.end(); } catch {} return 'The headset view could not start: ' + (e.message || e.name); }
+    XR.on = true; XR.session = ses; XR.was = sbs.mode; sbs.mode = '';
+    renderer.setAnimationLoop(t => { try { XR.frame && XR.frame(t); } catch (e) { console.error(e); } });
+    ses.addEventListener('end', () => { XR.on = false; XR.session = null; renderer.setAnimationLoop(null); renderer.xr.enabled = false; size = ''; if (XR.onEnd) XR.onEnd(); });
+    return ''; }
+  function renderView() { if (XR.on) { const par = camera.parent; XR.p.copy(camera.position); XR.q.copy(camera.quaternion); XR.e.setFromQuaternion(XR.q, 'YXZ'); XR.e.x = XR.e.z = 0;
+      XR.rig.position.copy(XR.p); XR.rig.quaternion.setFromEuler(XR.e); XR.rig.updateMatrixWorld(true); XR.rig.add(camera); renderer.render(scene, camera);
+      XR.rig.remove(camera); if (par) par.add(camera); camera.position.copy(XR.p); camera.quaternion.copy(XR.q); camera.updateMatrixWorld(); return; }
+    if (!sbs.mode) { renderer.render(scene, camera); return; }
     const sz = renderer.getSize(sbs.v2), W = sz.x, H = sz.y, half = W / 2; sbs.keep.copy(camera.quaternion); sbs.keepP.copy(camera.position); if (sbs.posOn) { sbs.pe.setFromQuaternion(camera.quaternion, 'YXZ'); sbs.pe.x = sbs.pe.z = 0; camera.position.add(sbs.pv.copy(sbs.pos).applyQuaternion(sbs.pq.setFromEuler(sbs.pe))); }   /* 6DOF glasses: where your head has moved since you set straight ahead, turned with the view's heading (so stepping forward goes the way you look) */ if (sbs.headOn) { camera.quaternion.multiply(sbs.q.setFromEuler(sbs.head)); }
     let focus = 1.6; try { head.getWorldPosition(sbs.hv); focus = Math.max(0.45, Math.min(5, sbs.hv.distanceTo(camera.position))); } catch {}
     camera.aspect = W / H; camera.focus = focus; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); sbs.rig.aspect = sbs.mode === 'full' ? 0.5 : 1; sbs.rig.eyeSep = sbs.eye * Math.min(1, focus / 0.9); sbs.rig.update(camera);   /* very close up the eyes are brought together a little, or it is hard to look at */
@@ -1674,6 +1689,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     photoFace(name, v) { try { if (name === 'reset') { for (const n of ['happy', 'angry', 'sad', 'relaxed', 'surprised', 'blink', 'blinkLeft', 'blinkRight', 'aa', 'ih', 'ou', 'ee', 'oh']) vrm.expressionManager.setValue(n, 0); } else vrm.expressionManager.setValue(name, Math.max(0, Math.min(1, +v))); } catch {} },
     photoShot(scale) { const pr = renderer.getPixelRatio(), W = el.clientWidth, H = el.clientHeight; renderer.setPixelRatio(Math.max(1, Math.min(4, (scale || 2)))); renderer.setSize(W, H, false); photoCamApply(); vrm.scene.updateMatrixWorld(true); if (bg.blobs.length) bgUnify(0); renderView(); const url = renderer.domElement.toDataURL('image/png'); renderer.setPixelRatio(pr); renderer.setSize(W, H, false); if (bg.blobs.length) bgUnify(0);   /* (the liquid picture is redrawn at the picture's size, and back) */ size = ''; return url; },
     artWatch(cb) { artW.cb = cb; },
+    xr(kind) { return xrStart(kind); }, xrStop() { if (XR.session) XR.session.end(); }, xrOn() { return XR.on; }, xrHook(frame, onEnd) { XR.frame = frame; XR.onEnd = onEnd; },
     stereo(mode, o) { if (mode !== undefined) { sbs.mode = mode === 'full' || mode === 'half' ? mode : ''; size = ''; } if (o) Object.assign(sbs, o); return sbs.mode; },
     head(yaw, pitch, roll) { sbs.head.set(pitch || 0, yaw || 0, roll || 0, 'YXZ'); sbs.headOn = !!(yaw || pitch || roll); },
     headPos(x, y, z) { sbs.pos.set(+x || 0, +y || 0, +z || 0); sbs.posOn = !!(x || y || z); },   /* metres: x right, y up, z back, from where straight ahead was set */
