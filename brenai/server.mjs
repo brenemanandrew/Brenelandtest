@@ -823,6 +823,11 @@ async function handle(req, res) {
     if (url.pathname === '/health') return json(res, 200, { ok: true });
     if (url.pathname === '/api/brain') return json(res, 200, { online: !!brain.ws, model: brain.model, served: brain.served, failed: brain.failed, upMin: brain.since && brain.ws ? Math.round((Date.now() - brain.since) / 60000) : 0, fallback: !brain.ws && !!client, bridge: brain.ws ? brain.v : 0, bridgeLatest: 4, ctx: ctxNow(), ctxWhy: brain.ctxWhy || '', stuck: !!brain.ws && (brain.badAt || 0) > (brain.okAt || 0), stuckWhy: brain.ws && (brain.badAt || 0) > (brain.okAt || 0) ? brain.badWhy || '' : '', build: BUILD, ttsMs: brain.ttsMs || 0, tts: brain.tts, voices: brain.voices, voiceState: brain.ws ? (brain.voiceState || (brain.v < 3 ? 'the bridge on the PC is an old version' : 'not reported yet')) : 'the PC bridge is offline' });
 
+    // Pages on devices that will not start report what went wrong here, before anyone has signed in: the browser's name and the error
+    // text only (no chat, no PINs). Kept in clientlog.txt on the volume, newest last, at most about 200 KB; the owner reads it with GET.
+    if (url.pathname === '/api/clientlog') { const file = path.join(DATA_DIR, 'clientlog.txt');
+      if (req.method === 'POST') { let body = ''; for await (const c of req) { body += c; if (body.length > 4000) break; } let old = ''; try { old = fs.readFileSync(file, 'utf8'); } catch {} const line = new Date().toISOString() + ' ' + body.slice(0, 4000).replace(/\s+/g, ' ') + '\n'; fs.writeFileSync(file, (old + line).slice(-200000)); res.writeHead(204); return res.end(); }
+      if (!isOwner()) return json(res, 403, { error: 'owner only' }); let t = ''; try { t = fs.readFileSync(file, 'utf8'); } catch {} res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8' }); return res.end(t.slice(-20000)); }
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const { password } = await readBody(req);
       if (!PASSWORD || String(password || '').trim().toLowerCase() === String(PASSWORD).trim().toLowerCase()) {   /* phone keyboards capitalise the first letter and add a space after a word: neither counts */

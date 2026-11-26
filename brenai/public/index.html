@@ -1,6 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script>/* first thing on the page, in old-browser JavaScript: if this device cannot run the game, say why (to /api/clientlog) */
+(function () { var sent = 0; function tell(o) { if (sent++ > 12) return; o.ua = navigator.userAgent; o.page = location.pathname; try { var b = JSON.stringify(o); if (navigator.sendBeacon) navigator.sendBeacon('/api/clientlog', b); else { var x = new XMLHttpRequest(); x.open('POST', '/api/clientlog'); x.send(b); } } catch (e) {} }
+  window.addEventListener('error', function (e) { tell({ err: String(e.message || (e.target && (e.target.src || e.target.href)) || 'error'), src: String(e.filename || '').split('/').pop(), line: e.lineno, col: e.colno }); }, true);
+  window.addEventListener('unhandledrejection', function (e) { tell({ err: 'promise: ' + String(e.reason && (e.reason.message || e.reason)) }); });
+  tell({ boot: 1, modules: 'noModule' in document.createElement('script'), importmap: !!(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')) });
+  setTimeout(function () { if (!window.__booted) tell({ err: 'the game did not start within 12 s' }); }, 12000); })();
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>Brenai</title>
@@ -1482,6 +1489,7 @@ $('pinForm').onsubmit = async e => {
   if (r.ok) { if (pinMode === 'new' && $('pinWord').value.trim().length >= 3) await post('/api/pin/word', { word: $('pinWord').value }).catch(() => {}); return location.reload(); }
   $('pin').value = ''; $('pinMsg').textContent = r.status === 404 && pinMode === 'in' ? 'No game with that PIN. New here? Press "I am new here".' : (d.error || 'That did not work.');
 };
+window.__booted = 1;
 $('loginForm').onsubmit = async e => {
   e.preventDefault();
   const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: $('pw').value }) });
