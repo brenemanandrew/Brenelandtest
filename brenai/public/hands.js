@@ -13,6 +13,9 @@
 (function () {
   const LIB = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
   const MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
+  // Which camera: the one picked last time (🔄 in the corner picture cycles through them), else the one facing you. A camera facing you is
+  // mirrored, like a mirror; one facing away (glasses, the neckband's world camera, a phone's back camera) is not, so your right stays right.
+  let MIR = true; const camKey = 'brenai.handCam';
   let tracker = null, stream = null, video = null, box = null, cv = null, raf = 0, lastT = -1, emit = () => {}, G = null, nextId = 1;
   const rings = [];   /* on-screen rings, one a hand, in grab mode */
   const st = { hands: [], two: null, error: '' };   /* hands: per tracked hand { x, y, pinch, sx, sy } ; two: last two-hand spread and middle */
@@ -22,13 +25,13 @@
   function read(pts, old) {
     const d = (a, b) => Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y), size = d(0, 9) || 1e-3, gap = d(4, 8) / size;
     const pinch = old && old.pinch ? gap < 0.42 : gap < 0.28;
-    const x = 1 - (pts[4].x + pts[8].x) / 2, y = (pts[4].y + pts[8].y) / 2;   /* mirrored: your right is the screen's right */
+    const x = MIR ? 1 - (pts[4].x + pts[8].x) / 2 : (pts[4].x + pts[8].x) / 2, y = (pts[4].y + pts[8].y) / 2;   /* mirrored: your right is the screen's right */
     // grab mode: where the palm is, and whether the hand is closed (fingertips curled back toward the wrist)
     const curl = [[8, 5], [12, 9], [16, 13], [20, 17]].reduce((a, [t, m]) => a + d(t, 0) / (d(m, 0) || 1e-3), 0) / 4;
     const closed = old && old.closed ? curl < 1.55 : curl < 1.3;
     const pxr = [0, 5, 9, 13, 17].reduce((a, i) => a + pts[i].x, 0) / 5, pyr = [0, 5, 9, 13, 17].reduce((a, i) => a + pts[i].y, 0) / 5;
     const fit = v => Math.max(0, Math.min(1, (v - 0.15) / 0.7));   /* the middle 70% of the picture covers the whole screen */
-    return { x, y, pinch, gap, curl, closed, size, px: fit(1 - pxr), py: fit(pyr) };
+    return { x, y, pinch, gap, curl, closed, size, px: fit(MIR ? 1 - pxr : pxr), py: fit(pyr) };
   }
   // match this frame's hands to last frame's by nearness, so two hands keep their own state
   function track(list) {
@@ -74,13 +77,27 @@
   function ui() { if (box) return; box = document.createElement('div'); box.id = 'handBox';
     box.style.cssText = 'position:fixed;left:calc(10px + env(safe-area-inset-left));top:calc(48px + env(safe-area-inset-top));width:128px;height:96px;z-index:77;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 3px 12px rgba(0,0,0,.5);pointer-events:none';
     video = document.createElement('video'); video.muted = true; video.playsInline = true; video.style.cssText = 'width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.75';
-    cv = document.createElement('canvas'); cv.width = 128; cv.height = 96; cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'; box.append(video, cv); document.body.append(box); }
+    cv = document.createElement('canvas'); cv.width = 128; cv.height = 96; cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%'; box.append(video, cv);
+    const sw = document.createElement('button'); sw.textContent = '🔄'; sw.title = 'Use another camera'; sw.style.cssText = 'position:absolute;right:3px;top:3px;width:30px;height:30px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:15px;pointer-events:auto;z-index:2';
+    sw.onclick = async e => { e.stopPropagation(); let cams = []; try { cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); } catch {} if (cams.length < 2) { note(cams.length ? 'Only one camera here' : 'No cameras'); return; }
+      const cur = stream && stream.getVideoTracks()[0] && stream.getVideoTracks()[0].getSettings().deviceId, i = cams.findIndex(c => c.deviceId === cur), next = cams[(i + 1) % cams.length]; try { localStorage.setItem(camKey, next.deviceId); } catch {} await open(next.deviceId); };
+    const lab = document.createElement('div'); lab.style.cssText = 'position:absolute;left:4px;right:36px;top:4px;font:600 9px Fredoka,sans-serif;color:#fff;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis'; box.append(sw, lab); box.lab = lab;
+    for (const ev of ['pointerdown', 'pointerup', 'touchstart']) sw.addEventListener(ev, e => e.stopPropagation());
+    document.body.append(box); }
+  function note(t) { if (box && box.lab) { box.lab.textContent = t; clearTimeout(note.t); note.t = setTimeout(() => { if (box.lab) box.lab.textContent = ''; }, 3000); } }
+  async function open(id) {   /* (re)open the camera: the one asked for, or the one facing you */
+    if (stream) for (const t of stream.getTracks()) t.stop(); stream = null;
+    const size = { width: { ideal: 640 }, height: { ideal: 480 } };
+    stream = await navigator.mediaDevices.getUserMedia({ video: id ? { deviceId: { exact: id }, ...size } : { facingMode: 'user', ...size }, audio: false });
+    const tr = stream.getVideoTracks()[0], set = tr && tr.getSettings ? tr.getSettings() : {}, label = (tr && tr.label) || '';
+    MIR = set.facingMode ? set.facingMode !== 'environment' : !/back|rear|world|environment|outward/i.test(label); video.style.transform = MIR ? 'scaleX(-1)' : 'none';
+    video.srcObject = stream; try { await video.play(); } catch {} note(label || 'camera'); }
   const api = {
     on: false, mode: 'pinch', get error() { return st.error; }, get hands() { return st.hands.map(h => ({ x: h.sx, y: h.sy, pinch: h.pinch })); },
     async start(onMove, grab) { emit = onMove || emit; G = grab || G; st.error = ''; if (api.on) return true; ui(); box.style.display = 'block';
-      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }); }
-      catch (e) { st.error = e && e.name === 'NotAllowedError' ? 'The camera was not allowed.' : 'No camera could be opened.'; box.style.display = 'none'; return false; }
-      video.srcObject = stream; try { await video.play(); } catch {} api.on = true;
+      let want = ''; try { want = localStorage.getItem(camKey) || ''; } catch {}
+      try { await open(want); } catch (e) { if (want) { try { localStorage.removeItem(camKey); } catch {} try { await open(''); e = null; } catch (e2) { e = e2; } } if (e) { st.error = e && e.name === 'NotAllowedError' ? 'The camera was not allowed.' : 'No camera could be opened.'; box.style.display = 'none'; return false; } }
+      api.on = true;
       try { if (!tracker) { const vision = await import(LIB + '/vision_bundle.mjs'), files = await vision.FilesetResolver.forVisionTasks(LIB + '/wasm');
           tracker = await vision.HandLandmarker.createFromOptions(files, { baseOptions: { modelAssetPath: MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2 }); } }
       catch (e) { st.error = 'The hand reader could not load (' + (e && e.message ? e.message.slice(0, 60) : 'network') + ').'; api.stop(); return false; }
