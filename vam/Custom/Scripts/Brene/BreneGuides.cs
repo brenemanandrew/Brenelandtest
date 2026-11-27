@@ -15,6 +15,7 @@ namespace Brene
 
         void BuildGuides(Transform root)
         {
+            BuildVamMenu(root);
             Add("sceneflow", "Set up scene", () => sceneFlow.Open(0), null);
             Add("glassflow", "Glasses setup", () => glassFlow.Open(0), null);
             Add("help", "Help", OpenHelp, null);

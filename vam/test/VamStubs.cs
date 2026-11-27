@@ -8,7 +8,7 @@ using System.Collections.Generic;
 
 namespace UnityEngine
 {
-    public class Object { public string name; public static void Destroy(Object o) { } public static implicit operator bool(Object o) { return o != null; } }
+    public class Object { public string name; public static void Destroy(Object o) { } public static implicit operator bool(Object o) { return o != null; } public static T[] FindObjectsOfType<T>() where T : Object { return new T[0]; } }
     public class Component : Object { public Transform transform; public GameObject gameObject; public T GetComponent<T>() { return default(T); } public T GetComponentInParent<T>() { return default(T); } public T GetComponentInChildren<T>() { return default(T); } public T[] GetComponentsInChildren<T>(bool inactive) { return new T[0]; } public void SendMessage(string m, SendMessageOptions o) { } public void SendMessage(string m, object a, SendMessageOptions o) { } }
     public class Behaviour : Component { public bool enabled; }
     public class MonoBehaviour : Behaviour { public Coroutine StartCoroutine(IEnumerator e) { return null; } public Coroutine StartCoroutine(string m, object a) { return null; } }
@@ -35,7 +35,7 @@ namespace UnityEngine
     }
     public class Transform : Component, IEnumerable
     {
-        public Vector3 position, localPosition, localScale, forward, up; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
+        public Vector3 position, localPosition, localScale, forward, up, right; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
         public void SetParent(Transform p, bool keep) { } public void SetParent(Transform p) { } public Transform GetChild(int i) { return null; }
         public void SetAsLastSibling() { } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
         public IEnumerator GetEnumerator() { yield break; }
@@ -74,7 +74,7 @@ namespace UnityEngine
     public class Rigidbody : Component { }
     public class Camera : Behaviour { public static Camera main; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
         public Ray ScreenPointToRay(Vector3 p) { return new Ray(); } public Vector3 WorldToScreenPoint(Vector3 p) { return p; } }
-    public class Canvas : Behaviour { public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
+    public class Canvas : Behaviour { public bool isRootCanvas; public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
     public class CanvasGroup : Behaviour { public bool blocksRaycasts; public float alpha; }
 }
 namespace UnityEngine.Events { public class UnityEvent { public void AddListener(Action a) { } } public class UnityEvent<T> { public void AddListener(Action<T> a) { } } }

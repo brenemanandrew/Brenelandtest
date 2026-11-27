@@ -168,7 +168,7 @@ namespace Brene
             // calm start: only the dock. Tools, Wizra and the flows open from the dock or the radial menu
             pDock.Kind = "dock"; pChat.Kind = "chat";
             foreach (var p in new[] { chr.Panel, sceneFlow.Panel, glassFlow.Panel, pStory, pLaptop, pHelp }) p.Kind = "window";
-            foreach (var p in new[] { pChoice, pickFlow.Panel, pCall }) p.Kind = "dialog";
+            foreach (var p in new[] { pChoice, pickFlow.Panel, pCall, pVamMenu }) p.Kind = "dialog";
             foreach (var p in Panel.All) if (p.Kind != "dock") p.Root.gameObject.SetActive(false);
             // the dock in a sensible order
             int at = 0; foreach (var id in new[] { "radial", "tools", "chat", "character", "sceneflow", "glassflow", "story", "help", "edit" }) { Act a; if (acts.TryGetValue(id, out a) && a.btn != null) { a.btn.transform.SetParent(pDock.Body, false); a.btn.transform.SetSiblingIndex(at++); } }
@@ -267,7 +267,7 @@ namespace Brene
                 act("play"),
                 new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
                 new RItem("Wizra", () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); chatIn.ActivateInputField(); }),
-                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore") }),
+                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore"), act("movemenu") }),
                 act("menu"),
                 new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Talk to next", () => { NextWho(); pChat.Root.gameObject.SetActive(true); }) }),
             };
@@ -331,7 +331,7 @@ namespace Brene
         {
             try
             {
-                var j = new JSONClass(); j["v"].AsInt = 2; j["theme"] = Theme.Name; j["tutorialSeen"].AsBool = tutorialSeen; j["size"].AsFloat = uiSize.val;
+                var j = new JSONClass(); j["v"].AsInt = 2; j["theme"] = Theme.Name; j["menuX"].AsFloat = menuMove.x; j["menuY"].AsFloat = menuMove.y; j["menuZ"].AsFloat = menuMove.z; j["menuSize"].AsFloat = menuSize; j["tutorialSeen"].AsBool = tutorialSeen; j["size"].AsFloat = uiSize.val;
                 var ps = new JSONClass();
                 foreach (var p in Panel.All)
                 {
@@ -364,6 +364,7 @@ namespace Brene
                 if (j["theme"] != null && Array.IndexOf(Theme.Names, j["theme"].Value) >= 0) { Theme.Name = j["theme"].Value; Theme.ApplyAll(canvasGo.transform); }
                 if (j["size"] != null) uiSize.val = j["size"].AsFloat;
                 tutorialSeen = j["tutorialSeen"].AsBool;
+                if (j["menuSize"] != null) { menuMove = new Vector3(j["menuX"].AsFloat, j["menuY"].AsFloat, j["menuZ"].AsFloat); menuSize = Mathf.Clamp(j["menuSize"].AsFloat, 0.4f, 2.5f); }
                 var ps = j["panels"];
                 foreach (var p in Panel.All)
                 {
@@ -422,7 +423,7 @@ namespace Brene
             if (menuFit.val <= 0.01f) { if (fovWrote >= 0) { cam.fieldOfView = fovBase; fovWrote = -1; } return; }
             cam.fieldOfView = Mathf.Clamp(fovBase + menuFit.val, 10f, 120f); fovWrote = cam.fieldOfView;
         }
-        void LateUpdate() { FitMenu(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } }
+        void LateUpdate() { FitMenu(); TickVamMenu(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } }
 
         void OnDestroy()
         {
