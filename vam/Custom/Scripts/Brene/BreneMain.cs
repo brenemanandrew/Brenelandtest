@@ -307,7 +307,7 @@ namespace Brene
 
         void Refresh()
         {
-            foreach (var a in acts.Values) if (a.btn != null && a.on != null) { try { UI.SetOn(a.btn, a.on()); } catch (Exception) { } }
+            foreach (var a in new List<Act>(acts.Values)) if (a.btn != null && a.on != null) { try { UI.SetOn(a.btn, a.on()); } catch (Exception) { } }
             Act play; if (acts.TryGetValue("play", out play) && play.btn != null) { try { UI.SetText(play.btn, SuperController.singleton.gameMode == SuperController.GameMode.Play ? "Play mode" : "Edit mode"); } catch (Exception) { } }
         }
 
@@ -376,7 +376,7 @@ namespace Brene
             if (vr) LeaveVR();   // rebuilt on the monitor; TickVR moves it back onto the board within a second
             if (FileManagerSecure.FileExists(FILE)) FileManagerSecure.DeleteFile(FILE);
             Theme.Name = "Night"; uiSize.val = 1.25f;
-            Panel.All.Clear(); foreach (var a in acts.Values) a.btn = null; if (radial != null) radial.Close();
+            Panel.All.Clear(); foreach (var a in new List<Act>(acts.Values)) a.btn = null; if (radial != null) radial.Close();
             if (canvasGo != null) Destroy(canvasGo);
             BuildCanvas(); canvasGo.SetActive(showUi.val);
         }

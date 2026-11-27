@@ -16,6 +16,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// traits as a list too ({name, value}), which the VaM plugin can walk
+const withList = o => ({ ...o, traitList: Object.entries(o.traits || {}).map(([name, value]) => ({ name, value: +value || 0 })) });
 export const CAST = ['wizra', 'zoe', 'belinda', 'margo'];
 // the parts she can be touched on: Brenai's own touch areas plus the head; chest, hips and thighs stay off limits there
 export const ZONES = ['head', 'face', 'hair', 'shoulder', 'arm', 'hand', 'belly', 'knee'];
@@ -85,8 +87,8 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
       const who = CAST.includes(url.searchParams.get('who')) ? url.searchParams.get('who') : 'wizra';
       if (!brenai.enabled) return send(res, 200, { error: 'Set BRENAI_PIN on this PC to read her personality from Brenai' });
       try {
-        if (who === 'wizra') { const j = await call('GET', '/api/robot'); return send(res, 200, { traits: (j.sheet && j.sheet.traits) || j.traitsDefault || {}, mood: j.mood || '', feeling: j.feeling || '' }); }
-        const j = await call('GET', '/api/story/personality?who=' + who); return send(res, 200, { traits: j.traits || {}, mood: j.mood || '', feeling: j.feeling || '' });
+        if (who === 'wizra') { const j = await call('GET', '/api/robot'); return send(res, 200, withList({ traits: (j.sheet && j.sheet.traits) || j.traitsDefault || {}, mood: j.mood || '', feeling: j.feeling || '' })); }
+        const j = await call('GET', '/api/story/personality?who=' + who); return send(res, 200, withList({ traits: j.traits || {}, mood: j.mood || '', feeling: j.feeling || '' }));
       } catch (e) { return send(res, 200, { error: e.notYet ? `${who[0].toUpperCase() + who.slice(1)}'s personality isn't in Brenai yet (the story routes aren't built).` : /owner/i.test(e.message) ? 'Brenai only shows her personality to the game\'s owner: sign the relay in with the owner\'s PIN.' : e.message }); }
     }
     if (p === '/story/touch' && req.method === 'POST') {

@@ -70,7 +70,7 @@ try {
   ok(fs.readdirSync(path.join(T, 'writing')).length === 1, 'writing: a dated copy kept on the PC');
 
   // personality and touch
-  let pz = await get(18791, '/story/personality?who=wizra'); ok(pz.traits.warmth === 65 && pz.mood === 'cozy', "personality: Wizra's traits from Brenai's robot panel");
+  let pz = await get(18791, '/story/personality?who=wizra'); ok(pz.traits.warmth === 65 && pz.traitList.find(x => x.name === 'warmth').value === 65 && pz.mood === 'cozy', "personality: Wizra's traits from Brenai's robot panel");
   pz = await get(18791, '/story/personality?who=zoe'); ok(pz.traits.dryness === 90, "personality: Zoe's from the story route");
   r = await post(18791, '/story/touch', { who: 'wizra', zone: 'head' }); ok(r.ok && A.seen.touch[0].kind === 'pat', 'touch: a pat on Wizra\'s head goes to Brenai as her own "pat"');
   r = await post(18791, '/story/touch', { who: 'zoe', zone: 'hand' }); ok(r.ok && A.seen.stouch[0].who === 'zoe' && A.seen.stouch[0].zone === 'hand', 'touch: others go through the story route');

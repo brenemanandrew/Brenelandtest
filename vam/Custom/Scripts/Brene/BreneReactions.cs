@@ -55,8 +55,8 @@ namespace Brene
             {
                 for (int i = holder.childCount - 1; i >= 0; i--) Destroy(holder.GetChild(i).gameObject);
                 if (j == null || e != null) { Flow.Say(holder, e ?? "No answer"); return; }
-                var t = j["traits"] as JSONClass;
-                if (t != null) foreach (KeyValuePair<string, JSONNode> kv in t) Bar(holder, Nice(kv.Key), kv.Value.AsFloat / 100f);
+                var t = j["traitList"].AsArray;   // a list from the relay (VaM's checker refuses some ways of walking a JSON object)
+                if (t != null) for (int i = 0; i < t.Count; i++) Bar(holder, Nice(t[i]["name"].Value), t[i]["value"].AsFloat / 100f);
                 if (j["mood"] != null && j["mood"].Value != "") Flow.Say(holder, "Mood right now: " + j["mood"].Value);
                 if (j["feeling"] != null && j["feeling"].Value != "") Flow.Say(holder, "Feeling: " + j["feeling"].Value);
             }));

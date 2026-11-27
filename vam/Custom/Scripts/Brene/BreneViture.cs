@@ -167,7 +167,7 @@ namespace Brene
         }
 
         // where the webcam hands are in the scene (for touch reactions)
-        public List<Vector3> HandPoints() { var l = new List<Vector3>(); foreach (var m in markers.Values) if (m != null) l.Add(m.transform.position); return l; }
+        public List<Vector3> HandPoints() { var l = new List<Vector3>(); foreach (var m in new List<GameObject>(markers.Values)) if (m != null) l.Add(m.transform.position); return l; }
 
         public void Shutdown()
         {
@@ -181,7 +181,7 @@ namespace Brene
                     c.transform.localPosition = wrotePos - baseRot * lastPos; c.transform.localRotation = baseRot;
                 }
             }
-            foreach (var m in markers.Values) if (m != null) UnityEngine.Object.Destroy(m);
+            foreach (var m in new List<GameObject>(markers.Values)) if (m != null) UnityEngine.Object.Destroy(m);
             markers.Clear(); held.Clear();
         }
     }

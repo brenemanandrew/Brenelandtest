@@ -149,7 +149,7 @@ namespace Brene
         // every frame: each voice follows its body's head, each mouth follows its voice, expressions fade on time
         void TickWizra()
         {
-            foreach (var kv in voices)
+            foreach (var kv in new List<KeyValuePair<string, Voice>>(voices))
             {
                 var v = kv.Value; var body = BodyOf(kv.Key);
                 if (v.go != null && body != null) { var h = Head(body); if (h != null) v.go.transform.position = h.position; }
@@ -219,6 +219,6 @@ namespace Brene
             var f = geo.GetFloatJSONParam(cache); if (f != null) f.val = v;
         }
 
-        void DropWizra() { foreach (var v in voices.Values) if (v.go != null) Destroy(v.go); voices.Clear(); }
+        void DropWizra() { foreach (var v in new List<Voice>(voices.Values)) if (v.go != null) Destroy(v.go); voices.Clear(); }
     }
 }

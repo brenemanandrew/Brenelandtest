@@ -143,7 +143,7 @@ namespace Brene
         {
             if (sec != section && !keepSearch) { showAll = false; allPage = 0; search.text = ""; }
             section = sec; build++;
-            foreach (var kv in tabs) UI.SetOn(kv.Value, kv.Key == sec);
+            foreach (var kv in new List<KeyValuePair<string, Button>>(tabs)) UI.SetOn(kv.Value, kv.Key == sec);
             for (int i = content.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(content.GetChild(i).gameObject);
             int at = Array.IndexOf(STEPS, sec);
             hint.text = "Step " + (at + 1) + " of " + STEPS.Length + ": " + HINT[sec];
@@ -287,7 +287,7 @@ namespace Brene
 
         void Reset()
         {
-            foreach (var kv in original)
+            foreach (var kv in new List<KeyValuePair<string, float>>(original))
             {
                 var parts = kv.Key.Split(new[] { '|' }, 2); var a = SuperController.singleton.GetAtomByUid(parts[0]); if (a == null) continue;
                 var geo = a.GetStorableByID("geometry"); if (geo == null) continue; var f = geo.GetFloatJSONParam(parts[1]); if (f != null) f.val = kv.Value;
