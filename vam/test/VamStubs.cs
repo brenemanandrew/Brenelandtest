@@ -138,10 +138,11 @@ public class JSONStorableUrl { public string val; }
 public class JSONStorable : UnityEngine.MonoBehaviour { public JSONStorableUrl GetUrlJSONParam(string n) { return null; } public void CallAction(string n) { } public List<string> GetFloatParamNames() { return null; } public JSONStorableFloat GetFloatJSONParam(string n) { return null; } public JSONStorableString GetStringJSONParam(string n) { return null; } public JSONStorableStringChooser GetStringChooserJSONParam(string n) { return null; } }
 public class Atom : UnityEngine.MonoBehaviour { public string uid, type; public FreeControllerV3 mainController; public FreeControllerV3[] freeControllers; public JSONStorable GetStorableByID(string id) { return null; } }
 public class FreeControllerV3 : UnityEngine.MonoBehaviour { public UnityEngine.Transform control; public Atom containingAtom; }
+public class CameraTarget : UnityEngine.MonoBehaviour { }   // VaM 1.22: centerCameraTarget is this, not a Transform
 public class SuperController : UnityEngine.MonoBehaviour
 {
     public enum GameMode { Edit, Play }
-    public static SuperController singleton; public UnityEngine.Transform centerCameraTarget; public GameMode gameMode; public bool freezeAnimation; public UnityEngine.Camera MonitorCenterCamera;
+    public static SuperController singleton; public CameraTarget centerCameraTarget; public GameMode gameMode;  public UnityEngine.Camera MonitorCenterCamera;
     public List<Atom> GetAtoms() { return null; } public Atom GetAtomByUid(string u) { return null; } public Atom GetSelectedAtom() { return null; } public void SelectController(FreeControllerV3 fc) { }
     public void SaveJSON(SimpleJSON.JSONClass j, string p) { } public SimpleJSON.JSONClass LoadJSON(string p) { return null; }
     public static void LogError(string s) { } public static void LogMessage(string s) { }

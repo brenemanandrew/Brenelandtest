@@ -79,7 +79,7 @@ namespace Brene
         Transform HeadT()
         {
             var sc = SuperController.singleton;
-            if (sc != null && sc.centerCameraTarget != null) return sc.centerCameraTarget;
+            var ct = Vam.CenterTarget(); if (ct != null) return ct;
             var cam = Cam(); return cam != null ? cam.transform : null;
         }
 

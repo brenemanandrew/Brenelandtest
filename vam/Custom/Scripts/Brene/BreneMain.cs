@@ -30,6 +30,7 @@ namespace Brene
         readonly List<string> chatLines = new List<string>();
 
         JSONStorableString relayUrl; JSONStorableBool showUi, headOn, stereoOn, fullOn, handsOn, swapEyes, flipYaw, flipPitch, flipRoll;
+        bool frozen;
         JSONStorableFloat uiSize, ipd, posScale, menuFit; float fovBase = -1, fovWrote = -1;
 
         public override void Init()
@@ -80,7 +81,7 @@ namespace Brene
         {
             var sc = SuperController.singleton;
             Add("play", "Play mode", () => sc.gameMode = sc.gameMode == SuperController.GameMode.Play ? SuperController.GameMode.Edit : SuperController.GameMode.Play, () => sc.gameMode == SuperController.GameMode.Play);
-            Add("freeze", "Freeze", () => Send("SetFreezeAnimation", !sc.freezeAnimation), () => sc.freezeAnimation);
+            Add("freeze", "Freeze", () => { frozen = !frozen; Send("SetFreezeAnimation", frozen); }, () => frozen);   // asked by name; Brene keeps its own on/off
             Add("undo", "Undo", () => Send("Undo"), null);
             Add("redo", "Redo", () => Send("Redo"), null);
             Add("save", "Save scene", () => Send("SaveSceneDialog"), null);
@@ -402,7 +403,7 @@ namespace Brene
         // the wider view for "Fit VaM menu": VaM's own field of view is the base; ours is added on top each frame
         void FitMenu()
         {
-            if (vr) return; var cam = SuperController.singleton != null ? SuperController.singleton.MonitorCenterCamera : null; if (cam == null) return;
+            if (vr) return; var cam = Vam.MonitorCam(); if (cam == null) return;
             if (Mathf.Abs(cam.fieldOfView - fovWrote) > 0.01f) fovBase = cam.fieldOfView;   // VaM (or its preferences) set it: that is the base
             if (menuFit.val <= 0.01f) { if (fovWrote >= 0) { cam.fieldOfView = fovBase; fovWrote = -1; } return; }
             cam.fieldOfView = Mathf.Clamp(fovBase + menuFit.val, 10f, 120f); fovWrote = cam.fieldOfView;

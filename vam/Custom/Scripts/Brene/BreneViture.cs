@@ -25,7 +25,7 @@ namespace Brene
 
         public Viture(Link l) { link = l; }
 
-        Camera Cam { get { if (cam == null && SuperController.singleton != null) cam = SuperController.singleton.MonitorCenterCamera; return cam; } }
+        Camera Cam { get { if (cam == null && SuperController.singleton != null) cam = Vam.MonitorCam(); return cam; } }
 
         public void Recenter() { needZero = true; }
 
@@ -121,7 +121,7 @@ namespace Brene
                     float depth = 0.6f;
                     if (g != null) depth = Mathf.Clamp(g.depth * (h.size > 0 && g.size0 > 0 ? h.size / g.size0 : 1f), 0.15f, 8f);
                     var ray = c.ScreenPointToRay(sp); var at = ray.origin + ray.direction * depth;
-                    if (g != null && g.fc != null) g.fc.control.position = at + g.offset;
+                    if (g != null && g.fc != null) Vam.Ctrl(g.fc).position = at + g.offset;
                     Marker(h.id, at, grip, g != null, c);
                 }
             }
@@ -137,18 +137,18 @@ namespace Brene
                 if (atom == null || !atom.gameObject.activeInHierarchy) continue;
                 foreach (var fc in atom.freeControllers)
                 {
-                    if (fc == null || fc.control == null) continue;
-                    var s = c.WorldToScreenPoint(fc.control.position); if (s.z <= 0.05f) continue;
+                    if (fc == null) continue;
+                    var s = c.WorldToScreenPoint(Vam.Ctrl(fc).position); if (s.z <= 0.05f) continue;
                     float d = Vector2.Distance(new Vector2(s.x, s.y), new Vector2(sp.x, sp.y)); if (d > 70f) continue;
                     float score = d + s.z * 20f;
                     if (score < bestScore) { bestScore = score; best = fc; }
                 }
             }
             if (best == null) { HandNote = "Nothing to hold under that hand"; return null; }
-            float depth = c.WorldToScreenPoint(best.control.position).z;
+            float depth = c.WorldToScreenPoint(Vam.Ctrl(best).position).z;
             var ray = c.ScreenPointToRay(sp);
             HandNote = "Holding " + best.containingAtom.uid + " / " + best.name;
-            return new Held { fc = best, depth = depth, size0 = h.size, offset = best.control.position - (ray.origin + ray.direction * depth) };
+            return new Held { fc = best, depth = depth, size0 = h.size, offset = Vam.Ctrl(best).position - (ray.origin + ray.direction * depth) };
         }
 
         void Marker(int id, Vector3 at, bool grip, bool holding, Camera c)

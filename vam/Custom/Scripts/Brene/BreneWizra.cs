@@ -208,7 +208,7 @@ namespace Brene
         Transform Head(Atom body)
         {
             if (body.freeControllers == null) return null;
-            foreach (var fc in body.freeControllers) if (fc != null && fc.name == "headControl") return fc.control != null ? fc.control : fc.transform;
+            foreach (var fc in body.freeControllers) if (fc != null && fc.name == "headControl") return Vam.Ctrl(fc);
             return null;
         }
         JSONStorableFloat Geo(Atom body, string param) { var g = body.GetStorableByID("geometry"); return g != null ? g.GetFloatJSONParam(param) : null; }

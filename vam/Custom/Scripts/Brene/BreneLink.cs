@@ -15,6 +15,25 @@ using SimpleJSON;
 
 namespace Brene
 {
+    // VaM fields whose exact type differs between versions (or from what we expected): each is read as a plain Unity object, so any
+    // of Camera, Transform, a MonoBehaviour or a GameObject works. (VaM 1.22's centerCameraTarget turned out to be a CameraTarget.)
+    public static class Vam
+    {
+        public static Transform T(UnityEngine.Object o)
+        {
+            var c = o as Component; if (c != null) return c.transform;
+            var g = o as GameObject; return g != null ? g.transform : null;
+        }
+        public static Camera MonitorCam()
+        {
+            var sc = SuperController.singleton; if (sc == null) return null;
+            var t = T(sc.MonitorCenterCamera as UnityEngine.Object); if (t == null) return null;
+            var cam = t.GetComponent<Camera>(); if (cam == null) cam = t.GetComponentInChildren<Camera>(); return cam;
+        }
+        public static Transform CenterTarget() { var sc = SuperController.singleton; return sc == null ? null : T(sc.centerCameraTarget as UnityEngine.Object); }
+        public static Transform Ctrl(FreeControllerV3 fc) { if (fc == null) return null; var t = T(fc.control as UnityEngine.Object); return t != null ? t : fc.transform; }
+    }
+
     public class HandState { public int id; public float x, y, size; public bool pinch, closed; }
 
     public class Link
