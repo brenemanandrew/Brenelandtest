@@ -40,12 +40,15 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 - **Tap instead:** tap the key (or the dock's **Menu** button) to leave the ring open, then click.
 - **Back out:** right-click or Esc goes back one ring.
 - **Top ring:** Character >, Scene >, Play/Edit, Glasses >, Wizra, Panels >, VaM menu, Undo.
-  - Character > Body, Face, Skin, Hair, Clothes, Looks.
+  - Character > Start (the flow from step 1), Body, Face, Skin, Hair, Clothes, Pose, Save.
   - Scene > Play/Edit, Freeze, Undo, Redo, Save, Open.
   - Panels > Hide all / Show all, Edit layout, Theme, Bigger, Smaller.
 - **Hidden panels:** the menu still opens when the panels are hidden, so it's the way back.
 
 ## Character panel
+- **A flow, not menus:** 1 Who, 2 Start from (a saved whole look, or keep as is), 3 Body, 4 Face, 5 Skin, 6 Hair, 7 Clothes, 8 Pose, 9 Finish (save the look or the scene).
+  - **Back** and **Next** walk the steps in order; the numbered steps along the top jump anywhere. Each step says what it is for in one line.
+- **Nothing is taken away:** VaM's own menus are untouched ("VaM menu" opens them). Every shape stays reachable under "Show all body shapes" / "Show all face shapes" (60 at a time) or by search.
 - **Who:** the selected person (or the first one). "Next person" cycles through.
 - **Body and Face:** plain sliders such as Height, Thin, Heavy, Fit, Shoulders, Arms, Bust, Waist, Hips, Glutes, Thighs, Legs, Neck, Face width, Age, Eyes, Brow, Nose, Lips, Mouth, Cheekbones, Jaw, Chin and Ears.
   - Each is matched to a morph your VaM has, and the real morph name shows small underneath. A slider with no match is left out; the note says how many were found.

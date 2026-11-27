@@ -56,7 +56,7 @@ namespace UnityEngine
     public struct Rect { public Rect(float x, float y, float w, float h) { size = new Vector2(w, h); } public Vector2 size; }
     public class RectOffset { public RectOffset(int l, int r, int t, int b) { } }
     public struct Ray { public Vector3 origin, direction; }
-    public static class Mathf { public const float PI = 3.14159f; public static float Clamp(float v, float a, float b) { return v; } public static float Clamp01(float v) { return v; } public static float Sqrt(float v) { return v; } public static float Max(float a, float b) { return a; } public static int Max(int a, int b) { return a; } public static float Min(float a, float b) { return a; } public static int FloorToInt(float v) { return 0; } public static int RoundToInt(float v) { return 0; } public static float Floor(float v) { return v; } public static float Atan2(float y, float x) { return 0; } public static float Cos(float a) { return 0; } public static float Sin(float a) { return 0; } }
+    public static class Mathf { public const float PI = 3.14159f; public static float Clamp(float v, float a, float b) { return v; } public static int Clamp(int v, int a, int b) { return v; } public static float Clamp01(float v) { return v; } public static float Sqrt(float v) { return v; } public static float Max(float a, float b) { return a; } public static int Max(int a, int b) { return a; } public static float Min(float a, float b) { return a; } public static int FloorToInt(float v) { return 0; } public static int RoundToInt(float v) { return 0; } public static float Floor(float v) { return v; } public static float Atan2(float y, float x) { return 0; } public static float Cos(float a) { return 0; } public static float Sin(float a) { return 0; } }
     public static class Screen { public static int width, height; }
     public static class Time { public static float realtimeSinceStartup; }
     public static class Input { public static bool GetKey(KeyCode k) { return false; } public static bool GetKeyDown(KeyCode k) { return false; } public static bool GetKeyUp(KeyCode k) { return false; } public static bool GetMouseButtonDown(int b) { return false; } public static Vector3 mousePosition; }
@@ -124,7 +124,7 @@ namespace MVR.FileManagementSecure { public static class FileManagerSecure { pub
 
 // ---- VaM ----
 public class JSONStorableUrl { public string val; }
-public class JSONStorable : UnityEngine.MonoBehaviour { public JSONStorableUrl GetUrlJSONParam(string n) { return null; } public void CallAction(string n) { } public List<string> GetFloatParamNames() { return null; } public JSONStorableFloat GetFloatJSONParam(string n) { return null; } }
+public class JSONStorable : UnityEngine.MonoBehaviour { public JSONStorableUrl GetUrlJSONParam(string n) { return null; } public void CallAction(string n) { } public List<string> GetFloatParamNames() { return null; } public JSONStorableFloat GetFloatJSONParam(string n) { return null; } public JSONStorableString GetStringJSONParam(string n) { return null; } }
 public class Atom : UnityEngine.MonoBehaviour { public string uid, type; public FreeControllerV3 mainController; public FreeControllerV3[] freeControllers; public JSONStorable GetStorableByID(string id) { return null; } }
 public class FreeControllerV3 : UnityEngine.MonoBehaviour { public UnityEngine.Transform control; public Atom containingAtom; }
 public class SuperController : UnityEngine.MonoBehaviour

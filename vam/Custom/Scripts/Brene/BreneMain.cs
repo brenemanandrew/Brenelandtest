@@ -248,7 +248,7 @@ namespace Brene
             Func<string, RItem> act = id => { Act a = acts[id]; return new RItem(a.label == "Play mode" && SuperController.singleton.gameMode != SuperController.GameMode.Play ? "Edit mode" : a.label, () => { a.run(); Refresh(); }) { On = a.on }; };
             Func<string, RItem> sec = s => new RItem(s, () => chr.Open(s));
             return new List<RItem> {
-                new RItem("Character", new List<RItem> { sec("Body"), sec("Face"), sec("Skin"), sec("Hair"), sec("Clothes"), sec("Looks") }),
+                new RItem("Character", new List<RItem> { new RItem("Start", () => chr.Open("Who")), sec("Body"), sec("Face"), sec("Skin"), sec("Hair"), sec("Clothes"), sec("Pose"), new RItem("Save", () => chr.Open("Finish")) }),
                 new RItem("Scene", new List<RItem> { act("play"), act("freeze"), act("undo"), act("redo"), act("save"), act("load") }),
                 act("play"),
                 new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
