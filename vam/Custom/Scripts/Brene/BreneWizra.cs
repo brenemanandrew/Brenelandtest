@@ -38,7 +38,7 @@ namespace Brene
 
         void InitWizra()
         {
-            voiceOn = new JSONStorableBool("Their voices", true, (bool v) => { if (voiceBtn != null) { UI.SetOn(voiceBtn, v); UI.SetText(voiceBtn, v ? "Voice: on" : "Voice: off"); } });
+            voiceOn = new JSONStorableBool("Their voices", true, (bool v) => { if (voiceBtn != null) { Ui.SetOn(voiceBtn, v); Ui.SetText(voiceBtn, v ? "Voice: on" : "Voice: off"); } });
             RegisterBool(voiceOn); CreateToggle(voiceOn);
             wizraBody = new JSONStorableString("Wizra's body (person)", "", (string v) => ShowBody()); RegisterString(wizraBody);   // kept from before the cast
             castBodies = new JSONStorableString("Cast bodies", "{}", (string v) => ShowBody()); RegisterString(castBodies);            // {"zoe":"Person#2", ...}
@@ -68,22 +68,22 @@ namespace Brene
         // the bar along the top of the chat panel: talking to whom, her body, voice on or off
         void BuildWizraBar()
         {
-            var bar = UI.Rect("WizraBar", pChat.Body); bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1); bar.sizeDelta = new Vector2(0, 48);
-            var a = UI.Rect("Who", bar); a.anchorMin = new Vector2(0, 0); a.anchorMax = new Vector2(0.33f, 1); a.offsetMin = a.offsetMax = Vector2.zero;
-            whoBtn = UI.Button(a, "", NextWho); Flow.Stretch(whoBtn); UI.SetOn(whoBtn, true);
-            var b = UI.Rect("Body", bar); b.anchorMin = new Vector2(0.35f, 0); b.anchorMax = new Vector2(0.78f, 1); b.offsetMin = b.offsetMax = Vector2.zero;
-            bodyBtn = UI.Button(b, "", NextBody); Flow.Stretch(bodyBtn);
-            var c = UI.Rect("Voice", bar); c.anchorMin = new Vector2(0.8f, 0); c.anchorMax = new Vector2(1, 1); c.offsetMin = c.offsetMax = Vector2.zero;
-            voiceBtn = UI.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Flow.Stretch(voiceBtn); UI.SetOn(voiceBtn, voiceOn.val);
+            var bar = Ui.Rect("WizraBar", pChat.Body); bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1); bar.sizeDelta = new Vector2(0, 48);
+            var a = Ui.Rect("Who", bar); a.anchorMin = new Vector2(0, 0); a.anchorMax = new Vector2(0.33f, 1); a.offsetMin = a.offsetMax = Vector2.zero;
+            whoBtn = Ui.Button(a, "", NextWho); Flow.Stretch(whoBtn); Ui.SetOn(whoBtn, true);
+            var b = Ui.Rect("Body", bar); b.anchorMin = new Vector2(0.35f, 0); b.anchorMax = new Vector2(0.78f, 1); b.offsetMin = b.offsetMax = Vector2.zero;
+            bodyBtn = Ui.Button(b, "", NextBody); Flow.Stretch(bodyBtn);
+            var c = Ui.Rect("Voice", bar); c.anchorMin = new Vector2(0.8f, 0); c.anchorMax = new Vector2(1, 1); c.offsetMin = c.offsetMax = Vector2.zero;
+            voiceBtn = Ui.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Flow.Stretch(voiceBtn); Ui.SetOn(voiceBtn, voiceOn.val);
             voiceBtn.GetComponentInChildren<Text>().fontSize = 16;
             for (int i = 0; i < pChat.Body.childCount; i++) { var r = (RectTransform)pChat.Body.GetChild(i); if (r.name == "Log") r.offsetMax = new Vector2(0, -56); }
             ShowBody();
         }
         void ShowBody()
         {
-            if (whoBtn != null) UI.SetText(whoBtn, "Talking to: " + Nice(talkTo));
+            if (whoBtn != null) Ui.SetText(whoBtn, "Talking to: " + Nice(talkTo));
             if (bodyBtn == null) return; var a = BodyOf(talkTo);
-            UI.SetText(bodyBtn, a != null ? Nice(talkTo) + "'s body: " + a.uid : "Pick " + Nice(talkTo) + "'s body (tap)"); UI.SetOn(bodyBtn, a != null);
+            Ui.SetText(bodyBtn, a != null ? Nice(talkTo) + "'s body: " + a.uid : "Pick " + Nice(talkTo) + "'s body (tap)"); Ui.SetOn(bodyBtn, a != null);
         }
         public void TalkTo(string who) { if (Array.IndexOf(CAST, who) >= 0) { talkTo = who; ShowBody(); } }
         void NextWho() { talkTo = CAST[(Array.IndexOf(CAST, talkTo) + 1) % CAST.Length]; ShowBody(); }

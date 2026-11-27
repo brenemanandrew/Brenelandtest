@@ -49,38 +49,38 @@ namespace Brene
         {
             Close(false);
             center = screenPos; shown.Clear(); shown.AddRange(items); petals.Clear(); hot = -1;
-            float k = World ? 1f : Editor.Scale; float SW = World ? WorldSize.x : Screen.width, SH = World ? WorldSize.y : Screen.height;
-            root = UI.Rect("Radial", canvas); root.anchorMin = root.anchorMax = Vector2.zero; root.pivot = new Vector2(0.5f, 0.5f);
+            float k = World ? 1f : BreneEdit.Scale; float SW = World ? WorldSize.x : Screen.width, SH = World ? WorldSize.y : Screen.height;
+            root = Ui.Rect("Radial", canvas); root.anchorMin = root.anchorMax = Vector2.zero; root.pivot = new Vector2(0.5f, 0.5f);
             // keep the whole ring on screen
             float m = (R + PETAL / 2 + 8) * k;
             center = new Vector2(Mathf.Clamp(center.x, m, SW - m), Mathf.Clamp(center.y, m, SH - m));
             root.anchoredPosition = center / k; root.sizeDelta = Vector2.one * (R * 2 + PETAL);
             root.SetAsLastSibling();
 
-            var shade = UI.Rect("Shade", root); shade.anchorMin = shade.anchorMax = new Vector2(0.5f, 0.5f); shade.sizeDelta = Vector2.one * (R * 2 + PETAL + 30);
-            var si = UI.Box(shade, Role.Panel); si.sprite = Circle; si.type = Image.Type.Simple; si.raycastTarget = false;
+            var shade = Ui.Rect("Shade", root); shade.anchorMin = shade.anchorMax = new Vector2(0.5f, 0.5f); shade.sizeDelta = Vector2.one * (R * 2 + PETAL + 30);
+            var si = Ui.Box(shade, Role.Panel); si.sprite = Circle; si.type = Image.Type.Simple; si.raycastTarget = false;
 
             for (int i = 0; i < items.Count; i++)
             {
                 float a = Mathf.PI / 2 - i * Mathf.PI * 2 / items.Count;   // first choice at the top, then clockwise
-                var p = UI.Rect("Petal " + items[i].Label, root); p.anchorMin = p.anchorMax = new Vector2(0.5f, 0.5f);
+                var p = Ui.Rect("Petal " + items[i].Label, root); p.anchorMin = p.anchorMax = new Vector2(0.5f, 0.5f);
                 p.sizeDelta = Vector2.one * PETAL; p.anchoredPosition = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * R;
-                var img = UI.Box(p, items[i].On != null && items[i].On() ? Role.ButtonOn : Role.Button); img.sprite = Circle; img.type = Image.Type.Simple;
+                var img = Ui.Box(p, items[i].On != null && items[i].On() ? Role.ButtonOn : Role.Button); img.sprite = Circle; img.type = Image.Type.Simple;
                 var label = items[i].Label + (items[i].Kids != null ? "  >" : "");
-                var t = UI.Label(p, label, 19, Role.Text, TextAnchor.MiddleCenter); t.fontStyle = FontStyle.Bold;
+                var t = Ui.Label(p, label, 19, Role.Text, TextAnchor.MiddleCenter); t.fontStyle = FontStyle.Bold;
                 petals.Add(img);
                 // a petal is also a button: clicked with the mouse on a monitor, or with VaM's pointer in VR
                 int idx = i; var pb = p.gameObject.AddComponent<Button>(); pb.targetGraphic = img; pb.onClick.AddListener(() => { hot = idx; Pick(); });
             }
-            var core = UI.Rect("Core", root); core.anchorMin = core.anchorMax = new Vector2(0.5f, 0.5f); core.sizeDelta = Vector2.one * CORE;
-            var ci = UI.Box(core, Role.Title); ci.sprite = Circle; ci.type = Image.Type.Simple;
-            coreText = UI.Label(core, title, 17, Role.Dim, TextAnchor.MiddleCenter);
+            var core = Ui.Rect("Core", root); core.anchorMin = core.anchorMax = new Vector2(0.5f, 0.5f); core.sizeDelta = Vector2.one * CORE;
+            var ci = Ui.Box(core, Role.Title); ci.sprite = Circle; ci.type = Image.Type.Simple;
+            coreText = Ui.Label(core, title, 17, Role.Dim, TextAnchor.MiddleCenter);
         }
 
         void Track()
         {
             Vector2 d = (Vector2)Input.mousePosition - center; int was = hot;
-            if (d.magnitude < DEAD * Editor.Scale || shown.Count == 0) hot = -1;
+            if (d.magnitude < DEAD * BreneEdit.Scale || shown.Count == 0) hot = -1;
             else
             {
                 float ang = Mathf.Atan2(d.y, d.x), step = Mathf.PI * 2 / shown.Count;

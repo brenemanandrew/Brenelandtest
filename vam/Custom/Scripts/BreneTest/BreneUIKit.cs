@@ -13,7 +13,8 @@ using UnityEngine.EventSystems;
 
 namespace Brene
 {
-    public enum Role { Panel, Title, Button, ButtonOn, Accent, Text, Dim, Field }
+    // the colour roles (plain numbers: VaM 1.22's compiler crashed on this file, and an enum used as a MonoBehaviour field is a suspect)
+    public static class Role { public const int Panel = 0, Title = 1, Button = 2, ButtonOn = 3, Accent = 4, Text = 5, Dim = 6, Field = 7; }
 
     public static class Theme
     {
@@ -29,10 +30,10 @@ namespace Brene
             { "Light",  new[] { C(0.95f,0.95f,0.97f,0.94f), C(0.82f,0.84f,0.92f,0.98f), C(1.00f,1.00f,1.00f,1f), C(0.55f,0.85f,0.65f,1f), C(0.40f,0.35f,0.90f,1f), C(0.10f,0.10f,0.14f,1f), C(0.38f,0.40f,0.48f,1f), C(1.00f,1.00f,1.00f,1f) } },
         };
         static Color C(float r, float g, float b, float a) { return new Color(r, g, b, a); }
-        public static Color Get(Role r)
+        public static Color Get(int r)
         {
             Color[] s; if (!sets.TryGetValue(Name, out s)) s = sets["Night"];
-            return s[(int)r];
+            return s[Mathf.Clamp(r, 0, s.Length - 1)];
         }
 
         static Font font;
@@ -68,7 +69,7 @@ namespace Brene
 
     public class Skin : MonoBehaviour
     {
-        public Role role;
+        public int role;
         public void Apply()
         {
             var img = GetComponent<Image>(); if (img != null) { img.color = Theme.Get(role); return; }
@@ -76,7 +77,7 @@ namespace Brene
         }
     }
 
-    public static class UI
+    public static class Ui
     {
         public static RectTransform Rect(string name, Transform parent)
         {
@@ -87,12 +88,12 @@ namespace Brene
         {
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = new Vector2(l, b); rt.offsetMax = new Vector2(-r, -t);
         }
-        public static Image Box(RectTransform rt, Role role)
+        public static Image Box(RectTransform rt, int role)
         {
             var img = rt.gameObject.AddComponent<Image>(); img.sprite = Theme.Round; img.type = Image.Type.Sliced;
             rt.gameObject.AddComponent<Skin>().role = role; img.color = Theme.Get(role); return img;
         }
-        public static Text Label(Transform parent, string text, int size, Role role, TextAnchor align)
+        public static Text Label(Transform parent, string text, int size, int role, TextAnchor align)
         {
             var rt = Rect("Text", parent); Fill(rt, 8, 0, 8, 0);
             var t = rt.gameObject.AddComponent<Text>(); t.font = Theme.Font; t.fontSize = size; t.text = text; t.alignment = align;
@@ -138,10 +139,10 @@ namespace Brene
     }
 
     // ---- the editor's state ----
-    public static class Editor
+    public static class BreneEdit
     {
         public static bool On;
-        public static Action Changed = delegate { };
+        public static Action Changed = () => { };
         public static Canvas Canvas;
         public static float Scale { get { return Canvas != null ? Canvas.scaleFactor : 1f; } }
     }
@@ -158,25 +159,25 @@ namespace Brene
         public Panel(Transform canvas, string id, string title, Vector2 pos, Vector2 size, bool grid)
         {
             Id = id; Title = title; Droppable = grid;
-            Root = UI.Rect("Panel " + id, canvas);
+            Root = Ui.Rect("Panel " + id, canvas);
             Root.anchorMin = Root.anchorMax = new Vector2(0, 1); Root.pivot = new Vector2(0, 1);
             Root.anchoredPosition = pos; Root.sizeDelta = size;
-            UI.Box(Root, Role.Panel);
+            Ui.Box(Root, Role.Panel);
             Root.gameObject.AddComponent<PanelTag>().panel = this;
 
-            Bar = UI.Rect("Bar", Root); Bar.anchorMin = new Vector2(0, 1); Bar.anchorMax = new Vector2(1, 1); Bar.pivot = new Vector2(0.5f, 1);
+            Bar = Ui.Rect("Bar", Root); Bar.anchorMin = new Vector2(0, 1); Bar.anchorMax = new Vector2(1, 1); Bar.pivot = new Vector2(0.5f, 1);
             Bar.sizeDelta = new Vector2(0, 46); Bar.anchoredPosition = Vector2.zero;
-            UI.Box(Bar, Role.Title);
-            UI.Label(Bar, title, 22, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
+            Ui.Box(Bar, Role.Title);
+            Ui.Label(Bar, title, 22, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
             Bar.gameObject.AddComponent<DragMove>().target = Root;
 
-            var hrt = UI.Rect("Hide", Bar); hrt.anchorMin = hrt.anchorMax = new Vector2(1, 0.5f); hrt.pivot = new Vector2(1, 0.5f);
+            var hrt = Ui.Rect("Hide", Bar); hrt.anchorMin = hrt.anchorMax = new Vector2(1, 0.5f); hrt.pivot = new Vector2(1, 0.5f);
             hrt.sizeDelta = new Vector2(38, 34); hrt.anchoredPosition = new Vector2(-6, 0);
-            var hb = UI.Button(hrt, "x", () => { Root.gameObject.SetActive(false); Editor.Changed(); });
+            var hb = Ui.Button(hrt, "x", () => { Root.gameObject.SetActive(false); BreneEdit.Changed(); });
             ((RectTransform)hb.transform).anchorMin = Vector2.zero; ((RectTransform)hb.transform).anchorMax = Vector2.one; ((RectTransform)hb.transform).sizeDelta = Vector2.zero;
             Hide = hrt.gameObject;
 
-            Body = UI.Rect("Body", Root); UI.Fill(Body, 10, 54, 10, 10);
+            Body = Ui.Rect("Body", Root); Ui.Fill(Body, 10, 54, 10, 10);
             if (grid)
             {
                 var g = Body.gameObject.AddComponent<GridLayoutGroup>();
@@ -184,14 +185,14 @@ namespace Brene
                 Body.gameObject.AddComponent<DropZone>().panel = this;
             }
 
-            var rr = UI.Rect("Resize", Root); rr.anchorMin = rr.anchorMax = new Vector2(1, 0); rr.pivot = new Vector2(1, 0);
+            var rr = Ui.Rect("Resize", Root); rr.anchorMin = rr.anchorMax = new Vector2(1, 0); rr.pivot = new Vector2(1, 0);
             rr.sizeDelta = new Vector2(30, 30); rr.anchoredPosition = Vector2.zero;
-            UI.Box(rr, Role.Accent);
+            Ui.Box(rr, Role.Accent);
             rr.gameObject.AddComponent<DragResize>().target = Root;
             Resize = rr.gameObject;
 
             All.Add(this);
-            ShowEdit(Editor.On);
+            ShowEdit(BreneEdit.On);
         }
 
         public void ShowEdit(bool on) { Resize.SetActive(on); Hide.SetActive(on && CanHide); }
@@ -212,8 +213,8 @@ namespace Brene
     {
         public RectTransform target;
         public void OnBeginDrag(PointerEventData e) { target.SetAsLastSibling(); }
-        public void OnDrag(PointerEventData e) { target.anchoredPosition += e.delta / Editor.Scale; }
-        public void OnEndDrag(PointerEventData e) { Editor.Changed(); }
+        public void OnDrag(PointerEventData e) { target.anchoredPosition += e.delta / BreneEdit.Scale; }
+        public void OnEndDrag(PointerEventData e) { BreneEdit.Changed(); }
     }
 
     public class DragResize : MonoBehaviour, IDragHandler, IEndDragHandler
@@ -221,11 +222,11 @@ namespace Brene
         public RectTransform target;
         public void OnDrag(PointerEventData e)
         {
-            var s = target.sizeDelta + new Vector2(e.delta.x, -e.delta.y) / Editor.Scale;
+            var s = target.sizeDelta + new Vector2(e.delta.x, -e.delta.y) / BreneEdit.Scale;
             target.sizeDelta = new Vector2(Mathf.Max(180, s.x), Mathf.Max(110, s.y));
             var tag = target.GetComponent<PanelTag>(); if (tag != null) tag.panel.Fit();
         }
-        public void OnEndDrag(PointerEventData e) { Editor.Changed(); }
+        public void OnEndDrag(PointerEventData e) { BreneEdit.Changed(); }
     }
 
     // edit mode: pick a button up, drop it on any button panel (before the button under the pointer, or at the end)
@@ -235,10 +236,10 @@ namespace Brene
         Transform homeParent; int homeIndex; CanvasGroup cg; bool dragging; Vector2 size;
         public void OnBeginDrag(PointerEventData e)
         {
-            if (!Editor.On) { dragging = false; return; }
+            if (!BreneEdit.On) { dragging = false; return; }
             dragging = true; homeParent = transform.parent; homeIndex = transform.GetSiblingIndex();
             size = ((RectTransform)transform).rect.size;
-            transform.SetParent(Editor.Canvas.transform, true); transform.SetAsLastSibling();
+            transform.SetParent(BreneEdit.Canvas.transform, true); transform.SetAsLastSibling();
             ((RectTransform)transform).sizeDelta = size;
             cg = GetComponent<CanvasGroup>(); if (cg == null) cg = gameObject.AddComponent<CanvasGroup>();
             cg.blocksRaycasts = false; cg.alpha = 0.8f;
@@ -246,7 +247,7 @@ namespace Brene
         public void OnDrag(PointerEventData e)
         {
             if (!dragging) return;
-            ((RectTransform)transform).anchoredPosition += e.delta / Editor.Scale;
+            ((RectTransform)transform).anchoredPosition += e.delta / BreneEdit.Scale;
         }
         public void OnEndDrag(PointerEventData e)
         {
@@ -264,7 +265,7 @@ namespace Brene
             if (dropParent == null) { dropParent = homeParent; dropIndex = homeIndex; }
             transform.SetParent(dropParent, false);
             if (dropIndex >= 0) transform.SetSiblingIndex(dropIndex); else transform.SetAsLastSibling();
-            Editor.Changed();
+            BreneEdit.Changed();
         }
     }
 }

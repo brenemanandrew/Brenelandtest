@@ -105,13 +105,13 @@ namespace Brene
             wristCanvas = wristGo.AddComponent<Canvas>(); wristCanvas.renderMode = RenderMode.WorldSpace; wristCanvas.worldCamera = Cam();
             wristGo.AddComponent<GraphicRaycaster>();
             var rt = (RectTransform)wristGo.transform; rt.sizeDelta = new Vector2(420, 300); rt.localScale = Vector3.one * 0.00045f;   // about 19 by 13 cm
-            var bg = UI.Rect("Bg", rt); UI.Fill(bg, 0, 0, 0, 0); UI.Box(bg, Role.Panel);
-            var g = UI.Rect("Grid", rt); UI.Fill(g, 12, 12, 12, 12);
+            var bg = Ui.Rect("Bg", rt); Ui.Fill(bg, 0, 0, 0, 0); Ui.Box(bg, Role.Panel);
+            var g = Ui.Rect("Grid", rt); Ui.Fill(g, 12, 12, 12, 12);
             var grid = g.gameObject.AddComponent<GridLayoutGroup>(); grid.cellSize = new Vector2(192, 84); grid.spacing = new Vector2(12, 12);
-            UI.SetOn(UI.Button(g, "Board", ToggleBoard), true);
-            UI.Button(g, "Menu", () => { if (!canvasGo.activeSelf) ToggleBoard(); radial.OpenAtCentre(); });
-            UI.Button(g, "Wizra", () => { if (!canvasGo.activeSelf) ToggleBoard(); pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); });
-            UI.Button(g, "Bring board here", PlaceBoard);
+            Ui.SetOn(Ui.Button(g, "Board", ToggleBoard), true);
+            Ui.Button(g, "Menu", () => { if (!canvasGo.activeSelf) ToggleBoard(); radial.OpenAtCentre(); });
+            Ui.Button(g, "Wizra", () => { if (!canvasGo.activeSelf) ToggleBoard(); pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); });
+            Ui.Button(g, "Bring board here", PlaceBoard);
             Theme.ApplyAll(rt);
             Send("AddCanvas", wristCanvas);
             wristGo.SetActive(false);
@@ -142,10 +142,10 @@ namespace Brene
         void BuildQuick()
         {
             if (pChat == null) return;
-            var row = UI.Rect("Quick", pChat.Body); row.anchorMin = new Vector2(0, 0); row.anchorMax = new Vector2(1, 0); row.pivot = new Vector2(0.5f, 0);
+            var row = Ui.Rect("Quick", pChat.Body); row.anchorMin = new Vector2(0, 0); row.anchorMax = new Vector2(1, 0); row.pivot = new Vector2(0.5f, 0);
             row.sizeDelta = new Vector2(0, 50); row.anchoredPosition = new Vector2(0, 60);
             var g = row.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(140, 46); g.spacing = new Vector2(6, 6);
-            foreach (var q in QUICK) { var line = q; var b = UI.Button(row, line, () => { chatIn.text = line; SendChat(); }); b.GetComponentInChildren<Text>().fontSize = 17; }
+            foreach (var q in QUICK) { var line = q; var b = Ui.Button(row, line, () => { chatIn.text = line; SendChat(); }); b.GetComponentInChildren<Text>().fontSize = 17; }
             quickRow = row.gameObject;
             for (int i = 0; i < pChat.Body.childCount; i++) { var c = (RectTransform)pChat.Body.GetChild(i); if (c.name == "Log") c.offsetMin = new Vector2(0, 116); }
         }

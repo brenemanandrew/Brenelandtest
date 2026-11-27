@@ -17,8 +17,11 @@ title: Brene for VaM - first real load in VaM 1.22: checker fix
 - Compile check passed; story test 28 passed.
 ## Not tested
 - Whether VaM's checker accepts everything else (it reports one problem at a time).
+- Bisect round 1 (Andrew): tests with BreneUIKit.cs crashed VaM's compiler, the one without it loaded. BreneUIKit changed: the Role enum (a MonoBehaviour field) is now int constants, the helper classes `UI` and `Editor` are renamed `Ui` and `BreneEdit`, anonymous `delegate { }` replaced by lambdas. Round 2 tests P (fixed file alone), Q (drag handlers), R (colour table) sent with the fixed Brene.
+- VaM's security setting "Allow Plugins Network Access" must be on for Brene's relay link.
+
 ## Broken
-- VaM 1.22 crashes while compiling the full Brene (see above). Being bisected.
+- VaM 1.22 crashed compiling the full Brene; fix candidate sent, not yet confirmed.
 ## Open
 - Next VaM load result.
 ## Settings changed

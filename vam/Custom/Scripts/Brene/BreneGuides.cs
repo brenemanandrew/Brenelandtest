@@ -38,8 +38,8 @@ namespace Brene
             Lessons();
             foreach (var l in lessons)
             {
-                var lesson = l; var r = UI.Rect("Lesson " + l.Name, pHelp.Body); r.gameObject.AddComponent<LayoutElement>().minHeight = 70;
-                var b = UI.Button(r, l.Name + "  -  " + l.About, () => { pHelp.Root.gameObject.SetActive(false); coach.Start(lesson); }); Flow.Stretch(b);
+                var lesson = l; var r = Ui.Rect("Lesson " + l.Name, pHelp.Body); r.gameObject.AddComponent<LayoutElement>().minHeight = 70;
+                var b = Ui.Button(r, l.Name + "  -  " + l.About, () => { pHelp.Root.gameObject.SetActive(false); coach.Start(lesson); }); Flow.Stretch(b);
                 b.GetComponentInChildren<Text>().fontSize = 19;
             }
             pHelp.Root.gameObject.SetActive(false);
@@ -84,12 +84,12 @@ namespace Brene
             for (int i = 0; i < items.Count; i++)
             {
                 var path = items[i]["path"].Value; var name = items[i]["name"].Value;
-                var tile = UI.Rect("Tile " + name, grid); var bg = UI.Box(tile, Role.Button);
+                var tile = Ui.Rect("Tile " + name, grid); var bg = Ui.Box(tile, Role.Button);
                 var bt = tile.gameObject.AddComponent<Button>(); bt.targetGraphic = bg; bt.onClick.AddListener(() => pick(path, name));
-                var pic = UI.Rect("Pic", tile); pic.anchorMin = Vector2.zero; pic.anchorMax = Vector2.one; pic.offsetMin = new Vector2(6, 34); pic.offsetMax = new Vector2(-6, -6);
+                var pic = Ui.Rect("Pic", tile); pic.anchorMin = Vector2.zero; pic.anchorMax = Vector2.one; pic.offsetMin = new Vector2(6, 34); pic.offsetMax = new Vector2(-6, -6);
                 var raw = pic.gameObject.AddComponent<RawImage>(); raw.color = new Color(1, 1, 1, 0.08f); raw.raycastTarget = false;
-                var cap = UI.Rect("Cap", tile); cap.anchorMin = new Vector2(0, 0); cap.anchorMax = new Vector2(1, 0); cap.pivot = new Vector2(0.5f, 0); cap.sizeDelta = new Vector2(0, 32);
-                UI.Label(cap, name, 15, Role.Text, TextAnchor.MiddleCenter);
+                var cap = Ui.Rect("Cap", tile); cap.anchorMin = new Vector2(0, 0); cap.anchorMax = new Vector2(1, 0); cap.pivot = new Vector2(0.5f, 0); cap.sizeDelta = new Vector2(0, 32);
+                Ui.Label(cap, name, 15, Role.Text, TextAnchor.MiddleCenter);
                 if (items[i]["thumb"].Value != "") thumbs.Add(new KeyValuePair<RawImage, string>(raw, items[i]["thumb"].Value));
             }
             foreach (var t in thumbs)
@@ -119,9 +119,9 @@ namespace Brene
                 foreach (var a in people)
                 {
                     var atom = a; var row = Flow.Grid(c, new Vector2(196, 56));
-                    UI.Label(UI.Rect("Name", row), atom.uid, 21, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
-                    UI.Button(row, "Select", () => SuperController.singleton.SelectController(atom.mainController));
-                    UI.SetOn(UI.Button(row, "Character  >", () => { SuperController.singleton.SelectController(atom.mainController); chr.Open("Start"); }), true);
+                    Ui.Label(Ui.Rect("Name", row), atom.uid, 21, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
+                    Ui.Button(row, "Select", () => SuperController.singleton.SelectController(atom.mainController));
+                    Ui.SetOn(Ui.Button(row, "Character  >", () => { SuperController.singleton.SelectController(atom.mainController); chr.Open("Start"); }), true);
                 }
                 Flow.Wide(c, "+ Add a person", () => AddAtom("Person", f), false);
             }) { Check = () => Atoms("Person").Count > 0 ? null : "add at least one person" });
@@ -130,7 +130,7 @@ namespace Brene
                 var people = Atoms("Person"); if (people.Count == 0) { Flow.Say(c, "Add a person first (step 2)."); return; }
                 Atom who = null; var sel = SuperController.singleton.GetSelectedAtom(); if (sel != null && sel.type == "Person") who = sel; if (who == null) who = people[0];
                 var chips = Flow.Grid(c, new Vector2(150, 48));
-                foreach (var a in people) { var atom = a; UI.SetOn(UI.Button(chips, atom.uid, () => { SuperController.singleton.SelectController(atom.mainController); f.Redraw(); }), atom == who); }
+                foreach (var a in people) { var atom = a; Ui.SetOn(Ui.Button(chips, atom.uid, () => { SuperController.singleton.SelectController(atom.mainController); f.Redraw(); }), atom == who); }
                 var target = who;
                 StartCoroutine(FlowTiles(f.Note, c, "pose", (path, name) => { var err = ApplyPreset("pose", path, target.uid); f.Note(err ?? (name + " on " + target.uid)); }));
             }));
@@ -152,13 +152,13 @@ namespace Brene
             f.Steps.Add(new FlowStep("View", "How you look at it: glasses, 3D, head tracking.", c =>
             {
                 var g = Flow.Grid(c, new Vector2(196, 60));
-                foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) { var a = acts[id]; var b = UI.Button(g, a.label, () => { a.run(); Refresh(); f.Redraw(); }); UI.SetOn(b, a.on != null && a.on()); }
+                foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) { var a = acts[id]; var b = Ui.Button(g, a.label, () => { a.run(); Refresh(); f.Redraw(); }); Ui.SetOn(b, a.on != null && a.on()); }
                 Flow.Wide(c, "Glasses setup, step by step  >", () => { f.Panel.Root.gameObject.SetActive(false); glassFlow.Open(0); }, true);
             }));
             f.Steps.Add(new FlowStep("Play & save", "Try it, then keep it.", c =>
             {
                 var g = Flow.Grid(c, new Vector2(196, 60));
-                foreach (var id in new[] { "play", "freeze", "undo", "redo" }) { var a = acts[id]; var b = UI.Button(g, a.id == "play" ? (SuperController.singleton.gameMode == SuperController.GameMode.Play ? "Play mode" : "Edit mode") : a.label, () => { a.run(); Refresh(); f.Redraw(); }); UI.SetOn(b, a.on != null && a.on()); }
+                foreach (var id in new[] { "play", "freeze", "undo", "redo" }) { var a = acts[id]; var b = Ui.Button(g, a.id == "play" ? (SuperController.singleton.gameMode == SuperController.GameMode.Play ? "Play mode" : "Edit mode") : a.label, () => { a.run(); Refresh(); f.Redraw(); }); Ui.SetOn(b, a.on != null && a.on()); }
                 Flow.Wide(c, "Save scene", () => Send("SaveSceneDialog"), true);
             }));
         }
@@ -256,10 +256,10 @@ namespace Brene
             lib.Steps.Add(new CoachStep("Hub", "Sort by Hot Picks, Trending, Rating and more. Install fetches the package and anything it needs, then VaM rescans."));
 
             var lay = new Lesson("Layout", "move and restyle everything"); lessons.Add(lay);
-            lay.Steps.Add(new CoachStep("Edit layout", "Turn on edit mode.\n\n<b>Try it:</b> press Edit layout.") { Target = () => Btn("edit"), Done = () => Editor.On });
+            lay.Steps.Add(new CoachStep("Edit layout", "Turn on edit mode.\n\n<b>Try it:</b> press Edit layout.") { Target = () => Btn("edit"), Done = () => BreneEdit.On });
             lay.Steps.Add(new CoachStep("Move and resize", "Drag a panel's title bar to move it. Drag the coloured corner to resize. x hides a panel.") { Target = () => pScene.Root });
             lay.Steps.Add(new CoachStep("Move buttons", "Drag a button onto another panel, or between two buttons, to put it there.") { Target = () => pScene.Body });
-            lay.Steps.Add(new CoachStep("Done", "Press Edit layout again to finish. Your layout is saved.\n\n<b>Try it now.</b>") { Target = () => Btn("edit"), Done = () => !Editor.On });
+            lay.Steps.Add(new CoachStep("Done", "Press Edit layout again to finish. Your layout is saved.\n\n<b>Try it now.</b>") { Target = () => Btn("edit"), Done = () => !BreneEdit.On });
         }
         string KeyName() { return menuKey.val == "BackQuote" ? "` (under Esc)" : menuKey.val == "Mouse4" ? "mouse back button" : menuKey.val; }
     }

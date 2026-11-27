@@ -49,7 +49,7 @@ namespace Brene
             var who = CastOf(person);
             if (who == null) { CastPicker(c, person, "Who is " + person.uid + "? Her personality comes from Brenai, so pick which of the cast she is:"); return; }
             Flow.Say(c, Nice(who) + "'s personality lives in Brenai: her persona and temperament. It shifts as you spend time with her. Change her persona in Brenai's robot panel (owner only).");
-            var holder = UI.Rect("Traits", c); var v = holder.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 4; v.childControlHeight = true; v.childControlWidth = true; v.childForceExpandHeight = false;
+            var holder = Ui.Rect("Traits", c); var v = holder.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 4; v.childControlHeight = true; v.childControlWidth = true; v.childForceExpandHeight = false;
             Flow.Say(holder, "Reading from Brenai...");
             StartCoroutine(Json("GET", "/story/personality?who=" + who, null, (j, e) =>
             {
@@ -63,15 +63,15 @@ namespace Brene
         }
         void Bar(RectTransform parent, string label, float v)
         {
-            var row = UI.Rect("Trait " + label, parent); row.gameObject.AddComponent<LayoutElement>().minHeight = 34;
-            var l = UI.Rect("L", row); l.anchorMin = new Vector2(0, 0); l.anchorMax = new Vector2(0.34f, 1); l.offsetMin = l.offsetMax = Vector2.zero; UI.Label(l, label, 18, Role.Text, TextAnchor.MiddleLeft);
-            var track = UI.Rect("Track", row); track.anchorMin = new Vector2(0.36f, 0.3f); track.anchorMax = new Vector2(1, 0.7f); track.offsetMin = track.offsetMax = Vector2.zero; UI.Box(track, Role.Field);
-            var fill = UI.Rect("Fill", track); fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(Mathf.Clamp01(v), 1); fill.offsetMin = fill.offsetMax = Vector2.zero; UI.Box(fill, Role.Accent);
+            var row = Ui.Rect("Trait " + label, parent); row.gameObject.AddComponent<LayoutElement>().minHeight = 34;
+            var l = Ui.Rect("L", row); l.anchorMin = new Vector2(0, 0); l.anchorMax = new Vector2(0.34f, 1); l.offsetMin = l.offsetMax = Vector2.zero; Ui.Label(l, label, 18, Role.Text, TextAnchor.MiddleLeft);
+            var track = Ui.Rect("Track", row); track.anchorMin = new Vector2(0.36f, 0.3f); track.anchorMax = new Vector2(1, 0.7f); track.offsetMin = track.offsetMax = Vector2.zero; Ui.Box(track, Role.Field);
+            var fill = Ui.Rect("Fill", track); fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(Mathf.Clamp01(v), 1); fill.offsetMin = fill.offsetMax = Vector2.zero; Ui.Box(fill, Role.Accent);
         }
         void CastPicker(RectTransform c, Atom person, string say)
         {
             Flow.Say(c, say); var g = Flow.Grid(c, new Vector2(140, 56));
-            foreach (var w in CAST) { var who = w; UI.Button(g, Nice(who), () => { SetBody(who, person.uid); ShowBody(); chr.Redraw(); }); }
+            foreach (var w in CAST) { var who = w; Ui.Button(g, Nice(who), () => { SetBody(who, person.uid); ShowBody(); chr.Redraw(); }); }
         }
 
         // ---- step 10: reactions ----
@@ -83,11 +83,11 @@ namespace Brene
             foreach (var z in ZONES)
             {
                 var zone = z; var row = Flow.Grid(c, new Vector2(140, 50));
-                UI.Label(UI.Rect("Zone", row), Nice(zone), 19, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
+                Ui.Label(Ui.Rect("Zone", row), Nice(zone), 19, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
                 var face = FaceFor(who, zone); var tell = TellFor(who, zone);
-                UI.Button(row, "Face: " + face, () => { SetRule(who, zone, FACES[(Array.IndexOf(FACES, FaceFor(who, zone)) + 1) % FACES.Length], TellFor(who, zone)); chr.Redraw(); });
-                UI.SetOn(UI.Button(row, tell ? "Tell her: yes" : "Tell her: no", () => { SetRule(who, zone, FaceFor(who, zone), !TellFor(who, zone)); chr.Redraw(); }), tell);
-                UI.Button(row, "Test", () => { ReactionTests++; Touch(who, zone, true); });
+                Ui.Button(row, "Face: " + face, () => { SetRule(who, zone, FACES[(Array.IndexOf(FACES, FaceFor(who, zone)) + 1) % FACES.Length], TellFor(who, zone)); chr.Redraw(); });
+                Ui.SetOn(Ui.Button(row, tell ? "Tell her: yes" : "Tell her: no", () => { SetRule(who, zone, FaceFor(who, zone), !TellFor(who, zone)); chr.Redraw(); }), tell);
+                Ui.Button(row, "Test", () => { ReactionTests++; Touch(who, zone, true); });
             }
         }
 

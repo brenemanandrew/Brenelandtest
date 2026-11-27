@@ -29,7 +29,7 @@
     {
      "id": "PluginManager",
      "plugins": {
-      "plugin#0": "Custom/Scripts/BreneTest/TestD.cslist"
+      "plugin#0": "Custom/Scripts/BreneTest/TestR.cslist"
      }
     }
    ]

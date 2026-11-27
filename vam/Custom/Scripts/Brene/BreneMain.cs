@@ -92,7 +92,7 @@ namespace Brene
             Add("full", "3D Full", () => fullOn.val = !fullOn.val, () => fullOn.val);
             Add("center", "Re-centre", () => vit.Recenter(), null);
             Add("hands", "Hands", () => handsOn.val = !handsOn.val, () => handsOn.val);
-            Add("edit", "Edit layout", () => SetEdit(!Editor.On), () => Editor.On);
+            Add("edit", "Edit layout", () => SetEdit(!BreneEdit.On), () => BreneEdit.On);
             Add("theme", "Theme", NextTheme, null);
             Add("bigger", "Bigger", () => uiSize.val = Mathf.Min(3f, uiSize.val + 0.15f), null);
             Add("smaller", "Smaller", () => uiSize.val = Mathf.Max(0.6f, uiSize.val - 0.15f), null);
@@ -114,7 +114,7 @@ namespace Brene
             canvas = canvasGo.AddComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 30;
             scaler = canvasGo.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; scaler.scaleFactor = uiSize.val;
             canvasGo.AddComponent<GraphicRaycaster>();
-            Editor.Canvas = canvas; Editor.Changed = () => { if (Editor.On) saveAt = Time.realtimeSinceStartup + 1f; };
+            BreneEdit.Canvas = canvas; BreneEdit.Changed = () => { if (BreneEdit.On) saveAt = Time.realtimeSinceStartup + 1f; };
             var root = canvasGo.transform;
 
             pScene = new Panel(root, "scene", "Scene", new Vector2(20, -20), new Vector2(340, 250), true);
@@ -122,7 +122,7 @@ namespace Brene
             pLayout = new Panel(root, "layout", "Layout", new Vector2(20, -560), new Vector2(340, 250), true);
             pPeople = new Panel(root, "people", "People", new Vector2(380, -20), new Vector2(240, 320), false);
             pChat = new Panel(root, "chat", "Wizra", new Vector2(-1, -20), new Vector2(460, 520), false);
-            pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(Editor.On);
+            pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(BreneEdit.On);
 
             foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
             foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
@@ -145,23 +145,23 @@ namespace Brene
             var v = peopleList.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 6; v.childForceExpandHeight = false; v.childControlHeight = true; v.childControlWidth = true;
 
             // Wizra: the log, a box to type in and Send
-            var logArea = UI.Rect("Log", pChat.Body); UI.Fill(logArea, 0, 0, 0, 62); UI.Box(logArea, Role.Field);
+            var logArea = Ui.Rect("Log", pChat.Body); Ui.Fill(logArea, 0, 0, 0, 62); Ui.Box(logArea, Role.Field);
             RectTransform logContent; chatScroll = Scroll(logArea, out logContent);
             var lv = logContent.gameObject.AddComponent<VerticalLayoutGroup>(); lv.childControlHeight = true; lv.childControlWidth = true; lv.padding = new RectOffset(10, 10, 8, 8);
-            chatLog = UI.Label(logContent, "Say something to Wizra. Her words come from the PC model through the Brene relay.", 21, Role.Text, TextAnchor.UpperLeft);
+            chatLog = Ui.Label(logContent, "Say something to Wizra. Her words come from the PC model through the Brene relay.", 21, Role.Text, TextAnchor.UpperLeft);
             chatLog.verticalOverflow = VerticalWrapMode.Overflow; chatLog.supportRichText = true;
             chatLog.gameObject.AddComponent<LayoutElement>();
-            var inRt = UI.Rect("Input", pChat.Body); inRt.anchorMin = new Vector2(0, 0); inRt.anchorMax = new Vector2(1, 0); inRt.pivot = new Vector2(0, 0);
+            var inRt = Ui.Rect("Input", pChat.Body); inRt.anchorMin = new Vector2(0, 0); inRt.anchorMax = new Vector2(1, 0); inRt.pivot = new Vector2(0, 0);
             inRt.offsetMin = new Vector2(0, 0); inRt.offsetMax = new Vector2(-110, 54);
             chatIn = Input(inRt, "Type here, Enter to send");
-            var sendRt = UI.Rect("Send", pChat.Body); sendRt.anchorMin = sendRt.anchorMax = new Vector2(1, 0); sendRt.pivot = new Vector2(1, 0); sendRt.sizeDelta = new Vector2(100, 54);
-            var sb = UI.Button(sendRt, "Send", SendChat); var sbr = (RectTransform)sb.transform; sbr.anchorMin = Vector2.zero; sbr.anchorMax = Vector2.one; sbr.sizeDelta = Vector2.zero;
-            UI.SetOn(sb, false);
+            var sendRt = Ui.Rect("Send", pChat.Body); sendRt.anchorMin = sendRt.anchorMax = new Vector2(1, 0); sendRt.pivot = new Vector2(1, 0); sendRt.sizeDelta = new Vector2(100, 54);
+            var sb = Ui.Button(sendRt, "Send", SendChat); var sbr = (RectTransform)sb.transform; sbr.anchorMin = Vector2.zero; sbr.anchorMax = Vector2.one; sbr.sizeDelta = Vector2.zero;
+            Ui.SetOn(sb, false);
 
             // status line along the bottom of the dock
-            var st = UI.Rect("Status", pDock.Root); st.anchorMin = new Vector2(0, 0); st.anchorMax = new Vector2(1, 0); st.pivot = new Vector2(0, 0); st.sizeDelta = new Vector2(0, 30);
-            status = UI.Label(st, "", 16, Role.Dim, TextAnchor.MiddleLeft);
-            UI.Fill((RectTransform)pDock.Body, 10, 54, 10, 34);
+            var st = Ui.Rect("Status", pDock.Root); st.anchorMin = new Vector2(0, 0); st.anchorMax = new Vector2(1, 0); st.pivot = new Vector2(0, 0); st.sizeDelta = new Vector2(0, 30);
+            status = Ui.Label(st, "", 16, Role.Dim, TextAnchor.MiddleLeft);
+            Ui.Fill((RectTransform)pDock.Body, 10, 54, 10, 34);
 
             PlaceRight(pChat, 20); PlaceBottomRight(pDock);
             foreach (var p in Panel.All) p.Fit();
@@ -175,16 +175,16 @@ namespace Brene
         {
             Act a; if (!acts.TryGetValue(id, out a)) return;
             if (a.btn != null) { a.btn.transform.SetParent(p.Body, false); return; }
-            a.btn = UI.Button(p.Body, a.label, () => { try { a.run(); } catch (Exception e) { SuperController.LogError("Brene " + a.id + ": " + e.Message); } Refresh(); });
+            a.btn = Ui.Button(p.Body, a.label, () => { try { a.run(); } catch (Exception e) { SuperController.LogError("Brene " + a.id + ": " + e.Message); } Refresh(); });
             a.btn.gameObject.AddComponent<DragButton>().actionId = id;
         }
 
         ScrollRect Scroll(RectTransform area, out RectTransform content)
         {
-            var vp = UI.Rect("Viewport", area); UI.Fill(vp, 0, 0, 0, 0);
+            var vp = Ui.Rect("Viewport", area); Ui.Fill(vp, 0, 0, 0, 0);
             vp.gameObject.AddComponent<RectMask2D>();
             var hit = vp.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0.001f);
-            content = UI.Rect("Content", vp); content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1); content.sizeDelta = Vector2.zero;
+            content = Ui.Rect("Content", vp); content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1); content.sizeDelta = Vector2.zero;
             var fit = content.gameObject.AddComponent<ContentSizeFitter>(); fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             var sr = area.gameObject.AddComponent<ScrollRect>(); sr.viewport = vp; sr.content = content; sr.horizontal = false; sr.scrollSensitivity = 30; sr.movementType = ScrollRect.MovementType.Clamped;
             return sr;
@@ -192,10 +192,10 @@ namespace Brene
 
         InputField Input(RectTransform rt, string hint)
         {
-            UI.Box(rt, Role.Field);
+            Ui.Box(rt, Role.Field);
             var f = rt.gameObject.AddComponent<InputField>();
-            var ph = UI.Label(rt, hint, 21, Role.Dim, TextAnchor.MiddleLeft); ph.fontStyle = FontStyle.Italic;
-            var tx = UI.Label(rt, "", 21, Role.Text, TextAnchor.MiddleLeft); tx.supportRichText = false; tx.raycastTarget = true;
+            var ph = Ui.Label(rt, hint, 21, Role.Dim, TextAnchor.MiddleLeft); ph.fontStyle = FontStyle.Italic;
+            var tx = Ui.Label(rt, "", 21, Role.Text, TextAnchor.MiddleLeft); tx.supportRichText = false; tx.raycastTarget = true;
             f.textComponent = tx; f.placeholder = ph; f.lineType = InputField.LineType.SingleLine;
             f.onEndEdit.AddListener(s => { if (UnityEngine.Input.GetKey(KeyCode.Return) || UnityEngine.Input.GetKey(KeyCode.KeypadEnter)) SendChat(); });
             return f;
@@ -286,30 +286,30 @@ namespace Brene
             foreach (var a in names)
             {
                 var atom = a;
-                var b = UI.Button(peopleList, atom.uid, () => { if (atom.mainController != null) SuperController.singleton.SelectController(atom.mainController); });
+                var b = Ui.Button(peopleList, atom.uid, () => { if (atom.mainController != null) SuperController.singleton.SelectController(atom.mainController); });
                 var le = b.gameObject.AddComponent<LayoutElement>(); le.minHeight = 52; le.preferredHeight = 52;
             }
-            if (names.Count == 0) { var t = UI.Label(peopleList, "No people in this scene", 18, Role.Dim, TextAnchor.MiddleLeft); t.gameObject.AddComponent<LayoutElement>().minHeight = 40; }
+            if (names.Count == 0) { var t = Ui.Label(peopleList, "No people in this scene", 18, Role.Dim, TextAnchor.MiddleLeft); t.gameObject.AddComponent<LayoutElement>().minHeight = 40; }
         }
 
         // ---- editor ----
         void SetEdit(bool on)
         {
-            Editor.On = on; foreach (var p in Panel.All) p.ShowEdit(on);
+            BreneEdit.On = on; foreach (var p in Panel.All) p.ShowEdit(on);
             if (!on) SaveLayout();
             Refresh();
         }
-        void ShowAll() { foreach (var p in Panel.All) p.Root.gameObject.SetActive(true); Editor.Changed(); }
+        void ShowAll() { foreach (var p in Panel.All) p.Root.gameObject.SetActive(true); BreneEdit.Changed(); }
         void NextTheme()
         {
             int i = Array.IndexOf(Theme.Names, Theme.Name); Theme.Name = Theme.Names[(i + 1) % Theme.Names.Length];
-            Theme.ApplyAll(canvasGo.transform); Refresh(); Editor.Changed();
+            Theme.ApplyAll(canvasGo.transform); Refresh(); BreneEdit.Changed();
         }
 
         void Refresh()
         {
-            foreach (var a in new List<Act>(acts.Values)) if (a.btn != null && a.on != null) { try { UI.SetOn(a.btn, a.on()); } catch (Exception) { } }
-            Act play; if (acts.TryGetValue("play", out play) && play.btn != null) { try { UI.SetText(play.btn, SuperController.singleton.gameMode == SuperController.GameMode.Play ? "Play mode" : "Edit mode"); } catch (Exception) { } }
+            foreach (var a in new List<Act>(acts.Values)) if (a.btn != null && a.on != null) { try { Ui.SetOn(a.btn, a.on()); } catch (Exception) { } }
+            Act play; if (acts.TryGetValue("play", out play) && play.btn != null) { try { Ui.SetText(play.btn, SuperController.singleton.gameMode == SuperController.GameMode.Play ? "Play mode" : "Edit mode"); } catch (Exception) { } }
         }
 
         // ---- layout file ----
@@ -396,7 +396,7 @@ namespace Brene
                 string s;
                 if (!link.Connected) s = "Relay: not running (start-brene.bat)";
                 else s = "Glasses: " + (link.Glasses ? (link.HasPos ? "6DOF" : "3DOF") : "none") + "   Hands: " + link.Hands.Count + (vit.HandNote != "" ? "   " + vit.HandNote : "");
-                if (Editor.On) s = "Editing: drag titles to move, corners to resize, buttons between panels";
+                if (BreneEdit.On) s = "Editing: drag titles to move, corners to resize, buttons between panels";
                 status.text = s;
             }
         }
@@ -418,7 +418,7 @@ namespace Brene
             if (coach != null) coach.Destroy();
             DropWizra();
             if (vr) LeaveVR();
-            Panel.All.Clear(); Editor.On = false;
+            Panel.All.Clear(); BreneEdit.On = false;
         }
     }
 }

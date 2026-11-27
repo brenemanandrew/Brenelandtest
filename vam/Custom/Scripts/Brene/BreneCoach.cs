@@ -28,7 +28,7 @@ namespace Brene
         public bool Running { get { return lesson != null; } }
         public GameObject CanvasGo { get { return go; } }
         public Vector2 WorldSize;   // set in VR: the board's size in canvas units (zero on a monitor)
-        public Action<string> Finished = delegate { };
+        public Action<string> Finished = _ => { };
 
         public Coach(float scale)
         {
@@ -40,30 +40,30 @@ namespace Brene
             root = (RectTransform)go.transform;
             for (int i = 0; i < 4; i++)
             {
-                var d = UI.Rect("Dim", root); d.anchorMin = d.anchorMax = Vector2.zero; d.pivot = Vector2.zero;
+                var d = Ui.Rect("Dim", root); d.anchorMin = d.anchorMax = Vector2.zero; d.pivot = Vector2.zero;
                 dims[i] = d.gameObject.AddComponent<Image>(); dims[i].color = new Color(0, 0, 0, 0.62f);
             }
-            ring = UI.Rect("Spot", root); ring.anchorMin = ring.anchorMax = Vector2.zero; ring.pivot = Vector2.zero;
-            var ri = UI.Box(ring, Role.Accent); ri.raycastTarget = false; ri.fillCenter = false;
-            card = UI.Rect("Card", root); card.anchorMin = card.anchorMax = Vector2.zero; card.pivot = new Vector2(0.5f, 0.5f); card.sizeDelta = new Vector2(560, 300);
-            UI.Box(card, Role.Panel); card.localScale = Vector3.one * k;
-            var tr = UI.Rect("Title", card); tr.anchorMin = new Vector2(0, 1); tr.anchorMax = new Vector2(1, 1); tr.pivot = new Vector2(0.5f, 1); tr.sizeDelta = new Vector2(-36, 50); tr.anchoredPosition = new Vector2(0, -12);
-            title = UI.Label(tr, "", 28, Role.Accent, TextAnchor.MiddleLeft); title.fontStyle = FontStyle.Bold;
-            var br = UI.Rect("Body", card); UI.Fill(br, 26, 66, 26, 86);
-            body = UI.Label(br, "", 22, Role.Text, TextAnchor.UpperLeft); body.supportRichText = true;
-            var dr = UI.Rect("Dots", card); dr.anchorMin = new Vector2(0, 0); dr.anchorMax = new Vector2(0.4f, 0); dr.pivot = new Vector2(0, 0); dr.sizeDelta = new Vector2(0, 30); dr.anchoredPosition = new Vector2(14, 24);
-            dots = UI.Label(dr, "", 18, Role.Dim, TextAnchor.MiddleLeft);
+            ring = Ui.Rect("Spot", root); ring.anchorMin = ring.anchorMax = Vector2.zero; ring.pivot = Vector2.zero;
+            var ri = Ui.Box(ring, Role.Accent); ri.raycastTarget = false; ri.fillCenter = false;
+            card = Ui.Rect("Card", root); card.anchorMin = card.anchorMax = Vector2.zero; card.pivot = new Vector2(0.5f, 0.5f); card.sizeDelta = new Vector2(560, 300);
+            Ui.Box(card, Role.Panel); card.localScale = Vector3.one * k;
+            var tr = Ui.Rect("Title", card); tr.anchorMin = new Vector2(0, 1); tr.anchorMax = new Vector2(1, 1); tr.pivot = new Vector2(0.5f, 1); tr.sizeDelta = new Vector2(-36, 50); tr.anchoredPosition = new Vector2(0, -12);
+            title = Ui.Label(tr, "", 28, Role.Accent, TextAnchor.MiddleLeft); title.fontStyle = FontStyle.Bold;
+            var br = Ui.Rect("Body", card); Ui.Fill(br, 26, 66, 26, 86);
+            body = Ui.Label(br, "", 22, Role.Text, TextAnchor.UpperLeft); body.supportRichText = true;
+            var dr = Ui.Rect("Dots", card); dr.anchorMin = new Vector2(0, 0); dr.anchorMax = new Vector2(0.4f, 0); dr.pivot = new Vector2(0, 0); dr.sizeDelta = new Vector2(0, 30); dr.anchoredPosition = new Vector2(14, 24);
+            dots = Ui.Label(dr, "", 18, Role.Dim, TextAnchor.MiddleLeft);
             back = Btn("Back", new Vector2(-276, 18), 110, () => Show(index - 1));
             Btn("Skip", new Vector2(-156, 18), 100, Stop);
             next = Btn("Next", new Vector2(-18, 18), 130, () => { if (!waiting) Show(index + 1); });
-            UI.SetOn(next, true);
+            Ui.SetOn(next, true);
             go.SetActive(false);
         }
 
         Button Btn(string text, Vector2 fromBottomRight, float w, Action a)
         {
-            var r = UI.Rect(text, card); r.anchorMin = r.anchorMax = new Vector2(1, 0); r.pivot = new Vector2(1, 0); r.sizeDelta = new Vector2(w, 54); r.anchoredPosition = fromBottomRight;
-            var b = UI.Button(r, text, a); var rr = (RectTransform)b.transform; rr.anchorMin = Vector2.zero; rr.anchorMax = Vector2.one; rr.sizeDelta = Vector2.zero; return b;
+            var r = Ui.Rect(text, card); r.anchorMin = r.anchorMax = new Vector2(1, 0); r.pivot = new Vector2(1, 0); r.sizeDelta = new Vector2(w, 54); r.anchoredPosition = fromBottomRight;
+            var b = Ui.Button(r, text, a); var rr = (RectTransform)b.transform; rr.anchorMin = Vector2.zero; rr.anchorMax = Vector2.one; rr.sizeDelta = Vector2.zero; return b;
         }
 
         public void Start(Lesson l) { lesson = l; go.SetActive(true); Theme.ApplyAll(root); Show(0); }
@@ -77,8 +77,8 @@ namespace Brene
             if (st.Enter != null) { try { st.Enter(); } catch (Exception e) { SuperController.LogError("Brene tutorial: " + e.Message); } }
             title.text = st.Title; body.text = st.Text; waiting = st.Done != null; doneAt = -1;
             var d = ""; for (int k = 0; k < lesson.Steps.Count; k++) d += k == index ? "● " : "○ "; dots.text = d;
-            UI.SetText(next, waiting ? "Waiting..." : index == lesson.Steps.Count - 1 ? "Finish" : "Next");
-            UI.SetOn(next, !waiting); back.gameObject.SetActive(index > 0);
+            Ui.SetText(next, waiting ? "Waiting..." : index == lesson.Steps.Count - 1 ? "Finish" : "Next");
+            Ui.SetOn(next, !waiting); back.gameObject.SetActive(index > 0);
             Place();
         }
 
