@@ -30,7 +30,7 @@ namespace Brene
         readonly List<string> chatLines = new List<string>();
 
         JSONStorableString relayUrl; JSONStorableBool showUi, headOn, stereoOn, fullOn, handsOn, swapEyes, flipYaw, flipPitch, flipRoll;
-        JSONStorableFloat uiSize, ipd, posScale;
+        JSONStorableFloat uiSize, ipd, posScale, menuFit; float fovBase = -1, fovWrote = -1;
 
         public override void Init()
         {
@@ -44,6 +44,8 @@ namespace Brene
                 RegisterFloat(uiSize); CreateSlider(uiSize);
                 menuKey = new JSONStorableStringChooser("Menu key", new List<string> { "BackQuote", "Tab", "Q", "F1", "Mouse4" }, "BackQuote", "Radial menu key (hold)");
                 RegisterStringChooser(menuKey); CreatePopup(menuKey);
+                // VaM's own menu can run off the top of a short screen: a wider camera view makes it smaller so it fits
+                menuFit = new JSONStorableFloat("Fit VaM menu (wider view)", 0f, v => { }, 0f, 45f); RegisterFloat(menuFit); CreateSlider(menuFit);
                 headOn = Bool("Head tracking (glasses)", true, v => vit.Head = v);
                 handsOn = Bool("Hand control", true, v => vit.HandsOn = v);
                 stereoOn = Bool("3D side by side", false, v => vit.Stereo = v);
@@ -95,6 +97,8 @@ namespace Brene
             Add("smaller", "Smaller", () => uiSize.val = Mathf.Max(0.6f, uiSize.val - 0.15f), null);
             Add("savelayout", "Save layout", SaveLayout, null);
             Add("panels", "Show all", ShowAll, null);
+            Add("fitless", "VaM menu smaller", () => menuFit.val = Mathf.Min(45f, menuFit.val + 8f), null);
+            Add("fitmore", "VaM menu bigger", () => menuFit.val = Mathf.Max(0f, menuFit.val - 8f), null);
             Add("radial", "Menu", () => radial.OpenAtCentre(), null);
             Add("character", "Character", () => chr.Open(null), null);
         }
@@ -121,7 +125,7 @@ namespace Brene
 
             foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
             foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
-            foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels" }) MakeButton(id, pLayout);
+            foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels", "fitless", "fitmore" }) MakeButton(id, pLayout);
             MakeButton("radial", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
             chr = new Character(this, link, ApplyPreset); chr.Build(root);
             BuildGuides(root);
@@ -251,7 +255,7 @@ namespace Brene
                 act("play"),
                 new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
                 new RItem("Wizra", () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); chatIn.ActivateInputField(); }),
-                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller") }),
+                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore") }),
                 act("menu"),
                 new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Talk to next", () => { NextWho(); pChat.Root.gameObject.SetActive(true); }) }),
             };
@@ -395,7 +399,15 @@ namespace Brene
                 status.text = s;
             }
         }
-        void LateUpdate() { if (vit != null) { vit.LateUpdate(); vit.Hands(); } }
+        // the wider view for "Fit VaM menu": VaM's own field of view is the base; ours is added on top each frame
+        void FitMenu()
+        {
+            if (vr) return; var cam = SuperController.singleton != null ? SuperController.singleton.MonitorCenterCamera : null; if (cam == null) return;
+            if (Mathf.Abs(cam.fieldOfView - fovWrote) > 0.01f) fovBase = cam.fieldOfView;   // VaM (or its preferences) set it: that is the base
+            if (menuFit.val <= 0.01f) { if (fovWrote >= 0) { cam.fieldOfView = fovBase; fovWrote = -1; } return; }
+            cam.fieldOfView = Mathf.Clamp(fovBase + menuFit.val, 10f, 120f); fovWrote = cam.fieldOfView;
+        }
+        void LateUpdate() { FitMenu(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } }
 
         void OnDestroy()
         {

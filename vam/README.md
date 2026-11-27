@@ -39,7 +39,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 
 ## Install
 1. **Copy the plugin.** Copy `Custom/Scripts/Brene` into your VaM folder, so you have `VaM\Custom\Scripts\Brene\Brene.cslist`.
-2. **Load it in VaM.** Main menu > Session Plugin Presets > Add plugin > `Brene.cslist` keeps it in every scene. Or add it to any atom's Plugins tab for one scene.
+2. **Load it in VaM.** Easiest: open the scene **Brene > Brene Loader** from VaM's scene browser (an empty scene with Brene in it; `Saves/scene/Brene/Brene Loader.json`, copy it in with the plugin). It works even when VaM's menu runs off the top of the screen. Otherwise: Main menu > Session Plugin Presets > Add plugin > `Brene.cslist` keeps it in every scene. Or add it to any atom's Plugins tab for one scene.
 3. **Start the relay** (only needed for Wizra, glasses and hands). Copy the `relay` folder, double-click `start-brene.bat`, and leave the window open.
    - **Wizra from brenai.fly.dev**, with her memory and story: set `BRENAI_PIN` in Windows' environment variables. Also set `BRENAI_PASSWORD` if the game has a password. Never put these in a file.
    - **Without `BRENAI_PIN`:** she runs on LM Studio on this PC with her persona, but no memory. Her full persona needs the relay run from inside the repo (`vam/relay`); otherwise it uses a short stand-in.
@@ -131,6 +131,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
   - Press x to hide a panel ("Show all" brings panels back).
   - Leaving edit mode saves to `Saves/PluginData/Brene/layout.json`.
 - **Theme** cycles Night, Ocean, Rose, Forest and Light. **Bigger** and **Smaller** scale everything.
+- **VaM menu smaller / bigger** (Layout panel, radial > Panels, or "Fit VaM menu" in the plugin's settings): widens the desktop camera's view so VaM's own menu fits a short screen. Not yet checked that VaM's menu shrinks with the view.
 - **3D:**
   - Use **Half** when the glasses take a 1920x1080 side-by-side picture.
   - Use **Full** when Windows turns the screen into 3840x1080.
