@@ -1,0 +1,119 @@
+{
+ "about": "Margo Vance, the agent. Selfies are rewards for writing progress; call frames are her video-call faces. From Andrew's Hi3D renders, picked for consistent looks.",
+ "selfies": [
+  {
+   "file": "selfies/cat.webp",
+   "caption": "Biscuit says hi. Biscuit also says chapter 2 or no treats.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/mug.webp",
+   "caption": "Morning. Coffee. Your chapter. In that order.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/glasses-off.webp",
+   "caption": "6 a.m. Reading your pages. Haven't even found my glasses.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/gym.webp",
+   "caption": "Did 5k this morning. Your turn: 5k words.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/markup.webp",
+   "caption": "Marked up your chapter. Mostly hearts. Some knives.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/reading.webp",
+   "caption": "Reading chapter 6 like it's a thriller. Because it is.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/weekend.webp",
+   "caption": "Weekend check-in. Tell me you wrote something.",
+   "use": "checkin"
+  },
+  {
+   "file": "selfies/evening.webp",
+   "caption": "Evening coffee. Yes, coffee. Your deadline keeps me up.",
+   "use": "checkin"
+  },
+  {
+   "file": "selfies/shelf.webp",
+   "caption": "Cleared a space on my shelf for book 3.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/armour.webp",
+   "caption": "Pitch-meeting armour on. Already selling book 4. No pressure.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/the-chair.webp",
+   "caption": "This chair has heard forty authors cry. Don't be forty-one.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/author-photo.webp",
+   "caption": "Taking jacket photos for the new book. Earn yours.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/camera.webp",
+   "caption": "New camera for your launch party. Finish the book so I can use it.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/arms-crossed.webp",
+   "caption": "We need to talk about your word count.",
+   "use": "warning"
+  },
+  {
+   "file": "selfies/field.webp",
+   "caption": "Your mountains are pretty. Your page count isn't. Yet.",
+   "use": "visit"
+  },
+  {
+   "file": "selfies/waterfront.webp",
+   "caption": "On the waterfront. Thinking about your ending. Don't make it sad.",
+   "use": "visit"
+  }
+ ],
+ "call": [
+  {
+   "file": "call/warm.webp",
+   "mood": "warm"
+  },
+  {
+   "file": "call/listening.webp",
+   "mood": "listening"
+  },
+  {
+   "file": "call/skeptical.webp",
+   "mood": "skeptical"
+  },
+  {
+   "file": "call/stern.webp",
+   "mood": "stern"
+  },
+  {
+   "file": "call/delighted.webp",
+   "mood": "delighted"
+  },
+  {
+   "file": "call/smiling.webp",
+   "mood": "smiling"
+  },
+  {
+   "file": "call/evening.webp",
+   "mood": "evening"
+  },
+  {
+   "file": "call/weekend.webp",
+   "mood": "weekend"
+  }
+ ]
+}
