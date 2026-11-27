@@ -39,9 +39,33 @@ Nothing has been deployed. Open the URL in the Quest browser and press Enter VR.
 
 ## Tested (2026-11-27, headless Chrome; devices added the same day)
 - `test/flow.mjs`: runs all seven modules through the real step engine, typing on the device keys and scanning barcodes from the hand (no JS errors). Also checks that wrong inputs (514 instead of 415, a blue tote before the red one) show the device error and count as mistakes. The forklift run uses the real driving physics: the pallet stops at the carriage, lifts at pocket height, goes into P104-B and is set on the 1.6 m beam, the truck parks.
+- `test/xr.mjs` also stands the emulated headset 0.7 m off-centre and checks the head lands on the forklift seat and the THOR platform (error 0.000 m).
 - `test/xr.mjs`: Meta's WebXR emulator (IWER, Quest 3 profile; download `iwer.min.js` from `cdn.jsdelivr.net/npm/iwer@2/build/` next to the script). Enter VR works, the panel appears, a right-controller trigger on the panel starts a module, and the left controller's ray types 415 + ENT on the handheld held in the right hand.
 - **Not tested on a real Quest 3.** Comfort, text size, performance and stick feel need a headset run.
 - Run: `python3 -m http.server 8099` in this folder, then `node test/flow.mjs <outdir>` (needs Playwright).
+
+## Cleanup pass (2026-11-27)
+Bugs fixed:
+- Typing in the Trainee box also drove the game (E used things, digits pressed panel buttons, WASD walked). Game keys are now ignored while a dialog is open.
+- Record and idea timestamps were UTC. They are local time now.
+- VR: getting on the forklift or a THOR put you wherever the centre of your play space was, not on the seat or platform. You now land on it facing forward from wherever you stand, and snap turn pivots around your head.
+- VR: there was no way back to the menu inside a module. The panel header has a MENU button (press twice).
+- The waste hunt timer kept running on its results screen; leaving it with nothing found wrote an empty record.
+- A toast from the last module could carry into the next one. A held item could carry over through the menu.
+- A name with a quote mark broke the Trainee box. CSV cells starting with = + - @ are now exported as text.
+- Keys stuck down if the window lost focus mid-walk.
+
+Easier to use:
+- The confirm key (F8 / F4) accepts what you typed without pressing ENT first, like the real screen. A spare ENT is no longer a mistake; the device says which key is next.
+- PC keyboard: D now types on the device (for D300), Tab frees or grabs the mouse.
+- Menu asks before dropping a run. Kaizen note is a proper box, not a browser prompt. Enter saves the name.
+- Reticle is green when the thing is in reach, grey when it is too far. VR panel buttons light up under the pointer. Controllers buzz on right, wrong and safety calls.
+- Progress bar on the panel. Help box toggles with the ? button and stays off once closed. "Click the view to look around" hint. A message if the 3D library cannot load.
+- One Enter VR button in the top bar, shown only when a headset is there (the grey "VR NOT SUPPORTED" box is gone).
+
+Faster: static geometry is merged per material. The menu view went from 570 draw calls to 170 (measured in headless Chrome), and the VR panel redraws once a second instead of four times.
+
+`test/checks.mjs` covers the new behaviour (F8 accepts typed values, spare ENT, dialog swallows game keys) and prints the draw calls.
 
 ## Placeholders to confirm
 - Box sizes #2-#6 and the product dimensions in Pack step 4.

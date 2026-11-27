@@ -95,6 +95,7 @@ const res = await page.evaluate(async () => {
   /* hunt */
   T.startHunt(); for (const h of T.HUNT) { T.huntHit(h.id); const opts = T.panelState().btns; const j = opts.findIndex(b => h.answer.includes(b.label)); opts[j].fn(); }
   log.push(['hunt', T.panelState().title, T.panelState().sub]);
+  T.menu(); T.tick(1/60); T.renderer.render(T.camera.parent.parent, T.camera); log.push(['draw calls', T.renderer.info.render.calls, 'triangles', T.renderer.info.render.triangles]);
   return log;
 });
 console.log(JSON.stringify(res, null, 1));

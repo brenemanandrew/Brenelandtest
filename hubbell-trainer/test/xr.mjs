@@ -11,7 +11,7 @@ await page.addInitScript({ content: fs.readFileSync('iwer.min.js','utf8') + ';wi
 await page.goto('http://localhost:8099/index.html?test', { waitUntil: 'load' });
 await page.waitForFunction(() => window.TR, null, { timeout: 30000 });
 await page.waitForTimeout(1500);
-const btn = await page.$('#VRButton'); console.log('vr button text:', await btn.textContent());
+await page.waitForSelector('#vrBtn:not([hidden])', { timeout: 5000 }); const btn = await page.$('#vrBtn'); console.log('vr button text:', await btn.textContent());
 await btn.click(); await page.waitForTimeout(2000);
 const r = await page.evaluate(async () => {
   const T = window.TR, d = window.__dev, out = {};
@@ -75,6 +75,21 @@ const r3 = await page.evaluate(async () => {
   return out;
 });
 console.log('handheld keys in VR', JSON.stringify(r3));
+const r4 = await page.evaluate(async () => {
+  const T = window.TR, d = window.__dev, THREE = T.THREE, wait = ms => new Promise(r => setTimeout(r, ms));
+  const head = () => T.camera.getWorldPosition(new THREE.Vector3());
+  d.position.set(.6, 1.6, -.4); await wait(300);                       /* stand off-centre in the play space */
+  T.startModule('pit'); await wait(200); T.mountTruck(); await wait(400);
+  const seat = T.truck.localToWorld(new THREE.Vector3(0, .95, -.35)), h = head();
+  const out = { seatErr: +Math.hypot(h.x - seat.x, h.z - seat.z).toFixed(3), eyeY: +h.y.toFixed(2) };
+  T.F.onboard = false; T.startModule('pick'); await wait(200);
+  const t2 = T.OBJ.thor2.parent, tp = t2.getWorldPosition(new THREE.Vector3()); T.ride(t2); await wait(300);
+  const h2 = head(), tp2 = t2.getWorldPosition(new THREE.Vector3());
+  out.thorHeadErr = +Math.hypot(h2.x - tp.x, h2.z - tp.z).toFixed(3); out.thorMoved = +tp.distanceTo(tp2).toFixed(3);
+  out.calls = T.renderer.info.render.calls;
+  return out;
+});
+console.log('VR offsets', JSON.stringify(r4));
 await page.screenshot({ path: 'xr.png' });
 console.log('ERRORS', JSON.stringify(errs.slice(0, 8)));
 await browser.close();

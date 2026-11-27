@@ -9,14 +9,14 @@
 :root{--y:#FDDB33;--k:#000;--ink:#1a1a1a;--gray:#595959;--line:#D9D9D9;--ok:#2E7D32;--red:#C00000}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden;background:#000;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;color:var(--ink)}
-canvas{display:block}
+body>canvas{position:fixed;left:0;top:0;width:100vw;height:100vh;display:block}
 #top{position:fixed;top:0;left:0;right:0;height:46px;background:var(--k);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;z-index:5}
 #top b{color:var(--y);font-size:20px;letter-spacing:.5px}
 #top .sub{color:#ccc;font-size:15px}
 #top .sp{flex:1}
 #top button{background:#222;color:#fff;border:1px solid #555;border-radius:4px;padding:5px 10px;font-size:14px;cursor:pointer}
 #top button:hover{border-color:var(--y)}
-#hud{position:fixed;left:12px;bottom:12px;width:min(470px,calc(100vw - 24px));max-height:calc(100vh - 80px);overflow:auto;background:rgba(255,255,255,.96);border-top:6px solid var(--y);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.35);padding:12px 14px;z-index:4}
+#hud{position:fixed;left:12px;bottom:12px;width:min(470px,calc(100vw - 24px));max-height:calc(100vh - 80px);overflow:auto;background:#fff;border-top:6px solid var(--y);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.35);padding:12px 14px;z-index:4}
 #hTitle{font-weight:700;font-size:18px}
 #hSub{font-size:13px;color:var(--gray);margin-bottom:6px}
 #hText{font-size:16px;line-height:1.3;white-space:pre-line}
@@ -25,7 +25,7 @@ canvas{display:block}
 #hWhy{display:none;margin-top:8px;font-size:14px;color:#333;background:#FEF6CC;border-left:4px solid var(--y);padding:6px 8px}
 #hBtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 #hBtns button{flex:1 1 45%;background:#fff;border:2px solid #000;border-radius:5px;padding:7px 8px;font-size:15px;text-align:left;cursor:pointer}
-#hBtns button:hover{background:var(--y)}
+#hBtns button:hover,#hBtns button.hot{background:var(--y)}
 #hBtns button .n{display:inline-block;min-width:18px;font-weight:700;color:var(--gray)}
 #hFoot{margin-top:8px;font-size:13px;color:var(--gray)}
 #cross{position:fixed;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;z-index:3;pointer-events:none;display:none}
@@ -45,20 +45,25 @@ canvas{display:block}
 #mbox th{background:#F2F2F2}
 #help{position:fixed;right:12px;bottom:12px;background:rgba(0,0,0,.75);color:#fff;font-size:13px;line-height:1.35;padding:8px 10px;border-radius:5px;z-index:3;max-width:300px}
 #help b{color:var(--y)}
+#help.off{display:none}
+#hProg{height:5px;background:#e6e6e6;border-radius:3px;margin:2px 0 8px;overflow:hidden}#hProg i{display:block;height:100%;width:0;background:var(--y);transition:width .25s}
+#top #vrBtn{background:var(--y);color:#000;border-color:var(--y);font-weight:700}
+#top button[hidden]{display:none}
 @media (max-width:700px){#help{display:none}#top .sub{display:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.181.0/examples/jsm/"}}</script>
 </head>
 <body>
-<div id="top"><b>ARDEN DC TRAINER</b><span class="sub">PIT · Pick · Pack · Ship · Kaizen</span><span class="sp"></span><span id="who" class="sub"></span><button id="menuBtn">Menu</button><button id="recBtn">Records</button><button id="nameBtn">Trainee</button></div>
-<div id="hud"><div id="hTitle"></div><div id="hSub"></div><div id="hText"></div><div id="hRF"></div><div id="hDev"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
+<div id="top"><b>ARDEN DC TRAINER</b><span class="sub">PIT · Pick · Pack · Ship · Kaizen</span><span class="sp"></span><span id="who" class="sub"></span><button id="vrBtn" hidden>Enter VR</button><button id="menuBtn">Menu</button><button id="recBtn">Records</button><button id="nameBtn">Trainee</button><button id="helpBtn" title="Controls">?</button></div>
+<div id="hud"><div id="hTitle">Loading the warehouse...</div><div id="hSub"></div><div id="hProg"><i></i></div><div id="hText"></div><div id="hRF"></div><div id="hDev"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
 <div id="cross"></div><div id="look"></div><div id="toast"></div>
-<div id="help"><b>PC:</b> click the view to look around, WASD to walk, click or E to use what the crosshair is on, 1-9 for the panel buttons, Esc to free the mouse.<br><b>Forklift:</b> W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.<br><b>Quest 3:</b> Enter VR. Trigger uses things and presses panel buttons. Left stick walks, right stick turns. X brings the panel back. In the forklift: left stick drives and steers, right stick lifts and tilts, A is the horn.</div>
+<div id="help"><b>PC:</b> click the view to look around, WASD to walk, click or E to use what the crosshair is on, 1-9 for the panel buttons, Tab or Esc to free the mouse.<br><b>Forklift:</b> W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.<br><b>Quest 3:</b> Enter VR. Trigger uses things and presses panel buttons. Left stick walks, right stick turns. X brings the panel back. In the forklift: left stick drives and steers, right stick lifts and tilts, A is the horn.</div>
 <div id="modal" class="hidden"><div id="mbox"></div></div>
+<script>setTimeout(function () { if (!window.TR) document.getElementById("hText").textContent = "Still loading. This page needs an internet connection the first time (it loads the 3D library from cdn.jsdelivr.net). If this does not go away, that address may be blocked on this network."; }, 12000);</script>
 
 <script type="module">
 import * as THREE from 'three';
-import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 /* ============================================================
@@ -81,12 +86,10 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
 document.body.appendChild(renderer.domElement);
-const vrBtn = VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] });
-document.body.appendChild(vrBtn);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xd9dee2);
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.08, 120);
 const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
 camera.position.y = EYE;
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.2));
@@ -102,6 +105,21 @@ let ROOT = null;   /* when set, helpers add to this group instead of the scene *
 function box(w, h, d, mat, x = 0, y = 0, z = 0, parent = ROOT || scene) {   /* y = bottom */
   const m = new THREE.Mesh(GEO, typeof mat === 'number' ? M(mat) : mat);
   m.scale.set(w, h, d); m.position.set(x, y + h / 2, z); parent.add(m); return m;
+}
+/* merge the plain boxes directly under root into one mesh per material (far fewer draw calls on the Quest) */
+function bake(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), by = new Map();
+  for (const m of root.children) {
+    if (!m.isMesh || m.geometry !== GEO || m.children.length || m.userData.iidOwner || !m.visible || m.material.transparent || m.material === HIDDEN) continue;
+    if (!by.has(m.material)) by.set(m.material, []); by.get(m.material).push(m);
+  }
+  for (const [mat, list] of by) {
+    if (list.length < 2) continue;
+    const geos = list.map(m => GEO.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)));
+    root.add(new THREE.Mesh(mergeGeometries(geos), mat));
+    list.forEach(m => root.remove(m)); geos.forEach(g => g.dispose());
+  }
 }
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
@@ -261,12 +279,14 @@ function devKey(id, k) {
   if (k === 'CLR') { if (f && !f.ok) { f.val = ''; s.msg = ''; drawDev(d); } mirrorDev(); return; }
   if (!active) { devMsg(d, 'Nothing to do on this screen', true); mirrorDev(); return; }
   if (k === 'ENT' && f && !f.ok) { if (f.val) checkField(d, f); else devMsg(d, 'Enter ' + f.label + ' first', true); mirrorDev(); return; }
+  if (k === 'ENT' && st.key && !st.seq && !(st.keyFb && st.keyFb.ENT)) { devMsg(d, 'Now press ' + st.key, false); mirrorDev(); return; }
   if (st.seq) {
     if (k === st.seq[S.k]) { S.k++; if (S.k >= st.seq.length) return rfDone(st); devMsg(d, st.seq.slice(0, S.k).join(' > '), false); }
     else { S.k = 0; rfWrong(d, st, k); }
     mirrorDev(); return;
   }
   if (st.key && k === st.key) {
+    if (f && !f.ok && f.via === 'type' && f.val) { checkField(d, f); if (!f.ok) return; }   /* the confirm key takes what is typed, like the real screen */
     const p = s.fields.find(x => !x.ok);
     if (p) { devMsg(d, 'Fill ' + p.label + ' first', true); toast('Fill ' + p.label + ' first.', 'info'); mirrorDev(); }
     else rfDone(st);
@@ -338,7 +358,8 @@ box(.3, 8, 34, wallM, 30.15, 0, 1); solid(30, 30.3, -16, 18);
 box(14.5, 8, .3, wallM, -22.75, 0, 18.15); box(42.5, 8, .3, wallM, 8.75, 0, 18.15); box(3, 4.5, .3, wallM, -14, 3.5, 18.15);
 solid(-30, -15.5, 18, 18.3); solid(-12.5, 30, 18, 18.3);
 /* ceiling lights (just visual) */
-for (let x = -24; x <= 24; x += 8) for (let z = -12; z <= 14; z += 7) box(2.4, .08, .4, new THREE.MeshBasicMaterial({ color: 0xffffff }), x, 7.6, z);
+const LIGHT_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
+for (let x = -24; x <= 24; x += 8) for (let z = -12; z <= 14; z += 7) box(2.4, .08, .4, LIGHT_MAT, x, 7.6, z);
 
 floorPaint(ZONE.walkway, 0x2e9d3a); floorPaint([ZONE.walkway[0] + .1, ZONE.walkway[1] - .1, ZONE.walkway[2], ZONE.walkway[3]], 0x55c25f, .004);
 for (let z = -5; z < 16; z += 6) floorText('WALKWAY\nNO PIT', 1.75, z, 1.3, 1.1, Math.PI / 2, { fg: '#fff' });
@@ -365,6 +386,9 @@ function makePallet(withLoad = 0, opt = {}) {
     const cm = M(opt.color || C.cardboard);
     const nx = 2, nz = 2; let n = 0;
     for (let y = 0; y < withLoad; y++) for (let ix = 0; ix < nx; ix++) for (let iz = 0; iz < nz; iz++) { box(.56, .3, .47, cm, -.29 + ix * .58, .13 + y * .31, -.245 + iz * .49, g); n++; }
+  }
+  bake(g);
+  if (withLoad) {
     if (opt.wrap) { const w = new THREE.Mesh(GEO, new THREE.MeshStandardMaterial({ color: 0xdfe8ee, transparent: true, opacity: .35 })); w.scale.set(1.18, withLoad * .31, .98); w.position.y = .13 + withLoad * .155; g.add(w); }
   }
   return g;
@@ -477,6 +501,7 @@ for (let i = 0; i < 4; i++) {
   const x0 = 8 + i * 3;
   const fr = new THREE.Group(); fr.position.set(x0 + 1.4, 0, -14.4); scene.add(fr);
   for (let l = 0; l < 4; l++) { const s = box(2.8, .04, 1, M(0x999999), 0, .5 + l * .45, 0, fr); s.rotation.x = .12; for (let k = 0; k < 5; k++) box(.45, .3, .5, M(C.cardboard), -1.1 + k * .55, .56 + l * .45, .2, fr); }
+  bake(fr);
   place(label('D' + (1 + i) + '00', .5, .25, { bg: '#FDDB33' }), x0 + 1.4, 2.6, -13.85);
 }
 solid(8, 20, -15, -13.8);
@@ -676,26 +701,31 @@ panel.visible = false; scene.add(panel);
 let P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '' };
 let panelRects = [];
 let toastMsg = null;
-function setPanel(p) { if (typeof mirrorDev === 'function' && S && S.phase !== 'run') $('#hDev').style.display = 'none'; P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; drawPanel(); drawHud(); }
+let hoverBtn = -1, leaveArm = 0;
+function progress() { return S.mod && S.mod.steps.length && S.phase === 'run' ? S.i / S.mod.steps.length : S.phase === 'done' ? 1 : S.phase === 'hunt' ? Object.keys(S.found).length / HUNT.length : 0; }
+function setPanel(p) { P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; hoverBtn = -1; drawPanel(); drawHud(); mirrorDev(); }
 function drawPanel() {
   panelCT.redraw((g, w, h) => {
     g.clearRect(0, 0, w, h);
     g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
-    g.fillStyle = '#000'; g.fillRect(0, 0, w, 96); g.fillStyle = '#FDDB33'; g.fillRect(0, 96, w, 10);
-    g.fillStyle = '#FDDB33'; g.font = 'bold 44px Calibri, Arial'; g.fillText(P.title.slice(0, 40), 24, 62);
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, 96);
+    const pr = progress(); g.fillStyle = pr ? '#5a5a5a' : '#FDDB33'; g.fillRect(0, 96, w, 10); if (pr) { g.fillStyle = '#FDDB33'; g.fillRect(0, 96, w * pr, 10); }
+    panelRects = [];
+    const inMod = S.phase === 'run' || S.phase === 'hunt';
+    g.fillStyle = '#FDDB33'; g.font = 'bold 44px Calibri, Arial'; g.fillText(P.title.slice(0, inMod ? 32 : 40), 24, 62);
+    if (inMod) { const arm = now() < leaveArm; g.fillStyle = arm ? '#C00000' : hoverBtn === -2 ? '#FDDB33' : '#333'; g.fillRect(w - 190, 16, 170, 64); g.strokeStyle = '#FDDB33'; g.lineWidth = 3; g.strokeRect(w - 190, 16, 170, 64); g.fillStyle = arm ? '#fff' : hoverBtn === -2 ? '#000' : '#FDDB33'; g.font = 'bold 30px Calibri, Arial'; g.textAlign = 'center'; g.fillText(arm ? 'LEAVE?' : 'MENU', w - 105, 59); g.textAlign = 'left'; panelRects.push({ x: w - 190, y: 16, w: 170, h: 64, i: -2 }); }
     let y = 150; g.fillStyle = '#595959'; g.font = '30px Calibri, Arial'; if (P.sub) { g.fillText(P.sub, 24, y); y += 46; }
     g.fillStyle = '#111'; g.font = '36px Calibri, Arial';
     for (const l of wrapText(g, P.text, w - 48)) { g.fillText(l, 24, y); y += 42; }
     if (P.rf) { const lines = P.rf; const hh = 20 + lines.length * 36; g.fillStyle = '#10233a'; g.fillRect(24, y, w - 48, hh); g.fillStyle = '#9fe39f'; g.font = '30px Consolas, monospace'; lines.forEach((l, i) => g.fillText(l, 40, y + 42 + i * 36)); y += hh + 16; }
     if (P.why) { g.font = '30px Calibri, Arial'; const wl = wrapText(g, 'WHY: ' + P.why, w - 72); g.fillStyle = '#FEF6CC'; g.fillRect(24, y, w - 48, 16 + wl.length * 34); g.fillStyle = '#FDDB33'; g.fillRect(24, y, 8, 16 + wl.length * 34); g.fillStyle = '#333'; wl.forEach((l, i) => g.fillText(l, 44, y + 38 + i * 34)); y += 30 + wl.length * 34; }
     /* buttons, 2 columns, bottom up */
-    panelRects = [];
     const n = P.btns.length, cols = n > 3 ? 2 : 1, bw = cols === 2 ? (w - 72) / 2 : w - 48, bh = 74;
     const rows = Math.ceil(n / cols); let by = Math.max(y + 10, h - 70 - rows * (bh + 12));
     g.font = 'bold 32px Calibri, Arial';
     P.btns.forEach((b, i) => {
       const cx = 24 + (i % cols) * (bw + 24), cy = by + Math.floor(i / cols) * (bh + 12);
-      g.fillStyle = b.hot ? '#FDDB33' : '#fff'; g.fillRect(cx, cy, bw, bh); g.strokeStyle = '#000'; g.lineWidth = 4; g.strokeRect(cx, cy, bw, bh);
+      g.fillStyle = i === hoverBtn ? '#ffe96b' : b.hot ? '#FDDB33' : '#fff'; g.fillRect(cx, cy, bw, bh); g.strokeStyle = '#000'; g.lineWidth = i === hoverBtn ? 8 : 4; g.strokeRect(cx, cy, bw, bh);
       g.fillStyle = '#000'; const lines = wrapText(g, b.label, bw - 30).slice(0, 2);
       lines.forEach((l, k) => g.fillText(l, cx + 16, cy + (lines.length === 1 ? 48 : 32 + k * 32)));
       panelRects.push({ x: cx, y: cy, w: bw, h: bh, i });
@@ -704,14 +734,15 @@ function drawPanel() {
     else if (P.foot) { g.fillStyle = '#595959'; g.font = '28px Calibri, Arial'; g.fillText(P.foot.slice(0, 70), 24, h - 22); }
   });
 }
-function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function drawHud() {
   $('#hTitle').textContent = P.title; $('#hSub').textContent = P.sub; $('#hText').textContent = P.text;
   const rf = $('#hRF'); rf.style.display = P.rf ? 'block' : 'none'; rf.textContent = P.rf ? P.rf.join('\n') : '';
   const wy = $('#hWhy'); wy.style.display = P.why ? 'block' : 'none'; wy.textContent = P.why ? 'Why: ' + P.why : '';
   const bb = $('#hBtns'); bb.innerHTML = '';
-  P.btns.forEach((b, i) => { const e = document.createElement('button'); e.innerHTML = `<span class="n">${i + 1}</span> ${esc(b.label)}`; e.onclick = () => b.fn(); bb.appendChild(e); });
+  P.btns.forEach((b, i) => { const e = document.createElement('button'); if (b.hot) e.className = 'hot'; e.innerHTML = `<span class="n">${i + 1}</span> ${esc(b.label)}`; e.onclick = () => b.fn(); bb.appendChild(e); });
   $('#hFoot').textContent = P.foot;
+  $('#hProg').style.display = progress() ? '' : 'none'; $('#hProg i').style.width = Math.round(progress() * 100) + '%';
 }
 let toastTimer = 0;
 function toast(text, kind = 'info', secs = 2.6) {
@@ -719,8 +750,14 @@ function toast(text, kind = 'info', secs = 2.6) {
   toastMsg = { text, kind }; drawPanel(); clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.style.display = 'none'; toastMsg = null; drawPanel(); }, secs * 1000);
 }
-function pressPanelButton(i) { const b = P.btns[i]; if (b) { beep(800, .05); b.fn(); } }
-addEventListener('keydown', e => { const st = cur(); if (st && st.type === 'rf' && S.phase === 'run') return; if (e.key >= '1' && e.key <= '9') pressPanelButton(+e.key - 1); });
+function clearToast() { clearTimeout(toastTimer); $('#toast').style.display = 'none'; toastMsg = null; }
+function uiBlocked() { const a = document.activeElement; return !$('#modal').classList.contains('hidden') || (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)); }
+function leaveModule() { if (F.onboard) dismountTruck(); menu(); }
+function pressPanelButton(i) {
+  if (i === -2) { if (now() < leaveArm) { leaveArm = 0; leaveModule(); } else { leaveArm = now() + 3; drawPanel(); setTimeout(drawPanel, 3100); } return; }
+  const b = P.btns[i]; if (b) { beep(800, .05); b.fn(); }
+}
+addEventListener('keydown', e => { const st = cur(); if (uiBlocked() || (st && st.type === 'rf' && S.phase === 'run')) return; if (e.key >= '1' && e.key <= '9') pressPanelButton(+e.key - 1); });
 
 /* ---------- sound ---------- */
 let AC = null;
@@ -735,17 +772,18 @@ const now = () => performance.now() / 1000;
    ============================================================ */
 const S = { tool: null, riding: null, mod: null, i: 0, k: 0, t0: 0, mistakes: [], viol: [], held: null, sub: null, inspected: {}, phase: 'menu', guide: localStorage.getItem(LS_GUIDE) !== '0', found: {} };
 const cur = () => S.mod && S.mod.steps[S.i];
-function mistake(msg) { S.mistakes.push({ step: S.i + 1, title: cur() ? cur().title : '', msg }); beep(160, .25, 'sawtooth', .07); toast(msg, 'bad', 3.4); }
+function mistake(msg) { S.mistakes.push({ step: S.i + 1, title: cur() ? cur().title : '', msg }); beep(160, .25, 'sawtooth', .07); buzz(.9, 160); toast(msg, 'bad', 3.4); }
 function violation(msg, key) {
   const t = now(); if (F.lastV[key] && t - F.lastV[key] < 4) return; F.lastV[key] = t;
-  S.viol.push({ step: S.i + 1, msg }); beep(140, .4, 'sawtooth', .08); toast('SAFETY: ' + msg, 'bad', 3.6);
+  S.viol.push({ step: S.i + 1, msg }); beep(140, .4, 'sawtooth', .08); buzz(1, 300); toast('SAFETY: ' + msg, 'bad', 3.6);
 }
-function good(msg) { beep(1400, .06); beep(1800, .06); if (msg) toast(msg, 'good', 1.6); }
+function buzz(v, ms) { for (const gp of [XRIN.left, XRIN.right]) { try { const a = gp && (gp.hapticActuators && gp.hapticActuators[0]); if (a && a.pulse) a.pulse(v, ms); } catch (e) { } } }
+function good(msg) { beep(1400, .06); beep(1800, .06); buzz(.4, 40); if (msg) toast(msg, 'good', 1.6); }
 
 const MODS = {};
 function startModule(id) {
   const m = MODS[id]; S.mod = m; S.i = 0; S.k = 0; S.t0 = now(); S.mistakes = []; S.viol = []; S.held = null; S.sub = null; S.inspected = {}; S.found = {}; S.phase = 'run';
-  unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene(id);
+  clearToast(); unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene(id);
   m.setup && m.setup();
   placePlayer(m.start.x, m.start.z, m.start.yaw);
   enterStep();
@@ -769,7 +807,7 @@ function showStep() {
   else if (st.type === 'keys') btns = st.pad.map(k => ({ label: k, fn: () => pressKey(k) }));
   else if (st.type === 'inspect') btns = [];
   const dn = st.type === 'rf' ? DEV[st.dev].name : '';
-  const doing = { rf: `Work it on the ${dn}.` + (renderer.xr.isPresenting ? '' : ' PC: click its keys (copy below), or type digits, P, K, Enter, Backspace, F-keys.'), interact: 'Use the highlighted item.', scan: 'Point at the barcode and pull the trigger (PC: click it).', carry: S.held ? 'Now put it where it goes.' : 'Pick it up.', order: 'Load them in the right order.', drive: '', inspect: `Checked ${Object.keys(S.inspected).length} of ${INSP.length}. Use each yellow dot.` }[st.type] || '';
+  const doing = { rf: `Work it on the ${dn}.` + (renderer.xr.isPresenting ? '' : ' PC: click its keys (copy below), or use the keyboard: digits, P, K, D, Enter, Backspace, F1 to F8.'), interact: 'Use the highlighted item.', scan: 'Point at the barcode and pull the trigger (PC: click it).', carry: S.held ? 'Now put it where it goes.' : 'Pick it up.', order: 'Load them in the right order.', drive: '', inspect: `Checked ${Object.keys(S.inspected).length} of ${INSP.length}. Use each yellow dot.` }[st.type] || '';
   setPanel({ title: st.title, sub: `${m.name} · step ${S.i + 1} of ${m.steps.length}`, text: st.text + (doing && st.type !== 'drive' ? '\n\n' + doing : ''), why: st.why || '', rf: typeof st.rf === 'function' ? st.rf() : st.rf || null, btns, foot: footText() });
   mirrorDev();
 }
@@ -839,10 +877,11 @@ function drop(st) {
 }
 
 /* results, records and the kaizen card */
+function stamp() { const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; }   /* local time, not UTC */
 function finish() {
   const m = S.mod, secs = Math.round(now() - S.t0);
   const score = Math.max(0, 100 - 5 * S.mistakes.length - 10 * S.viol.length), pass = score >= 80 && !S.viol.some(v => /Missed a defect|struck/i.test(v.msg));
-  const rec = { name: trainee(), module: m.name, date: new Date().toISOString().slice(0, 16).replace('T', ' '), secs, mistakes: S.mistakes.length, safety: S.viol.length, score, pass: pass ? 'PASS' : 'RETRY', notes: [...S.viol, ...S.mistakes].map(x => `#${x.step} ${x.msg}`).join(' | ') };
+  const rec = { name: trainee(), module: m.name, date: stamp(), secs, mistakes: S.mistakes.length, safety: S.viol.length, score, pass: pass ? 'PASS' : 'RETRY', notes: [...S.viol, ...S.mistakes].map(x => `#${x.step} ${x.msg}`).join(' | ') };
   const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'); recs.push(rec); localStorage.setItem(LS_REC, JSON.stringify(recs));
   S.phase = 'done'; S.lastRec = rec;
   const top = [...S.viol.map(v => 'SAFETY #' + v.step + ': ' + v.msg), ...S.mistakes.map(x => '#' + x.step + ': ' + x.msg)].slice(0, 5);
@@ -853,22 +892,26 @@ const TIMWOODS = ['Transport', 'Inventory', 'Motion', 'Waiting', 'Overproduction
 function kaizenCard() {
   setPanel({ title: 'Kaizen card', sub: S.mod.name, text: 'Which waste did you notice in this process? Pick one. It goes on the idea list for the CI board.' + (renderer.xr.isPresenting ? '' : '\nOn a PC you can add a note after you pick.'), btns: [...TIMWOODS.map(w => ({ label: w, fn: () => saveIdea(w) })), { label: 'Nothing to add', fn: menu }] });
 }
-function saveIdea(waste) {
-  let note = '';
-  if (!renderer.xr.isPresenting) { document.exitPointerLock && document.exitPointerLock(); note = prompt(`${waste}: what did you see, and what would you change?`) || ''; }
-  const ideas = JSON.parse(localStorage.getItem(LS_IDEA) || '[]'); ideas.push({ name: trainee(), module: S.mod ? S.mod.name : 'Waste hunt', date: new Date().toISOString().slice(0, 16).replace('T', ' '), waste, note }); localStorage.setItem(LS_IDEA, JSON.stringify(ideas));
+function saveIdea(waste, note) {
+  if (note === undefined && !renderer.xr.isPresenting) {
+    modal(`<h2>Kaizen card: ${esc(waste)}</h2><p>What did you see, and what would you change? (optional)</p><textarea id="kzNote" rows="4"></textarea><button id="kzOk">Save</button><button id="kzSkip">Save without a note</button>`);
+    $('#kzNote').focus(); $('#kzOk').onclick = () => { const v = $('#kzNote').value.trim(); closeModal(); saveIdea(waste, v); }; $('#kzSkip').onclick = () => { closeModal(); saveIdea(waste, ''); };
+    return;
+  }
+  note = note || '';
+  const ideas = JSON.parse(localStorage.getItem(LS_IDEA) || '[]'); ideas.push({ name: trainee(), module: S.mod ? S.mod.name : 'Waste hunt', date: stamp(), waste, note }); localStorage.setItem(LS_IDEA, JSON.stringify(ideas));
   toast('Saved to the idea list.', 'good'); menu();
 }
 function menu() {
-  S.phase = 'menu'; S.mod = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
+  S.phase = 'menu'; S.mod = null; S.held = null; S.sub = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
   setPanel({ title: 'Arden DC Trainer', sub: trainee() ? 'Trainee: ' + trainee() : 'Set your name with Trainee', text: 'Pick a module. Every step follows the current standard work, and each one tells you why.', btns: [
-    { label: '1 Forklift (PIT): inspect, drive, put away', fn: () => startModule('pit') },
-    { label: '2 Induction: EWM computer + scanner', fn: () => startModule('induct') },
-    { label: '3 Pick: Pallet Land on the THOR', fn: () => startModule('pick') },
-    { label: '4 Pick: Flow Rack with a handheld', fn: () => startModule('flow') },
-    { label: '5 Pack: parcel at the pack station', fn: () => startModule('pack') },
-    { label: '6 Ship: truck pack, stage, dock', fn: () => startModule('ship') },
-    { label: '7 Gemba waste hunt (TIMWOODS)', fn: startHunt },
+    { label: 'Forklift (PIT): inspect, drive, put away', fn: () => startModule('pit') },
+    { label: 'Induction: EWM computer + scanner', fn: () => startModule('induct') },
+    { label: 'Pick: Pallet Land on the THOR', fn: () => startModule('pick') },
+    { label: 'Pick: Flow Rack with a handheld', fn: () => startModule('flow') },
+    { label: 'Pack: parcel at the pack station', fn: () => startModule('pack') },
+    { label: 'Ship: truck pack, stage, dock', fn: () => startModule('ship') },
+    { label: 'Gemba waste hunt (TIMWOODS)', fn: startHunt },
     { label: 'Guide arrows: ' + (S.guide ? 'on' : 'off'), fn: () => { S.guide = !S.guide; localStorage.setItem(LS_GUIDE, S.guide ? '1' : '0'); menu(); } }] });
   if (renderer.xr.isPresenting) placePanelVR(true);
 }
@@ -982,7 +1025,7 @@ MODS.flow = {
 
 /* ---------- 4. Induction ---------- */
 MODS.induct = {
-  id: 'induct', name: 'Induction', start: { x: 2.4, z: -10.6, yaw: 0 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
+  id: 'induct', name: 'Induction', start: { x: 2.6, z: -9.4, yaw: .25 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
   steps: [
     info('Induction', 'Core process, Draft 1.0. Tools: computer (SAP EWM), scanner. Induction is where an order gets its totes. Nothing gets picked until it is inducted.', 'Induction steers the work for every picker behind you.'),
     getGun('ind_gun', 'scanner at the induction computer'),
@@ -1091,7 +1134,7 @@ huntSpot('w_retype', -7.5, 2.0, 12, ['Over-processing', 'Skills (unused talent)'
 function huntMarkers(on) { HP.visible = on; HUNT.forEach(h => { h.m.visible = on && !S.found[h.id]; }); }
 function startHunt() {
   S.mod = { id: 'hunt', name: 'Gemba waste hunt', steps: [] }; S.phase = 'hunt'; S.found = {}; S.mistakes = []; S.viol = []; S.t0 = now();
-  unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 4, 0); huntPanel();
+  clearToast(); S.held = null; S.sub = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 4, 0); huntPanel();
 }
 function huntPanel() {
   const n = Object.keys(S.found).length;
@@ -1106,10 +1149,11 @@ function huntHit(iid) {
   setPanel(S.sub); if (renderer.xr.isPresenting) placePanelVR(true);
 }
 function huntDone() {
-  huntMarkers(false); S.phase = 'run';
-  S.mod.steps = []; const n = Object.keys(S.found).length;
+  huntMarkers(false); const n = Object.keys(S.found).length; S.sub = null;
+  if (!n) return menu();   /* nothing found: no record */
+  S.phase = 'done';
   const secs = Math.round(now() - S.t0); const score = Math.max(0, Math.round(100 * n / HUNT.length) - 5 * S.mistakes.length);
-  const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'); recs.push({ name: trainee(), module: 'Gemba waste hunt', date: new Date().toISOString().slice(0, 16).replace('T', ' '), secs, mistakes: S.mistakes.length, safety: 0, score, pass: n === HUNT.length ? 'PASS' : 'RETRY', notes: `found ${n}/${HUNT.length}` }); localStorage.setItem(LS_REC, JSON.stringify(recs));
+  const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'); recs.push({ name: trainee(), module: 'Gemba waste hunt', date: stamp(), secs, mistakes: S.mistakes.length, safety: 0, score, pass: n === HUNT.length ? 'PASS' : 'RETRY', notes: `found ${n}/${HUNT.length}` }); localStorage.setItem(LS_REC, JSON.stringify(recs));
   setPanel({ title: 'Waste hunt done', sub: `${n} of ${HUNT.length} found`, text: `Score ${score}. Pick the waste you see most on your own shift for the idea list.`, btns: [{ label: 'Kaizen card', fn: kaizenCard, hot: true }, { label: 'Menu', fn: menu }] });
 }
 
@@ -1118,9 +1162,15 @@ function huntDone() {
    ============================================================ */
 let yaw = 0, pitch = 0;
 function placePlayer(x, z, ry) { rig.position.set(x, 0, z); yaw = ry; rig.rotation.y = ry; pitch = 0; camera.rotation.set(0, 0, 0); if (!renderer.xr.isPresenting) camera.position.set(0, EYE, 0); }
+const headYaw = () => renderer.xr.isPresenting ? new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ').y : 0;
+const rotXZ = (x, z, a) => [x * Math.cos(a) + z * Math.sin(a), -x * Math.sin(a) + z * Math.cos(a)];
+/* put the rig so the head (wherever it is in the play space) sits over world x,z */
+function headTo(x, z, ry) { const xr = renderer.xr.isPresenting, [ox, oz] = rotXZ(xr ? camera.position.x : 0, xr ? camera.position.z : 0, ry); rig.rotation.y = ry; rig.position.x = x - ox; rig.position.z = z - oz; }
 function mountTruck() {
   F.onboard = true; F.lookYaw = 0;
-  if (!renderer.xr.isPresenting) camera.position.set(0, 1.0, 0);
+  const xr = renderer.xr.isPresenting;
+  F.seat = { x: xr ? camera.position.x : 0, z: xr ? camera.position.z : 0, yaw: headYaw() };   /* where you stood and faced when you got on */
+  if (!xr) camera.position.set(0, 1.0, 0);
 }
 function dismountTruck() {
   F.onboard = false; const p = truck.localToWorld(new THREE.Vector3(1.3, 0, -.3)); rig.position.set(p.x, 0, p.z); yaw = F.heading + Math.PI; rig.rotation.y = yaw;
@@ -1136,18 +1186,21 @@ function attachTool() {
   if (S.tool === 'mc') { if (xr) { o.position.set(0, .04, .07); o.rotation.set(-.9, 0, 0); } else { o.position.set(.19, -.15, -.34); o.rotation.set(-.1, -.3, 0); } }
   else { if (xr) { o.position.set(0, -.02, -.03); o.rotation.set(0, 0, 0); o.scale.setScalar(1); } else { o.position.set(.24, -.22, -.5); o.rotation.set(.1, .35, 0); o.scale.setScalar(.6); } }
 }
-function ride(t) { S.riding = t; const p = t.position.clone(); rig.position.set(p.x, 0, p.z); yaw = t.rotation.y; rig.rotation.y = yaw; rig.add(t); t.position.set(0, 0, 0); t.rotation.set(0, 0, 0); }
+function ride(t) { S.riding = t; S.rideOff = headYaw(); yaw = t.rotation.y - S.rideOff; rig.position.y = 0; headTo(t.position.x, t.position.z, yaw); rig.updateMatrixWorld(true); rig.attach(t); }
 const keyDown = {};
 addEventListener('keydown', e => {
   const st = cur();
-  if (st && st.type === 'rf' && S.phase === 'run' && $('#modal').classList.contains('hidden')) {
-    let k = null; const c = e.code;
-    if (/^(Digit|Numpad)[0-9]$/.test(c)) k = c.slice(-1); else if (c === 'KeyP') k = 'P'; else if (c === 'KeyK') k = 'K';
+  if (st && st.type === 'rf' && S.phase === 'run' && !uiBlocked()) {
+    let k = null; const c = e.code, fl = DEV[st.dev].scr.fields[DEV[st.dev].scr.focus], typing = fl && !fl.ok && fl.via === 'type';
+    if (/^(Digit|Numpad)[0-9]$/.test(c)) k = c.slice(-1); else if (c === 'KeyP') k = 'P'; else if (c === 'KeyK') k = 'K'; else if (c === 'KeyD' && typing) k = 'D';
     else if (c === 'Enter' || c === 'NumpadEnter') k = 'ENT'; else if (c === 'Backspace') k = 'CLR'; else if (/^F[1-8]$/.test(e.key)) k = e.key;
     if (k) { e.preventDefault(); devKey(st.dev, k); return; }
   }
+  if (uiBlocked()) return;
+  if (e.code === 'Tab') { e.preventDefault(); if (document.pointerLockElement === cvs) document.exitPointerLock(); else cvs.requestPointerLock && cvs.requestPointerLock(); return; }
   keyDown[e.code] = true; if (e.code === 'KeyE') selectFrom('desk'); if (e.code === 'KeyH' && F.onboard) honk(); });
 addEventListener('keyup', e => { keyDown[e.code] = false; });
+addEventListener('blur', () => { for (const k in keyDown) keyDown[k] = false; });
 const cvs = renderer.domElement;
 cvs.addEventListener('mousedown', () => { if (document.pointerLockElement !== cvs) { cvs.requestPointerLock && cvs.requestPointerLock(); } else selectFrom('desk'); });
 document.addEventListener('pointerlockchange', () => { $('#cross').style.display = document.pointerLockElement === cvs ? 'block' : 'none'; });
@@ -1166,10 +1219,11 @@ const dz = v => Math.abs(v) < .15 ? 0 : v;
 const stick = (gp) => gp ? [dz(gp.axes[2] || 0), dz(gp.axes[3] || 0)] : [0, 0];
 let snapReady = true, xBtnPrev = false, aBtnPrev = false;
 function walk(dt) {
+  if (uiBlocked()) return;
   let fx = 0, fz = 0, sp = keyDown.ShiftLeft ? 4 : 2.2;
   if (renderer.xr.isPresenting) {
     const [lx, ly] = stick(XRIN.left), [rx] = stick(XRIN.right);
-    if (Math.abs(rx) > .7 && snapReady) { yaw -= Math.sign(rx) * Math.PI / 6; snapReady = false; } if (Math.abs(rx) < .3) snapReady = true;
+    if (Math.abs(rx) > .7 && snapReady) { const [hx, hz] = rotXZ(camera.position.x, camera.position.z, yaw), wx = rig.position.x + hx, wz = rig.position.z + hz; yaw -= Math.sign(rx) * Math.PI / 6; headTo(wx, wz, yaw); snapReady = false; } if (Math.abs(rx) < .3) snapReady = true;   /* turn around the head, not the room centre */
     const hq = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); const a = yaw + hq.y;
     fx = (-Math.sin(a) * -ly + Math.cos(a) * lx); fz = (-Math.cos(a) * -ly - Math.sin(a) * lx);
   } else {
@@ -1179,7 +1233,7 @@ function walk(dt) {
   const len = Math.hypot(fx, fz); if (len > 1) { fx /= len; fz /= len; }
   if (S.riding) sp = 2.0;
   const nx = rig.position.x + fx * sp * dt, nz = rig.position.z + fz * sp * dt;
-  const blocked = (x, z) => { if (hitsSolid(x, z, S.riding ? .45 : .3, 'walk')) return true; if (!S.riding) return false; return hitsSolid(x - Math.sin(yaw) * 1.45, z - Math.cos(yaw) * 1.45, .5, 'walk'); };
+  const blocked = (x, z) => { if (hitsSolid(x, z, S.riding ? .45 : .3, 'walk')) return true; if (!S.riding) return false; const ty = yaw + (S.rideOff || 0); return hitsSolid(x - Math.sin(ty) * 1.45, z - Math.cos(ty) * 1.45, .5, 'walk'); };
   if (!blocked(nx, rig.position.z)) rig.position.x = nx;
   if (!blocked(rig.position.x, nz)) rig.position.z = nz;
   rig.rotation.y = yaw;
@@ -1275,9 +1329,11 @@ function rules() {
 }
 function seatRig() {
   const seat = truck.localToWorld(_v.set(0, .95, -.35));
-  if (renderer.xr.isPresenting) { rig.position.set(seat.x, 0, seat.z); rig.position.y = Math.max(-.6, 1.95 - camera.position.y); }
-  else { rig.position.set(seat.x, .95, seat.z); camera.rotation.set(pitch, 0, 0, 'YXZ'); }
-  rig.rotation.y = F.heading + Math.PI + (renderer.xr.isPresenting ? 0 : F.lookYaw);
+  const sx = F.seat || { x: 0, z: 0, yaw: 0 };
+  if (renderer.xr.isPresenting) {   /* the spot you stood on when you got on stays over the seat, so you can still lean */
+    const ry = F.heading + Math.PI - sx.yaw, [ox, oz] = rotXZ(sx.x, sx.z, ry);
+    rig.rotation.y = ry; rig.position.set(seat.x - ox, Math.max(-.6, 1.95 - camera.position.y), seat.z - oz);
+  } else { rig.position.set(seat.x, .95, seat.z); camera.rotation.set(pitch, 0, 0, 'YXZ'); rig.rotation.y = F.heading + Math.PI + F.lookYaw; }
 }
 
 /* ============================================================
@@ -1306,26 +1362,30 @@ function castFrom(src) {
 }
 function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
 const REACH = 4.5;
+function panelRectAt(uv) { const px = uv.x * PW, py = (1 - uv.y) * PH; return panelRects.find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h); }
 function selectFrom(src) {
   const h = HITS[src] || castFrom(src); if (!h) return;
-  if (h.panel) { const px = h.uv.x * PW, py = (1 - h.uv.y) * PH; const r = panelRects.find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h); if (r) pressPanelButton(r.i); return; }
+  if (h.panel) { const r = panelRectAt(h.uv); if (r) pressPanelButton(r.i); return; }
   const far = S.phase === 'hunt' ? 14 : REACH;
   if (h.dist > far) return toast('Move closer.', 'info', 1);
   const hand = src === 'desk' ? camera : ctrls[src];
   onInteract(h.iid, hand, h);
 }
 function updateHover() {
-  let shown = false;
-  const srcs = renderer.xr.isPresenting ? [0, 1] : ['desk'];
+  let shown = false, hb = -1;
+  const xr = renderer.xr.isPresenting, srcs = xr ? [0, 1] : ['desk'], far = S.phase === 'hunt' ? 14 : REACH;
   for (const s of srcs) {
     const h = castFrom(s); HITS[s] = h;
     if (s !== 'desk') ctrls[s].userData.line.scale.z = h ? h.dist : 3;
     if (h && !shown) {
       shown = true; reticle.visible = true; reticle.position.copy(h.point); reticle.lookAt(camera.getWorldPosition(_w));
-      if (s === 'desk') { const o = h.panel ? null : OBJ[h.iid]; $('#look').textContent = o ? o.userData.name + (h.dist > REACH && S.phase !== 'hunt' ? ' (move closer)' : '') : ''; }
+      reticle.material.color.set(h.panel || h.dist <= far ? 0x38d430 : 0x9a9a9a);   /* green = in reach */
+      if (s === 'desk') { const o = h.panel ? null : OBJ[h.iid]; $('#look').textContent = o ? o.userData.name + (h.dist > far ? ' (move closer)' : '') : ''; }
     }
+    if (h && h.panel && hb === -1) { const r = panelRectAt(h.uv); if (r) hb = r.i; }
   }
-  if (!shown) { reticle.visible = false; $('#look').textContent = ''; }
+  if (xr && hb !== hoverBtn) { hoverBtn = hb; drawPanel(); }
+  if (!shown) { reticle.visible = false; $('#look').textContent = xr || document.pointerLockElement === cvs || uiBlocked() ? '' : 'Click the view to look around'; }
 }
 /* guide arrow over the current target */
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(.16, .4, 16), new THREE.MeshBasicMaterial({ color: 0xfddb33 })); arrow.rotation.x = Math.PI; scene.add(arrow);
@@ -1357,13 +1417,18 @@ function placePanelVR(force) {
   const want = head.clone().add(dir.multiplyScalar(1.0)); want.y = head.y - .15;
   if (force || panel.position.distanceTo(want) > 2.2) { panel.position.copy(want); panel.lookAt(head.x, panel.position.y, head.z); }
 }
-renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); $('#hud').style.display = 'none'; mirrorDev(); setTimeout(() => placePanelVR(true), 300); });
-renderer.xr.addEventListener('sessionend', () => { panel.visible = false; $('#hud').style.display = ''; camera.position.set(0, F.onboard ? 1.0 : EYE, 0); });
+renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); $('#hud').style.display = 'none'; $('#help').style.display = 'none'; $('#vrBtn').textContent = 'Exit VR'; mirrorDev(); setTimeout(() => placePanelVR(true), 300); });
+renderer.xr.addEventListener('sessionend', () => { panel.visible = false; $('#hud').style.display = ''; $('#help').style.display = ''; $('#vrBtn').textContent = 'Enter VR'; camera.position.set(0, F.onboard ? 1.0 : EYE, 0); camera.rotation.set(0, 0, 0); if (F.seat) F.seat = { x: 0, z: 0, yaw: 0 }; S.rideOff = 0; mirrorDev(); });
+if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(ok => { $('#vrBtn').hidden = !ok; }).catch(() => { });
+$('#vrBtn').onclick = async () => {
+  const cur = renderer.xr.getSession(); if (cur) return cur.end();
+  try { renderer.xr.setSession(await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] })); } catch (e) { toast('Could not start VR: ' + e.message, 'bad', 4); }
+};
 
 /* ============================================================
    MAIN LOOP
    ============================================================ */
-const clock = new THREE.Clock(); let hudT = 0;
+const clock = new THREE.Clock(); let hudT = 0, vrFootT = 0;
 function tick(dt) {
   const t = now();
   readXR();
@@ -1373,7 +1438,7 @@ function tick(dt) {
   updateHover(); updateGuide(t);
   const st = cur();
   if (S.phase === 'run' && st && st.type === 'drive' && st.check()) { good(); st.onDone && st.onDone(); next(); }
-  hudT += dt; if (hudT > .25) { hudT = 0; if (S.phase === 'run' || S.phase === 'hunt') { P.foot = footText(); $('#hFoot').textContent = P.foot; if (renderer.xr.isPresenting && !toastMsg) drawPanel(); } }
+  hudT += dt; if (hudT > .25) { hudT = 0; if (S.phase === 'run' || S.phase === 'hunt') { P.foot = footText(); $('#hFoot').textContent = P.foot; vrFootT += .25; if (renderer.xr.isPresenting && !toastMsg && (F.onboard || vrFootT >= 1)) { vrFootT = 0; drawPanel(); } } }
 }
 renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), .05); tick(dt); renderer.render(scene, camera); });
 
@@ -1382,13 +1447,13 @@ renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), .05); ti
    ============================================================ */
 function trainee() { return localStorage.getItem(LS_NAME) || ''; }
 function showWho() { $('#who').textContent = trainee() ? 'Trainee: ' + trainee() : ''; }
-function modal(html) { $('#mbox').innerHTML = html; $('#modal').classList.remove('hidden'); document.exitPointerLock && document.exitPointerLock(); }
+function modal(html) { $('#mbox').innerHTML = html; $('#modal').classList.remove('hidden'); document.exitPointerLock && document.exitPointerLock(); for (const k in keyDown) keyDown[k] = false; }
 function closeModal() { $('#modal').classList.add('hidden'); }
 function askName() {
   modal(`<h2>Trainee</h2><p>Name as it appears on the roster. Records stay on this device until you export them.</p><input id="nm" value="${esc(trainee())}" placeholder="First Last"><button id="nmOk">Save</button>`);
-  $('#nm').focus(); $('#nmOk').onclick = () => { localStorage.setItem(LS_NAME, $('#nm').value.trim()); showWho(); closeModal(); if (S.phase === 'menu') menu(); };
+  $('#nm').focus(); $('#nm').onkeydown = e => { if (e.key === 'Enter') $('#nmOk').click(); }; $('#nmOk').onclick = () => { localStorage.setItem(LS_NAME, $('#nm').value.trim()); showWho(); closeModal(); if (S.phase === 'menu') menu(); };
 }
-function csv(rows, cols) { return [cols.join(','), ...rows.map(r => cols.map(c => '"' + String(r[c] ?? '').replace(/"/g, '""') + '"').join(','))].join('\r\n'); }
+function csv(rows, cols) { return [cols.join(','), ...rows.map(r => cols.map(c => { let v = String(r[c] ?? ''); if (/^[=+\-@]/.test(v)) v = "'" + v; return '"' + v.replace(/"/g, '""') + '"'; }).join(','))].join('\r\n'); }
 function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click(); }
 function showRecords() {
   const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'), ideas = JSON.parse(localStorage.getItem(LS_IDEA) || '[]');
@@ -1409,13 +1474,18 @@ $('#hDev').addEventListener('click', e => {
   const r = c.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * d.W, py = (e.clientY - r.top) / r.height * d.H;
   const k = d.rects.find(q => px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h); if (k) devKey(d.id, k.k);
 });
-$('#recBtn').onclick = showRecords; $('#nameBtn').onclick = askName; $('#menuBtn').onclick = () => { if (F.onboard) dismountTruck(); menu(); };
+$('#recBtn').onclick = showRecords; $('#nameBtn').onclick = askName; $('#menuBtn').onclick = () => { if ((S.phase === 'run' || S.phase === 'hunt') && !confirm('Leave this module? This run will not be recorded.')) return; leaveModule(); };
+const LS_HELP = 'arden.trainer.help';
+function setHelp(on) { $('#help').classList.toggle('off', !on); localStorage.setItem(LS_HELP, on ? '1' : '0'); }
+setHelp(localStorage.getItem(LS_HELP) !== '0'); $('#helpBtn').onclick = () => setHelp($('#help').classList.contains('off'));
+$('#modal').addEventListener('mousedown', e => { if (e.target.id === 'modal' && trainee()) closeModal(); });
+bake(scene); bake(HP);
 showWho(); menu();
 if (!trainee() && !/[?&]test/.test(location.search)) askName();
 
 /* test hook for the headless checks */
 window.TR = { S, MODS, F, OBJ, SLOTS, PALLETS, recvPallet, startModule, answer, pressKey, onInteract, next, menu, tick, cur, startHunt, huntHit, HUNT, ZONE,
-  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls };
+  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo };
 </script>
 </body>
 </html>
