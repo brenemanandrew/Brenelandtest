@@ -67,8 +67,17 @@ namespace Brene
                 link.OnCmd = RunCmd; link.Report = SceneReport;
                 StartCoroutine(link.Poll(() => true));   // always: the library page needs the scene's people and sends commands
             }
-            catch (Exception e) { SuperController.LogError("Brene: " + e); }
+            catch (Exception e) { Report("Brene could not start: " + e); }
+            // a line in VaM's output_log.txt so a start can be checked from the log alone
+            try
+            {
+                var d = pDock != null ? pDock.Root : null;
+                UnityEngine.Debug.Log("Brene started: panels " + Panel.All.Count + ", dock " + (d == null ? "missing" : (d.gameObject.activeInHierarchy ? "shown" : "hidden") + " at " + d.anchoredPosition + " size " + d.sizeDelta) + ", panel size " + uiSize.val + ", screen " + Screen.width + "x" + Screen.height + ", canvas " + (canvasGo != null && canvasGo.activeSelf ? "on" : "off"));
+            }
+            catch (Exception e) { Report("Brene start note failed: " + e.Message); }
         }
+        // errors go to VaM's error window and to output_log.txt (VaM's window can run off a short screen)
+        static void Report(string s) { SuperController.LogError(s); UnityEngine.Debug.LogError(s); }
 
         JSONStorableBool Bool(string name, bool def, Action<bool> set)
         {
@@ -105,7 +114,7 @@ namespace Brene
             Add("radial", "Menu", () => radial.OpenAtCentre(), null);
             Add("character", "Character", () => chr.Open(null), null);
         }
-        void Add(string id, string label, Action run, Func<bool> on) { acts[id] = new Act { id = id, label = label, run = run, on = on }; }
+        void Add(string id, string label, Action run, Func<bool> on) { var inner = run; run = () => { if (canvasGo != null && !canvasGo.activeSelf) { showUi.val = true; canvasGo.SetActive(true); } inner(); }; acts[id] = new Act { id = id, label = label, run = run, on = on }; }
         static void Send(string method) { SuperController.singleton.gameObject.SendMessage(method, SendMessageOptions.DontRequireReceiver); }
         static void Send(string method, object arg) { SuperController.singleton.gameObject.SendMessage(method, arg, SendMessageOptions.DontRequireReceiver); }
 
@@ -140,6 +149,7 @@ namespace Brene
                 radialScaler = radialGo.AddComponent<CanvasScaler>(); radialScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; radialScaler.scaleFactor = uiSize.val;
                 radialGo.AddComponent<GraphicRaycaster>();
                 radial = new Radial(radialGo.transform, MenuItems);
+                radial.BeforeRun = () => { if (canvasGo != null && !canvasGo.activeSelf) { showUi.val = true; canvasGo.SetActive(true); } };
             }
 
             // people: one button per person in the scene, tap to select
@@ -267,7 +277,7 @@ namespace Brene
                 act("play"),
                 new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
                 new RItem("Wizra", () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); chatIn.ActivateInputField(); }),
-                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore"), act("movemenu") }),
+                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore"), act("movemenu"), new RItem("Reset layout", ResetLayout) }),
                 act("menu"),
                 new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Talk to next", () => { NextWho(); pChat.Root.gameObject.SetActive(true); }) }),
             };
@@ -311,7 +321,7 @@ namespace Brene
             Refresh();
         }
         // Show all brings back the quick-button panels only (flows and pop-ups open when they are needed)
-        void ShowAll() { foreach (var p in Panel.All) if (p.Kind == "tool") p.Root.gameObject.SetActive(true); BreneEdit.Changed(); Refresh(); }
+        void ShowAll() { showUi.val = true; if (canvasGo != null) canvasGo.SetActive(true); pDock.Root.gameObject.SetActive(true); foreach (var p in Panel.All) if (p.Kind == "tool") p.Root.gameObject.SetActive(true); BreneEdit.Changed(); Refresh(); }
         bool AnyTool() { foreach (var p in Panel.All) if (p.Kind == "tool" && p.Root.gameObject.activeSelf) return true; return false; }
         void ToggleTools() { bool on = !AnyTool(); foreach (var p in Panel.All) if (p.Kind == "tool") { p.Root.gameObject.SetActive(on); if (on) p.Root.SetAsLastSibling(); } BreneEdit.Changed(); Refresh(); }
         void NextTheme()
@@ -351,7 +361,7 @@ namespace Brene
                 FileManagerSecure.CreateDirectory(DIR);
                 SuperController.singleton.SaveJSON(j, FILE);
             }
-            catch (Exception e) { SuperController.LogError("Brene: could not save the layout: " + e.Message); }
+            catch (Exception e) { Report("Brene: could not save the layout: " + e.Message); }
         }
 
         void LoadLayout()
@@ -383,8 +393,11 @@ namespace Brene
                 foreach (var p in Panel.All) p.Fit();
                 Act edit; if (acts.TryGetValue("edit", out edit) && edit.btn != null && !edit.btn.gameObject.activeInHierarchy) edit.btn.transform.SetParent(pDock.Body, false);   // never lose the way back into the editor
                 pDock.Root.gameObject.SetActive(true);
+                // panels saved off screen (a smaller window, an older layout) come back inside it
+                float W = Screen.width / uiSize.val, H = Screen.height / uiSize.val;
+                foreach (var p in Panel.All) { var a = p.Root.anchoredPosition; var z = p.Root.sizeDelta; if (a.x < -z.x + 60 || a.x > W - 60 || -a.y > H - 40 || a.y > 0) p.Root.anchoredPosition = new Vector2(Mathf.Clamp(a.x, 0, Mathf.Max(0, W - z.x)), -Mathf.Clamp(-a.y, 0, Mathf.Max(0, H - z.y))); }
             }
-            catch (Exception e) { SuperController.LogError("Brene: could not read the layout: " + e.Message); }
+            catch (Exception e) { Report("Brene: could not read the layout: " + e.Message); }
         }
 
         void ResetLayout()

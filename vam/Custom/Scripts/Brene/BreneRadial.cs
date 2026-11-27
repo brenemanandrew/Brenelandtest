@@ -24,7 +24,8 @@ namespace Brene
         readonly Stack<List<RItem>> trail = new Stack<List<RItem>>(); readonly Stack<string> titles = new Stack<string>();
         Text coreText; Vector2 center; int hot = -1; float openedAt; bool sticky;
         public bool Open { get { return root != null; } }
-        public bool World; public Vector2 WorldSize;   // VR: the ring opens on the board and is clicked with VaM's pointer
+        public bool World; public Vector2 WorldSize;
+        public Action BeforeRun;   // the plugin makes sure its panels are showing before a choice opens one   // VR: the ring opens on the board and is clicked with VaM's pointer
 
         public Radial(Transform canvas, Func<List<RItem>> items) { this.canvas = canvas; rootItems = items; }
 
@@ -107,7 +108,7 @@ namespace Brene
                 var c = center; Show(c, it.Kids, it.Label); sticky = true; return;
             }
             Close();
-            try { if (it.Run != null) it.Run(); } catch (Exception e) { SuperController.LogError("Brene menu " + it.Label + ": " + e.Message); }
+            try { if (BeforeRun != null) BeforeRun(); if (it.Run != null) it.Run(); } catch (Exception e) { SuperController.LogError("Brene menu " + it.Label + ": " + e.Message); }
         }
         string coreTitle() { return titles.Count > 0 ? titles.Peek() : "Brene"; }
 
