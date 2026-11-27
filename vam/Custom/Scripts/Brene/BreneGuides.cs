@@ -32,6 +32,7 @@ namespace Brene
             BuildStory(root);
             chr.MakeWizra = a => { MakeWizra(a); ShowBody(); };
             chr.MakeCast = (w, a) => { MakeCast(w, a); ShowBody(); };
+            chr.BuildPersonality = BuildPersonality; chr.BuildReactions = BuildReactions;
             if (coach != null) coach.Destroy();
             coach = new Coach(uiSize.val); coach.Finished = n => { if (n == "Welcome") { tutorialSeen = true; SaveLayout(); } };
             Lessons();
@@ -55,6 +56,7 @@ namespace Brene
             if (glassFlow != null) glassFlow.Tick();
             TickWizra();
             TickStory();
+            TickReactions();
         }
 
         // ---- helpers ----
@@ -209,7 +211,7 @@ namespace Brene
             w.Steps.Add(new CoachStep("Welcome to Brene", "Brene puts VaM's tools into big, clear panels and step-by-step flows. Nothing of VaM's is taken away: its own menus are still one tap away.\n\nThis tour takes about a minute. Skip any time."));
             w.Steps.Add(new CoachStep("Your dock", "Everything starts here: the menu, Character, scene and glasses setup, Help, and Edit layout. The line at the bottom says what is connected.") { Target = () => pDock.Root, Enter = () => pDock.Root.gameObject.SetActive(true) });
             w.Steps.Add(new CoachStep("The radial menu", "Hold the <b>" + KeyName() + "</b> key, move the mouse toward a choice and let go. Two flicks reach anything.\n\n<b>Try it now:</b> hold the key.") { Done = () => radial.Open });
-            w.Steps.Add(new CoachStep("Character", "Makes and changes a person in nine steps: who, a starting look, body, face, skin, hair, clothes, pose, save. The \"Build Wizra\" tutorial in Help walks you through making Wizra herself.") { Target = () => Btn("character") });
+            w.Steps.Add(new CoachStep("Character", "Makes and changes a person in eleven steps: who, a starting look, body, face, skin, hair, clothes, pose, personality, reactions, save. The \"Build Wizra\" tutorial in Help walks you through making Wizra herself.") { Target = () => Btn("character") });
             w.Steps.Add(new CoachStep("Set up a scene", "A flow for the whole scene: open one, people, poses, lights, how you view it, play and save.") { Target = () => Btn("sceneflow") });
             w.Steps.Add(new CoachStep("Library", "Your scenes, looks and poses as picture tiles, and the VaM Hub with one-tap install. It's a web page, so it also works on your phone:\n\n<b>127.0.0.1:8767/library</b> on this PC (needs the relay running)."));
             w.Steps.Add(new CoachStep("Make it yours", "Edit layout lets you drag panels, resize them and move buttons between them. Theme changes the colours.") { Target = () => Btn("edit") });
@@ -225,7 +227,10 @@ namespace Brene
             ch.Steps.Add(new CoachStep("Pale skin", "Showing skins with \"pale\" in the name. Clear the search to see them all. Tap one.") { Enter = () => { chr.Open("Skin"); chr.Find("pale"); }, Target = () => chr.Panel.Root });
             ch.Steps.Add(new CoachStep("Dark black hair", "Showing hair with \"black\" in the name; try \"dark\" or \"long\" too.\n\n<b>Try it:</b> tap a hairstyle.") { Enter = () => { chr.Open("Hair"); chr.Find("black"); }, Target = () => chr.Panel.Root, Done = () => chr.LastApplied == "hair" });
             ch.Steps.Add(new CoachStep("Her style", "Hoodies, skirts, heeled boots, dark layers. Showing \"hoodie\"; search \"skirt\" or \"boots\" for the rest.") { Enter = () => { chr.Open("Clothes"); chr.Find("hoodie"); }, Target = () => chr.Panel.Root });
-            ch.Steps.Add(new CoachStep("Make her Wizra", "Save the look as <b>Wizra</b>, then tap <b>Make her Wizra</b>. From then on Wizra's voice comes from this body, her lips move when she talks, and her face follows what she does.\n\n<b>Try it:</b> tap Make her Wizra.") { Enter = () => { chr.SaveName = "Wizra"; chr.Open("Finish"); }, Target = () => chr.Panel.Root, Done = () => Body() != null });
+            ch.Steps.Add(new CoachStep("This is Wizra", "Tell Brene this person is Wizra, so her mind, voice and reactions come with her.\n\n<b>Try it:</b> tap Wizra.") { Enter = () => chr.Open("Personality"), Target = () => chr.Panel.Root, Done = () => Body() != null });
+            ch.Steps.Add(new CoachStep("Her personality", "VaM has no personalities of its own: hers lives in Brenai. These bars are her temperament (warmth, sarcasm, playfulness...) and her mood right now. They shift as you spend time with her; her persona is edited in Brenai's robot panel.") { Enter = () => chr.Open("Personality"), Target = () => chr.Panel.Root });
+            ch.Steps.Add(new CoachStep("Her reactions", "What she does when you touch her head, face, hair, shoulder, arm, hand, belly or knee: a face (tap to change it), and whether she's told, so she can answer it in words.\n\nTouch her with your hands in VR, or the webcam hands.\n\n<b>Try it:</b> press Test on Head.") { Enter = () => chr.Open("Reactions"), Target = () => chr.Panel.Root, Done = () => ReactionTests > 0 });
+            ch.Steps.Add(new CoachStep("Make her Wizra", "Save the look as <b>Wizra</b>. (<b>Make her Wizra</b> is here too, if you skipped it.) From now on her voice comes from this body, her lips move when she talks, and her face follows what she does.") { Enter = () => { chr.SaveName = "Wizra"; chr.Open("Finish"); }, Target = () => chr.Panel.Root });
             ch.Steps.Add(new CoachStep("Say hi", "Now talk to her in the Wizra panel. She remembers everything from Brenai.\n\n<b>Try it:</b> send her a message.") { Enter = () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); replyMark = WizraReplies; }, Target = () => pChat.Root, Done = () => WizraReplies > replyMark });
 
             var sc = new Lesson("Set up a scene", "the scene flow"); lessons.Add(sc);

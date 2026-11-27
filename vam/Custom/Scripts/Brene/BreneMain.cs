@@ -57,7 +57,7 @@ namespace Brene
                 CreateButton("Re-centre head", true).button.onClick.AddListener(() => vit.Recenter());
                 CreateButton("Reset panel layout", true).button.onClick.AddListener(ResetLayout);
 
-                InitWizra();
+                InitWizra(); InitReactions();
                 Actions();
                 BuildCanvas();
                 LoadLayout();

@@ -29,6 +29,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 | `BreneStory.cs` | Little Shepersville: story panel (day, time, place), places tied to scenes, turning-point choices, Margo's video call, the cabin laptop. |
 | `relay/story.mjs` | The relay's story routes (`/story/*`), talking to Brenai's story routes (provisional shapes until the Brenai session's spec). |
 | `story/margo/` | Margo's selfies and call faces as JPG (VaM cannot read WebP), from the Brenai session's branch. |
+| `BreneReactions.cs` | Personality (from Brenai) and touch reactions for the cast: steps 9 and 10 of the Character flow. |
 | `BreneLink.cs` | Talks to the relay on this PC. |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
@@ -60,7 +61,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 - **Turning points:** when Brenai has a question waiting, a card opens in the middle (on the board in VR) with its 2 to 4 answers.
 - **Margo's call:** her call faces on a screen, changing with what she does in her replies (smiling, stern, delighted, listening); her voice plays like a phone call.
 - **Cabin laptop:** title, text, word count; Save keeps it on the PC (plus a dated copy) and sends it to Brenai; Tell Margo saves, calls her and tells her.
-- **Test:** `node vam/test/story.test.mjs`, 21 checks: a stand-in Brenai with and without the story routes.
+- **Test:** `node vam/test/story.test.mjs`, 28 checks (including personality and touch): a stand-in Brenai with and without the story routes.
 
 ## In a VR headset
 - **Automatic:** when VaM runs in a headset, everything Brene shows moves onto a board floating about an arm's length ahead at eye height: the same panels, layout, flows, radial menu and tutorials. Back on the monitor, it returns to the screen.
@@ -90,7 +91,9 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 - **Hidden panels:** the menu still opens when the panels are hidden, so it's the way back.
 
 ## Character panel
-- **A flow, not menus:** 1 Who, 2 Start from (a saved whole look, or keep as is), 3 Body, 4 Face, 5 Skin, 6 Hair, 7 Clothes, 8 Pose, 9 Finish (save the look or the scene).
+- **A flow, not menus:** 1 Who, 2 Start from (a saved whole look, or keep as is), 3 Body, 4 Face, 5 Skin, 6 Hair, 7 Clothes, 8 Pose, 9 Personality, 10 Reactions, 11 Finish (save the look or the scene).
+- **Personality:** VaM has no personalities of its own. Hers lives in Brenai: her temperament bars (warmth, sarcasm, playfulness...) and her mood, read through the relay. It shifts as you spend time with her; her persona is edited in Brenai's robot panel (owner only).
+- **Reactions:** for each part (head, face, hair, shoulder, arm, hand, belly, knee), the face she makes when touched (smile, frown, surprise or none) and whether she is told, so she can answer it in words. Touches come from your hands in VR, or the webcam hands; Test tries one. These are Brenai's own touch areas; Brenai keeps chest, hips and thighs off limits, so they are not offered. Today Brenai can be told about Wizra's head (pat) and face (poke); the rest need Brenai's story routes.
   - **Back** and **Next** walk the steps in order; the numbered steps along the top jump anywhere. Each step says what it is for in one line.
 - **Nothing is taken away:** VaM's own menus are untouched ("VaM menu" opens them). Every shape stays reachable under "Show all body shapes" / "Show all face shapes" (60 at a time) or by search.
 - **Who:** the selected person (or the first one). "Next person" cycles through.

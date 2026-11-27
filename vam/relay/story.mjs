@@ -10,11 +10,15 @@
 //   POST /story/goto             {place} -> loads that place's scene in VaM (through the library's command queue)
 //   GET  /story/margo            margo.json (her selfies and call faces, JPG)
 //   GET  /story/media?p=         a picture from the story folder (JPG or PNG only, inside the folder)
+//   GET  /story/personality?who=  {traits{}, mood, feeling}: Wizra from Brenai's robot panel (owner only), others from the story routes
+//   POST /story/touch            {who, zone} -> tells her (Brenai's touch notes: Wizra's pat and poke today, the rest through the story routes)
 //   GET  /story/writing          {title, text, words, at};  POST {title, text} saves it (on this PC; also sent to Brenai when it has a route)
 import fs from 'node:fs';
 import path from 'node:path';
 
 export const CAST = ['wizra', 'zoe', 'belinda', 'margo'];
+// the parts she can be touched on: Brenai's own touch areas plus the head; chest, hips and thighs stay off limits there
+export const ZONES = ['head', 'face', 'hair', 'shoulder', 'arm', 'hand', 'belly', 'knee'];
 export const PLACES = ['Rental cabin', 'Peak Pizza', 'Casa Belinda', 'Main Street', 'Library', "Wizra's flat", 'Lodge', 'Trail', 'Lake'];
 
 export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spokenOf }) {
@@ -76,6 +80,25 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
       s.place = b.place; save();
       if (!scene) return send(res, 200, { ok: true, note: 'No scene set for ' + b.place + ' yet: pick one in the Places list.' });
       const c = lib.queue({ kind: 'scene', path: scene }); return send(res, 200, { ok: true, id: c.id });
+    }
+    if (p === '/story/personality') {
+      const who = CAST.includes(url.searchParams.get('who')) ? url.searchParams.get('who') : 'wizra';
+      if (!brenai.enabled) return send(res, 200, { error: 'Set BRENAI_PIN on this PC to read her personality from Brenai' });
+      try {
+        if (who === 'wizra') { const j = await call('GET', '/api/robot'); return send(res, 200, { traits: (j.sheet && j.sheet.traits) || j.traitsDefault || {}, mood: j.mood || '', feeling: j.feeling || '' }); }
+        const j = await call('GET', '/api/story/personality?who=' + who); return send(res, 200, { traits: j.traits || {}, mood: j.mood || '', feeling: j.feeling || '' });
+      } catch (e) { return send(res, 200, { error: e.notYet ? `${who[0].toUpperCase() + who.slice(1)}'s personality isn't in Brenai yet (the story routes aren't built).` : /owner/i.test(e.message) ? 'Brenai only shows her personality to the game\'s owner: sign the relay in with the owner\'s PIN.' : e.message }); }
+    }
+    if (p === '/story/touch' && req.method === 'POST') {
+      const b = await readBody(req), who = CAST.includes(b.who) ? b.who : 'wizra', zone = ZONES.includes(b.zone) ? b.zone : null;
+      if (!zone) return send(res, 400, { error: 'unknown part' });
+      if (!brenai.enabled) return send(res, 200, { ok: false, note: 'Not told: set BRENAI_PIN on this PC.' });
+      // Wizra's own touch notes in Brenai today: a pat on the head, a poke on the cheek
+      const kind = who === 'wizra' ? { head: 'pat', face: 'poke' }[zone] : null;
+      try {
+        if (kind) { await call('POST', '/api/touch', { kind }); return send(res, 200, { ok: true }); }
+        await call('POST', '/api/story/touch', { who, zone }); return send(res, 200, { ok: true });
+      } catch (e) { return send(res, 200, { ok: false, note: e.notYet ? `She reacted, but Brenai can't be told about a touch on the ${zone} yet (needs the story routes). Head and face work for Wizra now.` : e.message }); }
     }
     if (p === '/story/margo') { try { return send(res, 200, JSON.parse(fs.readFileSync(path.join(storyDir, 'margo', 'margo.json'), 'utf8'))); } catch { return send(res, 404, { error: 'no margo.json in ' + storyDir }); } }
     if (p === '/story/media') {

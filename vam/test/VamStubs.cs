@@ -35,7 +35,7 @@ namespace UnityEngine
     }
     public class Transform : Component, IEnumerable
     {
-        public Vector3 position, localPosition, localScale, forward; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
+        public Vector3 position, localPosition, localScale, forward, up; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
         public void SetParent(Transform p, bool keep) { } public void SetParent(Transform p) { } public Transform GetChild(int i) { return null; }
         public void SetAsLastSibling() { } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
         public IEnumerator GetEnumerator() { yield break; }
@@ -43,7 +43,7 @@ namespace UnityEngine
     public class RectTransform : Transform { public void GetWorldCorners(Vector3[] c) { } public Vector2 anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax; public Rect rect; }
     public struct Vector2 { public float x, y; public float magnitude; public Vector2(float x, float y) { this.x = x; this.y = y; magnitude = 0; } public static Vector2 zero, one;
         public static Vector2 operator +(Vector2 a, Vector2 b) { return a; } public static Vector2 operator -(Vector2 a, Vector2 b) { return a; } public static Vector2 operator /(Vector2 a, float b) { return a; } public static Vector2 operator *(Vector2 a, float b) { return a; } public static Vector2 operator *(float b, Vector2 a) { return a; } public static implicit operator Vector2(Vector3 v) { return new Vector2(v.x, v.y); } public static float Distance(Vector2 a, Vector2 b) { return 0; } }
-    public struct Vector3 { public float x, y, z; public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; } public static Vector3 zero, one, up, forward; public float sqrMagnitude { get { return 0; } } public float magnitude { get { return 0; } } public void Normalize() { } public static float Dot(Vector3 a, Vector3 b) { return 0; } public static Vector3 operator /(Vector3 a, float b) { return a; }
+    public struct Vector3 { public float x, y, z; public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; } public static Vector3 zero, one, up, forward; public static Vector3 operator -(Vector3 a) { return a; } public float sqrMagnitude { get { return 0; } } public float magnitude { get { return 0; } } public void Normalize() { } public static float Dot(Vector3 a, Vector3 b) { return 0; } public static Vector3 operator /(Vector3 a, float b) { return a; }
         public static Vector3 operator +(Vector3 a, Vector3 b) { return a; } public static Vector3 operator -(Vector3 a, Vector3 b) { return a; } public static Vector3 operator *(Vector3 a, float b) { return a; } public static Vector3 operator *(float b, Vector3 a) { return a; }
         public static bool operator ==(Vector3 a, Vector3 b) { return true; } public static bool operator !=(Vector3 a, Vector3 b) { return false; } public override bool Equals(object o) { return true; } public override int GetHashCode() { return 0; }
         public static float Distance(Vector3 a, Vector3 b) { return 0; } public static Vector3 ClampMagnitude(Vector3 v, float m) { return v; } }
@@ -71,6 +71,7 @@ namespace UnityEngine
     public class Material : Object { public Color color; }
     public class Renderer : Component { public Material material; }
     public class Collider : Component { }
+    public class Rigidbody : Component { }
     public class Camera : Behaviour { public static Camera main; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
         public Ray ScreenPointToRay(Vector3 p) { return new Ray(); } public Vector3 WorldToScreenPoint(Vector3 p) { return p; } }
     public class Canvas : Behaviour { public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
@@ -128,7 +129,7 @@ namespace SimpleJSON
     public class JSONNode { public virtual JSONNode this[string k] { get { return null; } set { } } public virtual JSONNode this[int i] { get { return null; } set { } } public virtual string Value { get { return ""; } set { } }
         public virtual float AsFloat { get; set; } public virtual int AsInt { get; set; } public virtual bool AsBool { get; set; } public virtual JSONArray AsArray { get { return null; } } public virtual int Count { get { return 0; } }
         public virtual void Add(JSONNode n) { } public static implicit operator JSONNode(string s) { return null; } }
-    public class JSONClass : JSONNode { } public class JSONArray : JSONNode { }
+    public class JSONClass : JSONNode, System.Collections.IEnumerable { public System.Collections.IEnumerator GetEnumerator() { yield break; } } public class JSONArray : JSONNode { }
     public static class JSON { public static JSONNode Parse(string s) { return null; } }
 }
 namespace MVR.FileManagementSecure { public static class FileManagerSecure { public static void CreateDirectory(string p) { } public static bool FileExists(string p) { return false; } public static void DeleteFile(string p) { } } }

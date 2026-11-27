@@ -20,7 +20,11 @@ function brenai(withStory) {
     if (req.url === '/api/pin') return j(200, { ok: true, cookie: 'brenai_u=p.s; Path=/' });
     if (req.url === '/api/chat') { res.writeHead(200, { 'content-type': 'text/event-stream' }); return res.end(`data: {"t":"done","text":"*grins* chat says ${b.text}"}\n\n`); }
     if (req.url === '/api/tts') { seen.tts.push(b); res.writeHead(200, { 'content-type': 'audio/wav' }); return res.end(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(40)])); }
+    if (req.url === '/api/touch') { seen.touch = (seen.touch || []).concat(b); return j(200, { ok: true }); }
+    if (req.url === '/api/robot') return j(200, { sheet: { traits: { warmth: 65, sarcasm: 45 } }, mood: 'cozy', feeling: '' });
     if (!withStory) return j(404, { error: 'not found' });
+    if (req.url === '/api/story/personality?who=zoe') return j(200, { traits: { dryness: 90 }, mood: 'busy' });
+    if (req.url === '/api/story/touch') { seen.stouch = (seen.stouch || []).concat(b); return j(200, { ok: true }); }
     if (req.url === '/api/story/state') return j(200, { day: 3, time: 'evening', place: 'Peak Pizza', cast: { zoe: { mood: 'dry', where: 'Peak Pizza' } }, pending: { id: 'tp4', question: 'Stay for one more slice?', answers: ['Stay', 'Head home'] } });
     if (req.url === '/api/story/say') { seen.say.push(b); return j(200, { text: `*shrugs* ${b.who} heard: ${b.text}` }); }
     if (req.url === '/api/story/choose') { seen.choose.push(b); return j(200, { ok: true }); }
@@ -65,9 +69,18 @@ try {
   s = await get(18791, '/story/writing'); ok(s.title === 'Chapter 1' && s.words === 8, 'writing: the last save comes back');
   ok(fs.readdirSync(path.join(T, 'writing')).length === 1, 'writing: a dated copy kept on the PC');
 
+  // personality and touch
+  let pz = await get(18791, '/story/personality?who=wizra'); ok(pz.traits.warmth === 65 && pz.mood === 'cozy', "personality: Wizra's traits from Brenai's robot panel");
+  pz = await get(18791, '/story/personality?who=zoe'); ok(pz.traits.dryness === 90, "personality: Zoe's from the story route");
+  r = await post(18791, '/story/touch', { who: 'wizra', zone: 'head' }); ok(r.ok && A.seen.touch[0].kind === 'pat', 'touch: a pat on Wizra\'s head goes to Brenai as her own "pat"');
+  r = await post(18791, '/story/touch', { who: 'zoe', zone: 'hand' }); ok(r.ok && A.seen.stouch[0].who === 'zoe' && A.seen.stouch[0].zone === 'hand', 'touch: others go through the story route');
+  r = await post(18791, '/story/touch', { who: 'wizra', zone: 'chest' }); ok(r.error && !A.seen.stouch.some(x => x.zone === 'chest'), 'touch: parts Brenai keeps off limits are refused');
+
   // without the story routes yet
   s = await get(18792, '/story/state'); ok(!s.live && /no story routes/i.test(s.note), 'no story routes: state says so plainly');
   r = await post(18792, '/story/say', { who: 'wizra', text: 'yo', voice: true }); ok(r.text === '*grins* chat says yo' && r.voice, 'no story routes: Wizra still answers through her chat, with voice');
+  r = await post(18792, '/story/touch', { who: 'wizra', zone: 'face' }); ok(r.ok && B.seen.touch[0].kind === 'poke', 'no story routes: Wizra\'s face poke still reaches her');
+  r = await post(18792, '/story/touch', { who: 'wizra', zone: 'hand' }); ok(!r.ok && /needs the story routes/.test(r.note), 'no story routes: other parts say plainly they cannot be told yet');
   r = await post(18792, '/story/say', { who: 'belinda', text: 'hola' }); ok(r.error && /Belinda isn't connected yet/.test(r.error), 'no story routes: Belinda says she is not connected yet');
 } catch (e) { fail++; console.log('FAIL ' + (e.stack || e)); }
 finally { for (const p of procs) p.kill(); for (const s of servers) s.close(); fs.rmSync(T, { recursive: true, force: true }); }

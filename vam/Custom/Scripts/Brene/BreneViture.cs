@@ -166,6 +166,9 @@ namespace Brene
             if (rend != null) rend.material.color = holding ? new Color(0.3f, 0.9f, 0.5f) : grip ? new Color(1f, 0.7f, 0.2f) : new Color(0.6f, 0.5f, 1f);
         }
 
+        // where the webcam hands are in the scene (for touch reactions)
+        public List<Vector3> HandPoints() { var l = new List<Vector3>(); foreach (var m in markers.Values) if (m != null) l.Add(m.transform.position); return l; }
+
         public void Shutdown()
         {
             var c = Cam;

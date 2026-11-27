@@ -37,12 +37,12 @@ namespace Brene
             new[] { "Cheekbones", "Cheekbones Height", "Cheekbones Size", "Cheek Bones" }, new[] { "Jaw", "Jaw Width", "Jaw Size" },
             new[] { "Chin", "Chin Length", "Chin Size" }, new[] { "Ears", "Ears Size", "Ear Size" },
         };
-        static readonly string[] STEPS = { "Who", "Start", "Body", "Face", "Skin", "Hair", "Clothes", "Pose", "Finish" };
+        static readonly string[] STEPS = { "Who", "Start", "Body", "Face", "Skin", "Hair", "Clothes", "Pose", "Personality", "Reactions", "Finish" };
         static readonly Dictionary<string, string> KIND = new Dictionary<string, string> { { "Start", "look" }, { "Skin", "skin" }, { "Hair", "hair" }, { "Clothes", "clothing" }, { "Pose", "pose" } };
         static readonly Dictionary<string, string> HINT = new Dictionary<string, string> {
             { "Who", "Pick who to work on." }, { "Start", "Start from a saved look, or keep them as they are." }, { "Body", "Shape the body." },
             { "Face", "Shape the face." }, { "Skin", "Pick a skin." }, { "Hair", "Pick a hairstyle." }, { "Clothes", "Pick clothes." },
-            { "Pose", "Pick a pose." }, { "Finish", "Save the look, or the whole scene." } };
+            { "Pose", "Pick a pose." }, { "Personality", "Who she is (from Brenai)." }, { "Reactions", "What she does when you touch her." }, { "Finish", "Save the look, or the whole scene." } };
         static readonly string[] FACE_WORDS = { "face", "head", "eye", "brow", "nose", "nostril", "lip", "mouth", "jaw", "chin", "cheek", "ear", "forehead", "temple", "teeth", "tongue", "smile", "frown", "blink", "squint", "sneer", "pupil", "iris", "lash", "lid", "philtrum", "skull" };
 
         readonly MonoBehaviour host; readonly Link link; readonly Func<string, string, string, string> apply;
@@ -55,7 +55,7 @@ namespace Brene
 
         public void Build(Transform canvas)
         {
-            Panel = new Panel(canvas, "character", "Character", new Vector2(380, -300), new Vector2(660, 700), false);
+            Panel = new Panel(canvas, "character", "Character", new Vector2(380, -300), new Vector2(760, 720), false);
             var b = Panel.Body;
             // the person, Next person, Reset shapes
             var top = UI.Rect("Top", b); top.anchorMin = new Vector2(0, 1); top.anchorMax = new Vector2(1, 1); top.pivot = new Vector2(0.5f, 1); top.sizeDelta = new Vector2(0, 48);
@@ -64,8 +64,8 @@ namespace Brene
             // the steps, numbered, in order
             var bar = UI.Rect("Steps", b); StepsRt = bar; bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1);
             bar.sizeDelta = new Vector2(0, 52); bar.anchoredPosition = new Vector2(0, -54);
-            var g = bar.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(67, 52); g.spacing = new Vector2(3, 0);
-            for (int k = 0; k < STEPS.Length; k++) { var name = STEPS[k]; var tb = UI.Button(bar, (k + 1) + "\n" + (name == "Start" ? "Start" : name), () => Show(name)); tb.GetComponentInChildren<Text>().fontSize = 15; tabs[name] = tb; }
+            var g = bar.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(64, 52); g.spacing = new Vector2(3, 0);
+            for (int k = 0; k < STEPS.Length; k++) { var name = STEPS[k]; var tb = UI.Button(bar, (k + 1) + "\n" + (name == "Personality" ? "Person-\nality" : name == "Reactions" ? "React" : name), () => Show(name)); tb.GetComponentInChildren<Text>().fontSize = 14; tabs[name] = tb; }
             // search
             var sr = UI.Rect("Search", b); sr.anchorMin = new Vector2(0, 1); sr.anchorMax = new Vector2(1, 1); sr.pivot = new Vector2(0.5f, 1);
             sr.sizeDelta = new Vector2(0, 44); sr.anchoredPosition = new Vector2(0, -146);
@@ -98,7 +98,10 @@ namespace Brene
         public RectTransform StepsRt, NextRt, AllShapesRt;   // for the tutorial's spotlight
         public string SaveName, LastApplied = "";              // the name Finish offers; the kind of the last tile tapped
         public Action<Atom> MakeWizra;                         // Finish's "Make her Wizra"
-        public Action<string, Atom> MakeCast;                  // Finish's "Make her Zoe / Belinda / Margo" (Little Shepersville)
+        public Action<string, Atom> MakeCast;
+        public Action<RectTransform, Atom> BuildPersonality, BuildReactions;   // steps 9 and 10 come from BreneMain (they need Brenai)
+        public void Redraw() { Show(section, true); }
+        public void Note(string s) { if (note != null) note.text = s ?? ""; }                  // Finish's "Make her Zoe / Belinda / Margo" (Little Shepersville)
         public int Changed { get { return original.Count; } }
         public void Find(string q) { search.text = q; Show(section, true); }
         public string Section { get { return section; } }
@@ -146,11 +149,13 @@ namespace Brene
             hint.text = "Step " + (at + 1) + " of " + STEPS.Length + ": " + HINT[sec];
             UI.SetText(nextBtn, at == STEPS.Length - 1 ? "Done" : "Next: " + STEPS[at + 1] + " >");
             who.text = person != null ? person.uid : "No person yet"; note.text = "";
-            search.gameObject.SetActive(sec != "Who" && sec != "Finish");
+            search.gameObject.SetActive(sec != "Who" && sec != "Finish" && sec != "Personality" && sec != "Reactions");
             if (sec == "Who") { People(); return; }
             if (person == null) { note.text = "There is no person in this scene. Add one in VaM (Add Atom > People)."; return; }
             var q = search.text.Trim();
             if (sec == "Finish") Finish();
+            else if (sec == "Personality") { if (BuildPersonality != null) BuildPersonality(content, person); }
+            else if (sec == "Reactions") { if (BuildReactions != null) BuildReactions(content, person); }
             else if (sec == "Body" || sec == "Face") Shapes(sec == "Face", q);
             else host.StartCoroutine(Tiles(KIND[sec], q, build));
         }
