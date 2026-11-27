@@ -37,7 +37,7 @@ const r2 = await page.evaluate(async () => {
   const res = { panelVisible: panel && panel.visible };
   if (!panel) return res;
   panel.updateMatrixWorld();
-  const btnLocal = new (T.camera.position.constructor)(-.4 + (24 + 220) / 1024 * .8, .4 - (1024 - 70 - 3 * 86 + 37) / 1024 * .8, 0);
+  const rows = Math.ceil(T.panelState().btns.length / 2); const btnLocal = new (T.camera.position.constructor)(-.4 + (24 + 220) / 1024 * .8, .4 - (1024 - 70 - rows * 86 + 37) / 1024 * .8, 0);
   const target = panel.localToWorld(btnLocal.clone());
   const rig = T.camera.parent;
   const tl = rig.worldToLocal(target.clone());
@@ -51,6 +51,30 @@ const r2 = await page.evaluate(async () => {
   return res;
 });
 console.log('panel press', JSON.stringify(r2));
+const r3 = await page.evaluate(async () => {
+  const T = window.TR, d = window.__dev, THREE = T.THREE;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  T.startModule('flow'); T.next(); T.onInteract('mc_cradle', T.camera); T.answer(0);
+  await wait(400);
+  const mc = T.DEV.mc; mc.mesh.updateMatrixWorld(true);
+  const out = { tool: T.S.tool, heldBy: mc.group.parent === T.ctrls[0] ? 'ctrl0' : mc.group.parent === T.ctrls[1] ? 'ctrl1' : mc.group.parent && mc.group.parent.type };
+  const press = async (k) => {
+    const r = mc.rects.find(q => q.k === k); const u = (r.x + r.w / 2) / mc.W, v = 1 - (r.y + r.h / 2) / mc.H;
+    const pos = mc.mesh.geometry.attributes.position; const w = .09, h = .135;
+    const tgtW = mc.mesh.localToWorld(new THREE.Vector3((u - .5) * w, (v - .5) * h, 0));
+    const nrm = new THREE.Vector3(0, 0, 1).transformDirection(mc.mesh.matrixWorld);
+    const eyeW = tgtW.clone().add(nrm.multiplyScalar(.25));
+    const tgt = T.rig.worldToLocal(tgtW.clone()), eye = T.rig.worldToLocal(eyeW.clone());
+    const m = new THREE.Matrix4().lookAt(eye, tgt, new THREE.Vector3(0, 1, 0)); const q = new THREE.Quaternion().setFromRotationMatrix(m);
+    const left = d.controllers.left; left.position.set(eye.x, eye.y, eye.z); left.quaternion.set(q.x, q.y, q.z, q.w);
+    await wait(250); left.updateButtonValue('trigger', 1); await wait(120); left.updateButtonValue('trigger', 0); await wait(250);
+    mc.mesh.updateMatrixWorld(true);
+  };
+  for (const k of ['4', '1', '5', 'ENT']) await press(k);
+  out.after = T.cur().title; out.screen = T.DEV.mc.scr.head; out.mistakes = T.S.mistakes.length;
+  return out;
+});
+console.log('handheld keys in VR', JSON.stringify(r3));
 await page.screenshot({ path: 'xr.png' });
 console.log('ERRORS', JSON.stringify(errs.slice(0, 8)));
 await browser.close();

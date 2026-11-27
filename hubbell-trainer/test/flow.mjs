@@ -26,15 +26,38 @@ const res = await page.evaluate(async () => {
       else if (st.type === 'keys') st.seq.forEach(k => T.pressKey(k));
       else if (st.type === 'interact') T.onInteract(Array.isArray(st.target) ? st.target[0] : st.target, T.camera);
       else if (st.type === 'scan') T.onInteract('bc:' + st.code, T.camera);
-      else if (st.type === 'carry') { T.onInteract(st.item, T.camera); T.onInteract(Array.isArray(st.dest) ? st.dest[0] : st.dest, T.camera); }
+      else if (st.type === 'carry') { T.onInteract(Array.isArray(st.item) ? st.item[0] : st.item, T.camera); T.onInteract(Array.isArray(st.dest) ? st.dest[0] : st.dest, T.camera); }
       else if (st.type === 'order') st.seq.forEach(x => T.onInteract(x, T.camera));
       else if (st.type === 'inspect') { for (const it of T.INSP) T.onInteract(it.id, T.camera) || T.inspAnswer(it, T.F.defect === it.id); }
       else if (st.type === 'drive') return { stoppedAt: st.title };
+      else if (st.type === 'rf') {
+        const d = T.DEV[st.dev];
+        for (const f of d.scr.fields) {
+          if (f.ok) continue;
+          const val = Array.isArray(f.expect) ? f.expect.find(v => !d.used.includes(v)) : f.expect;
+          if (f.via === 'scan') {
+            if (!T.S.tool) return { stuck: st.title, why: 'no scanner in hand' };
+            const o = T.OBJ['bc:' + val]; if (!o) return { stuck: st.title, why: 'no barcode ' + val };
+            T.onInteract('bc:' + val, T.camera, { point: o.getWorldPosition(new (T.camera.position.constructor)()) });
+          } else { for (const ch of val) T.devKey(st.dev, ch); T.devKey(st.dev, 'ENT'); }
+          if (T.cur() !== st) break;
+        }
+        if (T.cur() === st) { if (st.seq) st.seq.forEach(k => T.devKey(st.dev, k)); else if (st.key) T.devKey(st.dev, st.key); }
+      }
       if (T.S.i === before && T.S.phase === 'run') return { stuck: st.title, type: st.type };
     }
     return { phase: T.S.phase, mistakes: T.S.mistakes.length, viol: T.S.viol.map(v => v.msg) };
   }
-  for (const id of ['pick', 'pack', 'ship']) { const r = runAuto(id); log.push([id, r, T.panelState().title]); }
+  /* wrong-input checks on the handheld */
+  T.startModule('flow'); T.next(); T.onInteract('mc_cradle', T.camera); T.answer(0);
+  for (const ch of '514') T.devKey('mc', ch); T.devKey('mc', 'ENT');
+  const m1 = T.S.mistakes.length, msg1 = T.DEV.mc.scr.msg;
+  for (const ch of '415') T.devKey('mc', ch); T.devKey('mc', 'ENT');
+  T.devKey('mc', 'F4'); const m2 = T.S.mistakes.length;
+  T.devKey('mc', 'F7'); for (const ch of 'D300') T.devKey('mc', ch); T.devKey('mc', 'ENT');
+  T.onInteract('bc:T-20006', T.camera, { point: T.OBJ['bc:T-20006'].getWorldPosition(new (T.camera.position.constructor)()) });
+  log.push(['wrong inputs', m1, msg1, m2, T.DEV.mc.scr.msg, 'mistakes', T.S.mistakes.length, T.cur().title]);
+  for (const id of ['induct', 'pick', 'flow', 'pack', 'ship']) { const r = runAuto(id); log.push([id, r, T.panelState().title]); }
 
   /* forklift: steps until the first drive step */
   const r0 = runAuto('pit'); log.push(['pit-pre', r0, 'defect=' + T.F.defect, 'onboard=' + T.F.onboard]);
@@ -76,8 +99,12 @@ const res = await page.evaluate(async () => {
 });
 console.log(JSON.stringify(res, null, 1));
 /* views */
-await page.evaluate(() => { const T = window.TR; T.startModule('pack'); });
+await page.evaluate(() => { const T = window.TR; T.startModule('pack'); T.next(); T.onInteract('pk_gun', T.camera); for (const ch of '01') T.devKey('pack', ch); });
 await page.waitForTimeout(800); await page.screenshot({ path: OUT + '/1-pack.png' });
+await page.evaluate(() => { const T = window.TR; T.startModule('pick'); for (let i = 0; i < 4; i++) { const st = T.cur(); st.type === 'choice' ? T.answer(st.correct) : st.type === 'interact' ? T.onInteract(st.target[0] || st.target, T.camera) : T.next(); } T.onInteract('thor2', T.camera); T.onInteract('thor2_gun', T.camera); for (const ch of '41') T.devKey('thor2', ch); });
+await page.waitForTimeout(800); await page.screenshot({ path: OUT + '/5-thor.png' });
+await page.evaluate(() => { const T = window.TR; T.startModule('flow'); T.next(); T.onInteract('mc_cradle', T.camera); T.answer(0); for (const ch of '415') T.devKey('mc', ch); T.devKey('mc','ENT'); T.devKey('mc','F7'); for (const ch of 'D300') T.devKey('mc', ch); T.devKey('mc','ENT'); });
+await page.waitForTimeout(800); await page.screenshot({ path: OUT + '/6-handheld.png' });
 await page.evaluate(() => { const T = window.TR; T.startModule('pick'); for (let i = 0; i < 12; i++) T.cur().type==='info'?T.next():null; });
 await page.evaluate(() => { const T = window.TR; T.startModule('pit'); T.next(); T.answer(1); T.F.onboard = false; });
 await page.waitForTimeout(800); await page.screenshot({ path: OUT + '/2-pit.png' });

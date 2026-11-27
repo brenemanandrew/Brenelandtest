@@ -2,14 +2,26 @@
 
 A 3D training app for the Arden DC floor. One file (`index.html`, Three.js r181 from the CDN, WebXR). Runs in the Quest 3 browser in VR, and on any PC browser with mouse and keyboard. Not part of Breneland.
 
+## The devices (the core of the job)
+Every EWM step is done on a working device screen, not a quiz button:
+- **THOR** (Pallet Land): the vehicle-mount terminal on the rider truck. You step on, it moves with you, and you type on its keys (415, ENT, F7, P100, F4, F1 F1 Save). Its paired handheld scanner reads every barcode into the field the screen is waiting on.
+- **Handheld** (Flow Rack): one mobile computer that scans, shows the RF screens and has the keys. Taken from the charging cradle; in VR it sits in your right hand and you press its keys with the left controller.
+- **Station screens** (Induction, Pack PK04, Truck pack PK10): EWM screens with fields, buttons (Tote Induct, Move HU, Unpack HU, Create HU, Move to HU, Ship, Full Ship Screen, PALLET_SSCC, Capacity) and a keypad, plus the station's corded scanner.
+- Wrong scan, wrong key or wrong value: the device shows the error (for example "Red tote first: it is a hot order") and it counts as a mistake.
+- PC: click the device keys (a copy of the screen sits in the instruction panel), or type digits, P, K, Enter, Backspace and F1-F8 on the keyboard.
+
+The screens are modeled on the SW text (transactions, keys, field names). They are not copies of the real EWM layouts; screenshots of the real screens would let them match.
+
 ## Modules
-| # | Module | Source | Steps |
+| # | Module | Source | Devices |
 |---|---|---|---|
-| 1 | Forklift (PIT) | Generic OSHA 1910.178 basics. **No Arden PIT SW was found on the Drive.** Replace when written. | Who may drive, 8-point pre-shift inspection (random defect 85% of runs), tag-out, mounting, seatbelt, drive to a pallet, pick it up, horn at the intersection, put away on P104 level B (1.6 m beam), park, shut down |
-| 2 | Pick: Pallet Land | Pallet Land Pick SW, Induction SW, Short Pick deviation (Draft 1.0, 10/17/2026) | PPE, THOR check (dead THOR scenario), 415 login, zone F7, totes and cones, tote colors, scan location and product, count, build the pallet, F4, a short pick (discrepancy card, blue cone, pick hospital, outbox times), complete and stage, F1 F1 Save |
-| 3 | Pack: parcel | Kaizen 03 parcel core process rev 0.6 | All 10 steps, plus scale in kg, missing tote, blind pack, smallest box, invalid-carrier popup, label and sticker rules, conveyor / tote / pallet rule |
-| 4 | Ship | Kaizen 03 truck core process rev 0.6, Pallet Land staging step, generic dock safety | Totes in transit, two-person lift, PALLET_SSCC, heavy-first build (ordered), 50 in, mixed carton, wrap and banding rules, system weight + 40/70 lb, BOL pinned on top, label layout and C, stage near the Lead Hub, dock lock before entering a trailer |
-| 5 | Gemba waste hunt | Kaizen 03 findings + TIMWOODS | 9 wastes placed on the floor (stickers, far box stock, pallet pile, waiting picker, banding, crushed carton, pre-built cartons, pallet in the walkway, lead re-typing weights) |
+| 1 | Forklift (PIT) | Generic OSHA 1910.178 basics. **No Arden PIT SW was found.** | Sit-down counterbalance truck: inspection, drive, put away at 1.6 m, park |
+| 2 | Induction | Induction SW, Draft 1.0 | Induction computer (ZEWM_INDUCT, 0103, oldest order, wave colors) + scanner |
+| 3 | Pick: Pallet Land | Pallet Land Pick SW + Short Pick deviation, Draft 1.0 | THOR terminal + paired scanner: dead THOR, 415, F7 zone, tote, SRCBIN, product, count, F4, short pick, F1 F1 Save |
+| 4 | Pick: Flow Rack | Flow Rack Pick SW, Draft 1.0 | Handheld: 415, D300, 4 totes with the red hot tote first, location, product, poly bag, Order Pick Complete = No, conveyor |
+| 5 | Pack: parcel | Kaizen 03 parcel core process rev 0.6 | PK04 screen + scanner: work center, Move HU, missing tote, Unpack HU, Create HU, Move to HU, Ship, Full Ship Screen, invalid-carrier popup |
+| 6 | Ship | Kaizen 03 truck core process rev 0.6 + staging + generic dock safety | PK10 screen + scanner: PALLET_SSCC, Capacity, 612 + 40 = 652 typed on Full Ship Screen, lane scan |
+| 7 | Gemba waste hunt | Kaizen 03 findings + TIMWOODS | 9 wastes on the floor |
 
 Every step shows the WHY from the SW. Wrong answers count as mistakes; unsafe ones (missed defect, no horn, forks up while traveling, struck rack, PIT in the walkway, unsafe lift) count as safety calls. Score = 100 - 5 per mistake - 10 per safety call. Pass at 80 with no missed defect or strike.
 
@@ -25,9 +37,9 @@ WebXR needs HTTPS. Any static host works (no server code):
 - a Fly app with the same nginx Dockerfile the Breneland test site uses.
 Nothing has been deployed. Open the URL in the Quest browser and press Enter VR.
 
-## Tested (2026-11-27, headless Chrome)
-- `test/flow.mjs`: runs all five modules through the real step engine (no JS errors). The forklift run uses the real driving physics: the pallet stops at the carriage, lifts at pocket height, goes into P104-B and is set on the 1.6 m beam, the truck parks.
-- `test/xr.mjs`: Meta's WebXR emulator (IWER, Quest 3 profile; download `iwer.min.js` from `cdn.jsdelivr.net/npm/iwer@2/build/` next to the script). Enter VR works, the panel appears, a right-controller trigger on the panel starts a module.
+## Tested (2026-11-27, headless Chrome; devices added the same day)
+- `test/flow.mjs`: runs all seven modules through the real step engine, typing on the device keys and scanning barcodes from the hand (no JS errors). Also checks that wrong inputs (514 instead of 415, a blue tote before the red one) show the device error and count as mistakes. The forklift run uses the real driving physics: the pallet stops at the carriage, lifts at pocket height, goes into P104-B and is set on the 1.6 m beam, the truck parks.
+- `test/xr.mjs`: Meta's WebXR emulator (IWER, Quest 3 profile; download `iwer.min.js` from `cdn.jsdelivr.net/npm/iwer@2/build/` next to the script). Enter VR works, the panel appears, a right-controller trigger on the panel starts a module, and the left controller's ray types 415 + ENT on the handheld held in the right hand.
 - **Not tested on a real Quest 3.** Comfort, text size, performance and stick feel need a headset run.
 - Run: `python3 -m http.server 8099` in this folder, then `node test/flow.mjs <outdir>` (needs Playwright).
 

@@ -21,6 +21,7 @@ canvas{display:block}
 #hSub{font-size:13px;color:var(--gray);margin-bottom:6px}
 #hText{font-size:16px;line-height:1.3;white-space:pre-line}
 #hRF{display:none;margin:8px 0;background:#10233a;color:#9fe39f;font-family:Consolas,monospace;font-size:14px;padding:8px;border-radius:4px;white-space:pre}
+#hDev{display:none;margin:8px 0}#hDev canvas{display:block;border-radius:6px;cursor:pointer;max-width:100%}
 #hWhy{display:none;margin-top:8px;font-size:14px;color:#333;background:#FEF6CC;border-left:4px solid var(--y);padding:6px 8px}
 #hBtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 #hBtns button{flex:1 1 45%;background:#fff;border:2px solid #000;border-radius:5px;padding:7px 8px;font-size:15px;text-align:left;cursor:pointer}
@@ -50,7 +51,7 @@ canvas{display:block}
 </head>
 <body>
 <div id="top"><b>ARDEN DC TRAINER</b><span class="sub">PIT · Pick · Pack · Ship · Kaizen</span><span class="sp"></span><span id="who" class="sub"></span><button id="menuBtn">Menu</button><button id="recBtn">Records</button><button id="nameBtn">Trainee</button></div>
-<div id="hud"><div id="hTitle"></div><div id="hSub"></div><div id="hText"></div><div id="hRF"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
+<div id="hud"><div id="hTitle"></div><div id="hSub"></div><div id="hText"></div><div id="hRF"></div><div id="hDev"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
 <div id="cross"></div><div id="look"></div><div id="toast"></div>
 <div id="help"><b>PC:</b> click the view to look around, WASD to walk, click or E to use what the crosshair is on, 1-9 for the panel buttons, Esc to free the mouse.<br><b>Forklift:</b> W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.<br><b>Quest 3:</b> Enter VR. Trigger uses things and presses panel buttons. Left stick walks, right stick turns. X brings the panel back. In the forklift: left stick drives and steers, right stick lifts and tilts, A is the horn.</div>
 <div id="modal" class="hidden"><div id="mbox"></div></div>
@@ -169,6 +170,156 @@ function hitsSolid(x, z, r, who) {
 function inRect(x, z, r) { return x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]; }
 
 /* ============================================================
+   DEVICES: THOR terminal, handheld mobile computer, EWM station screens.
+   One engine: a screen (lines, fields, keys) drawn on a canvas. Keys are
+   pressed with the ray (VR), the crosshair or the copy in the HUD (PC), or
+   the PC keyboard (digits, P, K, Enter, Backspace, F1-F8). Scans come from
+   the scanner in your hand.
+   ============================================================ */
+const DEV = {};
+const RF_ROWS = [['F1', 'F2', 'F4', 'F7'], ['F8', 'CLR', 'ENT', 'P'], ['1', '2', '3', 'D'], ['4', '5', '6', '0'], ['7', '8', '9', 'K']];
+const GUI_PAD = [['7', '8', '9', 'CLR'], ['4', '5', '6', 'P'], ['1', '2', '3', 'K'], ['0', 'D', 'ENT', 'F8']];
+function makeDevice(id, kind, wM, hM, name, batt) {
+  const W = kind === 'rf' ? 512 : 1024, H = kind === 'rf' ? 768 : 640;
+  const ct = canvasTex(W, H);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(wM, hM), new THREE.MeshBasicMaterial({ map: ct.tex }));
+  const d = DEV[id] = { id, kind, ct, mesh, W, H, rects: [], batt, name, scr: null, used: [] };
+  reg(mesh, 'dev:' + id, name, { dev: id });
+  devSet(id, kind === 'rf' ? { head: 'SAP EWM RF', lines: ['', 'Ready.'] } : { head: 'SAP EWM', lines: ['Ready.'], pad: false });
+  return d;
+}
+function devSet(id, scr) {
+  const d = DEV[id];
+  d.scr = { head: '', lines: [], fields: [], keys: [], soft: [], focus: 0, msg: '', bad: false, pad: true, ...scr };
+  d.scr.fields = d.scr.fields.map(f => ({ via: 'scan', ...f, val: '', ok: false }));
+  d.used = []; drawDev(d);
+}
+function devMsg(d, msg, bad) { d.scr.msg = msg; d.scr.bad = bad; drawDev(d); }
+function drawDev(d) {
+  const s = d.scr;
+  d.ct.redraw((g, w, h) => {
+    d.rects = [];
+    const key = (k, x, y, kw, kh, hot) => {
+      g.fillStyle = hot ? '#FDDB33' : /^(F\d|ENT|CLR)$/.test(k) ? '#2f2f2f' : '#565656'; g.fillRect(x, y, kw, kh);
+      g.strokeStyle = '#000'; g.lineWidth = 3; g.strokeRect(x, y, kw, kh);
+      g.fillStyle = hot ? '#000' : '#fff'; g.font = `bold ${Math.min(kh * .48, (kw - 8) / (k.length * .58 + .2))}px Arial`;
+      g.textAlign = 'center'; g.fillText(k, x + kw / 2, y + kh * .66); g.textAlign = 'left';
+      d.rects.push({ k, x, y, w: kw, h: kh });
+    };
+    if (d.kind === 'rf') {
+      g.fillStyle = '#1e1e1e'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#0d2340'; g.fillRect(16, 16, w - 32, 430);
+      g.fillStyle = '#2a5d9f'; g.fillRect(16, 16, w - 32, 46);
+      g.fillStyle = '#fff'; g.font = 'bold 26px Consolas, monospace'; g.fillText(s.head.slice(0, 22), 28, 48);
+      if (d.batt != null) { g.fillStyle = d.batt < 20 ? '#ff5050' : '#8f8'; g.textAlign = 'right'; g.fillText(d.batt + '%', w - 28, 48); g.textAlign = 'left'; }
+      let y = 98; g.font = '26px Consolas, monospace';
+      for (const l of s.lines) { g.fillStyle = '#e8f0ff'; g.fillText(String(l).slice(0, 28), 28, y); y += 32; }
+      s.fields.forEach((f, i) => {
+        g.font = '24px Consolas, monospace'; g.fillStyle = '#9fc3ff'; g.fillText(f.label.slice(0, 9), 28, y + 6);
+        const fx = 180; g.fillStyle = f.ok ? '#123d1c' : '#fff'; g.fillRect(fx, y - 20, w - fx - 30, 34);
+        if (i === s.focus && !f.ok) { g.strokeStyle = '#FDDB33'; g.lineWidth = 4; g.strokeRect(fx, y - 20, w - fx - 30, 34); }
+        g.font = '26px Consolas, monospace'; g.fillStyle = f.ok ? '#8f8' : '#000'; g.fillText((f.val || (i === s.focus && !f.ok ? '_' : '')).slice(0, 16), fx + 8, y + 6); y += 42;
+      });
+      if (s.msg) { g.fillStyle = s.bad ? '#c00000' : '#2e7d32'; g.fillRect(16, 400, w - 32, 46); g.fillStyle = '#fff'; g.font = 'bold 22px Arial'; g.fillText(s.msg.slice(0, 38), 26, 431); }
+      let ky = 458;
+      if (s.soft.length) { const kw = (w - 32 - (s.soft.length - 1) * 8) / s.soft.length; s.soft.forEach((k, i) => key(k, 16 + i * (kw + 8), ky, kw, 44, true)); ky += 50; }
+      const rowH = (h - ky - 10) / RF_ROWS.length - 6;
+      RF_ROWS.forEach((row, r) => row.forEach((k, c) => key(k, 16 + c * 122, ky + r * (rowH + 6), 114, rowH)));
+    } else {
+      g.fillStyle = '#e8eef5'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#0a3d7a'; g.fillRect(0, 0, w, 54); g.fillStyle = '#fff'; g.font = 'bold 30px Arial'; g.fillText(s.head.slice(0, 54), 16, 37);
+      let x = 12, ty = 64;
+      for (const k of s.keys) { g.font = 'bold 26px Arial'; const kw = Math.min(w - 24, g.measureText(k).width + 30); if (x + kw > (s.pad ? 680 : w - 12)) { x = 12; ty += 56; } key(k, x, ty, kw, 48, true); x += kw + 8; }
+      let y = (s.keys.length ? ty + 90 : 100);
+      for (const l of s.lines) { const t = String(l); if (t.startsWith('>')) { g.fillStyle = '#FDDB33'; g.fillRect(12, y - 26, 660, 34); } g.fillStyle = '#111'; g.font = '26px Arial'; g.fillText(t.replace(/^>/, '').slice(0, 46), 18, y); y += 36; }
+      y += 10;
+      s.fields.forEach((f, i) => {
+        g.fillStyle = '#333'; g.font = '26px Arial'; g.fillText(f.label, 18, y + 8);
+        const fx = 230, fw = 400; g.fillStyle = f.ok ? '#d9f2dc' : '#fff'; g.fillRect(fx, y - 22, fw, 40); g.strokeStyle = i === s.focus && !f.ok ? '#e0a800' : '#888'; g.lineWidth = i === s.focus && !f.ok ? 5 : 2; g.strokeRect(fx, y - 22, fw, 40);
+        g.fillStyle = '#000'; g.font = '28px Consolas, monospace'; g.fillText((f.val || (i === s.focus && !f.ok ? '_' : '')).slice(0, 20), fx + 10, y + 8); y += 54;
+      });
+      if (s.msg) { g.fillStyle = s.bad ? '#c00000' : '#2e7d32'; g.fillRect(12, h - 62, s.pad ? 664 : w - 24, 50); g.fillStyle = '#fff'; g.font = 'bold 26px Arial'; g.fillText(s.msg.slice(0, 44), 22, h - 28); }
+      if (s.pad) GUI_PAD.forEach((row, r) => row.forEach((k, c) => key(k, 694 + c * 80, 130 + r * 120, 74, 110)));
+    }
+  });
+}
+function devPress(id, uv) {
+  const d = DEV[id], px = uv.x * d.W, py = (1 - uv.y) * d.H;
+  const r = d.rects.find(q => px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h);
+  if (r) devKey(id, r.k);
+}
+function devKey(id, k) {
+  const d = DEV[id], s = d.scr, st = cur();
+  beep(900, .03, 'square', .03);
+  const active = st && st.type === 'rf' && st.dev === id && S.phase === 'run';
+  const f = s.fields[s.focus];
+  if (/^[0-9A-Z]$/.test(k)) {
+    if (f && !f.ok && f.via === 'type') { f.val += k; s.msg = ''; drawDev(d); }
+    else if (active && f && !f.ok) devMsg(d, 'Scan this field', true);
+    mirrorDev(); return;
+  }
+  if (k === 'CLR') { if (f && !f.ok) { f.val = ''; s.msg = ''; drawDev(d); } mirrorDev(); return; }
+  if (!active) { devMsg(d, 'Nothing to do on this screen', true); mirrorDev(); return; }
+  if (k === 'ENT' && f && !f.ok) { if (f.val) checkField(d, f); else devMsg(d, 'Enter ' + f.label + ' first', true); mirrorDev(); return; }
+  if (st.seq) {
+    if (k === st.seq[S.k]) { S.k++; if (S.k >= st.seq.length) return rfDone(st); devMsg(d, st.seq.slice(0, S.k).join(' > '), false); }
+    else { S.k = 0; rfWrong(d, st, k); }
+    mirrorDev(); return;
+  }
+  if (st.key && k === st.key) {
+    const p = s.fields.find(x => !x.ok);
+    if (p) { devMsg(d, 'Fill ' + p.label + ' first', true); toast('Fill ' + p.label + ' first.', 'info'); mirrorDev(); }
+    else rfDone(st);
+    return;
+  }
+  rfWrong(d, st, k); mirrorDev();
+}
+function rfWrong(d, st, k) {
+  const fb = (st.keyFb && st.keyFb[k]) || `${k} is not this step.` + (st.key ? ` The SW says ${st.key}.` : st.seq ? ` The SW says ${st.seq.join(', ')}.` : '');
+  devMsg(d, fb, true); mistake(fb);
+}
+function checkField(d, f) {
+  const s = d.scr;
+  const ok = Array.isArray(f.expect) ? f.expect.includes(f.val) && !d.used.includes(f.val) : f.val === f.expect;
+  if (ok) {
+    f.ok = true; d.used.push(f.val); s.focus = s.fields.findIndex(x => !x.ok); s.msg = ''; beep(1900, .07, 'sine', .1);
+    drawDev(d); mirrorDev();
+    const st = cur(); if (s.focus < 0 && st && st.type === 'rf' && st.dev === d.id && !st.key && !st.seq) rfDone(st);
+  } else {
+    const msg = (f.wrong && f.wrong[f.val]) || f.err || `${f.val} is not valid for ${f.label}.`;
+    f.val = ''; devMsg(d, msg, true); mirrorDev(); mistake(msg);
+  }
+}
+function rfDone(st) { good(); st.onDone && st.onDone(); next(); }
+function devScan(code) {
+  const st = cur();
+  if (st && st.type === 'rf' && S.phase === 'run') {
+    const d = DEV[st.dev], f = d.scr.fields[d.scr.focus];
+    if (!f || f.ok) { devMsg(d, 'No scan field open', true); mirrorDev(); return toast('The screen is not asking for a scan. Use the keys.', 'info'); }
+    if (f.via !== 'scan') { devMsg(d, 'Type this one on the keys', true); mirrorDev(); return toast('Type this field on the keypad.', 'info'); }
+    f.val = code; checkField(d, f); return;
+  }
+  beep(1900, .07, 'sine', .1); toast('Scanned ' + code + '. Nothing on the screen is waiting for it.', 'info');
+}
+function mirrorDev() {
+  const boxEl = $('#hDev'), st = cur();
+  const id = st && st.type === 'rf' && S.phase === 'run' ? st.dev : null;
+  if (!id || renderer.xr.isPresenting) { boxEl.style.display = 'none'; return; }
+  const d = DEV[id]; boxEl.style.display = 'block';
+  if (boxEl.firstChild !== d.ct.c) { boxEl.innerHTML = ''; boxEl.appendChild(d.ct.c); d.ct.c.style.width = d.kind === 'rf' ? '230px' : '100%'; }
+}
+/* tools in your hand: the scanner gun, or the handheld (which is a device) */
+const TOOL = {};
+{ const gun = new THREE.Group(); box(.05, .06, .16, M(0x222222), 0, 0, -.04, gun); box(.04, .1, .05, M(0x333333), 0, -.1, .02, gun); box(.046, .03, .02, M(0xc00000), 0, .01, -.125, gun); gun.visible = false; TOOL.gun = gun; }
+function gunProp(x, y, z, id, name, parent = scene) {
+  const g = new THREE.Group(); box(.05, .06, .16, M(0x222222), 0, 0, 0, g); box(.04, .1, .05, M(0x333333), 0, -.1, .05, g); box(.046, .03, .02, M(0xc00000), 0, .01, -.085, g);
+  g.position.set(x, y, z); parent.add(g); reg(g, id, name); movable(g); return g;
+}
+const laserLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xff2020 }));
+laserLine.visible = false; laserLine.frustumCulled = false; scene.add(laserLine);
+function laser(from, to) { const a = from.getWorldPosition(new THREE.Vector3()); laserLine.geometry.setFromPoints([a, to.clone()]); laserLine.visible = true; setTimeout(() => { laserLine.visible = false; }, 160); }
+
+/* ============================================================
    THE WAREHOUSE (meters; x east, z south; door and dock to the south)
    ============================================================ */
 const C = { brown: 0xa77b4f, cardboard: 0xc49a6c, rackBlue: 0x1f4fa8, beam: 0xf07c00, pallet: 0xb48a58, conc: 0xb9bcbd, yellow: 0xfddb33, green: 0x2e9d3a, red: 0xc0392b, blue: 0x2a6fd6, orange: 0xf28c28, black: 0x111111, white: 0xffffff, gray: 0x777777 };
@@ -283,26 +434,37 @@ pickFace('P106-A', 'HBL2621', 4);
     const t = new THREE.Group(); box(.55, .3, .38, M(0x6b4a2b), 0, 0, 0, t);
     for (const [k, col] of [[0, C.green], [1, C.orange], [2, C.blue]]) { const cone = new THREE.Mesh(new THREE.ConeGeometry(.04, .12, 10), M(col)); cone.position.set(-.15 + k * .15, .36, 0); t.add(cone); }
     t.position.set(ix - .9 + i * .6, .85, iz + .1); scene.add(t);
+    if (i === 0) reg(t, 'ind_tote0', 'Tote T-10230');
     const bc = barcode('T-1023' + i, .2, .1, 'T-1023' + i); bc.position.set(0, .16, .195); t.add(bc);
     totes.push(t); movable(t);
   }
   OBJ.indTotes = totes;
+  const shelf = box(2.4, .05, 1, HIDDEN, ix, .86, iz); reg(shelf, 'ind_rack', 'Induction flow rack');
+  /* induction computer, scanner, tote stacks, flow rack pallet, turnover log */
+  box(.08, 1.15, .08, M(0x333333), 1.7, 0, -12.35); box(.5, .04, .35, M(0x333333), 1.7, 1.0, -12.3);
+  const d = makeDevice('ind', 'gui', .62, .39, 'Induction computer (EWM)'); d.mesh.position.set(1.7, 1.45, -12.42); scene.add(d.mesh); box(.66, .43, .03, M(0x111111), 1.7, 1.235, -12.45);
+  gunProp(1.55, 1.07, -12.2, 'ind_gun', 'Induction scanner');
+  const log = new THREE.Group(); box(.22, .02, .3, M(0x8b5a2b), 0, 0, 0, log); box(.2, .005, .26, M(0xffffff), 0, .02, 0, log); log.position.set(1.88, 1.04, -12.25); scene.add(log); reg(log, 'ind_log', 'Turnover log');
+  for (const [x, col, code, id] of [[5.4, 0x6b4a2b, 'T-10240', 'ind_brown'], [6.1, C.blue, 'T-10250', 'ind_blue']]) {
+    for (let k = 0; k < 3; k++) box(.55, .3, .38, M(col), x, k * .31, -11.3);
+    const top = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, top); top.position.set(x, .93, -11.3); scene.add(top);
+    const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); top.add(b); movable(top); OBJ[id] = top;
+  }
+  const frp = makePallet(0); frp.position.set(5.6, 0, -9.8); scene.add(frp); reg(frp, 'ind_frpallet', 'Flow rack induction pallet');
+  place(label('FLOW RACK\nINDUCTION', .7, .35, { bg: '#FDDB33' }), 5.6, 1.3, -10.35);
 }
 function makeThor(id, battery) {
-  const g = new THREE.Group();
-  box(.75, .25, 1.0, M(C.yellow), 0, 0, -.6, g);                     /* power unit */
-  box(.8, .08, .7, M(0x333333), 0, .05, -.6, g);                     /* platform */
-  box(.1, 1.15, .1, M(0x333333), 0, .25, -.95, g);                   /* control mast */
-  box(.5, .08, .12, M(0x333333), 0, 1.4, -.95, g);
-  for (const x of [-.3, .3]) box(.16, .06, 1.15, M(0x555555), x, .03, .5, g);   /* forks */
-  const ct = canvasTex(256, 128); const scr = new THREE.Mesh(new THREE.PlaneGeometry(.22, .11), new THREE.MeshBasicMaterial({ map: ct.tex }));
-  scr.position.set(0, 1.25, -.89); g.add(scr); g.userData.screen = ct;
-  const pal = makePallet(0); pal.position.set(0, .09, .5); g.add(pal);
-  reg(pal, id + '_pallet', 'Pallet on the THOR');
-  g.userData.setBattery = b => ct.redraw((x, w, h) => { x.fillStyle = '#111'; x.fillRect(0, 0, w, h); x.fillStyle = b < 20 ? '#ff4040' : '#5fe35f'; x.font = 'bold 52px Arial'; x.textAlign = 'center'; x.fillText('BATT ' + b + '%', w / 2, 80); });
-  g.userData.setBattery(battery);
-  const body = g.children[0];
-  reg(body, id, id === 'thor1' ? 'THOR 1' : 'THOR 2');
+  /* rider pallet truck with a THOR vehicle-mount terminal; the operator stands at the origin facing -z */
+  const g = new THREE.Group(), name = id === 'thor1' ? 'THOR 1' : 'THOR 2';
+  box(.8, .08, .6, M(0x333333), 0, .05, .05, g);                                 /* operator platform */
+  const body = box(.8, .9, .5, M(C.yellow), 0, .05, -.55, g);                    /* power unit */
+  box(.05, .45, .05, M(0x333333), .33, .95, -.42, g); box(.05, .45, .05, M(0x333333), -.33, .95, -.42, g); box(.71, .05, .05, M(0x333333), 0, 1.4, -.42, g);
+  for (const x of [-.3, .3]) box(.16, .06, 1.25, M(0x555555), x, .03, -1.45, g);  /* forks */
+  const pal = makePallet(0); pal.position.set(0, .09, -1.45); g.add(pal); reg(pal, id + '_pallet', 'Pallet on ' + name);
+  const back = box(.23, .33, .03, M(0x111111), 0, 1.035, -.385, g); back.rotation.x = -.45;
+  const d = makeDevice(id, 'rf', .2, .3, name + ' terminal', battery); d.mesh.position.set(0, 1.2, -.36); d.mesh.rotation.x = -.45; g.add(d.mesh);
+  gunProp(-.36, 1.0, -.36, id + '_gun', name + ' scanner', g);
+  reg(body, id, name);
   return g;
 }
 const thor1 = makeThor('thor1', 12); thor1.position.set(-1.2, 0, -5); scene.add(thor1);
@@ -318,7 +480,18 @@ for (let i = 0; i < 4; i++) {
   place(label('D' + (1 + i) + '00', .5, .25, { bg: '#FDDB33' }), x0 + 1.4, 2.6, -13.85);
 }
 solid(8, 20, -15, -13.8);
-box(12, .7, .6, M(0x555555), 14, 0, -12.9); solid(8, 20, -13.2, -12.6);   /* pick conveyor */
+const frConv = box(12, .7, .6, M(0x555555), 14, 0, -12.9); solid(8, 20, -13.2, -12.6);   /* pick conveyor */
+reg(frConv, 'fr_conv', 'Pick conveyor');
+for (let l = 1; l <= 2; l++) for (let k = 0; k < 5; k++) { const code = `D30${k + 1}-0${l + 1}`; const b = barcode(code, .2, .08, code); b.position.set(15.4 - 1.1 + k * .55, .47 + l * .45, -13.86); scene.add(b); }
+{ const b = barcode('HBL7740', .16, .08, 'HBL7740'); b.position.set(15.4 - 1.1 + 2 * .55, .47 + .45 + .12, -13.86); scene.add(b); }
+for (const [x, col, code, red] of [[10.4, C.blue, 'T-20006'], [11.1, C.blue, 'T-20007'], [11.8, C.red, 'T-20009', 1], [12.5, C.blue, 'T-20008']]) {
+  const t = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, t); t.position.set(x, .7, -12.9); scene.add(t);
+  const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); t.add(b); movable(t); if (red) OBJ.fr_red = t;
+}
+{ const base = box(.35, .95, .3, M(0x444444), 9.4, 0, -11.3); reg(base, 'mc_cradle', 'Handheld charging cradle'); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), 9.4, .7, -11.14);
+  const mc = new THREE.Group(); box(.1, .17, .025, M(0x1a1a1a), 0, -.085, -.0125, mc);
+  const d = makeDevice('mc', 'rf', .09, .135, 'Handheld (mobile computer)', 88); d.mesh.position.z = .002; mc.add(d.mesh);
+  mc.position.set(9.4, 1.05, -11.3); mc.rotation.x = -.6; scene.add(mc); movable(mc); d.group = mc; }
 
 /* ---------- pack stations ---------- */
 function packBench(x, z, name) {
@@ -334,9 +507,9 @@ reg(outfeed, 'pk_outfeed', 'Outfeed conveyor');
 const PK = {};
 {
   const bx = 12, bz = 3, top = .9;
-  const mon = canvasTex(640, 400); const monM = new THREE.Mesh(new THREE.PlaneGeometry(.62, .39), new THREE.MeshBasicMaterial({ map: mon.tex }));
-  monM.position.set(bx - .8, top + .45, bz - .2); monM.rotation.y = 0; scene.add(monM); box(.66, .43, .04, M(0x111111), bx - .8, top + .24, bz - .24); box(.06, .25, .06, M(0x111111), bx - .8, top, bz - .24);
-  reg(monM, 'pk_monitor', 'Pack station screen (EWM)'); PK.mon = mon;
+  const pd = makeDevice('pack', 'gui', .62, .39, 'Pack station screen (EWM)'); pd.mesh.position.set(bx - .8, top + .45, bz - .2); scene.add(pd.mesh);
+  box(.66, .43, .04, M(0x111111), bx - .8, top + .24, bz - .24); box(.06, .25, .06, M(0x111111), bx - .8, top, bz - .24);
+  gunProp(bx - .25, top + .04, bz - .25, 'pk_gun', 'Pack station scanner');
   /* scale with display */
   const scale = new THREE.Group(); box(.5, .06, .45, M(0x555555), 0, 0, 0, scale); scale.position.set(bx + .3, top, bz + .05); scene.add(scale);
   const sd = canvasTex(256, 96); const sdm = new THREE.Mesh(new THREE.PlaneGeometry(.16, .06), new THREE.MeshBasicMaterial({ map: sd.tex })); sdm.position.set(0, .04, .23); sdm.rotation.x = -.6; scale.add(sdm);
@@ -365,14 +538,7 @@ const PK = {};
   const plist = new THREE.Group(); box(.21, .005, .28, M(0xffffff), 0, 0, 0, plist); plist.position.set(bx + .85, top + .21, bz - .2); scene.add(plist); plist.visible = false; reg(plist, 'pk_plist', 'Packing list'); PK.plist = plist; movable(plist);
 }
 function setScale(txt, color = '#5fe35f') { PK.scaleDisp.redraw((g, w, h) => { g.fillStyle = '#111'; g.fillRect(0, 0, w, h); g.fillStyle = color; g.font = 'bold 64px Consolas, monospace'; g.textAlign = 'center'; g.fillText(txt, w / 2, 70); }); }
-function setMonitor(title, lines, hi) {
-  PK.mon.redraw((g, w, h) => {
-    g.fillStyle = '#e8eef5'; g.fillRect(0, 0, w, h); g.fillStyle = '#0a3d7a'; g.fillRect(0, 0, w, 54);
-    g.fillStyle = '#fff'; g.font = 'bold 30px Arial'; g.fillText(title, 16, 37);
-    g.fillStyle = '#111'; g.font = '26px Arial';
-    lines.forEach((l, i) => { if (hi === i) { g.fillStyle = '#FDDB33'; g.fillRect(10, 72 + i * 40, w - 20, 36); g.fillStyle = '#111'; } g.fillText(l, 18, 98 + i * 40); });
-  });
-}
+function setMonitor(title, lines) { devSet('pack', { head: title, lines, pad: false }); }
 
 /* ---------- truck pack area PK10 (Ship module) ---------- */
 const TK = {};
@@ -381,6 +547,9 @@ const TK = {};
   floorPaint([ax - 2.5, ax + 2.5, az - 1.5, az + 1.5], C.yellow); floorPaint([ax - 2.4, ax + 2.4, az - 1.4, az + 1.4], C.conc, .004);
   place(label('PK10 TRUCK PACK', 1.6, .4, { bg: '#FDDB33' }), ax, 2.6, az - 1.6); box(.06, 2.5, .06, M(C.gray), ax, 0, az - 1.65);
   const pal = makePallet(0); pal.position.set(ax, 0, az); scene.add(pal); reg(pal, 'tk_pallet', 'Empty pallet'); TK.pallet = pal;
+  box(.08, 1.15, .08, M(0x333333), ax - .9, 0, az - 1.25); box(.5, .04, .35, M(0x333333), ax - .9, 1.0, az - 1.2);
+  const sd = makeDevice('pk10', 'gui', .62, .39, 'PK10 station screen (EWM)'); sd.mesh.position.set(ax - .9, 1.45, az - 1.32); scene.add(sd.mesh); box(.66, .43, .03, M(0x111111), ax - .9, 1.235, az - 1.35);
+  gunProp(ax - .75, 1.07, az - 1.12, 'tk_gun', 'PK10 scanner');
   const totes = new THREE.Group(); for (let i = 0; i < 2; i++) box(.55, .3, .38, M(0x6b4a2b), 0, i * .31, 0, totes); totes.position.set(ax - 1.8, 0, az + .8); scene.add(totes);
   const tbc = barcode('HU8000777', .2, .1, 'HU 8000777'); tbc.position.set(0, .45, .195); totes.add(tbc); TK.totes = totes;
   const c48 = carton(.55, .4, .45, C.cardboard, '48 LB'), c20 = carton(.5, .3, .4, C.cardboard, '20 LB'), c6 = carton(.35, .25, .3, C.cardboard, 'LOOSE PARTS');
@@ -507,7 +676,7 @@ panel.visible = false; scene.add(panel);
 let P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '' };
 let panelRects = [];
 let toastMsg = null;
-function setPanel(p) { P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; drawPanel(); drawHud(); }
+function setPanel(p) { if (typeof mirrorDev === 'function' && S && S.phase !== 'run') $('#hDev').style.display = 'none'; P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; drawPanel(); drawHud(); }
 function drawPanel() {
   panelCT.redraw((g, w, h) => {
     g.clearRect(0, 0, w, h);
@@ -551,7 +720,7 @@ function toast(text, kind = 'info', secs = 2.6) {
   toastTimer = setTimeout(() => { t.style.display = 'none'; toastMsg = null; drawPanel(); }, secs * 1000);
 }
 function pressPanelButton(i) { const b = P.btns[i]; if (b) { beep(800, .05); b.fn(); } }
-addEventListener('keydown', e => { if (e.key >= '1' && e.key <= '9') pressPanelButton(+e.key - 1); });
+addEventListener('keydown', e => { const st = cur(); if (st && st.type === 'rf' && S.phase === 'run') return; if (e.key >= '1' && e.key <= '9') pressPanelButton(+e.key - 1); });
 
 /* ---------- sound ---------- */
 let AC = null;
@@ -564,7 +733,7 @@ const now = () => performance.now() / 1000;
 /* ============================================================
    STEP ENGINE
    ============================================================ */
-const S = { mod: null, i: 0, k: 0, t0: 0, mistakes: [], viol: [], held: null, sub: null, inspected: {}, phase: 'menu', guide: localStorage.getItem(LS_GUIDE) !== '0', found: {} };
+const S = { tool: null, riding: null, mod: null, i: 0, k: 0, t0: 0, mistakes: [], viol: [], held: null, sub: null, inspected: {}, phase: 'menu', guide: localStorage.getItem(LS_GUIDE) !== '0', found: {} };
 const cur = () => S.mod && S.mod.steps[S.i];
 function mistake(msg) { S.mistakes.push({ step: S.i + 1, title: cur() ? cur().title : '', msg }); beep(160, .25, 'sawtooth', .07); toast(msg, 'bad', 3.4); }
 function violation(msg, key) {
@@ -576,7 +745,7 @@ function good(msg) { beep(1400, .06); beep(1800, .06); if (msg) toast(msg, 'good
 const MODS = {};
 function startModule(id) {
   const m = MODS[id]; S.mod = m; S.i = 0; S.k = 0; S.t0 = now(); S.mistakes = []; S.viol = []; S.held = null; S.sub = null; S.inspected = {}; S.found = {}; S.phase = 'run';
-  resetMovables(); resetTruck(); setupScene(id);
+  unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene(id);
   m.setup && m.setup();
   placePlayer(m.start.x, m.start.z, m.start.yaw);
   enterStep();
@@ -585,6 +754,7 @@ function enterStep() {
   const st = cur(); if (!st) return finish();
   if (st.skipIf && st.skipIf()) { S.i++; return enterStep(); }
   S.k = 0; S.sub = null;
+  if (st.type === 'rf') devSet(st.dev, typeof st.scr === 'function' ? st.scr() : st.scr);
   st.enter && st.enter();
   showStep();
   if (renderer.xr.isPresenting) placePanelVR(true);
@@ -598,8 +768,10 @@ function showStep() {
   else if (st.type === 'choice') btns = st.opts.map((o, j) => ({ label: o, fn: () => answer(j) }));
   else if (st.type === 'keys') btns = st.pad.map(k => ({ label: k, fn: () => pressKey(k) }));
   else if (st.type === 'inspect') btns = [];
-  const doing = { interact: 'Use the highlighted item.', scan: 'Point at the barcode and pull the trigger (PC: click it).', carry: S.held ? 'Now put it where it goes.' : 'Pick it up.', order: 'Load them in the right order.', drive: '', inspect: `Checked ${Object.keys(S.inspected).length} of ${INSP.length}. Use each yellow dot.` }[st.type] || '';
+  const dn = st.type === 'rf' ? DEV[st.dev].name : '';
+  const doing = { rf: `Work it on the ${dn}.` + (renderer.xr.isPresenting ? '' : ' PC: click its keys (copy below), or type digits, P, K, Enter, Backspace, F-keys.'), interact: 'Use the highlighted item.', scan: 'Point at the barcode and pull the trigger (PC: click it).', carry: S.held ? 'Now put it where it goes.' : 'Pick it up.', order: 'Load them in the right order.', drive: '', inspect: `Checked ${Object.keys(S.inspected).length} of ${INSP.length}. Use each yellow dot.` }[st.type] || '';
   setPanel({ title: st.title, sub: `${m.name} · step ${S.i + 1} of ${m.steps.length}`, text: st.text + (doing && st.type !== 'drive' ? '\n\n' + doing : ''), why: st.why || '', rf: typeof st.rf === 'function' ? st.rf() : st.rf || null, btns, foot: footText() });
+  mirrorDev();
 }
 function footText() { const t = Math.round(now() - S.t0); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}  ·  mistakes ${S.mistakes.length}  ·  safety ${S.viol.length}` + (F.onboard ? `  ·  ${Math.abs(F.v).toFixed(1)} m/s  forks ${(F.h * 39.37).toFixed(0)} in  ${F.tilt < -.02 ? 'tilt back' : F.tilt > .02 ? 'tilt fwd' : 'level'}` : ''); }
 function isCorrect(st, j) { return Array.isArray(st.correct) ? st.correct.includes(j) : st.correct === j; }
@@ -613,11 +785,14 @@ function pressKey(k) {
   if (st.seq[S.k] === k) { beep(1000, .04); S.k++; if (S.k >= st.seq.length) { good(); st.onDone && st.onDone(); next(); } else toast(st.seq.slice(0, S.k).join(' > ') + ' ...', 'info', 1.2); }
   else { S.k = 0; mistake(st.fb || `Wrong key. The SW says: ${st.seq.join(', ')}.`); }
 }
-function onInteract(iid, hand) {
+function wants(st, iid) { const has = t => Array.isArray(t) ? t.includes(iid) : t === iid; return st && (has(st.target) || has(st.item) || has(st.dest) || (st.seq && st.seq.includes(iid))); }
+function onInteract(iid, hand, hit) {
   if (S.phase === 'hunt') return huntHit(iid);
   const st = cur(); if (!st) return;
   const o = OBJ[iid], name = o ? o.userData.name : iid;
   const want = t => Array.isArray(t) ? t.includes(iid) : t === iid;
+  if (o && o.userData.dev && hit && hit.uv && (o.userData.dev !== 'mc' || S.tool === 'mc') && !(st.type === 'interact' && want(st.target))) return devPress(o.userData.dev, hit.uv);
+  if (o && o.userData.code && S.tool && (st.type === 'rf' || !wants(st, iid))) { const tool = S.tool === 'mc' ? DEV.mc.group : TOOL.gun; if (hit) laser(tool, hit.point); return devScan(o.userData.code); }
   if (st.type === 'interact') {
     if (want(st.target)) { good(); st.onHit && st.onHit(); next(); }
     else if (st.wrong && st.wrong[iid]) mistake(st.wrong[iid]);
@@ -627,7 +802,7 @@ function onInteract(iid, hand) {
     if (o.userData.code === st.code) { beep(1900, .07, 'sine', .1); st.onHit && st.onHit(); next(); }
     else mistake(`Scanned ${o.userData.code}. The RF wants ${st.codeShow || st.code}.`);
   } else if (st.type === 'carry') {
-    if (!S.held && iid === st.item) { hold(o, hand); good(); showStep(); }
+    if (!S.held && want(st.item)) { const it = OBJ[Array.isArray(st.item) ? st.item[0] : st.item]; hold(it, hand); good(); showStep(); }
     else if (S.held && want(st.dest)) { drop(st); good(); next(); }
     else if (S.held) toast('That is not where it goes.', 'info', 1.4);
     else toast(name, 'info', 1.2);
@@ -658,7 +833,8 @@ function hold(o, hand) {
 }
 function drop(st) {
   const o = S.held; S.held = null; if (o.userData.s0) o.scale.copy(o.userData.s0);
-  if (st.dropAt) { scene.attach(o); const p = st.dropAt(); o.position.copy(p); o.rotation.set(0, 0, 0); }
+  if (st.dropOn) { const [par, pos] = st.dropOn(); par.add(o); o.position.copy(pos); o.rotation.set(0, 0, 0); }
+  else if (st.dropAt) { scene.attach(o); const p = st.dropAt(); o.position.copy(p); o.rotation.set(0, 0, 0); }
   else o.visible = false;
 }
 
@@ -684,20 +860,22 @@ function saveIdea(waste) {
   toast('Saved to the idea list.', 'good'); menu();
 }
 function menu() {
-  S.phase = 'menu'; S.mod = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
+  S.phase = 'menu'; S.mod = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
   setPanel({ title: 'Arden DC Trainer', sub: trainee() ? 'Trainee: ' + trainee() : 'Set your name with Trainee', text: 'Pick a module. Every step follows the current standard work, and each one tells you why.', btns: [
     { label: '1 Forklift (PIT): inspect, drive, put away', fn: () => startModule('pit') },
-    { label: '2 Pick: induction and Pallet Land', fn: () => startModule('pick') },
-    { label: '3 Pack: parcel core process', fn: () => startModule('pack') },
-    { label: '4 Ship: truck pack, stage, dock', fn: () => startModule('ship') },
-    { label: '5 Gemba waste hunt (TIMWOODS)', fn: startHunt },
+    { label: '2 Induction: EWM computer + scanner', fn: () => startModule('induct') },
+    { label: '3 Pick: Pallet Land on the THOR', fn: () => startModule('pick') },
+    { label: '4 Pick: Flow Rack with a handheld', fn: () => startModule('flow') },
+    { label: '5 Pack: parcel at the pack station', fn: () => startModule('pack') },
+    { label: '6 Ship: truck pack, stage, dock', fn: () => startModule('ship') },
+    { label: '7 Gemba waste hunt (TIMWOODS)', fn: startHunt },
     { label: 'Guide arrows: ' + (S.guide ? 'on' : 'off'), fn: () => { S.guide = !S.guide; localStorage.setItem(LS_GUIDE, S.guide ? '1' : '0'); menu(); } }] });
   if (renderer.xr.isPresenting) placePanelVR(true);
 }
 function setupScene(id) {
   inspHotspots(false); setDefect(null);
   setScale('0.0 lb'); setMonitor('SAP EWM - Pack station', ['Log in to start.']);
-  TK.wrapSkin.visible = false; TK.lamp.material.color.set(0xff2020); thor1.userData.setBattery(12);
+  TK.wrapSkin.visible = false; TK.lamp.material.color.set(0xff2020);
   for (const sid of ['P104-B']) SLOTS[sid].filled = null;
 }
 
@@ -737,104 +915,159 @@ MODS.pit = {
   ]
 };
 
-/* ---------- 2. Pick ---------- */
-const RF_HEAD = '415  RF  W/H 0103';
+/* ---------- device steps ---------- */
+const rf = (dev, title, text, scr, o = {}) => ({ type: 'rf', dev, title, text, scr, ...o });
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+const getGun = (id, name) => act('Take the scanner', `Take the ${name}.`, id, 'Every scan goes straight to the screen you are working on.', { onHit() { OBJ[id].visible = false; equip('gun'); } });
+const T415 = { head: 'SAP EWM RF', lines: ['Transaction'], fields: [{ label: 'Tran', via: 'type', expect: '415', err: 'Picking is transaction 415.' }] };
+
+/* ---------- 2. Pick: Pallet Land with the THOR ---------- */
 MODS.pick = {
-  id: 'pick', name: 'Pick: Pallet Land', start: { x: .5, z: -2, yaw: 0 }, target: 'lines per hour. Accuracy first: scan confirms the part, your eyes confirm the count.',
-  setup() { thor1.userData.setBattery(12); },
+  id: 'pick', name: 'Pick: Pallet Land (THOR)', start: { x: -.5, z: -2, yaw: 0 }, target: 'lines per hour. The scan confirms the part, your eyes confirm the count.',
   steps: [
-    info('Pallet Land Pick', 'Core process, Draft 1.0 (10/17/2026). Tools: THOR, handheld scanner, safety knife, marker, pen. Deviations (Short Pick, Add-On Tote, Scan and System Errors) have their own sheets.', 'One sheet for the normal job; the exceptions have their own so this one stays short.'),
+    info('Pallet Land Pick', 'Core process, Draft 1.0 (10/17/2026). You work from a THOR: its terminal runs the EWM RF screens and its handheld scanner reads every barcode. Tools: THOR, handheld scanner, safety knife, marker, pen.', 'One sheet for the normal job; Short Pick, Add-On Tote and Scan and System Errors have their own.'),
     choice('PPE', 'What PPE does Pallet Land Pick require?', ['General PPE, bump cap, cut-resistant gloves', 'General PPE only', 'Hard hat and harness', 'Gloves only'], 0, 'Bump cap for the rack beams, cut gloves for the safety knife and carton edges.'),
-    act('1. Get your equipment', 'Get a THOR and check it. Start with THOR 1.', 'thor1', 'A THOR that fails mid-pick strands an open order.', { wrong: { thor2: 'Check THOR 1 first.' } }),
-    choice('1. Check the THOR', 'THOR 1 shows BATT 12%. What do you do?', ['Use it, it will last', 'Don\'t use it. Tell your lead, take another THOR', 'Charge it during the pick', 'Swap batteries yourself'], 1, 'Damaged or not charged? Don\'t use it. Tell your lead before you start.', { fb: ['A dead THOR strands an open order.', '', 'You cannot pick and charge at once.', 'Tell your lead.'] }),
-    act('1. Take THOR 2', 'Take THOR 2 (91%). Nothing rides on the operator platform but you.', 'thor2', 'Boxes, totes or trash on the platform are a trip hazard.'),
-    keys('2. Log in', 'Type the resource transaction and press Enter.', ['415', 'Enter'], ['415', '514', '451', 'Enter', 'F4', 'F7'], 'The zone decides which tasks the system gives you.', { rf: ['SAP EWM RF', 'Transaction: ____'] }),
-    choice('2. Check your zone', 'The RF shows zone D300. The sign at the end of the rack says P100.', ['Keep D300, the system knows best', 'Press F7, type P100, press Enter', 'Pick from D300 anyway', 'Log out and back in'], 1, 'Wrong zone means wasted travel and misrouted picks.', { rf: [RF_HEAD, 'Zone: D300', 'F7 = change zone'] }),
-    choice('3. Totes', 'At induction: how many totes do you take for an LTL order?', ['1 tote', 'Up to 4 totes', 'As many as fit', 'None, LTL goes straight on the pallet'], 0, '1 tote for LTL, up to 4 for parcel.'),
-    scan('3. Scan the tote', 'Take your tote from the induction flow rack and scan it.', 'T-10230', 'The tote ties the order to you.', { rf: [RF_HEAD, 'Zone P100', 'Scan tote:'], codeShow: 'T-10230 (first tote)' }),
-    keys('3. Confirm', 'Totes scanned. Confirm.', ['F4'], ['F1', 'F4', 'F7', 'F8', 'Enter'], 'F4 confirms the tote on the order.', { rf: [RF_HEAD, 'Tote T-10230 OK', 'F4 = confirm'] }),
-    choice('3. Cones', 'What goes in each tote?', ['1 green, 1 orange and 1 blue cone', '3 green cones', 'No cones, the THOR has them', '1 red cone'], 0, 'Without the cones you cannot mark the order later.'),
-    choice('3. Tote colors', 'A red tote comes down the line. What is it?', ['Hot order: it goes first', 'International', 'Static / flow rack', 'Pallet Land'], 0, 'Brown Pallet Land, orange Grainger/SLW, green international, red hot order, blue static/flow rack.'),
-    scan('4. Scan the location', 'Drive to SRCBIN P104-01-A in the Pallet Land aisle and scan the location label.', 'P104-01-A', 'Scanning the location proves you are at the right bin before you touch product.', { rf: [RF_HEAD, 'SRCBIN  P104-01-A', 'Prod    HBL5262', 'Qty     6 EA'] }),
-    scan('5. Scan the product', 'Scan the part number on the box.', 'HBL5262', 'The scan confirms the part.', { rf: [RF_HEAD, 'SRCBIN  P104-01-A', 'Scan product:'] }),
-    choice('5. Count', 'The RF wants 6 EA of HBL5262. Count the cartons in the location with your eyes. How many will you pull?', ['6, it matches the count', '5', 'Whatever is there, confirm 6 anyway', 'Skip the count, the scan already checked it'], 0, 'Never confirm without checking the count. Your eyes confirm the count.', { fb: ['', 'Count again.', 'Never confirm a quantity you do not have.', 'The scan only checks the part, not the count.'] }),
-    carry('6. Build the pallet', 'Full cases go on the pallet. Pick up the HBL5262 cartons and put them on the pallet on THOR 2.', 'stock:P104-A', 'thor2_pallet', 'Heaviest on the bottom, labels out, nothing hanging off.', { dropAt: () => thor2.localToWorld(new THREE.Vector3(0, .25, .5)) }),
-    keys('5. Confirm the line', 'Scan the tote then press F4.', ['F4'], ['F1', 'F4', 'F8', 'Enter'], 'F4 confirms the line against your tote.', { rf: [RF_HEAD, 'HBL5262  6/6', 'Scan tote, F4 = confirm'] }),
-    scan('Next line', 'Next task: SRCBIN P106-01-A. Go there and scan the location.', 'P106-01-A', 'Same check every location.', { rf: [RF_HEAD, 'SRCBIN  P106-01-A', 'Prod    HBL2621', 'Qty     10 EA'] }),
+    act('1. Check THOR 1', 'Walk to THOR 1 and check it. Look at the top of its terminal.', ['thor1', 'dev:thor1'], 'A THOR that fails mid-pick strands an open order.', { wrong: { thor2: 'Check THOR 1 first.' } }),
+    choice('1. THOR 1', 'THOR 1\'s terminal shows 12% charge.', ['Use it, it will last', 'Don\'t use it. Tell your lead and take another THOR', 'Charge it during the pick', 'Swap batteries yourself'], 1, 'Damaged or not charged? Don\'t use it. Tell your lead before you start.', { fb: ['A dead THOR strands an open order.', '', 'You cannot pick and charge at once.', 'Tell your lead.'] }),
+    act('1. Take THOR 2', 'Step onto THOR 2 (91%). Nothing rides on the operator platform but you. From here on THOR 2 moves with you.', ['thor2', 'dev:thor2'], 'Boxes, totes or trash on the platform are a trip hazard.', { onHit() { ride(thor2); } }),
+    getGun('thor2_gun', 'handheld scanner from THOR 2 (left of the terminal)'),
+    rf('thor2', '2. Log in', 'On the THOR terminal: type 415, press ENT.', T415, { why: '415 opens RF picking for your resource.' }),
+    rf('thor2', '2. Check your zone', 'Compare the zone on the screen with the sign at the end of the rack: P100. Wrong zone? F7.', { head: '415 Resource', lines: ['Res:  THOR2', 'Zone: D300', '', 'F4 = start', 'F7 = change zone'] }, { key: 'F7', keyFb: { F4: 'D300 is flow rack. The sign says P100: F7 first.', ENT: 'Check the zone first: F7.' }, why: 'The zone decides which tasks the system gives you.' }),
+    rf('thor2', '2. Change the zone', 'Type P100, press ENT.', { head: 'Change zone', fields: [{ label: 'Zone', via: 'type', expect: 'P100', err: 'Type the zone on the sign: P100.' }] }, { why: 'Wrong zone means wasted travel and misrouted picks.' }),
+    choice('3. Totes', 'Order 4400101 is LTL. How many totes do you take?', ['1 tote', 'Up to 4 totes', 'As many as fit', 'None'], 0, '1 tote for LTL, up to 4 for parcel.'),
+    rf('thor2', '3. Scan your tote', 'Ride to the induction flow rack (north-east). Scan the first tote, T-10230, then press F4.', { head: 'Totes 4400101', lines: ['Wave LTL', 'Totes: 1'], fields: [{ label: 'Tote', expect: 'T-10230', wrong: { 'T-10231': 'Take the first tote in line: T-10230.', 'T-10232': 'Take the first tote in line: T-10230.', 'T-10233': 'Take the first tote in line: T-10230.' } }] }, { key: 'F4', why: 'The tote ties the order to you.' }),
+    carry('3. Tote on the THOR', 'Put the tote on the pallet on your THOR.', ['ind_tote0', 'bc:T-10230'], 'thor2_pallet', 'The tote rides with you to every location.', { dropOn: () => [OBJ.thor2_pallet, V3(.3, .13, .25)] }),
+    choice('3. Cones', 'What is in each tote?', ['1 green, 1 orange and 1 blue cone', '3 green cones', 'No cones', '1 red cone'], 0, 'Without the cones you cannot mark the order later.'),
+    rf('thor2', '4. Go to the location', 'Ride into the Pallet Land aisle to the SRCBIN on the screen. Scan the location label.', { head: 'Task 1 of 2', lines: ['SRCBIN P104-01-A', 'Prod   HBL5262', 'Qty    6 EA'], fields: [{ label: 'Loc', expect: 'P104-01-A', err: 'Wrong location. The RF says P104-01-A.' }] }, { why: 'Scanning the location proves you are at the right bin before you touch product.' }),
+    rf('thor2', '5. Scan the product', 'Scan the part number label on the box.', { head: 'Task 1 of 2', lines: ['SRCBIN P104-01-A', 'Prod   HBL5262', 'Qty    6 EA'], fields: [{ label: 'Prod', expect: 'HBL5262', err: 'Wrong part. Scan only the product in front of you.' }] }, { why: 'The scan confirms the part.' }),
+    choice('5. Count', 'The RF wants 6 EA. Count the cartons in the location with your eyes.', ['6. It matches, pull them', '5', 'Confirm 6 whatever is there', 'Skip the count, the scan checked it'], 0, 'Never confirm without checking the count. Your eyes confirm the count.', { fb: ['', 'Count again.', 'Never confirm a quantity you do not have.', 'The scan checks the part, not the count.'] }),
+    carry('6. Build the pallet', 'Full cases go on the pallet. Pick up the HBL5262 cartons and put them on your THOR pallet.', 'stock:P104-A', 'thor2_pallet', 'Heaviest on the bottom, labels out, nothing hanging off.', { dropOn: () => [OBJ.thor2_pallet, V3(0, .13, -.2)] }),
+    rf('thor2', '5. Confirm the line', 'Scan your tote, then press F4.', { head: 'Task 1 of 2', lines: ['HBL5262  6/6 EA'], fields: [{ label: 'Dest HU', expect: 'T-10230', err: 'Scan your tote: T-10230.' }] }, { key: 'F4', why: 'F4 confirms the line into your tote.' }),
+    rf('thor2', 'Next task', 'Ride to the next SRCBIN and scan it.', { head: 'Task 2 of 2', lines: ['SRCBIN P106-01-A', 'Prod   HBL2621', 'Qty    10 EA'], fields: [{ label: 'Loc', expect: 'P106-01-A', err: 'Wrong location. The RF says P106-01-A.' }] }),
     choice('Short!', 'The RF wants 10 EA of HBL2621. Only 4 are in the location.', ['Confirm 10, inventory will sort it out', 'Confirm 4 and keep going', 'Stop. Don\'t confirm the line. Follow the Short Pick SW', 'Take 6 from the next bin'], 2, 'CRITICAL STOP. A confirmed short ships an incomplete order and hides the inventory problem.', { fb: ['Never confirm a quantity you don\'t have.', 'Confirming a short hides it.', '', 'Never pick from a location the RF did not give you.'] }),
-    act('Short Pick 2. Discrepancy card', 'Fill out a discrepancy card: part, location, quantity needed, quantity found. The cards are at the Non Conf area.', 'disc_card', 'Inventory can\'t fix a location they don\'t know about. The card starts the count.'),
+    act('Short Pick 2. Discrepancy card', 'Fill out a discrepancy card: part, location, qty needed, qty found. The cards are by the Non Conf area.', 'disc_card', 'Inventory can\'t fix a location they don\'t know about.'),
     choice('Short Pick 3. Cone', 'Which cone goes on the short order?', ['Blue: audit before it ships', 'Green: order done', 'Orange: more picks to come', 'No cone'], 0, 'Cones: green order done, orange more picks to come, blue short.'),
-    act('Short Pick 3. Stage it', 'Stage the order in the Non Conf area (pick hospital, red square) and tell your lead.', 'hospital', 'Blue means the order gets fully audited before it ships.'),
-    choice('Short Pick 4. Follow up', 'When do you check the order shortage outbox?', ['Start of shift and every other hour (7:00, 9:00, 11:00, 13:00)', 'Only when the lead asks', 'End of shift', 'Never, inventory finishes it'], 0, 'The order is waiting on you once inventory finds the stock.'),
-    choice('7. Complete an order', 'Another order: all lines picked, Order Pick Complete. What goes on the first pallet?', ['Green cone, then stage it', 'Orange cone', 'Blue cone', 'Nothing'], 0, 'The cone tells the material handler what is ready to build.'),
-    choice('8. Stage the pallet', 'Where does a finished pallet go?', ['An open lane closest to the Lead Hub. Scan the lane label. More pallets for the same order go in the same lane', 'Any open floor space', 'On the conveyor', 'Back in the rack'], 0, 'One order in one lane is how it gets built and packed without mixing. Over 35 lb never goes on the conveyor.'),
-    keys('9. End your shift', 'Shift is over. Free your resource.', ['F1', 'F1', 'Save'], ['F1', 'F4', 'F7', 'Save', 'Enter'], 'Skip F1, F1, Save and the next shift can\'t use your resource.', { rf: [RF_HEAD, 'F1 = back', 'Save = log off resource'] })
+    act('Short Pick 3. Stage it', 'Ride the order to the Non Conf area (pick hospital, red square). Tell your lead.', 'hospital', 'Blue means the order gets fully audited before it ships.'),
+    choice('Short Pick 4. Follow up', 'When do you check the order shortage outbox?', ['Start of shift and every other hour (7:00, 9:00, 11:00, 13:00)', 'Only when the lead asks', 'End of shift', 'Never'], 0, 'The order is waiting on you once inventory finds the stock.'),
+    choice('7. Complete an order', 'Another order: all lines done, Order Pick Complete. What goes on the first pallet?', ['Green cone, then stage it', 'Orange cone', 'Blue cone', 'Nothing'], 0, 'The cone tells the material handler what is ready to build.'),
+    choice('8. Stage the pallet', 'Where does a finished pallet go?', ['Open lane closest to the Lead Hub. Scan the lane. Same order, same lane', 'Any open floor space', 'On the conveyor', 'Back in the rack'], 0, 'One order in one lane. Over 35 lb never goes on the conveyor.'),
+    rf('thor2', '9. End your shift', 'Free your resource: F1, F1, then Save.', { head: '415 Resource', lines: ['F1 = back', 'Save = log off resource'], soft: ['Save'] }, { seq: ['F1', 'F1', 'Save'], why: 'Skip F1, F1, Save and the next shift can\'t use your resource.' })
   ]
 };
 
-/* ---------- 3. Pack (parcel core process, Kaizen 03 rev 0.6) ---------- */
+/* ---------- 3. Pick: Flow Rack with a handheld ---------- */
+MODS.flow = {
+  id: 'flow', name: 'Pick: Flow Rack (handheld)', start: { x: 10.2, z: -10, yaw: 0 }, target: 'lines per hour. Hot orders first.',
+  steps: [
+    info('Flow Rack Pick', 'Core process, Draft 1.0. Your tool is the handheld: one device that scans, shows the RF screens and has the keys. Zone D###: D100, D200, D300, D400, D600, D700.', 'Totes ride the conveyor with you; the handheld goes everywhere you go.'),
+    act('1. Get your handheld', 'Take a handheld from the charging cradle.', ['mc_cradle', 'dev:mc'], 'A scanner that dies mid-pick leaves totes half-picked on the line.', { onHit() { equip('mc'); } }),
+    choice('1. Check', 'The handheld shows 88%. There is an empty carton lying on the conveyor along your pick path.', ['Clear it (or tell your lead), then start', 'Start, the totes will push it off', 'Leave it for the next shift', 'Pick around it'], 0, 'Check that the conveyor along your pick path is clear before you start.'),
+    rf('mc', '2. Log in', 'On the handheld: type 415, press ENT.', T415, { why: '415 opens RF picking for your resource.' }),
+    rf('mc', '2. Check your zone', 'The sign at the end of your rack says D300. Compare it with the screen.', { head: '415 Resource', lines: ['Res:  RF07', 'Zone: P100', '', 'F4 = start', 'F7 = change zone'] }, { key: 'F7', keyFb: { F4: 'P100 is Pallet Land. Your rack is D300: F7.', ENT: 'Check the zone first: F7.' } }),
+    rf('mc', '2. Change the zone', 'Type D300, press ENT.', { head: 'Change zone', fields: [{ label: 'Zone', via: 'type', expect: 'D300', err: 'Type the zone on the sign: D300.' }] }),
+    rf('mc', '3. Pull your totes', 'Scan the first 4 totes on the line, then F4. The red one is a hot order: scan it first, even though it is not first in line.', { head: 'Totes', lines: ['Scan up to 4 totes'], fields: [
+      { label: 'Tote 1', expect: 'T-20009', wrong: { 'T-20006': 'Red tote first: it is a hot order.', 'T-20007': 'Red tote first: it is a hot order.', 'T-20008': 'Red tote first: it is a hot order.' } },
+      { label: 'Tote 2', expect: ['T-20006', 'T-20007', 'T-20008'], err: 'That tote is already scanned or not on the line.' }, { label: 'Tote 3', expect: ['T-20006', 'T-20007', 'T-20008'], err: 'That tote is already scanned or not on the line.' }, { label: 'Tote 4', expect: ['T-20006', 'T-20007', 'T-20008'], err: 'That tote is already scanned or not on the line.' }] }, { key: 'F4', why: 'Hot orders ship first, so they get picked first.' }),
+    choice('3. Cones', 'Each tote has:', ['1 green, 1 orange and 1 blue cone', 'No cones', '2 blue cones', 'Cones only on red totes'], 0, 'The cones mark the order later.'),
+    rf('mc', '4. Scan the location', 'Roll the totes along the conveyor to the SRCBIN on the screen (rack D300) and scan the location label.', { head: 'Task  HOT', lines: ['SRCBIN D303-02', 'Prod   HBL7740', 'Qty    3 EA', 'Tote   T-20009'], fields: [{ label: 'Loc', expect: 'D303-02', err: 'Wrong location. The RF says D303-02.' }] }, { why: 'Scanning the location proves you are at the right bin.' }),
+    rf('mc', '5. Scan the product', 'Scan the part number on the box.', { head: 'Task  HOT', lines: ['SRCBIN D303-02', 'Prod   HBL7740', 'Qty    3 EA'], fields: [{ label: 'Prod', expect: 'HBL7740', err: 'Wrong part. Scan only the product in your hand.' }] }),
+    choice('6. Less than a case', 'You pull 3 loose pieces of HBL7740.', ['Clear poly bag, write 3 on the bag and circle it', 'Loose in the tote', 'Tape them together', 'Let pack count them'], 0, 'A bagged, counted part doesn\'t get lost at pack.'),
+    rf('mc', '5. Into the tote', 'Scan the tote, then F4.', { head: 'Task  HOT', lines: ['HBL7740  3/3 EA'], fields: [{ label: 'Dest HU', expect: 'T-20009', err: 'Put it in the hot tote: T-20009.' }] }, { key: 'F4' }),
+    choice('6. Too heavy', 'Your next line will not fit, and the tote would go over 35 lb.', ['Follow the Add-On Tote SW', 'Force it in', 'Send the rest loose on the conveyor', 'Skip the line'], 0, 'A tote over 35 lb is a lifting injury down the line.'),
+    rf('mc', '7. Order Pick Complete?', 'The hot order is done. The tote fits and is under 35 lb.', { head: 'Order Pick Complete?', lines: ['Order 4400188', 'Tote T-20009', '', 'Yes = stage it', 'No  = send on conveyor'], soft: ['Yes', 'No'] }, { key: 'No', keyFb: { Yes: 'Flow rack: it fits and is under 35 lb. Select No and send it down the conveyor.' }, why: 'The conveyor carries the tote to the next zone or to pack.' }),
+    act('7. Send the tote', 'Push the red tote down the conveyor, then go back to the start of your pick path.', 'fr_conv', 'An open order blocks pack, so it goes the moment it is done.', { onHit() { OBJ.fr_red.position.x += 5; } }),
+    rf('mc', '8. End your shift', 'F1, F1, then Save. Put the handheld back in the cradle.', { head: '415 Resource', lines: ['F1 = back', 'Save = log off resource'], soft: ['Save'] }, { seq: ['F1', 'F1', 'Save'], why: 'Skip F1, F1, Save and the next shift can\'t use your resource.' })
+  ]
+};
+
+/* ---------- 4. Induction ---------- */
+MODS.induct = {
+  id: 'induct', name: 'Induction', start: { x: 2.4, z: -10.6, yaw: 0 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
+  steps: [
+    info('Induction', 'Core process, Draft 1.0. Tools: computer (SAP EWM), scanner. Induction is where an order gets its totes. Nothing gets picked until it is inducted.', 'Induction steers the work for every picker behind you.'),
+    getGun('ind_gun', 'scanner at the induction computer'),
+    rf('ind', '1. Open Tote Induct', 'You are logged into PS1. Open Tote Induct from the favorites.', { head: 'SAP Easy Access - PS1', lines: ['Favorites'], keys: ['Tote Induct (ZEWM_INDUCT)', 'Warehouse Monitor', 'Pack (Work Center)'], pad: false }, { key: 'Tote Induct (ZEWM_INDUCT)' }),
+    rf('ind', '1. Warehouse', 'Type 0103 next to the warehouse number and press F8.', { head: 'Tote Induct (ZEWM_INDUCT)', fields: [{ label: 'Warehouse', via: 'type', expect: '0103', err: 'Arden is warehouse 0103.' }] }, { key: 'F8' }),
+    rf('ind', '2. Oldest order first', 'Double-click the oldest order.', { head: 'Tote Induct - 0103', lines: ['Order / zone / wave / created'], keys: ['4400117  P100  PARCEL  07:45', '4400101  P100  LTL  06:10', '4400125  D300  FLOW  08:30'], pad: false },
+      { key: '4400101  P100  LTL  06:10', keyFb: { '4400117  P100  PARCEL  07:45': 'Oldest first: 4400101 was created at 06:10.', '4400125  D300  FLOW  08:30': 'Oldest first: 4400101 was created at 06:10.' }, why: 'Oldest first keeps orders shipping on time.' }),
+    choice('2. Supervisor', 'Your supervisor asks you to do 4400125 next instead.', ['Do that one', 'Finish the queue your way first', 'Ignore it, oldest first is the rule', 'Ask another inducter to do it'], 0, 'Don\'t set your own priorities for an area. A supervisor-directed order goes next.'),
+    rf('ind', '3. Induct the LTL order', 'Order 4400101, LTL wave, color BROWN. Scan 1 tote in the wave color (the tote stacks are to your right).', { head: 'Induct 4400101', lines: ['Wave LTL  color BROWN', 'Totes needed: 1'], fields: [{ label: 'Tote', expect: 'T-10240', wrong: { 'T-10250': 'Blue is static / flow rack. Match the wave: brown.' } }], pad: false }, { why: 'The tote color tells pack and the dock how the order ships.' }),
+    choice('3. Cones', 'Before the tote goes on the rack:', ['1 green, 1 orange and 1 blue cone in it', 'Nothing, the picker adds cones', 'Only a green cone', 'Write the order number on it'], 0, 'Pallet Land pickers take their totes from this rack, ready to go.'),
+    act('3. Place it', 'Put the tote on the induction flow rack.', 'ind_rack', 'Pallet Land pickers take their totes from this rack, so it has to be stocked and in order.', { onHit() { OBJ.ind_brown.position.set(3.6 + .9, 1.55, -12.5); } }),
+    rf('ind', '4. Induct a flow rack order', 'Order 4400125, FLOW wave, color BLUE. Scan a tote in the wave color.', { head: 'Induct 4400125', lines: ['Wave FLOW  color BLUE', 'Totes needed: 1'], fields: [{ label: 'Tote', expect: 'T-10250', wrong: { 'T-10240': 'Brown is Pallet Land. This wave is blue.' } }], pad: false }),
+    act('4. Place it', 'Put it on the flow rack induction pallet.', 'ind_frpallet', 'Match the tote color to the wave every time.', { onHit() { OBJ.ind_blue.position.set(5.6, .13, -9.8); } }),
+    choice('5. Completed totes', 'How many completed totes do you move at a time?', ['Up to 10: zone-complete to the conveyor, order-complete to D100', 'All of them at once', 'One at a time', 'Leave them for the pickers'], 0, 'Too few and pickers wait; too many and the line jams.'),
+    choice('6. Stock', 'How do you keep empty pallets ready?', ['3 stacks about 10 high, plus a row of singles in front', 'One big stack', 'Whatever is left', 'Pickers get their own'], 0, 'A picker who has to hunt for a pallet or cones isn\'t picking.'),
+    choice('7. Release work', 'How do you decide which work to release?', ['Check with the supervisors where the demand is', 'Run down the queue', 'Whatever is easiest', 'Biggest orders first'], 0, 'Releasing by need keeps every area busy and nothing waiting.'),
+    act('8. End your shift', 'Restock, clean the area, and write open issues in the turnover log.', 'ind_log', 'The next shift starts with a full line, and the turnover log is the first thing they read.')
+  ]
+};
+
+/* ---------- 5. Pack (parcel core process, Kaizen 03 rev 0.6) ---------- */
+const PACK_KEYS = ['Move HU', 'Unpack HU', 'Create HU', 'Ship'];
 MODS.pack = {
   id: 'pack', name: 'Pack: parcel', start: { x: 12, z: 4.6, yaw: 0 }, target: '35 s per parcel carton (Kaizen 03 pilot, down from 44 s).',
-  setup() { setScale('2.3 kg', '#ffb040'); setMonitor('Windows - Okta', ['Sign in to start.']); },
+  setup() { setScale('2.3 kg', '#ffb040'); },
   steps: [
-    info('Parcel core process', 'Kaizen 03 rev 0.6: 10 steps. Built on the scale, labels on top, most old stickers gone. The same steps run on the station app in English and Spanish.', 'One way is the whole point. Doing it the same way every time is what took the carton from 44 s to 35 s.'),
-    act('1. Log in', 'Log into the computer, then Okta. Use the pack station screen.', 'pk_monitor', 'Everything you pack is tied to this station.', { onHit() { setMonitor('PS1 - SAP EWM', ['Work Center Initial Screen', 'Warehouse: ____', 'Work center: ____'], 1); } }),
-    choice('1. Warehouse and work center', 'Your station sign says PK04. What do you enter?', ['Warehouse 0103, work center PK04, F8', 'Warehouse 0301, work center PK04, F8', 'Warehouse 0103, work center PK40, F8', 'Leave the last station\'s entry'], 0, 'The wrong station puts your cartons under somebody else.', { onDone() { setMonitor('Work center PK04 - W/H 0103', ['Move HU', 'Scan HU: ____'], 1); } }),
+    info('Parcel core process', 'Kaizen 03 rev 0.6: 10 steps, worked on the pack station screen with the station scanner. Built on the scale, labels on top, most old stickers gone.', 'One way is the whole point. That is what took the carton from 44 s to 35 s.'),
+    getGun('pk_gun', 'station scanner on the bench'),
+    rf('pack', '1. Open your station', 'Computer and Okta are done. In PS1, Work Center Initial Screen: type warehouse 0103 and your work center from the sign (PK04), then F8.', { head: 'Work Center Initial Screen', fields: [{ label: 'Warehouse', via: 'type', expect: '0103', err: 'Arden is warehouse 0103.' }, { label: 'Work center', via: 'type', expect: 'PK04', err: 'Your station sign says PK04.' }] }, { key: 'F8', why: 'The wrong station puts your cartons under somebody else.' }),
     act('1. Check the scale', 'QUALITY: check the scale.', 'pk_scale', 'A wrong scale prints a wrong label.'),
-    choice('1. Scale reads 2.3 kg', 'The empty scale reads 2.3 kg.', ['Zero it and switch it to lb', 'Fine, the system converts it', 'Zero it, kg is fine', 'Tell maintenance and wait'], 0, 'Zero the scale and make sure it reads lb, not kg.', { onDone() { setScale('0.0 lb'); } }),
-    scan('2. Scan the tote', 'Open Move HU and scan the tote into the HU field.', 'HU8000451', 'A missing tote is product that won\'t ship.', { rf: ['Move HU', 'Order 4400123 totes:', '  HU8000451', '  HU8000452'], onHit() { setMonitor('Move HU - order 4400123', ['HU8000451  scanned', 'HU8000452  NOT SCANNED'], 1); } }),
-    choice('2. Tote missing', 'The order lists 2 totes. Only one is at your station.', ['Stop and tell your lead', 'Pack what is here and press F8', 'Mark the order complete', 'Go pick it yourself'], 0, 'A missing tote stops the order. Catching it here takes seconds.', { fb: ['', 'That ships short.', 'That ships short.', 'Your lead runs it down; you stay at the station.'], onDone() { PK.tote2.visible = true; toast('Your lead brings the second tote.', 'info', 2.5); } }),
-    scan('2. Scan the second tote', 'Scan the tote your lead brought.', 'HU8000452', 'Every tote on the list, then F8.', { rf: ['Move HU', '  HU8000451  OK', '  HU8000452  ?'] }),
-    keys('2. Confirm', 'Every tote is on the list. Confirm.', ['F8'], ['F4', 'F7', 'F8', 'Enter'], 'F8 confirms on the pack screens.', { onDone() { setMonitor('Pack - order 4400123', ['HU8000451 / HU8000452', '[Unpack HU]  (open-box icon)'], 1); } }),
-    act('3. Unpack HU', 'Select the tote lines and click Unpack HU (the open-box icon) on the screen.', 'pk_monitor', 'Unpack HU moves the items to your station in the system.', { onHit() { PK.items.visible = true; PK.tote.visible = false; PK.tote2.visible = false; setMonitor('Pack - station PK04', ['4 EA  HBL1221  (bench)', '[Create HU]'], 1); } }),
-    choice('3. Blind pack', 'The product is on the bench. Do you count it against the screen?', ['No. This is a blind pack. Counting belongs to the audit pack', 'Yes, every line', 'Only if it looks short', 'Count, then recount'], 0, 'Everyday packing is blind, so the audit pack gets its own sheet.'),
-    keys('4. Create HU', 'On Create HU, confirm.', ['F8'], ['F4', 'F8', 'Enter'], 'The carton HU is what the packing list says is in the box.'),
-    act('4. Pick the box', 'Select the smallest box that fits the product: 4 pieces, each 5 x 4 x 2 in. (Box sizes in this trainer are placeholders.)', 'box3', 'The right size box is safer to handle.', { wrong: { box2: 'Too small: 10 x 8 in of product does not fit 9 x 6.', box4: 'Fits, but #3 is smaller.', box6: 'Too big. Smallest box that fits.' } }),
+    choice('1. Scale reads 2.3 kg', 'The empty scale reads 2.3 kg.', ['Zero it and switch it to lb', 'Fine, the system converts it', 'Zero it, kg is fine', 'Wait for maintenance'], 0, 'Zero the scale and make sure it reads lb, not kg.', { onDone() { setScale('0.0 lb'); } }),
+    rf('pack', '2. Scan the tote', 'Move HU is open. Scan the tote on the infeed into the HU field.', { head: 'PK04 - Move HU', keys: PACK_KEYS, lines: ['Order 4400123 totes', '  HU8000451', '  HU8000452'], fields: [{ label: 'HU', expect: 'HU8000451', err: 'That HU is not on this order.' }], pad: false }, { why: 'A missing tote is product that won\'t ship.' }),
+    choice('2. Tote missing', 'The order lists 2 totes. Only one is at your station.', ['Stop and tell your lead', 'Pack what is here and press F8', 'Mark the order complete', 'Go find it yourself'], 0, 'A missing tote stops the order. Catching it here takes seconds.', { fb: ['', 'That ships short.', 'That ships short.', 'Your lead runs it down; you stay at the station.'], onDone() { PK.tote2.visible = true; toast('Your lead brings the second tote.', 'info', 2.5); } }),
+    rf('pack', '2. Second tote', 'Scan the tote your lead brought, then F8.', { head: 'PK04 - Move HU', keys: PACK_KEYS, lines: ['Order 4400123 totes', '  HU8000451  OK', '  HU8000452'], fields: [{ label: 'HU', expect: 'HU8000452', err: 'Scan the second tote: HU8000452.' }] }, { key: 'F8' }),
+    rf('pack', '3. Empty the tote', 'Select the tote lines and click Unpack HU (the open-box icon).', { head: 'PK04 - Pack', keys: PACK_KEYS, lines: ['>HU8000451  4 EA HBL1221', '>HU8000452  (empty)'], pad: false }, { key: 'Unpack HU', keyFb: { 'Create HU': 'Unpack the totes to your station first.', Ship: 'Nothing is packed yet.', 'Move HU': 'The totes are already moved in.' }, why: 'Unpack HU moves the items to your station in the system.', onDone() { PK.items.visible = true; PK.tote.visible = false; PK.tote2.visible = false; } }),
+    choice('3. Blind pack', 'The product is on the bench. Do you count it against the screen?', ['No. Blind pack. Counting belongs to the audit pack', 'Yes, every line', 'Only if it looks short', 'Count, then recount'], 0, 'Everyday packing is blind, so the audit pack gets its own sheet.'),
+    rf('pack', '4. Create HU', 'Click Create HU, then F8 to confirm.', { head: 'PK04 - Pack', keys: PACK_KEYS, lines: ['Station: 4 EA HBL1221'] }, { seq: ['Create HU', 'F8'], keyFb: { 'Unpack HU': 'Already unpacked. Create HU next.', Ship: 'Create the carton HU first.' } }),
+    act('4. Pick the box', 'Select the smallest box that fits: 4 pieces, each 5 x 4 x 2 in. (Box sizes here are placeholders.)', 'box3', 'The right size box is safer to handle.', { wrong: { box2: 'Too small: 10 x 8 in of product does not fit 9 x 6.', box4: 'Fits, but #3 is smaller.', box6: 'Too big. Smallest box that fits.' } }),
     act('4. Tape the bottom', 'Tape the bottom of the box.', 'pk_tape', 'Taped first, so nothing drops through.'),
     act('4. Box on the scale', 'Set the box on the scale. Build it there.', 'pk_scale', 'Building on the scale means you don\'t move the product twice.', { onHit() { const b = PK.box3; b.position.set(PK.scale.position.x, PK.scale.position.y + .06, PK.scale.position.z); setScale('0.9 lb'); } }),
-    carry('5. Move the items', 'Drag the item lines into the carton HU on the screen, then put the product in the box.', 'pk_items', 'box3', 'Move each item in the system as it goes in.', { dropAt: () => PK.box3.position.clone().add(new THREE.Vector3(0, .02, 0)), after() { setScale('3.8 lb'); } }),
+    rf('pack', '5. Move the items in the system', 'Drag the item line into the carton HU: select it and click Move to HU.', { head: 'PK04 - Pack', keys: ['Move to HU', 'Create HU', 'Ship'], lines: ['>Station: 4 EA HBL1221', 'Carton HU 1 (#3): empty'], pad: false }, { key: 'Move to HU', why: 'The carton HU is what the packing list says is in the box.' }),
+    carry('5. Product in the box', 'Now put the product in the box.', 'pk_items', 'box3', 'Move each item in the system as it goes in.', { dropAt: () => PK.box3.position.clone().add(V3(0, .02, 0)), after() { setScale('3.8 lb'); } }),
     act('6. Dunnage', 'Pack dunnage so the product cannot shift.', 'pk_dunnage', 'Product that shifts arrives damaged.'),
-    choice('6. Mark the carton', 'Where do the box count and weight go?', ['#/# and weight in the upper-right corner of the top', 'On the side', 'On the packing list only', 'Nowhere, the label prints it'], 0, 'On a multi-box order the written weight goes in the system in step 7. The shipping label goes over it later. Hand-writing stays until the label prints it (Rec. 1).'),
-    choice('6. Last carton', 'This is the only carton. What now?', ['Leave it open for the packing list', 'Tape it shut', 'Create another HU', 'Put it on the conveyor'], 0, 'The packing list goes inside the last carton in step 9.'),
-    choice('7. Weight', 'Ship > Full Ship Screen. One carton, still on the scale. What do you do?', ['Leave it on the scale and press F8', 'Type the weight in', 'Weigh it on another scale', 'Skip the weight'], 0, 'One carton reads off the scale. Only multi-carton orders get typed weights.', { onDone() { PK.plist.visible = true; } }),
-    choice('8. Error pops up', 'While printing, EWM pops up "Invalid carrier".', ['Stop. Follow the deviation SW for that error, or tell your lead if there isn\'t one', 'Click OK and keep packing', 'Change the carrier yourself', 'Reprint until it goes away'], 0, 'CRITICAL STOP. Errors have their own sheets, so this one stays short.'),
-    carry('9. Packing list in', 'Repack carton: take the packing list from the printer and put it inside the last carton.', 'pk_plist', 'box3', 'The customer needs it inside.', { dropAt: () => PK.box3.position.clone().add(new THREE.Vector3(0, .05, 0)) }),
-    act('9. Tape it shut', 'Tape the last carton shut.', 'pk_tape', 'Closed carton, ready for labels.'),
-    choice('9. Labels', 'Where do the labels go?', ['Both on top: shipping label upper-right over your writing, "Packing list inside" lower-left', 'Shipping label on the side', 'Anywhere flat', 'Inside the box'], 0, 'With both labels on top the dock and the customer read them without flipping the box.'),
-    choice('9. Stickers', 'Which other stickers still go on?', ['Only pink (FedEx), yellow (international), Heavy (lower-right) and mixed-carton', 'All the old colored stickers', 'None at all', 'Whatever the last packer used'], 0, 'Most old colored stickers are gone. These four stay.'),
+    choice('6. Mark the carton', 'Where do the box count and weight go?', ['#/# and weight in the upper-right corner of the top', 'On the side', 'On the packing list only', 'Nowhere'], 0, 'The shipping label goes over it later. Hand-writing stays until the label prints it (Rec. 1).'),
+    choice('6. Last carton', 'This is the only carton. What now?', ['Leave it open for the packing list', 'Tape it shut', 'Create another HU', 'Put it on the conveyor'], 0, 'The packing list goes inside the last carton.'),
+    rf('pack', '7. Ship', 'Click Ship, then Full Ship Screen.', { head: 'PK04 - Pack', keys: ['Ship', 'Full Ship Screen', 'Create HU'], lines: ['Carton HU 1 (#3): 4 EA HBL1221'], pad: false }, { seq: ['Ship', 'Full Ship Screen'] }),
+    rf('pack', '7. Weight and confirm', 'One carton, still on the scale: confirm with F8. (More than one carton: type each box\'s written weight first.)', { head: 'Full Ship Screen', lines: ['Carton 1  #3  3.8 lb  (scale)'] }, { key: 'F8', why: 'This weight prints on the shipping label.', onDone() { PK.plist.visible = true; } }),
+    choice('8. Error pops up', 'While printing, EWM pops up "Invalid carrier".', ['Stop. Follow the deviation SW for that error, or tell your lead if there isn\'t one', 'Click OK and keep packing', 'Change the carrier yourself', 'Reprint until it goes away'], 0, 'CRITICAL STOP. Errors have their own sheets.', { enter() { devSet('pack', { head: 'Error', lines: ['Carrier XYZQ is not valid', 'for ship-to 0004410077'], msg: 'Invalid carrier', bad: true, pad: false }); } }),
+    carry('9. Packing list in', 'Take the packing list from the printer and put it inside the carton.', 'pk_plist', 'box3', 'The customer needs it inside.', { dropAt: () => PK.box3.position.clone().add(V3(0, .05, 0)) }),
+    act('9. Tape it shut', 'Tape the carton shut.', 'pk_tape', 'Closed carton, ready for labels.'),
+    choice('9. Labels', 'Where do the labels go?', ['Both on top: shipping label upper-right over your writing, "Packing list inside" lower-left', 'Shipping label on the side', 'Anywhere flat', 'Inside the box'], 0, 'With both labels on top, the dock and the customer read them without flipping the box.'),
+    choice('9. Stickers', 'Which other stickers still go on?', ['Only pink (FedEx), yellow (international), Heavy (lower-right), mixed-carton', 'All the old colored stickers', 'None at all', 'Whatever the last packer used'], 0, 'Most old colored stickers are gone. These four stay.'),
     act('10. Send it', 'Put the carton on the conveyor, label up.', 'pk_outfeed', 'The conveyor sorts to the door.', { onHit() { PK.box3.position.set(12, .8, 1.9); } }),
-    choice('10. Too big', 'Next order: a #6 carton at 42 lb. Where does it go?', ['On a pallet', 'On the conveyor', 'In a tote', 'Split it on the floor'], 0, 'Bigger than a #6 or over 35 lb goes on a pallet. Smaller than a #2 goes in a tote. 35 lb max per repack carton.')
+    choice('10. Too big', 'Next order: a #6 carton at 42 lb. Where does it go?', ['On a pallet', 'On the conveyor', 'In a tote', 'Split it'], 0, 'Bigger than a #6 or over 35 lb: pallet. Smaller than a #2: tote.')
   ]
 };
 
-/* ---------- 4. Ship (truck core process, Kaizen 03 rev 0.6, + staging and dock) ---------- */
+/* ---------- 6. Ship (truck core process, Kaizen 03 rev 0.6, + staging and dock) ---------- */
 MODS.ship = {
   id: 'ship', name: 'Ship: truck pack and dock', start: { x: 12, z: 12, yaw: 0 }, target: 'no skid-weight wait. System weight plus pallet weight.',
-  setup() { },
   steps: [
-    info('Truck core process', 'Kaizen 03 rev 0.6: 10 steps at a truck pack station, then staging and the dock. Same login as parcel (PS1, Work Center Initial Screen, 0103, PK + station, F8).', 'A truck order ships once, so a pallet built wrong gets rebuilt or ships short.'),
-    choice('1. Scale', 'Truck step 1 has the same quality check as parcel. Which?', ['Zero the scale, make sure it reads lb', 'Weigh an empty pallet', 'None', 'Calibrate it'], 0, 'Every pallet is tied to this station: labels, BOL and dashboard pull from it.'),
-    scan('2. Scan the totes', 'Open Move HU and scan the totes for the order.', 'HU8000777', 'The list must match the totes on the floor.', { rf: ['Move HU', 'Order 4400555: 3 totes', '  HU8000777', '  HU8000778', '  HU8000779 (in transit)'] }),
-    choice('2. Totes on the way', 'Two of three totes are here. The third shows in transit.', ['Wait for all of them. Tell your lead if one is missing', 'Start the pallet now', 'Ship what is here', 'Close the order'], 0, 'Don\'t start the pallet on a partial order. It gets rebuilt or ships short.'),
-    choice('3. Heavy item', 'Unpacking the totes, a case feels well over 35 lb.', ['Test the weight first, lift it with two people', 'Lift it alone, quickly', 'Drag it off the tote', 'Leave it in the tote'], 0, 'SAFETY: over 35 lb or awkward, two people.', { critical: true, fb: ['', 'That is how backs go.', 'Dragging damages product and backs.', 'It still has to ship.'] }),
-    choice('4. Create the pallet HU', 'Create HU screen. What must it show?', ['Packaging material PALLET_SSCC, number of HUs 1, then F8', 'CARTON, 1', 'PALLET_SSCC, 3', 'Anything, it can be fixed later'], 0, 'The BOL counts HUs, so the system has to match the dock.'),
-    { type: 'order', title: '5. Build the pallet', text: 'Stack heavy on the bottom, light on top, labels out. Use the cases in the right order: heaviest first, the repack carton of loose parts last.', seq: ['tk_c48', 'tk_c20', 'tk_c6'], fb: 'Heavy on the bottom, light on top. Small parts go on last.', why: 'A square pallet loads faster and arrives in one piece.', target: ['tk_c48', 'tk_c20', 'tk_c6'],
+    info('Truck core process', 'Kaizen 03 rev 0.6, worked on the PK10 station screen and scanner, then staging and the dock.', 'A truck order ships once, so a pallet built wrong gets rebuilt or ships short.'),
+    getGun('tk_gun', 'PK10 scanner'),
+    rf('pk10', '1. Open your station', 'Work Center Initial Screen: warehouse 0103, work center PK10, F8.', { head: 'Work Center Initial Screen', fields: [{ label: 'Warehouse', via: 'type', expect: '0103', err: 'Arden is warehouse 0103.' }, { label: 'Work center', via: 'type', expect: 'PK10', err: 'This station is PK10.' }] }, { key: 'F8' }),
+    rf('pk10', '2. Scan the totes', 'Move HU: scan the tote on the floor.', { head: 'PK10 - Move HU', lines: ['Order 4400555: 3 totes', '  HU8000777', '  HU8000778  in transit', '  HU8000779  in transit'], fields: [{ label: 'HU', expect: 'HU8000777' }], pad: false }),
+    choice('2. Totes on the way', 'Two totes still show in transit.', ['Wait for all of them. Tell your lead if one is missing', 'Start the pallet now', 'Ship what is here', 'Close the order'], 0, 'Don\'t start the pallet on a partial order.'),
+    choice('3. Heavy item', 'Unpacking, a case feels well over 35 lb.', ['Test the weight first, lift it with two people', 'Lift it alone, quickly', 'Drag it off the tote', 'Leave it'], 0, 'SAFETY: over 35 lb or awkward, two people.', { critical: true, fb: ['', 'That is how backs go.', 'Dragging damages product and backs.', 'It still has to ship.'] }),
+    rf('pk10', '4. Create the pallet HU', 'Create HU: packaging material PALLET_SSCC, number of HUs 1, then F8.', { head: 'PK10 - Create HU', lines: ['No. of HUs: 1', 'Packaging material:'], keys: ['PALLET_SSCC', 'CARTON_S', 'CARTON_L'] }, { seq: ['PALLET_SSCC', 'F8'], keyFb: { CARTON_S: 'A truck pallet is PALLET_SSCC.', CARTON_L: 'A truck pallet is PALLET_SSCC.' }, why: 'The BOL counts HUs, so the system has to match the dock.' }),
+    { type: 'order', title: '5. Build the pallet', text: 'Heavy on the bottom, light on top, labels out: the 48 lb case, then the 20 lb case, then the repack carton of loose parts.', seq: ['tk_c48', 'tk_c20', 'tk_c6'], fb: 'Heavy on the bottom, light on top. Small parts go on last.', why: 'A square pallet loads faster and arrives in one piece.', target: ['tk_c48', 'tk_c20', 'tk_c6'],
       place(iid, k) { const c = OBJ[iid]; scene.attach(c); const p = TK.pallet.position; const ys = [.14, .54, .84]; c.position.set(p.x + [-.25, .2, -.2][k], ys[k], p.z + [0, 0, .1][k]); c.rotation.set(0, 0, 0); } },
-    choice('5. Height', 'How high can you build the pallet?', ['No higher than 50 in, stack square', 'As high as it stays up', '72 in', 'Up to the rack beam'], 0, 'SAFETY: build no higher than 50 in and keep the stack square.'),
-    choice('6. Mixed carton', 'The repack carton has two different products in it.', ['Add a mixed-carton label', 'Nothing extra', 'Split them into two cartons', 'Write "mixed" on it'], 0, 'Loose parts on a pallet get lost; fewer cartons and a clear label mean fewer pieces to track.'),
+    choice('5. Height', 'How high can you build?', ['No higher than 50 in, stack square', 'As high as it stays up', '72 in', 'Up to the rack beam'], 0, 'SAFETY: no higher than 50 in.'),
+    choice('6. Mixed carton', 'The repack carton has two different products in it.', ['Add a mixed-carton label', 'Nothing extra', 'Split it', 'Write "mixed" on it'], 0, 'Fewer pieces to track, clearly marked.'),
     act('7. Wrap it', 'Stretch wrap the center and top of the pallet.', 'tk_wrap', 'Wrap holds the load.', { onHit() { TK.wrapSkin.visible = true; } }),
-    choice('7. Banding', 'This order goes to Ohio. Standard product, no cabinets.', ['No bands. Wrap only', '4 bands', '2 bands across the width', 'Band every pallet'], 0, 'Band only UK (4 bands), long product (its own SW), and cabinets 24-50 in (2 bands across the width). Banding every pallet was the biggest waste on the team\'s wall.'),
-    choice('8. Weight', 'Last Shipment > Capacity shows 612 lb of product. Standard pallet. What do you write on the pallet label?', ['652 lb', '612 lb', '682 lb', 'Weigh it on the floor scale'], 0, 'System weight plus 40 lb for a standard pallet (70 lb for long). Written top-right of the pallet label.', { fb: ['', 'Add the pallet: 40 lb standard.', '70 lb is for a long pallet.', 'Truck ships on system weights now. No skid-weight wait.'] }),
-    act('9. Ship it', 'Full Ship Screen: enter the weight, Enter, F8. Get the paperwork from the printer.', 'tk_printer', 'The packing list, shipping label and BOL print.', { onHit() { TK.bol.visible = true; } }),
-    carry('9. Pin the paperwork', 'Sign the BOL and push-pin all three to the top of the pallet, facing the aisle.', 'tk_bol', 'tk_pallet', 'If the paperwork isn\'t on top, the pallet sits.', { dropAt: () => TK.pallet.position.clone().add(new THREE.Vector3(0, 1.12, .1)) }),
-    choice('10. Label every piece', 'On each pallet and loose carton label:', ['Weight top-right, #/# middle, #P or #L bottom-left, then a big C around the #/# when done', 'Just the weight', 'Only the order number', 'The weight in the middle'], 0, 'The label tells the dock which piece this is and how many go together. The C says it is ready to load.'),
-    scan('Stage it', 'Stage the pallet in the open lane closest to the Lead Hub (L05) and scan the lane label.', 'LANE-L05', 'One order in one lane.', { rf: ['Stage HU', 'Scan lane:'], wrongNote: true }),
-    choice('More pallets', 'A second pallet for the same order is done.', ['Same lane as the first', 'The next open lane', 'Anywhere close to the dock', 'Leave it at the station'], 0, 'More pallets for the same order go in the same lane. Lane full? Start a new one.'),
-    act('Dock: check the trailer', 'Before any truck enters the trailer at Door 4, check the dock lock light.', 'dock_lock', 'A trailer that creeps away from the dock drops the forklift between dock and trailer.', { onHit() { } }),
-    choice('Dock: red light', 'The dock light is red. The trailer is not locked or chocked.', ['Don\'t enter. Get the trailer locked or chocked and the plate set, then check the trailer floor', 'Go in quickly', 'Go in, the driver is still in the cab', 'Honk and go'], 0, 'Generic dock safety (OSHA). Replace with the Arden loading SW when written.', { critical: true, fb: ['', 'Never enter an unsecured trailer.', 'Drivers pull away.', 'A horn does not secure a trailer.'], onDone() { TK.lamp.material.color.set(0x20ff40); toast('Trailer locked. Light green.', 'good'); } })
+    choice('7. Banding', 'This order goes to Ohio. Standard product, no cabinets.', ['No bands. Wrap only', '4 bands', '2 bands across the width', 'Band every pallet'], 0, 'Band only UK (4), long product (own SW), cabinets 24-50 in (2 across the width).'),
+    rf('pk10', '8. Get the weight', 'Double-click the pallet HU, open Last Shipment, then Capacity.', { head: 'HU 00340012 - pallet', keys: ['Last Shipment', 'Capacity', 'Contents'], lines: ['Pallet HU 00340012'], pad: false }, { seq: ['Last Shipment', 'Capacity'], onDone() { } }),
+    choice('8. Total weight', 'Capacity shows 612 lb of product. Standard pallet. What do you write top-right on the pallet label?', ['652 lb', '612 lb', '682 lb', 'Weigh it on a floor scale'], 0, 'System weight plus 40 lb standard pallet (70 lb long).', { enter() { devSet('pk10', { head: 'Capacity', lines: ['Product weight   612 lb', 'Pallet           standard'], pad: false }); }, fb: ['', 'Add the pallet: 40 lb.', '70 lb is for a long pallet.', 'Truck ships on system weight now. No skid-weight wait.'] }),
+    rf('pk10', '9. Full Ship Screen', 'Type the total weight, ENT, then F8. The packing list, shipping label and BOL print.', { head: 'Full Ship Screen', lines: ['Pallet HU 00340012'], fields: [{ label: 'Weight (lb)', via: 'type', expect: '652', err: '612 lb product + 40 lb standard pallet = 652.' }] }, { key: 'F8', onDone() { TK.bol.visible = true; } }),
+    carry('9. Pin the paperwork', 'Sign the BOL and push-pin all three to the top of the pallet, facing the aisle.', 'tk_bol', 'tk_pallet', 'If the paperwork isn\'t on top, the pallet sits.', { dropAt: () => TK.pallet.position.clone().add(V3(0, 1.12, .1)) }),
+    choice('10. Label every piece', 'On each pallet and loose-carton label:', ['Weight top-right, #/# middle, #P or #L bottom-left, then a big C around the #/#', 'Just the weight', 'Only the order number', 'Weight in the middle'], 0, 'The C says it is complete and ready to load.'),
+    rf('pk10', 'Stage it', 'Stage the pallet in the open lane closest to the Lead Hub (L05). Scan the lane label with your scanner.', { head: 'Stage HU', lines: ['HU 00340012', 'Scan lane'], fields: [{ label: 'Lane', expect: 'LANE-L05', err: 'Use the open lane closest to the Lead Hub: L05.' }], pad: false }),
+    choice('More pallets', 'A second pallet for the same order is done.', ['Same lane as the first', 'The next open lane', 'Anywhere near the dock', 'Leave it at the station'], 0, 'Same order, same lane. Lane full? Start a new one.'),
+    act('Dock: check the trailer', 'Before any truck enters the trailer at Door 4, check the dock lock light.', 'dock_lock', 'A trailer that creeps away from the dock drops the forklift between dock and trailer.'),
+    choice('Dock: red light', 'The light is red. The trailer is not locked or chocked.', ['Don\'t enter. Get it locked or chocked and the plate set, then check the trailer floor', 'Go in quickly', 'Go in, the driver is in the cab', 'Honk and go'], 0, 'Generic dock safety (OSHA). Replace with the Arden loading SW when written.', { critical: true, fb: ['', 'Never enter an unsecured trailer.', 'Drivers pull away.', 'A horn does not secure a trailer.'], onDone() { TK.lamp.material.color.set(0x20ff40); toast('Trailer locked. Light green.', 'good'); } })
   ]
 };
-/* the lane scan wants the lane closest to the Lead Hub */
 
 /* ---------- 5. Waste hunt ---------- */
 const HUNT = [];
@@ -858,7 +1091,7 @@ huntSpot('w_retype', -7.5, 2.0, 12, ['Over-processing', 'Skills (unused talent)'
 function huntMarkers(on) { HP.visible = on; HUNT.forEach(h => { h.m.visible = on && !S.found[h.id]; }); }
 function startHunt() {
   S.mod = { id: 'hunt', name: 'Gemba waste hunt', steps: [] }; S.phase = 'hunt'; S.found = {}; S.mistakes = []; S.viol = []; S.t0 = now();
-  resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 4, 0); huntPanel();
+  unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 4, 0); huntPanel();
 }
 function huntPanel() {
   const n = Object.keys(S.found).length;
@@ -893,8 +1126,27 @@ function dismountTruck() {
   F.onboard = false; const p = truck.localToWorld(new THREE.Vector3(1.3, 0, -.3)); rig.position.set(p.x, 0, p.z); yaw = F.heading + Math.PI; rig.rotation.y = yaw;
   if (!renderer.xr.isPresenting) camera.position.set(0, EYE, 0);
 }
+function rightCtrl() { return ctrls.find(c => c.userData.hand === 'right') || ctrls[1]; }
+function equip(kind) { unequip(); S.tool = kind; if (kind === 'gun') TOOL.gun.visible = true; attachTool(); }
+function unequip() { S.tool = null; TOOL.gun.visible = false; if (TOOL.gun.parent) TOOL.gun.parent.remove(TOOL.gun); }
+function attachTool() {
+  const o = S.tool === 'mc' ? DEV.mc.group : S.tool === 'gun' ? TOOL.gun : null; if (!o) return;
+  const xr = renderer.xr.isPresenting, h = xr ? rightCtrl() : camera;
+  if (o.parent !== h) h.add(o);
+  if (S.tool === 'mc') { if (xr) { o.position.set(0, .04, .07); o.rotation.set(-.9, 0, 0); } else { o.position.set(.19, -.15, -.34); o.rotation.set(-.1, -.3, 0); } }
+  else { if (xr) { o.position.set(0, -.02, -.03); o.rotation.set(0, 0, 0); o.scale.setScalar(1); } else { o.position.set(.24, -.22, -.5); o.rotation.set(.1, .35, 0); o.scale.setScalar(.6); } }
+}
+function ride(t) { S.riding = t; const p = t.position.clone(); rig.position.set(p.x, 0, p.z); yaw = t.rotation.y; rig.rotation.y = yaw; rig.add(t); t.position.set(0, 0, 0); t.rotation.set(0, 0, 0); }
 const keyDown = {};
-addEventListener('keydown', e => { keyDown[e.code] = true; if (e.code === 'KeyE') selectFrom('desk'); if (e.code === 'KeyH' && F.onboard) honk(); });
+addEventListener('keydown', e => {
+  const st = cur();
+  if (st && st.type === 'rf' && S.phase === 'run' && $('#modal').classList.contains('hidden')) {
+    let k = null; const c = e.code;
+    if (/^(Digit|Numpad)[0-9]$/.test(c)) k = c.slice(-1); else if (c === 'KeyP') k = 'P'; else if (c === 'KeyK') k = 'K';
+    else if (c === 'Enter' || c === 'NumpadEnter') k = 'ENT'; else if (c === 'Backspace') k = 'CLR'; else if (/^F[1-8]$/.test(e.key)) k = e.key;
+    if (k) { e.preventDefault(); devKey(st.dev, k); return; }
+  }
+  keyDown[e.code] = true; if (e.code === 'KeyE') selectFrom('desk'); if (e.code === 'KeyH' && F.onboard) honk(); });
 addEventListener('keyup', e => { keyDown[e.code] = false; });
 const cvs = renderer.domElement;
 cvs.addEventListener('mousedown', () => { if (document.pointerLockElement !== cvs) { cvs.requestPointerLock && cvs.requestPointerLock(); } else selectFrom('desk'); });
@@ -925,9 +1177,11 @@ function walk(dt) {
     fx = -Math.sin(yaw) * f + Math.cos(yaw) * r; fz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
   }
   const len = Math.hypot(fx, fz); if (len > 1) { fx /= len; fz /= len; }
+  if (S.riding) sp = 2.0;
   const nx = rig.position.x + fx * sp * dt, nz = rig.position.z + fz * sp * dt;
-  if (!hitsSolid(nx, rig.position.z, .3, 'walk')) rig.position.x = nx;
-  if (!hitsSolid(rig.position.x, nz, .3, 'walk')) rig.position.z = nz;
+  const blocked = (x, z) => { if (hitsSolid(x, z, S.riding ? .45 : .3, 'walk')) return true; if (!S.riding) return false; return hitsSolid(x - Math.sin(yaw) * 1.45, z - Math.cos(yaw) * 1.45, .5, 'walk'); };
+  if (!blocked(nx, rig.position.z)) rig.position.x = nx;
+  if (!blocked(rig.position.x, nz)) rig.position.z = nz;
   rig.rotation.y = yaw;
   if (!renderer.xr.isPresenting) camera.rotation.set(pitch, 0, 0, 'YXZ');
 }
@@ -1035,6 +1289,7 @@ const ctrls = [0, 1].map(i => {
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xfddb33 }));
   line.scale.z = 3; c.add(line); c.userData.line = line;
   c.addEventListener('select', () => selectFrom(i));
+  c.addEventListener('connected', e => { c.userData.hand = e.data && e.data.handedness; });
   const grip = renderer.xr.getControllerGrip(i); grip.add(new XRControllerModelFactory().createControllerModel(grip)); rig.add(grip);
   return c;
 });
@@ -1047,7 +1302,7 @@ function castFrom(src) {
   const hits = ray.intersectObjects(targets, false).filter(h => h.object === panel || isVisible(h.object));
   const h = hits[0]; if (!h) return null;
   if (h.object === panel) return { panel: true, uv: h.uv, point: h.point, dist: h.distance };
-  return { iid: h.object.userData.iidOwner, point: h.point, dist: h.distance, normal: h.face ? h.face.normal : null };
+  return { iid: h.object.userData.iidOwner, point: h.point, dist: h.distance, uv: h.uv };
 }
 function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
 const REACH = 4.5;
@@ -1057,7 +1312,7 @@ function selectFrom(src) {
   const far = S.phase === 'hunt' ? 14 : REACH;
   if (h.dist > far) return toast('Move closer.', 'info', 1);
   const hand = src === 'desk' ? camera : ctrls[src];
-  onInteract(h.iid, hand);
+  onInteract(h.iid, hand, h);
 }
 function updateHover() {
   let shown = false;
@@ -1081,7 +1336,8 @@ const TARGET_POS = {
 function updateGuide(t) {
   const st = cur(); arrow.visible = false;
   if (!S.guide || !st || S.phase !== 'run' || S.sub) return;
-  let tgt = st.type === 'carry' && S.held ? st.dest : st.target; if (Array.isArray(tgt)) tgt = st.type === 'order' ? st.seq[S.k] : tgt[0];
+  let tgt = st.type === 'carry' && S.held ? st.dest : st.type === 'carry' ? st.item : st.target;
+  if (st.type === 'rf') { const d = DEV[st.dev], f = d.scr.fields[d.scr.focus]; tgt = f && !f.ok && f.via === 'scan' && typeof f.expect === 'string' ? 'bc:' + f.expect : (st.dev === 'mc' || (S.riding && st.dev.startsWith('thor'))) ? null : 'dev:' + st.dev; if (!tgt) return; } if (Array.isArray(tgt)) tgt = st.type === 'order' ? st.seq[S.k] : tgt[0];
   let p = null;
   if (TARGET_POS[tgt]) p = TARGET_POS[tgt]();
   else if (OBJ[tgt]) { const o = OBJ[tgt]; if (!isVisible(o)) return; p = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()); p.y = new THREE.Box3().setFromObject(o).max.y; }
@@ -1101,7 +1357,7 @@ function placePanelVR(force) {
   const want = head.clone().add(dir.multiplyScalar(1.0)); want.y = head.y - .15;
   if (force || panel.position.distanceTo(want) > 2.2) { panel.position.copy(want); panel.lookAt(head.x, panel.position.y, head.z); }
 }
-renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); $('#hud').style.display = 'none'; setTimeout(() => placePanelVR(true), 300); });
+renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); $('#hud').style.display = 'none'; mirrorDev(); setTimeout(() => placePanelVR(true), 300); });
 renderer.xr.addEventListener('sessionend', () => { panel.visible = false; $('#hud').style.display = ''; camera.position.set(0, F.onboard ? 1.0 : EYE, 0); });
 
 /* ============================================================
@@ -1112,6 +1368,7 @@ function tick(dt) {
   const t = now();
   readXR();
   if (renderer.xr.isPresenting) { const x = !!(XRIN.left && XRIN.left.buttons[4] && XRIN.left.buttons[4].pressed); if (x && !xBtnPrev) placePanelVR(true); xBtnPrev = x; placePanelVR(false); }
+  if (S.tool) attachTool();
   if (F.onboard) { driveTruck(dt); seatRig(); } else walk(dt);
   updateHover(); updateGuide(t);
   const st = cur();
@@ -1147,13 +1404,18 @@ function showRecords() {
   $('#clr').onclick = () => { if (confirm('Delete all records and ideas on this device?')) { localStorage.removeItem(LS_REC); localStorage.removeItem(LS_IDEA); showRecords(); } };
   $('#cls').onclick = closeModal;
 }
+$('#hDev').addEventListener('click', e => {
+  const c = e.target; if (c.tagName !== 'CANVAS') return; const d = Object.values(DEV).find(x => x.ct.c === c); if (!d) return;
+  const r = c.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * d.W, py = (e.clientY - r.top) / r.height * d.H;
+  const k = d.rects.find(q => px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h); if (k) devKey(d.id, k.k);
+});
 $('#recBtn').onclick = showRecords; $('#nameBtn').onclick = askName; $('#menuBtn').onclick = () => { if (F.onboard) dismountTruck(); menu(); };
 showWho(); menu();
 if (!trainee() && !/[?&]test/.test(location.search)) askName();
 
 /* test hook for the headless checks */
 window.TR = { S, MODS, F, OBJ, SLOTS, PALLETS, recvPallet, startModule, answer, pressKey, onInteract, next, menu, tick, cur, startHunt, huntHit, HUNT, ZONE,
-  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera };
+  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls };
 </script>
 </body>
 </html>
