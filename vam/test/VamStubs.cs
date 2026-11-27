@@ -120,13 +120,15 @@ namespace SimpleJSON
 namespace MVR.FileManagementSecure { public static class FileManagerSecure { public static void CreateDirectory(string p) { } public static bool FileExists(string p) { return false; } public static void DeleteFile(string p) { } } }
 
 // ---- VaM ----
-public class Atom : UnityEngine.MonoBehaviour { public string uid, type; public FreeControllerV3 mainController; public FreeControllerV3[] freeControllers; }
+public class JSONStorableUrl { public string val; }
+public class JSONStorable : UnityEngine.MonoBehaviour { public JSONStorableUrl GetUrlJSONParam(string n) { return null; } public void CallAction(string n) { } }
+public class Atom : UnityEngine.MonoBehaviour { public string uid, type; public FreeControllerV3 mainController; public FreeControllerV3[] freeControllers; public JSONStorable GetStorableByID(string id) { return null; } }
 public class FreeControllerV3 : UnityEngine.MonoBehaviour { public UnityEngine.Transform control; public Atom containingAtom; }
 public class SuperController : UnityEngine.MonoBehaviour
 {
     public enum GameMode { Edit, Play }
     public static SuperController singleton; public GameMode gameMode; public bool freezeAnimation; public UnityEngine.Camera MonitorCenterCamera;
-    public List<Atom> GetAtoms() { return null; } public void SelectController(FreeControllerV3 fc) { }
+    public List<Atom> GetAtoms() { return null; } public Atom GetAtomByUid(string u) { return null; } public Atom GetSelectedAtom() { return null; } public void SelectController(FreeControllerV3 fc) { }
     public void SaveJSON(SimpleJSON.JSONClass j, string p) { } public SimpleJSON.JSONClass LoadJSON(string p) { return null; }
     public static void LogError(string s) { } public static void LogMessage(string s) { }
 }

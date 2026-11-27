@@ -3,6 +3,8 @@
 // (from brenai.fly.dev or LM Studio), so this side only makes small local HTTP requests and never holds a password.
 //   GET  /state  -> {"pose":{"yaw","pitch","roll","pos":[x,y,z],"age"},"hands":[{"id","x","y","size","pinch","closed"}],"glasses":bool,"handsOn":bool}
 //   POST /chat   {"text"} -> {"text"} or {"error"}
+//   /state may carry "cmd" {"id","kind":"scene|look|pose|rescan","path","person"} from the library page; the plugin runs it and
+//   POST /vam    {"people":[uids],"selected","done":id,"error"} reports back (also once a second, so the page lists the people)
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -25,7 +27,11 @@ namespace Brene
         public bool HasPos;
         public readonly List<HandState> Hands = new List<HandState>();
         public string Error = "";
-        float lastOk = -10f;
+        float lastOk = -10f, nextReport;
+        int lastCmd;
+        public Func<JSONNode, string> OnCmd;   // runs a library command; returns an error or null
+        public Func<JSONClass> Report;          // what the scene looks like now (people, selected)
+        int doneId; string doneErr;
 
         // keeps asking the relay for its state, one request at a time, as fast as it answers (about 60 a second on this PC)
         public IEnumerator Poll(Func<bool> wanted)
@@ -33,6 +39,15 @@ namespace Brene
             while (true)
             {
                 if (!wanted()) { Connected = false; yield return new WaitForSeconds(0.5f); continue; }
+                if (Report != null && (doneId != 0 || Time.realtimeSinceStartup > nextReport))
+                {
+                    nextReport = Time.realtimeSinceStartup + 1f;
+                    var rep = Report(); if (doneId != 0) { rep["done"].AsInt = doneId; if (doneErr != null) rep["error"] = doneErr; doneId = 0; doneErr = null; }
+                    var pr = new UnityWebRequest(Url + "/vam", "POST");
+                    pr.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(rep.ToString())); pr.downloadHandler = new DownloadHandlerBuffer();
+                    pr.SetRequestHeader("Content-Type", "application/json"); pr.timeout = 2;
+                    yield return pr.SendWebRequest(); pr.Dispose();
+                }
                 var req = UnityWebRequest.Get(Url + "/state"); req.timeout = 2;
                 yield return req.SendWebRequest();
                 if (req.isNetworkError || req.isHttpError)
@@ -50,6 +65,13 @@ namespace Brene
 
         void Read(JSONNode j)
         {
+            var cmd = j["cmd"];
+            if (cmd != null && cmd["id"] != null && cmd["id"].AsInt != lastCmd && OnCmd != null)
+            {
+                lastCmd = cmd["id"].AsInt; string err;
+                try { err = OnCmd(cmd); } catch (Exception ex) { err = ex.Message; }
+                doneId = lastCmd; doneErr = err;
+            }
             var p = j["pose"];
             Glasses = j["glasses"].AsBool && p != null && p["yaw"] != null;
             if (Glasses)

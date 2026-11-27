@@ -57,7 +57,8 @@ namespace Brene
                 Actions();
                 BuildCanvas();
                 LoadLayout();
-                StartCoroutine(link.Poll(() => vit.Head || vit.HandsOn));
+                link.OnCmd = RunCmd; link.Report = SceneReport;
+                StartCoroutine(link.Poll(() => true));   // always: the library page needs the scene's people and sends commands
             }
             catch (Exception e) { SuperController.LogError("Brene: " + e); }
         }
@@ -198,6 +199,37 @@ namespace Brene
         }
         static string Esc(string s) { return (s ?? "").Replace("<", "&lt;").Replace(">", "&gt;"); }
 
+        // ---- the library page's commands ----
+        string RunCmd(JSONNode c)
+        {
+            var kind = c["kind"].Value; var path = c["path"].Value;
+            if (kind == "rescan") { Send("RescanPackages"); return null; }
+            if (kind == "scene") { if (path == "") return "no scene"; Send("Load", path); return null; }
+            if (kind == "look" || kind == "pose")
+            {
+                Atom a = null; var who = c["person"].Value;
+                if (who != "") a = SuperController.singleton.GetAtomByUid(who);
+                if (a == null) { var sel = SuperController.singleton.GetSelectedAtom(); if (sel != null && sel.type == "Person") a = sel; }
+                if (a == null) foreach (var x in SuperController.singleton.GetAtoms()) if (x != null && x.type == "Person") { a = x; break; }
+                if (a == null) return "There is no person in this scene";
+                var st = a.GetStorableByID(kind == "look" ? "AppearancePresets" : "PosePresets");
+                if (st == null) return a.uid + " has no " + (kind == "look" ? "appearance" : "pose") + " presets";
+                var url = st.GetUrlJSONParam("presetBrowsePath");
+                if (url == null) return "This VaM version names the preset path differently";
+                url.val = path; st.CallAction("LoadPreset");
+                return null;
+            }
+            return "Unknown command " + kind;
+        }
+        JSONClass SceneReport()
+        {
+            var j = new JSONClass(); var arr = new JSONArray();
+            foreach (var a in SuperController.singleton.GetAtoms()) if (a != null && a.type == "Person") arr.Add(a.uid);
+            j["people"] = arr;
+            var sel = SuperController.singleton.GetSelectedAtom(); j["selected"] = sel != null ? sel.uid : "";
+            return j;
+        }
+
         // ---- people ----
         void RefreshPeople()
         {
@@ -312,7 +344,7 @@ namespace Brene
             {
                 nextStatus = Time.realtimeSinceStartup + 0.5f;
                 string s;
-                if (!link.Connected) s = (vit.Head || vit.HandsOn) ? "Relay: not running" : "Glasses and hands off";
+                if (!link.Connected) s = "Relay: not running (start-brene.bat)";
                 else s = "Glasses: " + (link.Glasses ? (link.HasPos ? "6DOF" : "3DOF") : "none") + "   Hands: " + link.Hands.Count + (vit.HandNote != "" ? "   " + vit.HandNote : "");
                 if (Editor.On) s = "Editing: drag titles to move, corners to resize, buttons between panels";
                 status.text = s;

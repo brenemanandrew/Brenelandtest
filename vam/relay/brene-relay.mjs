@@ -12,11 +12,16 @@
 //   GET  /state   {"pose":{...,"age"},"glasses":bool,"hands":[...],"handsOn":bool}
 //   POST /chat    {"text"} -> {"text"} | {"error"}
 //   GET  /hands   the hand tracking page;  POST /hands {"hands":[...]} from that page
+//   GET  /library the library page (your scenes, looks and poses, and the VaM Hub) and its /lib/* routes
+//   POST /vam     the plugin's report (people in the scene, a finished command); /state carries the next command as "cmd"
 //   GET  /        a status page
+// --lan also listens on the home network (for a phone), with a key printed at start that the page needs; this PC needs no key.
 import http from 'node:http';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import crypto from 'node:crypto';
+import { Library } from './library.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
@@ -26,6 +31,10 @@ const BRENAI = String(arg('--brenai', process.env.BRENAI_URL || 'https://brenai.
 const LMSTUDIO = String(arg('--lmstudio', process.env.LMSTUDIO_URL || 'http://127.0.0.1:1234')).replace(/\/$/, '');
 const WIZRA = arg('--wizra', process.env.BRENE_WIZRA || (process.env.BRENAI_PIN ? 'brenai' : 'local'));
 const NAME = process.env.BRENE_NAME || 'Andrew';
+const LAN = process.argv.includes('--lan');
+const KEY = crypto.randomBytes(6).toString('hex');
+const lib = new Library({ dataFile: arg('--data', path.join(HERE, 'brene-relay.json')), vamDir: arg('--vam', process.env.VAM_DIR || ''), hubApi: arg('--hub-api', undefined) });
+if (lib.vamDir) lib.scan();
 
 // ---- head pose from the glasses helper ----
 const pose = { at: 0 };
@@ -102,13 +111,21 @@ let chatting = false;
 const send = (res, code, obj, type = 'application/json') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(typeof obj === 'string' ? obj : JSON.stringify(obj)); };
 const readBody = req => new Promise((ok, bad) => { let s = ''; req.on('data', c => { s += c; if (s.length > 1e6) req.destroy(); }); req.on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { bad(e); } }); req.on('error', bad); });
 
+const isLocal = req => /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
+    if (!isLocal(req)) {   // only reachable with --lan: the key is needed, from the link (once) or the cookie it sets
+      const ck = /(?:^|; )brene=([0-9a-f]+)/.exec(req.headers.cookie || ''), k = url.searchParams.get('k');
+      if (k === KEY) res.setHeader('set-cookie', `brene=${KEY}; Path=/; HttpOnly; SameSite=Strict`);
+      else if (!ck || ck[1] !== KEY) return send(res, 403, 'Open the link with the key that brene-relay printed when it started.', 'text/plain');
+    }
+    if (url.pathname.startsWith('/lib') || url.pathname === '/library' || url.pathname === '/vam') return await libRoute(req, res, url);
     if (url.pathname === '/state') {
       const age = pose.at ? Date.now() - pose.at : null, fresh = age != null && age < 1000;
       const handsFresh = Date.now() - handsAt < 500;
-      return send(res, 200, { glasses: fresh, pose: fresh ? { yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, ...(pose.pos ? { pos: pose.pos } : {}), age } : null, hands: handsFresh ? hands : [], handsOn: handsFresh });
+      const cmd = lib.nextFor();
+      return send(res, 200, { ...(cmd ? { cmd } : {}), glasses: fresh, pose: fresh ? { yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, ...(pose.pos ? { pos: pose.pos } : {}), age } : null, hands: handsFresh ? hands : [], handsOn: handsFresh });
     }
     if (url.pathname === '/hands' && req.method === 'POST') { hands = cleanHands((await readBody(req)).hands); handsAt = Date.now(); return send(res, 200, { ok: true }); }
     if (url.pathname === '/hands') return send(res, 200, fs.readFileSync(path.join(HERE, 'hands.html'), 'utf8'), 'text/html; charset=utf-8');
@@ -125,13 +142,37 @@ const server = http.createServer(async (req, res) => {
       const s = `<!doctype html><meta name=viewport content="width=device-width"><title>Brene relay</title><body style="font:18px system-ui;background:#111;color:#eee;padding:20px">
 <h2>Brene relay</h2><p>Glasses helper: <b>${bridgeUp ? 'connected' : 'not running'}</b>${pose.at && Date.now() - pose.at < 1000 ? (pose.pos ? ' (6DOF)' : ' (3DOF)') : ''}</p>
 <p>Hands: <b>${Date.now() - handsAt < 500 ? hands.length + ' tracked' : 'off'}</b> <a style="color:#9cf" href="/hands">open hand tracking</a></p>
-<p>Wizra: <b>${WIZRA === 'brenai' ? 'brenai.fly.dev (your save)' : 'LM Studio on this PC'}</b></p></body>`;
+<p><a style="color:#9cf;font-size:22px" href="/library">Open the library</a></p><p>Wizra: <b>${WIZRA === 'brenai' ? 'brenai.fly.dev (your save)' : 'LM Studio on this PC'}</b></p></body>`;
       return send(res, 200, s, 'text/html; charset=utf-8');
     }
     send(res, 404, { error: 'not found' });
   } catch (e) { send(res, 400, { error: String(e.message || e) }); }
 });
-server.listen(PORT, '127.0.0.1', () => {
+async function libRoute(req, res, url) {
+  const q = Object.fromEntries(url.searchParams);
+  if (url.pathname === '/library') return send(res, 200, fs.readFileSync(path.join(HERE, 'library.html'), 'utf8'), 'text/html; charset=utf-8');
+  if (url.pathname === '/vam' && req.method === 'POST') { lib.report(await readBody(req)); return send(res, 200, { ok: true }); }
+  if (url.pathname === '/lib/state') return send(res, 200, { vam: lib.vamState(), folder: lib.vamDir, scanned: lib.scanned, scanning: !!lib.scanning, error: lib.scanError, counts: { scene: lib.items.filter(i => i.kind === 'scene').length, look: lib.items.filter(i => i.kind === 'look').length, pose: lib.items.filter(i => i.kind === 'pose').length } });
+  if (url.pathname === '/lib/folder' && req.method === 'POST') { await lib.setVam((await readBody(req)).folder); return send(res, 200, { ok: true, folder: lib.vamDir }); }
+  if (url.pathname === '/lib/rescan' && req.method === 'POST') { await lib.scan(); return send(res, 200, { ok: true }); }
+  if (url.pathname === '/lib/items') return send(res, 200, lib.list({ kind: q.kind, q: q.q, filter: q.filter }));
+  if (url.pathname === '/lib/thumb') { const b = await lib.thumb(q.p); if (!b) return send(res, 404, 'none', 'text/plain'); res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'max-age=3600' }); return res.end(b); }
+  if (url.pathname === '/lib/fav' && req.method === 'POST') { const b = await readBody(req); return send(res, 200, { fav: lib.fav(String(b.path || ''), !!b.on) }); }
+  if (url.pathname === '/lib/open' && req.method === 'POST') {
+    const b = await readBody(req); if (!['scene', 'look', 'pose'].includes(b.kind) || typeof b.path !== 'string') return send(res, 400, { error: 'what?' });
+    const c = lib.queue({ kind: b.kind, path: b.path, person: String(b.person || ''), merge: !!b.merge });
+    return send(res, 200, { id: c.id, vam: lib.vamState().connected });
+  }
+  if (url.pathname === '/lib/result') return send(res, 200, lib.results.get(+q.id) || { pending: true });
+  if (url.pathname === '/lib/hub') return send(res, 200, await lib.hubList({ q: q.q || '', sort: q.sort || 'Hot Picks', type: q.type || '', page: +q.page || 1 }));
+  if (url.pathname === '/lib/hub/item') return send(res, 200, await lib.hubItem(q.id));
+  if (url.pathname === '/lib/hub/install' && req.method === 'POST') { const j = lib.install((await readBody(req)).id); return send(res, 200, { job: j.id }); }
+  if (url.pathname === '/lib/hub/job') { const j = lib.jobs.get(+q.id); return send(res, j ? 200 : 404, j || { error: 'no such job' }); }
+  return send(res, 404, { error: 'not found' });
+}
+
+server.listen(PORT, LAN ? '0.0.0.0' : '127.0.0.1', () => {
+  console.log(`Library: http://127.0.0.1:${PORT}/library` + (LAN ? `   On your phone: http://<this PC's address>:${PORT}/library?k=${KEY}` : ''));
   console.log(`Brene relay on http://127.0.0.1:${PORT}  (Wizra: ${WIZRA === 'brenai' ? 'brenai.fly.dev' : 'LM Studio ' + LMSTUDIO})`);
   console.log(`Hand tracking page: http://127.0.0.1:${PORT}/hands   Glasses helper expected on ${BRIDGE}`);
 });

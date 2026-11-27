@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Brene Library</title>
+<style>
+:root{--bg:#0b0d14;--card:#151927;--line:#232a3d;--txt:#eef0f7;--dim:#8e95ad;--acc:#8f7bff;--acc2:#4fd1b5;--warn:#ff8a7a;--r:16px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,rgba(11,13,20,.98),rgba(11,13,20,.88));backdrop-filter:blur(10px);padding:12px 16px 10px;border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:12px}
+.logo{font-weight:800;font-size:20px;letter-spacing:.3px;white-space:nowrap}.logo span{color:var(--acc)}
+.pill{margin-left:auto;display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:14px;color:var(--dim);white-space:nowrap}
+.dot{width:10px;height:10px;border-radius:50%;background:#555}.dot.on{background:var(--acc2);box-shadow:0 0 10px var(--acc2)}
+.tabs{display:flex;gap:8px;margin-top:12px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border-radius:14px;border:1px solid var(--line);background:var(--card);cursor:pointer;color:var(--dim);font-size:13px;font-weight:600}
+.tab b{font-size:24px;line-height:1}.tab.on{background:linear-gradient(135deg,#2b2360,#1c3b52);color:#fff;border-color:#4a3fa0}
+.tools{display:flex;gap:8px;margin-top:10px;align-items:center}
+.search{flex:1;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 12px}
+.search input{flex:1;border:0;background:none;outline:0;padding:11px 0;min-width:0}
+.chips{display:flex;gap:6px;overflow-x:auto;margin-top:10px;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:7px 14px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--dim);cursor:pointer;font-size:14px}
+.chip.on{background:var(--txt);color:#111;border-color:var(--txt);font-weight:600}
+select.chip{appearance:none;padding-right:14px}
+main{padding:14px 16px 90px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.tile{position:relative;aspect-ratio:1;border-radius:var(--r);overflow:hidden;background:var(--card);cursor:pointer;border:1px solid var(--line);transition:transform .12s}
+.tile:active{transform:scale(.97)}.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .ph{position:absolute;inset:0;display:grid;place-items:center;font-size:44px;opacity:.35}
+.tile .cap{position:absolute;left:0;right:0;bottom:0;padding:24px 10px 8px;background:linear-gradient(transparent,rgba(0,0,0,.85));font-size:14px;font-weight:600}
+.tile .cap small{display:block;font-weight:400;color:#c5c9d8;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .star{position:absolute;top:8px;right:8px;font-size:18px;text-shadow:0 1px 4px #000}
+.tile .badge{position:absolute;top:8px;left:8px;font-size:11px;padding:3px 8px;border-radius:99px;background:rgba(0,0,0,.6);color:#ddd}
+.empty{text-align:center;color:var(--dim);padding:60px 20px}.empty b{display:block;font-size:52px;margin-bottom:8px}
+.setup{max-width:520px;margin:30px auto;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px}
+.setup input{width:100%;margin:12px 0;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0b0d14}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 20px;border-radius:14px;border:0;background:linear-gradient(135deg,#7c66ff,#5a8bff);color:#fff;font-weight:700;cursor:pointer;font-size:16px}
+.btn.alt{background:var(--card);border:1px solid var(--line);color:var(--txt);font-weight:600}.btn:disabled{opacity:.5}
+.more{display:flex;justify-content:center;margin-top:18px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9;display:none}.sheet-bg.on{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:10;max-width:640px;margin:0 auto;background:#121624;border-radius:22px 22px 0 0;border:1px solid var(--line);transform:translateY(105%);transition:transform .22s;max-height:92vh;overflow:auto}
+.sheet.on{transform:none}.sheet .hero{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#000}
+.sheet .body{padding:16px 18px 26px}.sheet h2{margin:0 0 4px;font-size:22px}.sheet .by{color:var(--dim);font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.row .btn{flex:1}
+.stats{display:flex;gap:16px;margin-top:10px;color:var(--dim);font-size:14px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.tags span{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--card);color:var(--dim)}
+.people{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.files{margin-top:12px;font-size:14px;color:var(--dim)}.files div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)}
+.ok{color:var(--acc2)}.bad{color:var(--warn)}
+.bar{height:8px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;background:var(--acc2);width:0;transition:width .3s}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#222a40;border:1px solid #39456a;padding:12px 18px;border-radius:14px;z-index:20;transition:transform .2s;max-width:90vw}.toast.on{transform:translateX(-50%)}
+@media(min-width:900px){.grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}}
+</style></head>
+<body>
+<header>
+  <div class="top"><div class="logo">Brene <span>Library</span></div><div class="pill" id="vampill"><i class="dot" id="vamdot"></i><span id="vamtxt">VaM</span></div></div>
+  <nav class="tabs">
+    <button class="tab on" data-tab="scene"><b>🎬</b>Scenes</button>
+    <button class="tab" data-tab="look"><b>👗</b>Looks</button>
+    <button class="tab" data-tab="pose"><b>🕺</b>Poses</button>
+    <button class="tab" data-tab="hub"><b>🌐</b>Hub</button>
+  </nav>
+  <div class="tools"><label class="search"><span>🔎</span><input id="q" placeholder="Search" autocomplete="off"></label><button class="chip" id="rescan" title="Look for new files">⟳</button></div>
+  <div class="chips" id="chips"></div>
+</header>
+<main id="main"></main>
+<div class="sheet-bg" id="sbg"></div><div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+<script>
+const $ = s => document.querySelector(s), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const api = async (u, body) => { const r = await fetch(u, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; };   // a 200 may still carry a note in .error (an unreadable package): shown, not fatal
+const ICON = { scene: '🎬', look: '👗', pose: '🕺', hub: '🌐' };
+const FILTERS = [['all', 'All'], ['favs', '★ Favourites'], ['recent', 'Recent'], ['mine', 'Mine'], ['packages', 'Packages']];
+const SORTS = ['Hot Picks', 'Trending Downloads', 'Latest Update', 'Rating', 'Downloads'];
+const TYPES = ['', 'Scenes', 'Looks', 'Clothing', 'Hairstyles', 'Morphs', 'Plugins + Scripts', 'Assets + Accessories', 'Environments', 'Textures', 'Pose'];
+let tab = 'scene', filter = 'all', sort = 'Hot Picks', type = '', page = 1, st = { vam: {} }, timer = 0;
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2600); }
+
+function chips() {
+  const c = $('#chips');
+  if (tab === 'hub') {
+    c.innerHTML = SORTS.map(s => `<button class="chip ${s === sort ? 'on' : ''}" data-sort="${s}">${s}</button>`).join('') +
+      `<select class="chip" id="type">${TYPES.map(t => `<option value="${t}" ${t === type ? 'selected' : ''}>${t || 'All types'}</option>`).join('')}</select>`;
+    $('#type').onchange = e => { type = e.target.value; page = 1; load(); };
+  } else c.innerHTML = FILTERS.map(([k, l]) => `<button class="chip ${k === filter ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
+  c.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { sort = b.dataset.sort; page = 1; chips(); load(); });
+  c.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; chips(); load(); });
+}
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { tab = b.dataset.tab; page = 1; document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b)); $('#q').value = ''; chips(); load(); });
+$('#q').oninput = () => { clearTimeout(timer); timer = setTimeout(() => { page = 1; load(); }, tab === 'hub' ? 450 : 150); };
+$('#rescan').onclick = async () => { toast('Looking for new files...'); await api('/lib/rescan', {}).catch(e => toast(e.message)); load(); };
+
+async function state() {
+  try { st = await api('/lib/state'); } catch { st = { vam: {} }; }
+  $('#vamdot').classList.toggle('on', !!st.vam.connected);
+  $('#vamtxt').textContent = st.vam.connected ? 'VaM connected' + (st.vam.selected ? ' · ' + st.vam.selected : '') : 'VaM not connected';
+}
+setInterval(state, 2500);
+
+function setup(msg) {
+  $('#main').innerHTML = `<div class="setup"><h2 style="margin-top:0">Where is VaM?</h2><p style="color:var(--dim)">Paste the folder that holds <b>VaM.exe</b> (for example <code>C:\\VaM</code>). Your scenes, looks and poses are read from there, packages included.</p>
+    <input id="folder" placeholder="C:\\VaM" value="${esc(st.folder || '')}"><button class="btn" id="setf">Use this folder</button><p class="bad">${esc(msg || '')}</p></div>`;
+  $('#setf').onclick = async () => { $('#setf').disabled = true; $('#setf').textContent = 'Reading your files...'; try { await api('/lib/folder', { folder: $('#folder').value }); await state(); load(); } catch (e) { setup(e.message); } };
+}
+
+async function load() {
+  const m = $('#main');
+  if (tab === 'hub') return hub();
+  await state();
+  if (!st.folder) return setup();
+  if (st.scanning && !st.scanned) { m.innerHTML = `<div class="empty"><b>⏳</b>Reading your VaM folder...</div>`; return setTimeout(load, 1200); }
+  const j = await api(`/lib/items?kind=${tab}&filter=${filter}&q=${encodeURIComponent($('#q').value)}`).catch(e => ({ items: [], error: e.message }));
+  if (!j.items.length) { m.innerHTML = `<div class="empty"><b>${ICON[tab]}</b>${filter === 'favs' ? 'No favourites yet. Open one and tap the star.' : $('#q').value ? 'Nothing matches.' : 'None found in your VaM folder.'}${j.error ? `<p class="bad">${esc(j.error)}</p>` : ''}</div>`; return; }
+  m.innerHTML = `<div class="grid">${j.items.map((it, i) => `<div class="tile" data-i="${i}">${it.thumb ? `<img loading="lazy" src="/lib/thumb?p=${encodeURIComponent(it.thumb)}" alt="">` : `<div class="ph">${ICON[tab]}</div>`}
+    ${it.fav ? '<span class="star">⭐</span>' : ''}${it.pkg ? '' : '<span class="badge">Mine</span>'}<div class="cap">${esc(it.name)}<small>${esc(it.pkg ? it.creator : it.folder || 'Saves')}</small></div></div>`).join('')}</div>
+    ${j.total > j.items.length ? `<p class="empty" style="padding:20px">Showing ${j.items.length} of ${j.total}. Search to narrow it down.</p>` : ''}${j.error ? `<p class="bad">${esc(j.error)}</p>` : ''}`;
+  m.querySelectorAll('.tile').forEach(t => t.onclick = () => open(j.items[+t.dataset.i]));
+}
+
+function sheet(html) { $('#sheet').innerHTML = html; $('#sheet').classList.add('on'); $('#sbg').classList.add('on'); $('#sheet').scrollTop = 0; }
+function close() { $('#sheet').classList.remove('on'); $('#sbg').classList.remove('on'); }
+$('#sbg').onclick = close;
+
+function open(it) {
+  const people = st.vam.people || [], who = st.vam.selected && people.includes(st.vam.selected) ? st.vam.selected : people[0] || '';
+  const verb = it.kind === 'scene' ? 'Load in VaM' : it.kind === 'look' ? 'Apply look' : 'Apply pose';
+  sheet(`${it.thumb ? `<img class="hero" src="/lib/thumb?p=${encodeURIComponent(it.thumb)}">` : ''}<div class="body"><h2>${esc(it.name)}</h2><div class="by">${esc(it.pkg ? it.pkg : 'Your file · ' + it.path)}</div>
+    ${it.kind !== 'scene' ? (people.length ? `<div class="people">${people.map(p => `<button class="chip ${p === who ? 'on' : ''}" data-p="${esc(p)}">${esc(p)}</button>`).join('')}</div>` : `<p class="bad">${st.vam.connected ? 'No people in the open scene.' : 'Open VaM with the Brene plugin to apply it.'}</p>`) : ''}
+    <div class="row"><button class="btn" id="go">${verb}</button><button class="btn alt" id="fav">${it.fav ? '★ Saved' : '☆ Favourite'}</button></div>
+    ${!st.vam.connected ? '<p style="color:var(--dim);font-size:14px">VaM is not connected: it will load when the Brene plugin next checks in (within a minute).</p>' : ''}</div>`);
+  let person = who;
+  $('#sheet').querySelectorAll('[data-p]').forEach(b => b.onclick = () => { person = b.dataset.p; $('#sheet').querySelectorAll('[data-p]').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#fav').onclick = async () => { it.fav = !it.fav; await api('/lib/fav', { path: it.path, on: it.fav }); $('#fav').textContent = it.fav ? '★ Saved' : '☆ Favourite'; load(); };
+  $('#go').onclick = async () => {
+    $('#go').disabled = true;
+    try {
+      const r = await api('/lib/open', { kind: it.kind, path: it.path, person });
+      $('#go').textContent = 'Sent to VaM...';
+      for (let i = 0; i < 40; i++) { await new Promise(z => setTimeout(z, 700)); const res = await api('/lib/result?id=' + r.id); if (!res.pending) { if (res.ok) { toast('Done in VaM'); close(); } else { toast('VaM: ' + res.error); $('#go').disabled = false; $('#go').textContent = verb; } return; } }
+      toast('VaM has not picked it up yet'); $('#go').disabled = false; $('#go').textContent = verb;
+    } catch (e) { toast(e.message); $('#go').disabled = false; }
+  };
+}
+
+// ---- Hub ----
+async function hub() {
+  const m = $('#main'); if (page === 1) m.innerHTML = `<div class="empty"><b>🌐</b>Asking the Hub...</div>`;
+  let j; try { j = await api(`/lib/hub?sort=${encodeURIComponent(sort)}&type=${encodeURIComponent(type)}&page=${page}&q=${encodeURIComponent($('#q').value)}`); }
+  catch (e) { m.innerHTML = `<div class="empty"><b>⚠️</b>The Hub did not answer.<p class="bad">${esc(e.message)}</p></div>`; return; }
+  const html = j.items.map(it => `<div class="tile" data-id="${esc(it.id)}"><img loading="lazy" src="${esc(it.img)}" alt="" referrerpolicy="no-referrer"><span class="badge">${esc(it.type)}</span>
+    <div class="cap">${esc(it.title)}<small>${esc(it.by)} · ⬇ ${it.downloads.toLocaleString()}${it.ratings ? ' · ★ ' + it.rating.toFixed(1) : ''}</small></div></div>`).join('');
+  if (page === 1) m.innerHTML = `<div class="grid" id="hgrid">${html || ''}</div><div class="more" id="more"></div>`;
+  else $('#hgrid').insertAdjacentHTML('beforeend', html);
+  if (!j.items.length && page === 1) m.innerHTML = `<div class="empty"><b>🌐</b>Nothing found.</div>`;
+  $('#more') && ($('#more').innerHTML = j.page < j.pages ? `<button class="btn alt" id="mbtn">More</button>` : '');
+  $('#mbtn') && ($('#mbtn').onclick = () => { page++; hub(); });
+  m.querySelectorAll('.tile[data-id]').forEach(t => t.onclick = () => hubOpen(t.dataset.id));
+}
+const mb = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+async function hubOpen(id) {
+  sheet(`<div class="body"><div class="empty"><b>🌐</b>Loading...</div></div>`);
+  let d; try { d = await api('/lib/hub/item?id=' + encodeURIComponent(id)); } catch (e) { sheet(`<div class="body"><p class="bad">${esc(e.message)}</p></div>`); return; }
+  const need = [...d.files, ...d.deps].filter(f => !f.installed), size = need.reduce((a, f) => a + f.size, 0), have = d.files.length && d.files.every(f => f.installed);
+  sheet(`<img class="hero" src="${esc(d.img)}" referrerpolicy="no-referrer"><div class="body"><h2>${esc(d.title)}</h2><div class="by">${esc(d.by)} · ${esc(d.type)} · ${esc(d.version || '')}</div>
+    <p style="margin:10px 0 0">${esc(d.tag)}</p><div class="stats"><span>⬇ ${d.downloads.toLocaleString()}</span>${d.rating ? `<span>★ ${d.rating.toFixed(1)}</span>` : ''}<span>${d.deps.length} dependencies</span></div>
+    <div class="tags">${d.tags.slice(0, 10).map(t => `<span>${esc(t)}</span>`).join('')}</div>
+    <div class="row"><button class="btn" id="inst" ${!d.canInstall || !need.length ? 'disabled' : ''}>${have && !need.length ? '✓ Installed' : !d.canInstall ? 'Not on the Hub' : `Install · ${need.length} file${need.length > 1 ? 's' : ''} · ${mb(size)}`}</button></div>
+    <div class="bar" id="bar" style="display:none"><i></i></div><p id="jmsg" style="color:var(--dim);font-size:14px"></p>
+    <div class="files">${[...d.files, ...d.deps].slice(0, 30).map(f => `<div><span>${esc(f.filename)}</span><span class="${f.installed ? 'ok' : ''}">${f.installed ? 'installed' : mb(f.size)}</span></div>`).join('')}</div></div>`);
+  $('#inst').onclick = async () => {
+    $('#inst').disabled = true; $('#bar').style.display = 'block';
+    try {
+      const { job } = await api('/lib/hub/install', { id });
+      for (;;) { await new Promise(z => setTimeout(z, 600)); const s = await api('/lib/hub/job?id=' + job).catch(e => ({ state: 'failed', error: e.message }));
+        $('#bar i').style.width = (s.total ? s.done / s.total * 100 : 5) + '%'; $('#jmsg').textContent = s.state === 'downloading' ? `Downloading ${s.file} (${s.done + 1} of ${s.total})` : '';
+        if (s.state === 'done') { $('#inst').textContent = '✓ Installed'; $('#jmsg').textContent = `Got ${s.got.length} file(s). VaM is asked to rescan its packages.`; return; }
+        if (s.state === 'failed') { $('#jmsg').innerHTML = `<span class="bad">${esc(s.error)}</span>`; $('#inst').disabled = false; return; } }
+    } catch (e) { $('#jmsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; $('#inst').disabled = false; }
+  };
+}
+chips(); load();
+</script></body></html>
