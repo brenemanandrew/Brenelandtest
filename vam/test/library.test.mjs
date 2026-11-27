@@ -23,6 +23,7 @@ put('Saves/scene/Beach Day.json', '{}'); put('Saves/scene/Beach Day.jpg', JPG);
 put('Saves/scene/Studio/Night Club.json', '{}');
 put('Custom/Atom/Person/Appearance/Preset_Goth.vap', '{}'); put('Custom/Atom/Person/Appearance/Preset_Goth.jpg', JPG);
 put('Custom/Atom/Person/Pose/Preset_Wave.vap', '{}');
+put('Custom/Atom/Person/Hair/Preset_Bob.vap', '{}'); put('Custom/Atom/Person/Hair/Preset_Bob.jpg', JPG); put('Custom/Atom/Person/Clothing/Preset_Hoodie.vap', '{}'); put('Custom/Atom/Person/Skin/Preset_Pale.vap', '{}');
 put('Saves/scene/notes.txt', 'not a scene');
 const mkVar = (name, files, deflate) => execFileSync('python3', ['-I', '-c', `
 import sys, zipfile, json
@@ -64,7 +65,7 @@ try {
   let s = await get('/lib/state'); ok(s.folder === '' && !s.vam.connected, 'no folder set yet, VaM not connected');
   let r = await post('/lib/folder', { folder: path.join(T, 'nope') }); ok(r.error && /AddonPackages/.test(r.error), 'a wrong folder is refused in plain words');
   r = await post('/lib/folder', { folder: VAM }); ok(r.ok, 'VaM folder set and read');
-  s = await get('/lib/state'); ok(s.counts.scene === 4 && s.counts.look === 2 && s.counts.pose === 1, `counts: ${JSON.stringify(s.counts)} (4 scenes, 2 looks, 1 pose)`);
+  s = await get('/lib/state'); ok(s.counts.scene === 4 && s.counts.look === 2 && s.counts.pose === 1 && s.counts.hair === 1 && s.counts.clothing === 1 && s.counts.skin === 1, `counts: ${JSON.stringify(s.counts)} (4 scenes, 2 looks, 1 pose)`);
   ok(/1 package/.test(s.error), 'the broken package is reported, not fatal: ' + s.error);
   let l = await get('/lib/items?kind=scene'); const names = l.items.map(i => i.name).sort().join(',');
   ok(names === 'Alley,Beach Day,Night Club,Rooftop', 'scenes from loose files, a subfolder and a package: ' + names);
@@ -75,6 +76,8 @@ try {
   t = await get('/lib/thumb?p=' + encodeURIComponent(elf.thumb)); buf = Buffer.from(await t.arrayBuffer()); ok(buf.equals(JPG), 'thumbnail read out of a stored package in a subfolder');
   t = await get('/lib/thumb?p=' + encodeURIComponent('Saves/scene/Beach Day.jpg')); ok(t.status === 200, 'loose thumbnail served');
   t = await get('/lib/thumb?p=' + encodeURIComponent('../../etc/passwd.jpg')); ok(t.status === 404, 'paths out of the VaM folder refused');
+  l = await get('/lib/items?kind=hair&limit=1'); ok(l.items.length === 1 && l.items[0].name === 'Bob' && l.items[0].thumb, 'hair presets listed with thumbnails (for the Character panel)');
+  r = await post('/lib/open', { kind: 'clothing', path: 'Custom/Atom/Person/Clothing/Preset_Hoodie.vap', person: 'Person' }); ok(r.id, 'clothing can be sent to VaM'); await post('/vam', { done: r.id });
   l = await get('/lib/items?kind=scene&q=roof'); ok(l.items.length === 1 && l.items[0].name === 'Rooftop', 'search');
   l = await get('/lib/items?kind=scene&filter=mine'); ok(l.items.length === 2, 'filter Mine (loose files only)');
   await post('/lib/fav', { path: roof.path, on: true }); l = await get('/lib/items?kind=scene&filter=favs'); ok(l.items.length === 1 && l.items[0].fav, 'favourites saved');

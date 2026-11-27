@@ -110,6 +110,22 @@ namespace Brene
             if (onClick != null) b.onClick.AddListener(() => onClick());
             return b;
         }
+        // a thick, thumb-friendly slider: track, accent fill, round handle
+        public static Slider Slider(RectTransform parent, float min, float max, float val, Action<float> onChange)
+        {
+            var track = Rect("Track", parent); track.anchorMin = new Vector2(0, 0.5f); track.anchorMax = new Vector2(1, 0.5f); track.sizeDelta = new Vector2(-20, 12);
+            Box(track, Role.Field).raycastTarget = true;
+            var fillArea = Rect("FillArea", parent); fillArea.anchorMin = new Vector2(0, 0.5f); fillArea.anchorMax = new Vector2(1, 0.5f); fillArea.sizeDelta = new Vector2(-20, 12);
+            var fill = Rect("Fill", fillArea); fill.sizeDelta = Vector2.zero; Box(fill, Role.Accent).raycastTarget = false;
+            var handleArea = Rect("HandleArea", parent); Fill(handleArea, 10, 0, 10, 0);
+            var handle = Rect("Handle", handleArea); handle.sizeDelta = new Vector2(30, 30);
+            var hi = Box(handle, Role.Text);
+            var s = parent.gameObject.AddComponent<Slider>();
+            s.fillRect = fill; s.handleRect = handle; s.targetGraphic = hi; s.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
+            s.minValue = min; s.maxValue = max; s.value = val;
+            s.onValueChanged.AddListener(v => onChange(v));
+            return s;
+        }
         public static void SetOn(Button b, bool on)
         {
             var s = b.GetComponent<Skin>(); if (s == null) return;

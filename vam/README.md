@@ -3,6 +3,8 @@
 A VaM plugin plus a small helper app on the PC:
 - **Library:** a cleaner, visual front for VaM's Hub, your scene collection and your looks and poses. It's a page on the PC or your phone, and VaM loads what you tap.
 - **Panels:** big, themed panels you can drag around, in place of VaM's tiny menus.
+- **Radial menu:** hold the ` key (under Esc), flick toward a choice, let go. Two flicks reach anything.
+- **Character panel:** VaM's character editor in plain words (Body, Face, Skin, Hair, Clothes, Looks).
 - **Wizra:** her chat inside VaM.
 - **VITURE glasses:** head tracking (3DOF, or 6DOF on the Luma Ultra), side-by-side 3D and hand control.
 
@@ -15,6 +17,8 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 | `BreneUIKit.cs` | Themes, rounded panels, the drag-around editor. |
 | `BreneMain.cs` | The plugin itself: panels, buttons, Wizra's chat, layout saving, settings in VaM's plugin screen. |
 | `BreneViture.cs` | Head tracking on VaM's desktop camera, side-by-side 3D, hand grabbing. |
+| `BreneRadial.cs` | The radial menu. |
+| `BreneCharacter.cs` | The Character panel. |
 | `BreneLink.cs` | Talks to the relay on this PC. |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
@@ -30,6 +34,25 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
    - **Without `BRENAI_PIN`:** she runs on LM Studio on this PC with her persona, but no memory. Her full persona needs the relay run from inside the repo (`vam/relay`); otherwise it uses a short stand-in.
 4. **Glasses.** Run `start-viture.bat` (Brenai's VITURE helper, see `brenai/VITURE.md`). The relay finds it on port 8766.
 5. **Hands.** Open `http://127.0.0.1:8767/hands` in Chrome or Edge on the PC and press Start camera. Leave the tab open.
+
+## Radial menu
+- **Hold and flick:** hold the menu key (default ` under Esc; change it in the plugin's settings: Tab, Q, F1 or the mouse's back button). A ring opens around the mouse. Move toward a choice and let go.
+- **Tap instead:** tap the key (or the dock's **Menu** button) to leave the ring open, then click.
+- **Back out:** right-click or Esc goes back one ring.
+- **Top ring:** Character >, Scene >, Play/Edit, Glasses >, Wizra, Panels >, VaM menu, Undo.
+  - Character > Body, Face, Skin, Hair, Clothes, Looks.
+  - Scene > Play/Edit, Freeze, Undo, Redo, Save, Open.
+  - Panels > Hide all / Show all, Edit layout, Theme, Bigger, Smaller.
+- **Hidden panels:** the menu still opens when the panels are hidden, so it's the way back.
+
+## Character panel
+- **Who:** the selected person (or the first one). "Next person" cycles through.
+- **Body and Face:** plain sliders such as Height, Thin, Heavy, Fit, Shoulders, Arms, Bust, Waist, Hips, Glutes, Thighs, Legs, Neck, Face width, Age, Eyes, Brow, Nose, Lips, Mouth, Cheekbones, Jaw, Chin and Ears.
+  - Each is matched to a morph your VaM has, and the real morph name shows small underneath. A slider with no match is left out; the note says how many were found.
+  - **Search** finds any shape by a word, with the package clutter stripped from the names.
+  - **Reset** puts back everything you moved.
+- **Skin, Hair, Clothes, Looks:** picture tiles of your saved presets, packages included. Tap one to put it on the person.
+  - These come from the relay's library, so the relay must be running with your VaM folder set.
 
 ## The Library
 - **Open it:** `http://127.0.0.1:8767/library` on the PC. The first time, paste your VaM folder (the one with VaM.exe), or start the relay with `--vam "C:\VaM"` or set `VAM_DIR`.
@@ -88,6 +111,8 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 - **Not tested: nothing has run inside VaM yet.** What could go wrong there:
   - **VaM may refuse a call:** VaM checks plugins when it loads them. If it refuses `UnityEngine.Networking` (web requests to the relay), the plugin will not load at all. The fix is a file-based link instead: tell the coding session.
   - **Some buttons may do nothing:** Undo, Redo, Save scene, Open scene, VaM menu and Freeze call VaM by method name. If a name differs in your VaM version, that button simply does nothing. Report which.
+  - **Character panel unknowns:** it reaches shapes as float settings on the person's `geometry`. If Body and Face show "No shapes found", that route is wrong for your VaM. The friendly names are guesses at VaM's morph names; the note says how many matched. Skin, hair and clothing use `SkinPresets`, `HairPresets` and `ClothingPresets`.
+  - **Menu key may clash:** if VaM already uses the menu key, pick another in the plugin's settings.
   - **Library loading may not work:** it calls VaM's `Load`, `RescanPackages` and the person's `AppearancePresets` / `PosePresets` with `presetBrowsePath` and `LoadPreset`. If a look or pose does not apply, the page shows VaM's answer.
   - **Head tracking may misbehave:** it assumes the desktop camera is `MonitorCenterCamera`. If the view jitters or fights the mouse, report it.
   - **Typing in Wizra's box may trigger VaM's own keyboard shortcuts.**

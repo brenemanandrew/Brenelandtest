@@ -67,11 +67,12 @@ main{padding:14px 16px 90px}
 <script>
 const $ = s => document.querySelector(s), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = async (u, body) => { const r = await fetch(u, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; };   // a 200 may still carry a note in .error (an unreadable package): shown, not fatal
-const ICON = { scene: '🎬', look: '👗', pose: '🕺', hub: '🌐' };
+const ICON = { scene: '🎬', look: '👗', pose: '🕺', hub: '🌐', skin: '🎨', hair: '💇', clothing: '👕' };
+const PARTS = [['look', 'Whole look'], ['skin', 'Skin'], ['hair', 'Hair'], ['clothing', 'Clothes']];
 const FILTERS = [['all', 'All'], ['favs', '★ Favourites'], ['recent', 'Recent'], ['mine', 'Mine'], ['packages', 'Packages']];
 const SORTS = ['Hot Picks', 'Trending Downloads', 'Latest Update', 'Rating', 'Downloads'];
 const TYPES = ['', 'Scenes', 'Looks', 'Clothing', 'Hairstyles', 'Morphs', 'Plugins + Scripts', 'Assets + Accessories', 'Environments', 'Textures', 'Pose'];
-let tab = 'scene', filter = 'all', sort = 'Hot Picks', type = '', page = 1, st = { vam: {} }, timer = 0;
+let tab = 'scene', part = 'look', filter = 'all', sort = 'Hot Picks', type = '', page = 1, st = { vam: {} }, timer = 0;
 function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('on'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2600); }
 
 function chips() {
@@ -80,7 +81,8 @@ function chips() {
     c.innerHTML = SORTS.map(s => `<button class="chip ${s === sort ? 'on' : ''}" data-sort="${s}">${s}</button>`).join('') +
       `<select class="chip" id="type">${TYPES.map(t => `<option value="${t}" ${t === type ? 'selected' : ''}>${t || 'All types'}</option>`).join('')}</select>`;
     $('#type').onchange = e => { type = e.target.value; page = 1; load(); };
-  } else c.innerHTML = FILTERS.map(([k, l]) => `<button class="chip ${k === filter ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
+  } else c.innerHTML = (tab === 'look' ? PARTS.map(([k, l]) => `<button class="chip ${k === part ? 'on' : ''}" data-part="${k}">${l}</button>`).join('') + '<span style="width:1px;background:var(--line);flex:none"></span>' : '') + FILTERS.map(([k, l]) => `<button class="chip ${k === filter ? 'on' : ''}" data-f="${k}">${l}</button>`).join('');
+  c.querySelectorAll('[data-part]').forEach(b => b.onclick = () => { part = b.dataset.part; chips(); load(); });
   c.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { sort = b.dataset.sort; page = 1; chips(); load(); });
   c.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { filter = b.dataset.f; chips(); load(); });
 }
@@ -107,9 +109,10 @@ async function load() {
   await state();
   if (!st.folder) return setup();
   if (st.scanning && !st.scanned) { m.innerHTML = `<div class="empty"><b>⏳</b>Reading your VaM folder...</div>`; return setTimeout(load, 1200); }
-  const j = await api(`/lib/items?kind=${tab}&filter=${filter}&q=${encodeURIComponent($('#q').value)}`).catch(e => ({ items: [], error: e.message }));
-  if (!j.items.length) { m.innerHTML = `<div class="empty"><b>${ICON[tab]}</b>${filter === 'favs' ? 'No favourites yet. Open one and tap the star.' : $('#q').value ? 'Nothing matches.' : 'None found in your VaM folder.'}${j.error ? `<p class="bad">${esc(j.error)}</p>` : ''}</div>`; return; }
-  m.innerHTML = `<div class="grid">${j.items.map((it, i) => `<div class="tile" data-i="${i}">${it.thumb ? `<img loading="lazy" src="/lib/thumb?p=${encodeURIComponent(it.thumb)}" alt="">` : `<div class="ph">${ICON[tab]}</div>`}
+  const kind = tab === 'look' ? part : tab;
+  const j = await api(`/lib/items?kind=${kind}&filter=${filter}&q=${encodeURIComponent($('#q').value)}`).catch(e => ({ items: [], error: e.message }));
+  if (!j.items.length) { m.innerHTML = `<div class="empty"><b>${ICON[kind]}</b>${filter === 'favs' ? 'No favourites yet. Open one and tap the star.' : $('#q').value ? 'Nothing matches.' : 'None found in your VaM folder.'}${j.error ? `<p class="bad">${esc(j.error)}</p>` : ''}</div>`; return; }
+  m.innerHTML = `<div class="grid">${j.items.map((it, i) => `<div class="tile" data-i="${i}">${it.thumb ? `<img loading="lazy" src="/lib/thumb?p=${encodeURIComponent(it.thumb)}" alt="">` : `<div class="ph">${ICON[kind]}</div>`}
     ${it.fav ? '<span class="star">⭐</span>' : ''}${it.pkg ? '' : '<span class="badge">Mine</span>'}<div class="cap">${esc(it.name)}<small>${esc(it.pkg ? it.creator : it.folder || 'Saves')}</small></div></div>`).join('')}</div>
     ${j.total > j.items.length ? `<p class="empty" style="padding:20px">Showing ${j.items.length} of ${j.total}. Search to narrow it down.</p>` : ''}${j.error ? `<p class="bad">${esc(j.error)}</p>` : ''}`;
   m.querySelectorAll('.tile').forEach(t => t.onclick = () => open(j.items[+t.dataset.i]));
@@ -121,7 +124,7 @@ $('#sbg').onclick = close;
 
 function open(it) {
   const people = st.vam.people || [], who = st.vam.selected && people.includes(st.vam.selected) ? st.vam.selected : people[0] || '';
-  const verb = it.kind === 'scene' ? 'Load in VaM' : it.kind === 'look' ? 'Apply look' : 'Apply pose';
+  const verb = { scene: 'Load in VaM', look: 'Apply look', pose: 'Apply pose', skin: 'Apply skin', hair: 'Apply hair', clothing: 'Put on' }[it.kind];
   sheet(`${it.thumb ? `<img class="hero" src="/lib/thumb?p=${encodeURIComponent(it.thumb)}">` : ''}<div class="body"><h2>${esc(it.name)}</h2><div class="by">${esc(it.pkg ? it.pkg : 'Your file · ' + it.path)}</div>
     ${it.kind !== 'scene' ? (people.length ? `<div class="people">${people.map(p => `<button class="chip ${p === who ? 'on' : ''}" data-p="${esc(p)}">${esc(p)}</button>`).join('')}</div>` : `<p class="bad">${st.vam.connected ? 'No people in the open scene.' : 'Open VaM with the Brene plugin to apply it.'}</p>`) : ''}
     <div class="row"><button class="btn" id="go">${verb}</button><button class="btn alt" id="fav">${it.fav ? '★ Saved' : '☆ Favourite'}</button></div>

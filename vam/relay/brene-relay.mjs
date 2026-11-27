@@ -152,14 +152,14 @@ async function libRoute(req, res, url) {
   const q = Object.fromEntries(url.searchParams);
   if (url.pathname === '/library') return send(res, 200, fs.readFileSync(path.join(HERE, 'library.html'), 'utf8'), 'text/html; charset=utf-8');
   if (url.pathname === '/vam' && req.method === 'POST') { lib.report(await readBody(req)); return send(res, 200, { ok: true }); }
-  if (url.pathname === '/lib/state') return send(res, 200, { vam: lib.vamState(), folder: lib.vamDir, scanned: lib.scanned, scanning: !!lib.scanning, error: lib.scanError, counts: { scene: lib.items.filter(i => i.kind === 'scene').length, look: lib.items.filter(i => i.kind === 'look').length, pose: lib.items.filter(i => i.kind === 'pose').length } });
+  if (url.pathname === '/lib/state') return send(res, 200, { vam: lib.vamState(), folder: lib.vamDir, scanned: lib.scanned, scanning: !!lib.scanning, error: lib.scanError, counts: Object.fromEntries(['scene', 'look', 'pose', 'skin', 'hair', 'clothing'].map(k => [k, lib.items.filter(i => i.kind === k).length])) });
   if (url.pathname === '/lib/folder' && req.method === 'POST') { await lib.setVam((await readBody(req)).folder); return send(res, 200, { ok: true, folder: lib.vamDir }); }
   if (url.pathname === '/lib/rescan' && req.method === 'POST') { await lib.scan(); return send(res, 200, { ok: true }); }
-  if (url.pathname === '/lib/items') return send(res, 200, lib.list({ kind: q.kind, q: q.q, filter: q.filter }));
+  if (url.pathname === '/lib/items') return send(res, 200, lib.list({ kind: q.kind, q: q.q, filter: q.filter, limit: Math.max(1, Math.min(600, +q.limit || 600)) }));
   if (url.pathname === '/lib/thumb') { const b = await lib.thumb(q.p); if (!b) return send(res, 404, 'none', 'text/plain'); res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'max-age=3600' }); return res.end(b); }
   if (url.pathname === '/lib/fav' && req.method === 'POST') { const b = await readBody(req); return send(res, 200, { fav: lib.fav(String(b.path || ''), !!b.on) }); }
   if (url.pathname === '/lib/open' && req.method === 'POST') {
-    const b = await readBody(req); if (!['scene', 'look', 'pose'].includes(b.kind) || typeof b.path !== 'string') return send(res, 400, { error: 'what?' });
+    const b = await readBody(req); if (!['scene', 'look', 'pose', 'skin', 'hair', 'clothing'].includes(b.kind) || typeof b.path !== 'string') return send(res, 400, { error: 'what?' });
     const c = lib.queue({ kind: b.kind, path: b.path, person: String(b.person || ''), merge: !!b.merge });
     return send(res, 200, { id: c.id, vam: lib.vamState().connected });
   }

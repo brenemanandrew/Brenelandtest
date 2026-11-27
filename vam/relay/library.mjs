@@ -15,6 +15,9 @@ const KINDS = [
   { kind: 'scene', dir: 'Saves/scene/', ext: '.json' },
   { kind: 'look', dir: 'Custom/Atom/Person/Appearance/', ext: '.vap' },
   { kind: 'pose', dir: 'Custom/Atom/Person/Pose/', ext: '.vap' },
+  { kind: 'skin', dir: 'Custom/Atom/Person/Skin/', ext: '.vap' },
+  { kind: 'hair', dir: 'Custom/Atom/Person/Hair/', ext: '.vap' },
+  { kind: 'clothing', dir: 'Custom/Atom/Person/Clothing/', ext: '.vap' },
 ];
 const kindOf = name => { const n = name.replace(/\\/g, '/'); for (const k of KINDS) if (n.startsWith(k.dir) && n.toLowerCase().endsWith(k.ext)) return k.kind; return null; };
 

@@ -22,10 +22,11 @@ namespace Brene
         class Act { public string id, label; public Action run; public Func<bool> on; public Button btn; }
         readonly Dictionary<string, Act> acts = new Dictionary<string, Act>();
 
-        GameObject canvasGo; Canvas canvas; CanvasScaler scaler;
+        GameObject canvasGo, radialGo; Canvas canvas; CanvasScaler scaler, radialScaler;
         Panel pScene, pPeople, pGlasses, pChat, pLayout, pDock;
         Text status, chatLog; InputField chatIn; ScrollRect chatScroll; RectTransform peopleList;
-        Link link; Viture vit; bool chatBusy; float nextStatus, nextPeople, saveAt = -1;
+        Link link; Viture vit; Character chr; Radial radial;
+        JSONStorableStringChooser menuKey; bool chatBusy; float nextStatus, nextPeople, saveAt = -1;
         readonly List<string> chatLines = new List<string>();
 
         JSONStorableString relayUrl; JSONStorableBool showUi, headOn, stereoOn, fullOn, handsOn, swapEyes, flipYaw, flipPitch, flipRoll;
@@ -39,8 +40,10 @@ namespace Brene
                 relayUrl = new JSONStorableString("Relay address", "http://127.0.0.1:8767", s => link.Url = s.TrimEnd('/'));
                 RegisterString(relayUrl); CreateTextField(relayUrl).height = 60; link.Url = relayUrl.val;
                 showUi = Bool("Show Brene panels", true, v => { if (canvasGo != null) canvasGo.SetActive(v); });
-                uiSize = new JSONStorableFloat("Panel size", 1.25f, v => { if (scaler != null) scaler.scaleFactor = v; }, 0.6f, 3f);
+                uiSize = new JSONStorableFloat("Panel size", 1.25f, v => { if (scaler != null) scaler.scaleFactor = v; if (radialScaler != null) radialScaler.scaleFactor = v; }, 0.6f, 3f);
                 RegisterFloat(uiSize); CreateSlider(uiSize);
+                menuKey = new JSONStorableStringChooser("Menu key", new List<string> { "BackQuote", "Tab", "Q", "F1", "Mouse4" }, "BackQuote", "Radial menu key (hold)");
+                RegisterStringChooser(menuKey); CreatePopup(menuKey);
                 headOn = Bool("Head tracking (glasses)", true, v => vit.Head = v);
                 handsOn = Bool("Hand control", true, v => vit.HandsOn = v);
                 stereoOn = Bool("3D side by side", false, v => vit.Stereo = v);
@@ -91,6 +94,8 @@ namespace Brene
             Add("smaller", "Smaller", () => uiSize.val = Mathf.Max(0.6f, uiSize.val - 0.15f), null);
             Add("savelayout", "Save layout", SaveLayout, null);
             Add("panels", "Show all", ShowAll, null);
+            Add("radial", "Menu", () => radial.OpenAtCentre(), null);
+            Add("character", "Character", () => chr.Open(null), null);
         }
         void Add(string id, string label, Action run, Func<bool> on) { acts[id] = new Act { id = id, label = label, run = run, on = on }; }
         static void Send(string method) { SuperController.singleton.gameObject.SendMessage(method, SendMessageOptions.DontRequireReceiver); }
@@ -111,12 +116,22 @@ namespace Brene
             pLayout = new Panel(root, "layout", "Layout", new Vector2(20, -560), new Vector2(340, 250), true);
             pPeople = new Panel(root, "people", "People", new Vector2(380, -20), new Vector2(240, 320), false);
             pChat = new Panel(root, "chat", "Wizra", new Vector2(-1, -20), new Vector2(460, 520), false);
-            pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(330, 110), true); pDock.CanHide = false; pDock.ShowEdit(Editor.On);
+            pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(Editor.On);
 
             foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
             foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
             foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels" }) MakeButton(id, pLayout);
-            MakeButton("edit", pDock);
+            MakeButton("radial", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
+            chr = new Character(this, link, ApplyPreset); chr.Build(root);
+            // the radial menu has its own canvas so it still opens when the panels are hidden
+            if (radialGo == null)
+            {
+                radialGo = new GameObject("Brene menu");
+                var rc = radialGo.AddComponent<Canvas>(); rc.renderMode = RenderMode.ScreenSpaceOverlay; rc.sortingOrder = 40;
+                radialScaler = radialGo.AddComponent<CanvasScaler>(); radialScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; radialScaler.scaleFactor = uiSize.val;
+                radialGo.AddComponent<GraphicRaycaster>();
+                radial = new Radial(radialGo.transform, MenuItems);
+            }
 
             // people: one button per person in the scene, tap to select
             Scroll(pPeople.Body, out peopleList);
@@ -205,22 +220,49 @@ namespace Brene
             var kind = c["kind"].Value; var path = c["path"].Value;
             if (kind == "rescan") { Send("RescanPackages"); return null; }
             if (kind == "scene") { if (path == "") return "no scene"; Send("Load", path); return null; }
-            if (kind == "look" || kind == "pose")
-            {
-                Atom a = null; var who = c["person"].Value;
-                if (who != "") a = SuperController.singleton.GetAtomByUid(who);
-                if (a == null) { var sel = SuperController.singleton.GetSelectedAtom(); if (sel != null && sel.type == "Person") a = sel; }
-                if (a == null) foreach (var x in SuperController.singleton.GetAtoms()) if (x != null && x.type == "Person") { a = x; break; }
-                if (a == null) return "There is no person in this scene";
-                var st = a.GetStorableByID(kind == "look" ? "AppearancePresets" : "PosePresets");
-                if (st == null) return a.uid + " has no " + (kind == "look" ? "appearance" : "pose") + " presets";
-                var url = st.GetUrlJSONParam("presetBrowsePath");
-                if (url == null) return "This VaM version names the preset path differently";
-                url.val = path; st.CallAction("LoadPreset");
-                return null;
-            }
+            if (PRESETS.ContainsKey(kind)) return ApplyPreset(kind, path, c["person"].Value);
             return "Unknown command " + kind;
         }
+        static readonly Dictionary<string, string> PRESETS = new Dictionary<string, string> {
+            { "look", "AppearancePresets" }, { "pose", "PosePresets" }, { "skin", "SkinPresets" }, { "hair", "HairPresets" }, { "clothing", "ClothingPresets" } };
+        // a saved preset onto a person: the named person, else the selected one, else the first in the scene
+        string ApplyPreset(string kind, string path, string who)
+        {
+            Atom a = null;
+            if (!string.IsNullOrEmpty(who)) a = SuperController.singleton.GetAtomByUid(who);
+            if (a == null) { var sel = SuperController.singleton.GetSelectedAtom(); if (sel != null && sel.type == "Person") a = sel; }
+            if (a == null) foreach (var x in SuperController.singleton.GetAtoms()) if (x != null && x.type == "Person") { a = x; break; }
+            if (a == null) return "There is no person in this scene";
+            string id; if (!PRESETS.TryGetValue(kind, out id)) return "Unknown kind " + kind;
+            var st = a.GetStorableByID(id);
+            if (st == null) return a.uid + " has no " + id;
+            var url = st.GetUrlJSONParam("presetBrowsePath");
+            if (url == null) return "This VaM version names the preset path differently";
+            url.val = path; st.CallAction("LoadPreset");
+            return null;
+        }
+
+        // ---- the radial menu: the same things as the panels, grouped, two flicks deep at most ----
+        List<RItem> MenuItems()
+        {
+            Func<string, RItem> act = id => { Act a = acts[id]; return new RItem(a.label == "Play mode" && SuperController.singleton.gameMode != SuperController.GameMode.Play ? "Edit mode" : a.label, () => { a.run(); Refresh(); }) { On = a.on }; };
+            Func<string, RItem> sec = s => new RItem(s, () => chr.Open(s));
+            return new List<RItem> {
+                new RItem("Character", new List<RItem> { sec("Body"), sec("Face"), sec("Skin"), sec("Hair"), sec("Clothes"), sec("Looks") }),
+                new RItem("Scene", new List<RItem> { act("play"), act("freeze"), act("undo"), act("redo"), act("save"), act("load") }),
+                act("play"),
+                new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
+                new RItem("Wizra", () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); chatIn.ActivateInputField(); }),
+                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller") }),
+                act("menu"),
+                act("undo"),
+            };
+        }
+        KeyCode MenuKey()
+        {
+            switch (menuKey.val) { case "Tab": return KeyCode.Tab; case "Q": return KeyCode.Q; case "F1": return KeyCode.F1; case "Mouse4": return KeyCode.Mouse3; default: return KeyCode.BackQuote; }
+        }
+
         JSONClass SceneReport()
         {
             var j = new JSONClass(); var arr = new JSONArray();
@@ -330,7 +372,7 @@ namespace Brene
         {
             if (FileManagerSecure.FileExists(FILE)) FileManagerSecure.DeleteFile(FILE);
             Theme.Name = "Night"; uiSize.val = 1.25f;
-            Panel.All.Clear(); foreach (var a in acts.Values) a.btn = null;
+            Panel.All.Clear(); foreach (var a in acts.Values) a.btn = null; if (radial != null) radial.Close();
             if (canvasGo != null) Destroy(canvasGo);
             BuildCanvas(); canvasGo.SetActive(showUi.val);
         }
@@ -338,6 +380,7 @@ namespace Brene
         // ---- every frame ----
         void Update()
         {
+            if (radial != null) radial.Tick(MenuKey());
             if (saveAt > 0 && Time.realtimeSinceStartup > saveAt) { saveAt = -1; SaveLayout(); }
             if (Time.realtimeSinceStartup > nextPeople) { nextPeople = Time.realtimeSinceStartup + 2f; RefreshPeople(); Refresh(); }
             if (status != null && Time.realtimeSinceStartup > nextStatus)
@@ -356,6 +399,7 @@ namespace Brene
         {
             if (vit != null) vit.Shutdown();
             if (canvasGo != null) Destroy(canvasGo);
+            if (radialGo != null) Destroy(radialGo);
             Panel.All.Clear(); Editor.On = false;
         }
     }
