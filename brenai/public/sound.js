@@ -6,10 +6,14 @@
 //   WizraSound.fx(name)                            one effect: type, pop, sparkle, heart, anger, ask, sweat, step, sit, tv, click, door, pour...
 //   WizraSound.emote(ch)                           the effect for an emoji that popped up over her
 //   WizraSound.volume('music' | 'fx', 0..1)        stored on the device;  WizraSound.duckWhen(fn) lowers music while fn() is true
+//   WizraSound.event(name, on)                     what is happening: 'beach' (beach games), 'chase' (the water fight), 'photo' (the studio),
+//                                                  'timestop' (the stopwatch: the music freezes and slurs down, then starts again)
+//   WizraSound.intensity(0..1)                     how hot the moment is: the chase theme adds drums, bass runs and sax as it rises
+// Effects include sax stingers: saxhit (a short honk), saxfall (a comic slide down), saxwin (a little fanfare), saxwolf (a whistle on sax).
 (function () {
   const LS = (k, d) => { const v = parseFloat(localStorage.getItem(k)); return Number.isFinite(v) ? v : d; };
   const vol = { music: LS('brenai.vol.music', 0.35), fx: LS('brenai.vol.fx', 0.6) };
-  let ctx = null, musicBus, fxBus, noise, scene = 'chat', path = '', track = null, themeUntil = 0, theme = '', duck = () => false, onCall = false, lastType = 0, trackSince = 0, lastName = '';
+  let ctx = null, musicBus, musicLP, fxBus, noise, override = '', chaseOn = false, inten = 0.3, stopped = false, scene = 'chat', path = '', track = null, themeUntil = 0, theme = '', duck = () => false, onCall = false, lastType = 0, trackSince = 0, lastName = '';
   const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.random() * a.length | 0], mtof = m => 440 * Math.pow(2, (m - 69) / 12);
 
   // ---------- instruments ----------
@@ -38,11 +42,42 @@
   const bell = (o, m, t, d, g) => { tone(o, 'sine', mtof(m), t, d, g, { decay: true }); tone(o, 'sine', mtof(m) * 2.76, t, d * 0.4, g * 0.22, { decay: true }); };               // music box
   const pad = (o, ms, t, d, g, lp = 900) => { for (const m of ms) { tone(o, 'sawtooth', mtof(m), t, d, g, { a: d * 0.3, r: d * 0.4, lp, det: -7 }); tone(o, 'sawtooth', mtof(m), t, d, g, { a: d * 0.3, r: d * 0.4, lp, det: 7 }); } };
   const bass = (o, m, t, d, g) => tone(o, 'triangle', mtof(m), t, d, g, { lp: 500, a: 0.012, r: 0.08 });
+  // A saxophone: two buzzy oscillators through the formant bumps of a reed horn, a little breath noise, a scoop up into the note,
+  // vibrato that blooms after the attack, and a filter that opens when it is played harder. o.fall: the note slides down at the end.
+  function sax(out, m, t, d, g, o = {}) {
+    const f = mtof(m), a = ctx.createOscillator(), b = ctx.createOscillator(), mix = ctx.createGain(), f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), amp = ctx.createGain();
+    a.type = 'sawtooth'; b.type = 'square'; b.detune.value = 4; const sc = o.scoop == null ? 0.06 : o.scoop;
+    for (const x of [a, b]) { x.frequency.setValueAtTime(f * (1 - sc), t); x.frequency.exponentialRampToValueAtTime(f, t + 0.05 + sc * 0.4); if (o.fall) { x.frequency.setValueAtTime(f, t + d * 0.55); x.frequency.exponentialRampToValueAtTime(f * Math.pow(2, -o.fall / 12), t + d); } }
+    if (d > 0.3) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = 5.4; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.014, t + Math.min(d, 0.6)); l.connect(lg); lg.connect(a.frequency); lg.connect(b.frequency); l.start(t); l.stop(t + d + 0.2); }
+    mix.gain.value = 0.5; f1.type = 'bandpass'; f1.frequency.value = 620; f1.Q.value = 1.3; f2.type = 'bandpass'; f2.frequency.value = 1550; f2.Q.value = 1.8;
+    const bright = o.bright || 1; lp.type = 'lowpass'; lp.Q.value = 1.2; lp.frequency.setValueAtTime(700, t); lp.frequency.linearRampToValueAtTime(1800 + 1600 * bright, t + 0.07); lp.frequency.linearRampToValueAtTime(1300 + 900 * bright, t + Math.max(0.1, d * 0.8));
+    amp.gain.setValueAtTime(0.0001, t); amp.gain.linearRampToValueAtTime(g, t + 0.035); amp.gain.setValueAtTime(g * 0.85, t + Math.max(0.05, d - 0.09)); amp.gain.linearRampToValueAtTime(0.0001, t + d);
+    a.connect(mix); b.connect(mix); mix.connect(f1); mix.connect(f2); const sum = ctx.createGain(); sum.gain.value = 2.2; f1.connect(sum); f2.connect(sum); const dry = ctx.createGain(); dry.gain.value = 0.25; mix.connect(dry); dry.connect(sum);
+    sum.connect(lp).connect(amp); let node = amp; if (o.pan != null && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = o.pan; amp.connect(p); node = p; } node.connect(out);
+    a.start(t); b.start(t); a.stop(t + d + 0.05); b.stop(t + d + 0.05);
+    hit(out, t, Math.min(0.25, d), g * 0.12, { type: 'bandpass', f: 2400, q: 1.5, a: 0.02 });   // breath
+  }
+  const pluck = (o, m, t, d, g) => { tone(o, 'triangle', mtof(m), t, d, g, { decay: true, lp: 2200 }); tone(o, 'sine', mtof(m) * 2, t, d * 0.3, g * 0.3, { decay: true }); };   // nylon guitar
+  const steel = (o, m, t, d, g) => { tone(o, 'sine', mtof(m), t, d, g, { decay: true }); tone(o, 'sine', mtof(m) * 2.02, t, d * 0.5, g * 0.4, { decay: true }); tone(o, 'sine', mtof(m) * 3.9, t, d * 0.2, g * 0.12, { decay: true }); };   // a steel pan
+  const clap = (o, t, g = 0.12) => { for (const dt of [0, 0.012, 0.024]) hit(o, t + dt, 0.11, g, { type: 'bandpass', f: 1400, q: 0.8 }); };
+  const rim = (o, t, g = 0.09) => { hit(o, t, 0.03, g, { type: 'bandpass', f: 2600, q: 3 }); tone(o, 'triangle', 820, t, 0.03, g * 0.5, { decay: true }); };
+  const conga = (o, t, f, g = 0.18) => tone(o, 'sine', f, t, 0.22, g, { to: f * 0.8, glide: 0.1, decay: true });
+  const shaker = (o, t, g = 0.03) => hit(o, t, 0.05, g, { f: 6000, a: 0.01 });
 
   // ---------- chord charts ----------
   const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }, QUAL = { maj7: [0, 4, 7, 11], m7: [0, 3, 7, 10], 7: [0, 4, 7, 10], m9: [0, 3, 7, 10, 14], maj9: [0, 4, 7, 11, 14], m: [0, 3, 7], '': [0, 4, 7] };
   const chart = s => s.split(' ').map(c => { const m = /^([A-G])([b#]?)(.*)$/.exec(c), root = NOTE[m[1]] + (m[2] === 'b' ? -1 : m[2] === '#' ? 1 : 0); return { root, tones: QUAL[m[3]] || QUAL[''], minor: /^m(?!aj)/.test(m[3]) }; });
   const scaleOf = c => (c.minor ? [0, 3, 5, 7, 10] : [0, 2, 4, 7, 9]).map(x => c.root + x);   // pentatonic that fits the chord
+  // A lead that sounds like someone playing: a short motif (a rhythm and a shape), stated, answered with a variation, then a breath.
+  // The notes come from the chord with a blue note now and then, so the line bends to every chord it passes.
+  const BLUE = c => c.minor ? [0, 3, 5, 6, 7, 10] : [0, 2, 3, 4, 7, 9];
+  function phrase(o, c, t, b, bar, mem, play, density = 0.7, base = 65, beats = 4) {
+    if (!mem.motif || bar % 4 === 0) { const n = 3 + (Math.random() * 3 | 0), at = []; let x = Math.random() < 0.5 ? 0 : 0.5; for (let i = 0; i < n && x < beats * 2 - 0.5; i++) { at.push(x); x += pick([0.5, 0.5, 1, 1, 1.5, 2]) * (0.6 + 0.8 * (1 - density)); } mem.motif = { at, steps: at.map(() => pick([-2, -1, 1, 1, 2, 3])), lens: at.map(() => pick([0.5, 0.9, 1.4, 2])) }; mem.deg = 4 + (Math.random() * 3 | 0); }
+    const part = bar % 4; if (part === 3 && Math.random() < 0.7) return;   // breathe at the end of the phrase
+    const sc = BLUE(c), m = mem.motif, vary = part === 2; let deg = mem.deg + (vary ? pick([-1, 1, 2]) : 0);
+    m.at.forEach((at, i) => { if (at < (part % 2) * beats || at >= (part % 2 + 1) * beats) return; if (Math.random() > density + 0.25) return; deg = Math.max(0, Math.min(11, deg + (vary && Math.random() < 0.4 ? -m.steps[i] : m.steps[i])));
+      const note = base + c.root + sc[deg % sc.length] + 12 * (deg / sc.length | 0); const sw = (at % 1) ? b * 0.16 : 0; play(note, t + (at - (part % 2) * beats) * b + sw, b * m.lens[i], i === m.at.length - 1 && part === 1); });
+  }
   // Each style writes one bar: (out, chord, next chord, bar start, seconds per beat, bar number, the track's memory)
   const STYLE = {
     lofi(o, c, n, t, b, bar, mem) {
@@ -85,32 +120,92 @@
       for (let i = 0; i < 8; i++) if (i % 2) hit(o, t + i * b / 2, 0.05, 0.012, { f: 5000 });                                                                                 // a soft shaker
       if (bar % 4 === 3) { const sc = scaleOf(c); [0, 1, 2].forEach(k => keys(o, 79 + sc[(k * 2) % 5], t + (1 + k) * b, b, 0.05)); }
     },
+    saxlounge(o, c, n, t, b, bar, mem) { // late-night lounge: brushes, Rhodes, upright bass in two, a tenor sax telling a story
+      const sw = b * 0.66; for (let i = 0; i < 4; i++) hit(o, t + i * b, 0.32, 0.03, { type: 'bandpass', f: 5200, q: 0.5, a: 0.03 }); hit(o, t + b, 0.06, 0.04, { type: 'bandpass', f: 1900 }); hit(o, t + 3 * b, 0.06, 0.045, { type: 'bandpass', f: 1900 });
+      bass(o, 36 + c.root, t, b * 1.8, 0.2); bass(o, 36 + c.root + 7, t + 2 * b, b * 1.6, 0.16); if (Math.random() < 0.4) bass(o, 36 + n.root - 1, t + 3 * b + sw, b * 0.4, 0.12);
+      for (const at of [0, pick([1.66, 2, 2.66])]) for (const x of c.tones.slice(1)) keys(o, 57 + c.root + x, t + at * b, b * 1.5, 0.042);
+      phrase(o, c, t, b, bar, mem, (m, at, d, end) => sax(o, m - 12, at, d, 0.11, { fall: end && Math.random() < 0.4 ? 3 : 0, pan: -0.15 }), 0.65, 67);
+    },
+    bossa(o, c, n, t, b, bar, mem) { // bossa nova: rim clave, nylon guitar comping, bass on the root and fifth, a soft lead (sax or flute)
+      const e = b / 2; [0, 3, 6].forEach(i => rim(o, t + i * e, 0.05)); if (bar % 2) [2, 5].forEach(i => rim(o, t + i * e + 2 * b, 0.05)); else [4, 7].forEach(i => rim(o, t + i * e, 0.045));
+      for (let i = 0; i < 8; i++) shaker(o, t + i * e, i % 2 ? 0.014 : 0.024);
+      bass(o, 36 + c.root, t, b * 1.4, 0.19); bass(o, 36 + c.root + 7, t + 1.5 * b, b * 0.45, 0.14); bass(o, 36 + c.root + 7, t + 2 * b, b * 1.4, 0.15); bass(o, 36 + n.root, t + 3.5 * b, b * 0.45, 0.13);
+      for (const at of [0, 1.5, 2.5, 3.5]) c.tones.forEach((x, k) => pluck(o, 55 + c.root + x + (k > 1 ? 12 : 0), t + at * b + k * 0.012, b * 0.9, 0.045));
+      if (mem.lead == null) mem.lead = Math.random() < 0.6 ? 'sax' : 'flute';
+      phrase(o, c, t, b, bar, mem, (m, at, d) => mem.lead === 'sax' ? sax(o, m - 12, at, d, 0.09, { scoop: 0.03, bright: 0.6 }) : tone(o, 'sine', mtof(m + 12), at, d, 0.06, { a: 0.05, vib: true }), 0.55, 67);
+    },
+    citypop(o, c, n, t, b, bar, mem) { // bright city pop: four on the floor, claps, a busy slap bass, keys stabs, and a sax hook every few bars
+      const s = b / 4; for (let i = 0; i < 4; i++) kick(o, t + i * b, 0.36); clap(o, t + b, 0.1); clap(o, t + 3 * b, 0.11); for (let i = 0; i < 8; i++) hat(o, t + i * b / 2 + b / 4, 0.03, 0.03);
+      [0, 3, 6, 8, 10, 11, 14].forEach((i, k) => tone(o, 'square', mtof(36 + c.root + (k % 3 === 1 ? 12 : 0) + (i === 14 ? 7 : 0)), t + i * s, s * 1.4, 0.07, { lp: 900, decay: true }));
+      for (const at of [0.5, 1.75, 2.5, 3.75]) for (const x of c.tones) keys(o, 64 + c.root + x, t + at * b, b * 0.35, 0.03);
+      if (bar % 4 >= 2) phrase(o, c, t, b, bar, mem, (m, at, d) => sax(o, m - 12, at, Math.min(d, b * 0.9), 0.1, { bright: 1.3 }), 0.8, 70); else if (Math.random() < 0.5) tone(o, 'triangle', mtof(79 + pick(scaleOf(c))), t + pick([1, 2, 3]) * b, b * 0.6, 0.05, { vib: true });
+    },
+    beach(o, c, n, t, b, bar, mem) { // a sunny beach: steel pan arpeggios, congas, a shaker, a round bass
+      const e = b / 2; for (let i = 0; i < 16; i++) shaker(o, t + i * b / 4, i % 4 === 2 ? 0.03 : 0.012);
+      conga(o, t + 1.5 * b, 260); conga(o, t + 2 * b, 210); conga(o, t + 3.5 * b, 260, 0.14); if (bar % 2) conga(o, t + 3.75 * b, 300, 0.12);
+      bass(o, 36 + c.root, t, b * 0.9, 0.2); bass(o, 36 + c.root + 7, t + 1.5 * b, b * 0.5, 0.15); bass(o, 36 + c.root, t + 2 * b, b * 0.9, 0.18); bass(o, 36 + c.root + 12, t + 3 * b, b * 0.5, 0.13);
+      const ar = [0, 1, 2, 1, 3, 2, 1, 2]; ar.forEach((i, k) => steel(o, 72 + c.root + c.tones[i % c.tones.length], t + k * e, e * 1.6, 0.05));
+      if (bar % 4 === 1 || bar % 4 === 3) { const sc = scaleOf(c); [0, 1, 2].forEach(k => steel(o, 84 + pick(sc), t + (1 + k) * b + e, b, 0.04)); }
+    },
+    nocturne(o, c, n, t, b, bar, mem) { // a quiet night piano, in three
+      bass(o, 36 + c.root, t, b * 2.8, 0.1); [0, 1, 2, 3, 2, 1].forEach((i, k) => keys(o, 55 + c.root + c.tones[i % c.tones.length] + (k > 2 ? 12 : 0), t + k * b / 2, b * 1.6, 0.045));
+      phrase(o, c, t, b, bar, mem, (m, at, d) => keys(o, m + 7, at, d * 1.2, 0.05), 0.45, 67, 3);
+    },
+    sunset(o, c, n, t, b, bar, mem) { // golden hour: a wide pad, slow bass, and a long-breathed alto sax
+      pad(o, c.tones.map(x => 52 + c.root + x), t, b * 4.05, 0.014, 900); bass(o, 36 + c.root, t, b * 3.6, 0.13); for (let i = 0; i < 4; i++) hit(o, t + i * b + b / 2, 0.08, 0.01, { f: 5200 });
+      phrase(o, c, t, b, bar, mem, (m, at, d, end) => sax(o, m, at, d * 1.3, 0.09, { fall: end ? 2 : 0, scoop: 0.08, bright: 0.7 }), 0.4, 62);
+    },
+    chase(o, c, n, t, b, bar, mem) { // the water fight: a playful chase that heats up with the intensity (0..1)
+      const k = inten, s = b / 4; kick(o, t, 0.4); kick(o, t + 2 * b, 0.36); if (k > 0.35) { kick(o, t + 1.5 * b, 0.3); kick(o, t + 3.5 * b, 0.26); } snare(o, t + b, 0.13); snare(o, t + 3 * b, 0.15);
+      for (let i = 0; i < (k > 0.6 ? 16 : 8); i++) hat(o, t + i * (k > 0.6 ? s : b / 2), i % 2 ? 0.02 : 0.035, 0.03);
+      for (let i = 0; i < 8; i++) tone(o, 'square', mtof(36 + c.root + (i % 2 ? 12 : 0)), t + i * b / 2, b * 0.35, 0.06, { lp: 700 + 900 * k, decay: true });
+      for (const at of [0, 1.5, 3]) for (const x of c.tones.slice(0, 3)) tone(o, 'sawtooth', mtof(60 + c.root + x), t + at * b, b * 0.3, 0.02 + 0.02 * k, { lp: 1600 + 1600 * k, decay: true });   // brass stabs
+      if (k > 0.45 || bar % 4 === 3) phrase(o, c, t, b, bar, mem, (m, at, d) => sax(o, m - 12, at, Math.min(d, b * 0.7), 0.1 + 0.03 * k, { bright: 1 + k }), 0.6 + 0.35 * k, 70);
+      if (bar % 8 === 7) for (let i = 0; i < 4; i++) snare(o, t + 3 * b + i * s, 0.06 + i * 0.03);   // a fill into the next section
+    },
   };
   const TRACKS = {
     lofi1: ['lofi', 72, 4, 'Fmaj7 Em7 Dm7 Cmaj7'], lofi2: ['lofi', 80, 4, 'Am7 Dm7 G7 Cmaj7'], lofi3: ['lofi', 66, 4, 'Dm9 G7 Cmaj9 A7'], lofi4: ['lofi', 76, 4, 'Ebmaj7 Dm7 Cm7 Bbmaj7'],
     jazz1: ['jazz', 104, 4, 'Dm7 G7 Cmaj7 A7'], jazz2: ['jazz', 92, 4, 'Cm7 F7 Bbmaj7 Ebmaj7 Am7 D7 Gm7 Gm7'], jazz3: ['jazz', 116, 4, 'Fmaj7 Dm7 Gm7 C7'],
     game1: ['chip', 96, 4, 'Am F C G'], game2: ['tavern', 88, 3, 'Dm C Bb A'], game3: ['dungeon', 58, 4, 'Em C Am B'],
     romance: ['romance', 76, 3, 'Cmaj7 Am7 Fmaj7 G7'], mentor: ['mentor', 84, 4, 'Gmaj7 Em7 Cmaj7 D'],
+    sax1: ['saxlounge', 70, 4, 'Dm9 G7 Cmaj9 Am7'], sax2: ['saxlounge', 64, 4, 'Ebmaj7 Cm7 Fm7 Bb7'], sax3: ['saxlounge', 76, 4, 'Am7 D7 Gmaj7 Cmaj7 F#m7 B7 Em7 Em7'],
+    bossa1: ['bossa', 70, 4, 'Cmaj7 Dm7 Em7 A7 Dm7 G7 Cmaj7 Cmaj7'], bossa2: ['bossa', 66, 4, 'Fmaj7 Bb7 Am7 D7 Gm7 C7 Fmaj7 Fmaj7'],
+    city1: ['citypop', 108, 4, 'Fmaj7 Em7 Am7 Dm7 Gm7 C7 Fmaj7 Fmaj7'], city2: ['citypop', 114, 4, 'Bbmaj7 Am7 Dm7 Gm7 Cm7 F7 Bbmaj7 Bbmaj7'],
+    beach1: ['beach', 100, 4, 'C F G C Am F G C'], beach2: ['beach', 94, 4, 'F Bb C F Dm Bb C C'],
+    night1: ['nocturne', 62, 3, 'Am7 Fmaj7 Cmaj7 E7'], night2: ['nocturne', 58, 3, 'Ebmaj7 Cm7 Abmaj7 Bb7'],
+    sunset1: ['sunset', 60, 4, 'Dbmaj7 Cm7 Bbm7 Ebm7 Ab7 Dbmaj7 Gbmaj7 Fm7'], sunset2: ['sunset', 56, 4, 'Fmaj7 Em7 Dm7 Cmaj7 Bbmaj7 Am7 Gm7 C7'],
+    chase: ['chase', 150, 4, 'Am F C G Am F G E'],
   };
-  const ROTATION = { chat: ['lofi1', 'lofi2', 'lofi3', 'lofi4'], house: ['jazz1', 'jazz2', 'jazz3'], dorm: ['game1', 'game2', 'game3'] };
+  const ROTATION = { chat: ['lofi1', 'lofi2', 'lofi3', 'lofi4', 'sax1', 'bossa1', 'city1'], house: ['jazz1', 'jazz2', 'jazz3', 'sax2', 'sax3', 'bossa2'], dorm: ['game1', 'game2', 'game3', 'city2', 'night1'],
+    beach: ['beach1', 'beach2', 'bossa1', 'sunset1'], photo: ['sax1', 'sax3', 'bossa2', 'night2', 'sunset2'], night: ['night1', 'night2', 'sax2', 'lofi3'] };
+  const nightNow = () => { const h = new Date().getHours(); return h >= 22 || h < 5; };   // late at night the quiet tracks join any rotation
   function startTrack(name) {
     if (track) { const old = track; old.dead = true; old.gain.gain.cancelScheduledValues(ctx.currentTime); old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.9); setTimeout(() => old.gain.disconnect(), 6000); }
-    const [style, bpm, beats, ch] = TRACKS[name], gain = ctx.createGain(), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = style === 'lofi' ? 2400 : 6000;
+    const [style, bpm, beats, ch] = TRACKS[name], gain = ctx.createGain(), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = style === 'lofi' ? 2400 : 9000;
     gain.gain.value = 0; gain.gain.setTargetAtTime(1, ctx.currentTime, 1.2); gain.connect(lp).connect(musicBus);
     track = { name, style, b: 60 / bpm, beats, chords: chart(ch), gain, bar: 0, next: ctx.currentTime + 0.25, mem: {} }; trackSince = performance.now(); lastName = name;
   }
   function wantTrack() { // the theme of the moment, else the place's rotation (with your theme mixed in when you are together)
+    if (chaseOn) return ['chase'];
     if (performance.now() < themeUntil && TRACKS[theme]) return [theme];
-    const list = [...ROTATION[scene]]; if (scene !== 'chat' && TRACKS[path]) list.push(path); return list;
+    if (override && ROTATION[override]) return ROTATION[override];
+    const list = [...ROTATION[scene]]; if (scene !== 'chat' && TRACKS[path]) list.push(path); if (nightNow()) list.push(...ROTATION.night); return list;
   }
   function tick() {
     if (!ctx || ctx.state !== 'running') return;
     const want = wantTrack(), stale = performance.now() - trackSince > 170000;
     if (!track || !want.includes(track.name) || (stale && want.length > 1)) startTrack(pick(want.filter(n => n !== lastName).length ? want.filter(n => n !== lastName) : want));
+    if (stopped) { track.next = Math.max(track.next, ctx.currentTime + 0.1); return; }   /* time stopped: nothing new is played */
     while (track.next < ctx.currentTime + 0.5) { const c = track.chords[track.bar % track.chords.length], n = track.chords[(track.bar + 1) % track.chords.length]; STYLE[track.style](track.gain, c, n, track.next, track.b, track.bar, track.mem); track.next += track.b * track.beats; track.bar++; }
     const level = vol.music * (onCall ? 0 : duck() ? 0.15 : 1); musicBus.gain.setTargetAtTime(level * 0.9, ctx.currentTime, 0.25);
     ambience();
   }
+
+  // The stopwatch: the music slurs down and muffles as if a tape had stopped, holds a faint ringing, then winds back up.
+  function timeStop(on) { if (!ctx || stopped === on) return; stopped = on; const t = ctx.currentTime;
+    if (on) { musicLP.frequency.cancelScheduledValues(t); musicLP.frequency.setValueAtTime(12000, t); musicLP.frequency.exponentialRampToValueAtTime(260, t + 0.7); tone(fxBus, 'sawtooth', 330, t, 0.8, 0.05, { to: 45, lp: 900, decay: true }); hit(fxBus, t, 0.6, 0.08, { type: 'bandpass', f: 1800, fTo: 200, q: 2 }); bell(fxBus, 96, t + 0.7, 2.5, 0.03); }
+    else { musicLP.frequency.cancelScheduledValues(t); musicLP.frequency.setValueAtTime(260, t); musicLP.frequency.exponentialRampToValueAtTime(12000, t + 0.6); tone(fxBus, 'sawtooth', 60, t, 0.5, 0.05, { to: 330, lp: 900 }); } }
 
   // ---------- what you hear around you ----------
   const due = {}; const every = (key, lo, hi) => { const now = performance.now(); if (!due[key]) due[key] = now + rnd(lo, hi) * 600; if (now < due[key]) return false; due[key] = now + rnd(lo, hi) * 1000; return true; };
@@ -156,6 +251,10 @@
     dial(t) { tone(fxBus, 'sine', 941, t, 0.11, 0.07, {}); tone(fxBus, 'sine', 1336, t, 0.11, 0.07, {}); },
     phone(t) { for (const at of [0, 0.42]) for (let i = 0; i < 7; i++) tone(fxBus, 'sine', i % 2 ? 1568 : 1319, t + at + i * 0.045, 0.05, 0.16, { a: 0.004, r: 0.01 }); },   // your phone ringing: she is calling
     ring(t) { for (const f of [440, 480]) tone(fxBus, 'sine', f, t, 1.8, 0.06, { a: 0.03, r: 0.05 }); },   // the ringing you hear while you wait
+    saxhit(t) { const r = pick([57, 59, 62]); sax(fxBus, r, t, 0.12, 0.14, { scoop: 0.1, bright: 1.4 }); sax(fxBus, r + pick([3, 5, 7]), t + 0.13, 0.22, 0.14, { bright: 1.4, fall: 2 }); },   // a short honk
+    saxfall(t) { [62, 61, 60, 59].forEach((m, i) => sax(fxBus, m, t + i * 0.2, 0.22, 0.13, { scoop: 0.02 })); sax(fxBus, 58, t + 0.8, 0.9, 0.14, { fall: 7, scoop: 0.02 }); },   // waah-waah-waah-waaaah
+    saxwin(t) { [[60, 0, 0.14], [64, 0.15, 0.14], [67, 0.3, 0.14], [72, 0.45, 0.6]].forEach(([m, at, d]) => sax(fxBus, m, t + at, d, 0.14, { bright: 1.5 })); },   // ta-da
+    saxwolf(t) { sax(fxBus, 67, t, 0.3, 0.12, { scoop: 0.2 }); sax(fxBus, 74, t + 0.35, 0.6, 0.12, { scoop: 0.25, fall: 9 }); },   // a wolf whistle on sax
   };
   const EMOTE = { '✨': 'sparkle', '💗': 'heart', '💢': 'anger', '❓': 'ask', '💦': 'sweat' };
   function fx(name) {
@@ -170,7 +269,7 @@
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return; ctx = new AC();
     const comp = ctx.createDynamicsCompressor(); comp.connect(ctx.destination);
-    musicBus = ctx.createGain(); musicBus.gain.value = 0; musicBus.connect(comp); fxBus = ctx.createGain(); fxBus.gain.value = vol.fx; fxBus.connect(comp);
+    musicBus = ctx.createGain(); musicBus.gain.value = 0; musicLP = ctx.createBiquadFilter(); musicLP.type = 'lowpass'; musicLP.frequency.value = 12000; musicBus.connect(musicLP).connect(comp); fxBus = ctx.createGain(); fxBus.gain.value = vol.fx; fxBus.connect(comp);
     noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     setInterval(tick, 110);
   }
@@ -191,7 +290,10 @@
     fx, emote(ch) { fx(EMOTE[ch] || 'pop'); },
     scene(name) { scene = ROTATION[name] ? name : 'chat'; for (const k in due) delete due[k]; },
     path(p) { path = p === 'romance' || p === 'mentor' ? p : ''; },
-    moment(kind) { fx('bond'); if (kind === 'romance' || kind === 'mentor') { theme = kind; themeUntil = performance.now() + 80000; } },
+    moment(kind) { fx('bond'); if (kind === 'romance' || kind === 'mentor') { theme = kind === 'romance' ? pick(['romance', 'sunset1', 'sax2']) : kind; themeUntil = performance.now() + 80000; } },
+    event(name, on = true) { on = !!on; if (name === 'chase') { chaseOn = on; if (on) inten = 0.3; } else if (name === 'timestop') timeStop(on); else if (ROTATION[name]) { if (on) override = name; else if (override === name) override = ''; } },
+    play(name, secs = 120) { if (!TRACKS[name]) return Object.keys(TRACKS); theme = name; themeUntil = performance.now() + secs * 1000; return name; },   /* try one track (for tests, or the console) */
+    intensity(x) { inten = Math.max(0, Math.min(1, +x || 0)); },
     volume(which, v) { if (v === undefined) return vol[which]; vol[which] = Math.max(0, Math.min(1, v)); localStorage.setItem('brenai.vol.' + which, vol[which]); if (ctx && which === 'fx') fxBus.gain.value = vol.fx; },
     duckWhen(fn) { duck = fn; }, playing: () => track && track.name,
   };

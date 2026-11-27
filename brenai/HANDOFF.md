@@ -108,7 +108,11 @@ Everything is in `brenai/`. No build step, no framework: plain Node and plain br
 ## 10. State of things
 Working and live: chat, voice, her 3D body and rooms, coming and going, calls, pictures by level, outfits by level and moment, the Studio, motion capture (camera, video, picture, face, fingers, tongue), movie night as a film, stories with character voices, weather, notifications.
 
-Known gaps and open items:
+Known gaps and open items (the full, current list is section 10 of `MASTERFILE.md`; agent skills are in `skills/`):
+- **Wide sleeves** still hang rigidly; coat tails and skirts now drape (bone cloth).
+- **Picture pack** predates bone cloth: pictures with a stiff skirt or coat hoop need rendering again.
+- **Sound clips** for her hums, sighs and giggles: the game plays them if they exist in `/data/sounds`; none are made yet.
+- **Room clipping**: scenery outside the windows and newer furniture placements, not investigated.
 - **Her PC model sometimes stops answering** while the bridge stays connected. The status dot turns amber. The fix is on the PC: load the model and its local server again.
 - **Movie night:** the player on the couch is a simple stand-in, not a real model. Her lounging pose and her walking over to switch the TV on are not built.
 - **Self-collision in the main game** is written (`bodyfix.js`) but switched off behind `window.WIZRA_FIX`, because it was never checked visually there.

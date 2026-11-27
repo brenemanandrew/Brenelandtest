@@ -1,0 +1,31 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brenai device check</title>
+<style>body{font:15px/1.4 system-ui,sans-serif;background:#1b1430;color:#eee;margin:0;padding:16px}h1{font-size:20px}button{font:600 16px system-ui;padding:12px 18px;border:0;border-radius:12px;background:#a78bfa;color:#1b1430}pre{white-space:pre-wrap;background:#0005;padding:10px;border-radius:10px;font-size:13px}video{width:160px;border-radius:8px;margin:4px;background:#000}</style></head>
+<body>
+<h1>Brenai device check</h1>
+<p>Checks what this browser lets the game use (cameras, motion sensors, USB, the local helper) and sends the result to Brenai so it can be set up for this device. Press the button and allow the camera (and motion) if asked.</p>
+<button id="go">Run the check</button>
+<div id="cams"></div>
+<pre id="out">Not run yet.</pre>
+<script>
+const out = document.getElementById('out'), R = {}, log = (k, v) => { R[k] = v; out.textContent = JSON.stringify(R, null, 1); };
+document.getElementById('go').onclick = async () => {
+  R.at = new Date().toISOString(); log('ua', navigator.userAgent); log('screen', [screen.width, screen.height, devicePixelRatio, innerWidth, innerHeight]);
+  log('apis', { webhid: !!navigator.hid, webusb: !!navigator.usb, webxr: !!navigator.xr, gyro: 'DeviceOrientationEvent' in window, camera: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) });
+  if (navigator.xr) { const m = {}; for (const k of ['immersive-vr', 'immersive-ar', 'inline']) { try { m[k] = await navigator.xr.isSessionSupported(k); } catch (e) { m[k] = 'err ' + e.message; } } log('webxr', m); }
+  /* cameras: ask once so their names show, then try each */
+  try { const s = await navigator.mediaDevices.getUserMedia({ video: true }); s.getTracks().forEach(t => t.stop()); } catch (e) { log('cameraAsk', e.name + ' ' + e.message); }
+  let cams = []; try { cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); } catch {}
+  const list = []; for (const c of cams) { const r = { label: c.label }; try { const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: c.deviceId } } }); const t = s.getVideoTracks()[0], st = t.getSettings(); Object.assign(r, { ok: true, w: st.width, h: st.height, facing: st.facingMode || '' }); const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = s; v.title = c.label; document.getElementById('cams').append(v); v.play().catch(() => {}); setTimeout(() => s.getTracks().forEach(x => x.stop()), 6000); } catch (e) { r.ok = false; r.err = e.name; } list.push(r); }
+  log('cameras', list);
+  /* motion: does turning the device or the glasses show up as orientation? */
+  try { if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); } catch {}
+  const seen = []; const on = e => { if (seen.length < 6) seen.push([e.alpha, e.beta, e.gamma].map(v => v == null ? null : Math.round(v))); }; addEventListener('deviceorientation', on);
+  log('motion', 'turn your head for 4 seconds...'); await new Promise(r => setTimeout(r, 4000)); removeEventListener('deviceorientation', on); log('motion', seen.length ? seen : 'no readings');
+  /* the local helper (glasses SDK app) */
+  log('helper', await new Promise(res => { let ws; try { ws = new WebSocket('ws://127.0.0.1:8766'); } catch (e) { return res('blocked: ' + e.message); } const t = setTimeout(() => { try { ws.close(); } catch {} res('no answer'); }, 3000); ws.onmessage = m => { clearTimeout(t); res('connected: ' + String(m.data).slice(0, 80)); ws.close(); }; ws.onerror = () => { clearTimeout(t); res('nothing there'); }; }));
+  if (navigator.hid) { try { log('hid', (await navigator.hid.getDevices()).map(d => [d.vendorId, d.productId, d.productName])); } catch (e) { log('hid', 'err ' + e.message); } }
+  try { const r = await fetch('/api/diag', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ check: R }) }); log('sent', r.ok ? 'yes: Brenai has the result' : 'not sent (' + r.status + '): sign in to Brenai on this device first'); } catch (e) { log('sent', 'failed ' + e.message); }
+};
+</script></body></html>

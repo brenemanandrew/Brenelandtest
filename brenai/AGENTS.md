@@ -22,3 +22,8 @@ After any change to this project, write `.brenebase/updates/<YYYY-MM-DD>-<short-
 - Never put passwords, PINs, tokens or their values in it. Name a secret, never its value.
 - No repo to commit to (a claude.ai chat, or Breneland-Next on the PC)? Save the same file in the Google Drive folder `Brenebase/updates` instead.
 - Template: `hub/UPDATE-TEMPLATE.md` in brenemanandrew/Brenelandtest.
+Also in this folder:
+- `MASTERFILE.md`: everything in one file (rules, architecture, data, every route, features, current state, open work). Section 10 is the current state. Keep it current when you ship something.
+- `skills/*/SKILL.md`: seven skills: making a change, headless testing, writing her character, her 3D body, reporting to the owner, assets, and building a server-run activity. Read the one that fits the job before starting.
+
+Standing rule from the owner (2026-11-23): whenever a skill or `MASTERFILE.md` is changed, (1) push it to `main`, (2) tell the Brenebase session ("Multi-agent work distribution system") exactly which files changed, and (3) check that Brenebase has the new version loaded before calling it done. If you cannot confirm step 3, say so plainly in your report.

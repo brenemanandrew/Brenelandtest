@@ -25,10 +25,14 @@ jobs:
           AK: ${{ secrets.ANTHROPIC_API_KEY }}
           PW: ${{ secrets.BRENAI_PASSWORD }}
           BT: ${{ secrets.BRENAI_BRAIN_TOKEN }}
+          HA: ${{ secrets.HI3D_ACCESS_KEY }}
+          HS: ${{ secrets.HI3D_SECRET_KEY }}
         run: |
           args=""
           [ -n "$AK" ] && args="$args ANTHROPIC_API_KEY=$AK"
           [ -n "$PW" ] && args="$args APP_PASSWORD=$PW"
           [ -n "$BT" ] && args="$args BRENAI_BRAIN_TOKEN=$BT"
+          [ -n "$HA" ] && args="$args HI3D_ACCESS_KEY=$HA"
+          [ -n "$HS" ] && args="$args HI3D_SECRET_KEY=$HS"
           [ -n "$args" ] && flyctl secrets set --stage --app brenai $args || echo "no app secrets in the repo; using what Fly already has"
       - run: flyctl deploy --remote-only --ha=false

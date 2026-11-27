@@ -7,7 +7,7 @@
 //   places.bounds[name]          the walls, for first person   places.blocks[name]   boxes you cannot walk into
 //   places.spawn[name]           where you stand when you arrive, and places.seat[name] where you can sit
 //   places.tick(night, t)        outside light and the TV
-import { buildItem, footprints, perchOf } from './mapkit.js';
+import { buildItem, footprint, footprints, perchOf } from './mapkit.js';
 // cel shading: light falls in three flat bands instead of a smooth ramp, and big shapes get a dark outline
 export function cel(THREE) {
   const ramp = new THREE.DataTexture(new Uint8Array([118, 118, 118, 255, 188, 188, 188, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
@@ -32,6 +32,7 @@ export function buildPlaces(THREE, A) {
   const beamTex = paint(8, 128, (c, W, H) => { const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,.12)'); c.fillStyle = g; c.fillRect(0, 0, W, H); });
   const paneTex = paint(64, 64, (c, W) => { c.fillStyle = '#fff'; c.fillRect(0, 0, W, W); c.fillStyle = '#000'; c.fillRect(W / 2 - 2, 0, 4, W); c.fillRect(0, W / 2 - 2, W, 4); c.strokeStyle = '#000'; c.lineWidth = 6; c.strokeRect(0, 0, W, W); });
   const dotTex = paint(16, 16, (c, W) => { const g = c.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W / 2); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, W, W); });
+  const grassTex = paint(4, 4, (c, W) => { c.fillStyle = '#7dbd76'; c.fillRect(0, 0, W, W); });
   function world(kind) {
     const tex = paint(1024, 512, (c, W, H) => {
       const sky = c.createLinearGradient(0, 0, 0, H * 0.7); sky.addColorStop(0, '#6fb7ff'); sky.addColorStop(1, '#d8f0ff'); c.fillStyle = sky; c.fillRect(0, 0, W, H);
@@ -83,8 +84,13 @@ export function buildPlaces(THREE, A) {
         const mg = new THREE.BufferGeometry(); mg.setAttribute('position', new THREE.Float32BufferAttribute(mp, 3)); const motes = new THREE.Points(mg, new THREE.PointsMaterial({ color: '#fff6dc', size: 0.022, map: dotTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); motes.renderOrder = 4; into.add(motes);
         beams.push({ shaft: shaft.material, patch: patch.material, motes: motes.material, pts: motes, group: into });
       }
-      if (worldMat) { const w = new THREE.Mesh(new THREE.PlaneGeometry(13, 6), worldMat); w.position.set(alongX ? h.at : fixed + out[0], floorY + 2.4, alongX ? fixed + out[1] : h.at); w.rotation.y = ry; into.add(w); }
     }
+    /* the world beyond: ONE panel for the whole wall (a panel per window put them on top of each other and they flickered), set 2.6 m back and
+       running 2.6 m past both corners, so the panels of two neighbouring walls meet edge to edge at the corner instead of cutting through each
+       other. A strip of grass fills the gap between the wall and the panel, so looking down through a window never shows the void. */
+    if (worldMat && hs.length) { const back = face === 'N' ? [0, -2.6] : face === 'S' ? [0, 2.6] : face === 'W' ? [-2.6, 0] : [2.6, 0], span = to - from + 5.2, mid = (from + to) / 2;
+      const w = new THREE.Mesh(new THREE.PlaneGeometry(span, 7), worldMat); w.position.set(alongX ? mid : fixed + back[0], floorY + 2.9, alongX ? fixed + back[1] : mid); w.rotation.y = ry; w.renderOrder = -2; into.add(w);
+      const g = new THREE.Mesh(new THREE.PlaneGeometry(alongX ? span : 2.6, alongX ? 2.6 : span), new THREE.MeshBasicMaterial({ map: grassTex })); g.rotation.x = -Math.PI / 2; g.position.set(alongX ? mid : fixed + back[0] / 2, floorY - 0.35, alongX ? fixed + back[1] / 2 : mid); into.add(g); worldMats.push(g.material); }
     piece(u, to, 0, height);
     const skirt = new THREE.Mesh(new THREE.BoxGeometry(alongX ? to - from : 0.03, 0.1, alongX ? 0.03 : to - from), toon(trim)); skirt.position.set(alongX ? (from + to) / 2 : fixed + (face === 'W' ? 0.015 : -0.015), floorY + 0.05, alongX ? fixed + (face === 'N' ? 0.015 : -0.015) : (from + to) / 2); into.add(skirt);
   }
@@ -190,8 +196,10 @@ export function buildPlaces(THREE, A) {
     group.add(g);
   }
   addItems(dorm, 'dorm', (maps.dorm || {}).items); addItems(house, 'house', (maps.house || {}).items);
-  for (const m of maps.custom || []) {
-    if (!m || !m.id || groups[m.id]) continue;
+  for (const m0 of maps.custom || []) {
+    if (!m0 || !m0.id || groups[m0.id]) continue;
+    /* furniture that was placed sticking through a wall is slid back inside the room (things hung on a wall are left alone). The saved map is not changed. */
+    const m = m0.open ? m0 : { ...m0, items: (m0.items || []).map(it => { try { if ((it.y || 0) > 0.3) return it; const f = footprint(it), x0 = -2.05 - (+m0.left || 0) + 0.03, x1 = 3.1 + (+m0.right || 0) - 0.03, z0 = D.z0 + 0.03, z1 = hip.z + 3.05 + (+m0.front || 0) - 0.03, dx = Math.max(0, x0 - f[0]) - Math.max(0, f[1] - x1), dz = Math.max(0, z0 - f[2]) - Math.max(0, f[3] - z1); return dx || dz ? { ...it, x: it.x + dx, z: it.z + dz } : it; } catch { return it; } }) };
     const g = new THREE.Group(); g.visible = false; into = g; place = m.id; TAG = '';
     const B = { x0: -2.05 - (+m.left || 0), x1: 3.1 + (+m.right || 0), z0: D.z0, z1: hip.z + 3.05 + (+m.front || 0), h: Math.max(2.3, +m.height || 2.6) }, out = world(m.outside === 'yard' ? 'yard' : 'campus');
     outdoor[m.id] = !!m.open; bare[m.id] = !!m.bare; dark[m.id] = m.open ? (m.sky === 'night' ? 1 : m.sky === 'dusk' ? 0.5 : 0) : Math.max(0, Math.min(1, +m.dim || 0));

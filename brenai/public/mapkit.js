@@ -34,6 +34,7 @@ export const CATALOG = {
   lamp: P('Floor lamp', 'Decor', [0.4, 1.7, 0.4], [['box', 0.3, 0.03, 0.3, 0, 0.015, 0, 'c2'], ['cyl', 0.018, 1.5, 0.018, 0, 0.77, 0, 'c2'], ['glow', 0.12, 0.26, 0.2, 0, 1.6, 0, '#ffe2ad']], '#3a3044'),
   rug: P('Rug', 'Decor', [2.0, 0.02, 1.4], [['box', 2.0, 0.012, 1.4, 0, 0.008, 0, 'c2'], ['box', 1.76, 0.014, 1.16, 0, 0.012, 0, 'c']], '#d9534f'),
   roundrug: P('Round rug', 'Decor', [1.8, 0.02, 1.8], [['cyl', 0.9, 0.014, 0.9, 0, 0.008, 0, 'c']], '#7b4fd1'),
+  artwork: P('Artwork', 'Decor', [0.9, 0.9, 0.08], [], '#2b2118'),   /* a real picture in a frame: the item carries img (a file in /art), aw and ah (its size in metres), title, by, date, about. With stand: true it sits on a plinth instead of hanging */
   picture: P('Picture', 'Decor', [0.8, 0.6, 0.05], [['box', 0.8, 0.6, 0.03, 0, 0.3, 0, 'c2'], ['box', 0.7, 0.5, 0.035, 0, 0.3, 0.004, 'c']], '#7fd0ff'),
   pillar: P('Pillar', 'Decor', [0.4, 2.5, 0.4], [['cyl', 0.2, 2.5, 0.2, 0, 1.25, 0, 'c'], ['box', 0.5, 0.1, 0.5, 0, 0.05, 0, 'c2'], ['box', 0.5, 0.1, 0.5, 0, 2.45, 0, 'c2']], '#e9e2cf'),
   cushion: P('Cushion', 'Decor', [0.4, 0.14, 0.4], [['box', 0.4, 0.14, 0.4, 0, 0.07, 0, 'c']], '#ffd166'),
@@ -54,6 +55,10 @@ export function buildItem(THREE, toon, outline, item) {
     const m = new THREE.Mesh(geo, shape === 'glow' ? new THREE.MeshBasicMaterial({ color: colour, side: THREE.DoubleSide }) : toon(colour)); m.position.set(x, y, z);
     if (outline && shape !== 'glow' && Math.max(w, h, d) > 0.24) outline(m); g.add(m);
   }
+  if (item.kind === 'artwork' && item.img) { const w = +item.aw || 0.9, h = +item.ah || 0.7, base = item.stand ? 0.95 : 0, frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, h + 0.1, 0.045), toon(item.stand ? '#1c1a22' : col)); frame.position.set(0, base + h / 2, 0); g.add(frame);
+    const tex = new THREE.TextureLoader().load(item.img); tex.colorSpace = THREE.SRGBColorSpace; const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex })); pic.position.set(0, base + h / 2, 0.024); g.add(pic);
+    if (item.stand) { const back = pic.clone(); back.rotation.y = Math.PI; back.position.z = -0.024; g.add(back); const pl = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.93, 0.46), toon('#e9e3d6')); pl.position.set(0, 0.465, 0); if (outline) outline(pl); g.add(pl); }
+    else { const tag = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.07, 0.012), toon('#f4efe4')); tag.position.set(w / 2 + 0.2, h * 0.18, 0.006); g.add(tag); } }
   place(g, item); g.userData.item = item; return g;
 }
 export function place(g, item) { g.position.set(item.x, item.y || 0, item.z); g.rotation.y = item.rot || 0; g.scale.set(item.sx || 1, item.sy || 1, item.sz || 1); }
