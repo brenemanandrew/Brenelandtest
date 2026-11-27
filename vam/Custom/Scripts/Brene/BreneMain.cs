@@ -200,14 +200,8 @@ namespace Brene
         void SendChat()
         {
             var text = chatIn.text.Trim(); if (text == "" || chatBusy) return;
-            chatIn.text = ""; chatBusy = true; Line("<b>You:</b> " + Esc(text)); Line("<i>Wizra is thinking...</i>");
-            StartCoroutine(link.Chat(text, voiceOn.val, (reply, err, voiceId) =>
-            {
-                chatBusy = false; chatLines.RemoveAt(chatLines.Count - 1);
-                if (err != null) { Line("<color=#ff8a8a>" + Esc(err) + "</color>"); return; }
-                Line("<b>Wizra:</b> " + Esc(reply));
-                Heard(reply, voiceId);   // her body: expression from her actions, then her voice with lip sync
-            }));
+            chatIn.text = "";
+            SayTo(talkTo, text, null);
             chatIn.ActivateInputField();
         }
         void Line(string s)
@@ -259,7 +253,7 @@ namespace Brene
                 new RItem("Wizra", () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); chatIn.ActivateInputField(); }),
                 new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller") }),
                 act("menu"),
-                act("undo"),
+                new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Talk to next", () => { NextWho(); pChat.Root.gameObject.SetActive(true); }) }),
             };
         }
         KeyCode MenuKey()

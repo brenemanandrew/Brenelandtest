@@ -91,6 +91,23 @@ namespace Brene
         }
 
         // one message to Wizra; done(reply, error)
+        // one line to a member of the cast (Little Shepersville): /story/say with where you are and who is there
+        public IEnumerator Say(string who, string text, string place, List<string> present, bool voice, Action<string, string, string> done)
+        {
+            var body = new JSONClass(); body["who"] = who; body["text"] = text; body["place"] = place ?? ""; body["voice"].AsBool = voice;
+            var arr = new JSONArray(); foreach (var p in present) arr.Add(p); body["present"] = arr;
+            var req = new UnityWebRequest(Url + "/story/say", "POST");
+            req.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body.ToString())); req.downloadHandler = new DownloadHandlerBuffer();
+            req.SetRequestHeader("Content-Type", "application/json"); req.timeout = 180;
+            yield return req.SendWebRequest();
+            if (req.isNetworkError) { done(null, "The Brene relay is not running on this PC (" + req.error + ")", null); req.Dispose(); yield break; }
+            JSONNode j = null; try { j = JSON.Parse(req.downloadHandler.text); } catch (Exception) { }
+            req.Dispose();
+            if (j == null) done(null, "Bad answer from the relay", null);
+            else if (j["error"] != null && j["error"].Value != "") done(null, j["error"].Value, null);
+            else done(j["text"].Value, null, j["voice"] != null && j["voice"].Value != "" && j["voice"].Value != "null" ? j["voice"].Value : null);
+        }
+
         // done(reply, error, voiceId): voiceId is set when the relay is making her voice for this reply (GET /voice?id=)
         public IEnumerator Chat(string text, bool voice, Action<string, string, string> done)
         {

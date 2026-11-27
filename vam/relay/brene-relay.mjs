@@ -22,6 +22,7 @@ import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import { Library } from './library.mjs';
+import { story } from './story.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
@@ -109,15 +110,22 @@ let chatting = false;
 // what she says out loud: her words without the *actions*
 const spokenOf = t => String(t || '').replace(/\*[^*]*\*/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
 const voices = new Map(); let nextVoice = 1;
-async function makeVoice(id, text) {
+async function makeVoice(id, text, cast = '') {
   try {
-    const r = await fetch(BRENAI + '/api/tts', { method: 'POST', headers: { 'content-type': 'application/json', cookie: cookieHeader() }, body: JSON.stringify({ text }) });
+    const r = await fetch(BRENAI + '/api/tts', { method: 'POST', headers: { 'content-type': 'application/json', cookie: cookieHeader() }, body: JSON.stringify(cast ? { text, cast } : { text }) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'voice ' + r.status); }
     const wav = Buffer.from(await r.arrayBuffer()); if (wav.toString('latin1', 0, 4) !== 'RIFF') throw new Error('the voice did not come back as a WAV');
     voices.set(id, { state: 'ready', wav });
   } catch (e) { voices.set(id, { state: 'failed', error: 'No voice: ' + (e.message || e) + ' (is her voice running on the PC?)' }); }
   for (const k of [...voices.keys()]) if (+k < +id - 20) voices.delete(k);   // keep the last 20
 }
+
+const startVoice = (text, cast) => { const id = String(nextVoice++); voices.set(id, { state: 'making' }); makeVoice(id, text, cast); return id; };
+const storyRoute = story({
+  dataDir: path.dirname(arg('--data', path.join(HERE, 'brene-relay.json'))), storyDir: arg('--story', path.join(HERE, '..', 'story')), lib,
+  brenai: { enabled: WIZRA === 'brenai', url: BRENAI, signedIn: () => !!cookies.brenai_u, signIn, cookie: cookieHeader },
+  askWizra: text => (WIZRA === 'brenai' ? askBrenai(text) : askLocal(text)), makeVoice: startVoice, spokenOf,
+});
 
 // ---- the server ----
 const send = (res, code, obj, type = 'application/json') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(typeof obj === 'string' ? obj : JSON.stringify(obj)); };
@@ -133,6 +141,7 @@ const server = http.createServer(async (req, res) => {
       else if (!ck || ck[1] !== KEY) return send(res, 403, 'Open the link with the key that brene-relay printed when it started.', 'text/plain');
     }
     if (url.pathname.startsWith('/lib') || url.pathname === '/library' || url.pathname === '/vam') return await libRoute(req, res, url);
+    if (url.pathname.startsWith('/story/')) return await storyRoute(req, res, url, { send, readBody });
     if (url.pathname === '/state') {
       const age = pose.at ? Date.now() - pose.at : null, fresh = age != null && age < 1000;
       const handsFresh = Date.now() - handsAt < 500;

@@ -26,6 +26,9 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 | `BreneGuides.cs` | The Set up a scene and Glasses setup flows, the Help panel and the six tutorials. |
 | `BreneWizra.cs` | Wizra's body: voice from her head, lip sync, expressions, looking at you. |
 | `BreneVR.cs` | The headset version: the panels on a floating board, the wrist dock, quick lines for Wizra. |
+| `BreneStory.cs` | Little Shepersville: story panel (day, time, place), places tied to scenes, turning-point choices, Margo's video call, the cabin laptop. |
+| `relay/story.mjs` | The relay's story routes (`/story/*`), talking to Brenai's story routes (provisional shapes until the Brenai session's spec). |
+| `story/margo/` | Margo's selfies and call faces as JPG (VaM cannot read WebP), from the Brenai session's branch. |
 | `BreneLink.cs` | Talks to the relay on this PC. |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
@@ -48,6 +51,16 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 - **Her voice:** Brenai's own voice for her, made on the PC as in the app (Voice: on/off in the panel). It plays from her head, and her mouth moves with it. Only with Brenai; LM Studio mode has no voice.
 - **Her face:** actions in her reply show for a few seconds (*smiles*, *laughs*, *blushes* = smile; *rolls her eyes*, *pouts*, *sighs* = frown; *gasps* = surprise). She looks at you while she talks.
 - **The Build Wizra tutorial** (Help) walks through the Character flow using her description from Brenai (about 5'4", black hair, pale skin, hourglass figure, goth style) and ends by making that person her body and saying hi.
+
+## Little Shepersville (story game, in progress)
+- **The split:** Brenai's server is every character's mind and keeps the story (Brenai session). VaM is the town and the bodies (this plugin). Their route spec is still to come; the relay's Brenai calls are provisional and sit in three small functions in `relay/story.mjs`.
+- **The cast:** Wizra, Zoe, Belinda, Margo. The chat panel's top bar says who you're talking to (tap to switch) and whose body it is (tap to cycle the scene's people). The Character flow's last step can make the person Wizra, Zoe, Belinda or Margo. Each has her own voice, lip sync and expressions; several can talk at once. Every message carries where you are and who is in the scene.
+- **Until Brenai's story routes exist:** Wizra still answers through her normal chat; the others say plainly they aren't connected yet.
+- **Story panel** (dock, or radial > Story): day, time and place from Brenai, and the nine places. Go loads that place's VaM scene; Set scene picks it from your scenes.
+- **Turning points:** when Brenai has a question waiting, a card opens in the middle (on the board in VR) with its 2 to 4 answers.
+- **Margo's call:** her call faces on a screen, changing with what she does in her replies (smiling, stern, delighted, listening); her voice plays like a phone call.
+- **Cabin laptop:** title, text, word count; Save keeps it on the PC (plus a dated copy) and sends it to Brenai; Tell Margo saves, calls her and tells her.
+- **Test:** `node vam/test/story.test.mjs`, 21 checks: a stand-in Brenai with and without the story routes.
 
 ## In a VR headset
 - **Automatic:** when VaM runs in a headset, everything Brene shows moves onto a board floating about an arm's length ahead at eye height: the same panels, layout, flows, radial menu and tutorials. Back on the monitor, it returns to the screen.

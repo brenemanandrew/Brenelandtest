@@ -19,7 +19,7 @@ namespace Brene
             Add("glassflow", "Glasses setup", () => glassFlow.Open(0), null);
             Add("help", "Help", OpenHelp, null);
             MakeButton("sceneflow", pDock); MakeButton("glassflow", pDock); MakeButton("help", pDock);
-            pDock.Root.sizeDelta = new Vector2(500, 230); pDock.Fit(); PlaceBottomRight(pDock);
+            pDock.Root.sizeDelta = new Vector2(500, 300); pDock.Fit(); PlaceBottomRight(pDock);
 
             sceneFlow = new Flow(root, "sceneflow", "Set up a scene", new Vector2(380, -60));
             SceneSteps(); sceneFlow.Build();
@@ -29,7 +29,9 @@ namespace Brene
             pHelp = new Panel(root, "help", "Help and tutorials", new Vector2(420, -120), new Vector2(520, 560), false);
             var vl = pHelp.Body.gameObject.AddComponent<VerticalLayoutGroup>(); vl.spacing = 8; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = false;
             BuildWizraBar();
+            BuildStory(root);
             chr.MakeWizra = a => { MakeWizra(a); ShowBody(); };
+            chr.MakeCast = (w, a) => { MakeCast(w, a); ShowBody(); };
             if (coach != null) coach.Destroy();
             coach = new Coach(uiSize.val); coach.Finished = n => { if (n == "Welcome") { tutorialSeen = true; SaveLayout(); } };
             Lessons();
@@ -52,6 +54,7 @@ namespace Brene
             if (sceneFlow != null) sceneFlow.Tick();
             if (glassFlow != null) glassFlow.Tick();
             TickWizra();
+            TickStory();
         }
 
         // ---- helpers ----
@@ -67,14 +70,14 @@ namespace Brene
         RectTransform Btn(string id) { Act a; return acts.TryGetValue(id, out a) && a.btn != null ? (RectTransform)a.btn.transform : null; }
 
         // library tiles (scenes, poses) in a flow step; tap runs pick(path, name)
-        System.Collections.IEnumerator FlowTiles(Flow f, RectTransform parent, string kind, Action<string, string> pick)
+        System.Collections.IEnumerator FlowTiles(Action<string> note, RectTransform parent, string kind, Action<string, string> pick)
         {
             var grid = Flow.Grid(parent, new Vector2(140, 164));
             var req = UnityEngine.Networking.UnityWebRequest.Get(link.Url + "/lib/items?limit=48&kind=" + kind); req.timeout = 10;
             yield return req.SendWebRequest();
-            if (req.isNetworkError || req.isHttpError) { f.Note("Start the Brene relay and set your VaM folder in the Library page to see your saved ones here."); req.Dispose(); yield break; }
+            if (req.isNetworkError || req.isHttpError) { note("Start the Brene relay and set your VaM folder in the Library page to see your saved ones here."); req.Dispose(); yield break; }
             var items = JSON.Parse(req.downloadHandler.text)["items"].AsArray; req.Dispose();
-            if (items == null || items.Count == 0) { f.Note("None found in your VaM folder."); yield break; }
+            if (items == null || items.Count == 0) { note("None found in your VaM folder."); yield break; }
             var thumbs = new List<KeyValuePair<RawImage, string>>();
             for (int i = 0; i < items.Count; i++)
             {
@@ -105,7 +108,7 @@ namespace Brene
             {
                 Flow.Wide(c, "Keep the scene I have  >", () => f.Show(1), true);
                 Flow.Say(c, "Or tap a saved scene to open it:");
-                StartCoroutine(FlowTiles(f, c, "scene", (path, name) => { Send("Load", path); f.Note("Opening " + name + "..."); }));
+                StartCoroutine(FlowTiles(f.Note, c, "scene", (path, name) => { Send("Load", path); f.Note("Opening " + name + "..."); }));
             }));
             f.Steps.Add(new FlowStep("People", "Who is in the scene. Shape anyone with Character.", c =>
             {
@@ -127,7 +130,7 @@ namespace Brene
                 var chips = Flow.Grid(c, new Vector2(150, 48));
                 foreach (var a in people) { var atom = a; UI.SetOn(UI.Button(chips, atom.uid, () => { SuperController.singleton.SelectController(atom.mainController); f.Redraw(); }), atom == who); }
                 var target = who;
-                StartCoroutine(FlowTiles(f, c, "pose", (path, name) => { var err = ApplyPreset("pose", path, target.uid); f.Note(err ?? (name + " on " + target.uid)); }));
+                StartCoroutine(FlowTiles(f.Note, c, "pose", (path, name) => { var err = ApplyPreset("pose", path, target.uid); f.Note(err ?? (name + " on " + target.uid)); }));
             }));
             f.Steps.Add(new FlowStep("Lights", "Brighten or soften the lights.", c =>
             {

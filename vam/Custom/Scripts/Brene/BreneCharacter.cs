@@ -98,6 +98,7 @@ namespace Brene
         public RectTransform StepsRt, NextRt, AllShapesRt;   // for the tutorial's spotlight
         public string SaveName, LastApplied = "";              // the name Finish offers; the kind of the last tile tapped
         public Action<Atom> MakeWizra;                         // Finish's "Make her Wizra"
+        public Action<string, Atom> MakeCast;                  // Finish's "Make her Zoe / Belinda / Margo" (Little Shepersville)
         public int Changed { get { return original.Count; } }
         public void Find(string q) { search.text = q; Show(section, true); }
         public string Section { get { return section; } }
@@ -178,6 +179,7 @@ namespace Brene
             UI.Button(grid, "Save scene", () => SuperController.singleton.gameObject.SendMessage("SaveSceneDialog", SendMessageOptions.DontRequireReceiver));
             UI.Button(grid, "Start over", () => Show("Who"));
             if (MakeWizra != null) UI.SetOn(UI.Button(grid, "Make her Wizra", () => { MakeWizra(person); note.text = person.uid + " is Wizra's body now: her voice, lips and face."; }), true);
+            if (MakeCast != null) foreach (var w in new[] { "Zoe", "Belinda", "Margo" }) { var who = w; UI.Button(grid, "Make her " + who, () => { MakeCast(who.ToLowerInvariant(), person); note.text = person.uid + " is " + who + "'s body now."; }); }
             note.text = original.Count + " shape(s) changed on " + person.uid + ". Reset shapes puts them back.";
         }
         // VaM's appearance preset store: name it, then its store action. Not yet checked inside VaM.

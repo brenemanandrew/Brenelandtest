@@ -1,0 +1,119 @@
+{
+ "about": "Margo Vance, the agent. Selfies are rewards for writing progress; call frames are her video-call faces. From Andrew's Hi3D renders, picked for consistent looks. JPG copies (VaM cannot read WebP), converted from the Brenai session's branch ccr-e7b1d912-7phaeo.",
+ "selfies": [
+  {
+   "file": "selfies/cat.jpg",
+   "caption": "Biscuit says hi. Biscuit also says chapter 2 or no treats.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/mug.jpg",
+   "caption": "Morning. Coffee. Your chapter. In that order.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/glasses-off.jpg",
+   "caption": "6 a.m. Reading your pages. Haven't even found my glasses.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/gym.jpg",
+   "caption": "Did 5k this morning. Your turn: 5k words.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/markup.jpg",
+   "caption": "Marked up your chapter. Mostly hearts. Some knives.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/reading.jpg",
+   "caption": "Reading chapter 6 like it's a thriller. Because it is.",
+   "use": "chapter"
+  },
+  {
+   "file": "selfies/weekend.jpg",
+   "caption": "Weekend check-in. Tell me you wrote something.",
+   "use": "checkin"
+  },
+  {
+   "file": "selfies/evening.jpg",
+   "caption": "Evening coffee. Yes, coffee. Your deadline keeps me up.",
+   "use": "checkin"
+  },
+  {
+   "file": "selfies/shelf.jpg",
+   "caption": "Cleared a space on my shelf for book 3.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/armour.jpg",
+   "caption": "Pitch-meeting armour on. Already selling book 4. No pressure.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/the-chair.jpg",
+   "caption": "This chair has heard forty authors cry. Don't be forty-one.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/author-photo.jpg",
+   "caption": "Taking jacket photos for the new book. Earn yours.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/camera.jpg",
+   "caption": "New camera for your launch party. Finish the book so I can use it.",
+   "use": "milestone"
+  },
+  {
+   "file": "selfies/arms-crossed.jpg",
+   "caption": "We need to talk about your word count.",
+   "use": "warning"
+  },
+  {
+   "file": "selfies/field.jpg",
+   "caption": "Your mountains are pretty. Your page count isn't. Yet.",
+   "use": "visit"
+  },
+  {
+   "file": "selfies/waterfront.jpg",
+   "caption": "On the waterfront. Thinking about your ending. Don't make it sad.",
+   "use": "visit"
+  }
+ ],
+ "call": [
+  {
+   "file": "call/warm.jpg",
+   "mood": "warm"
+  },
+  {
+   "file": "call/listening.jpg",
+   "mood": "listening"
+  },
+  {
+   "file": "call/skeptical.jpg",
+   "mood": "skeptical"
+  },
+  {
+   "file": "call/stern.jpg",
+   "mood": "stern"
+  },
+  {
+   "file": "call/delighted.jpg",
+   "mood": "delighted"
+  },
+  {
+   "file": "call/smiling.jpg",
+   "mood": "smiling"
+  },
+  {
+   "file": "call/evening.jpg",
+   "mood": "evening"
+  },
+  {
+   "file": "call/weekend.jpg",
+   "mood": "weekend"
+  }
+ ]
+}
