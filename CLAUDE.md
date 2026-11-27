@@ -14,6 +14,7 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 - `site/` - the deployed static app. `index.html` plus `hair/`, `models/`, `cloth/` data files (base64 GLB in small JS files, loaded on demand).
 - `Dockerfile`, `nginx.conf`, `fly.toml`, `.github/workflows/fly-deploy.yml` - Fly deploy on push to `main`. Both runs so far FAILED at `flyctl deploy`. Likely missing repo secret `FLY_API_TOKEN` or an app-name mismatch. Unresolved.
 - `brenai/` - separate app: Wizra, a chat persona for brenai.fly.dev running on the PC model via a bridge like the townsfolk (Node, own Dockerfile/fly.toml, deploy workflow `brenai-deploy.yml`). See `brenai/README.md`. Not part of Breneland.
+- `vam/` - Brene for Virt-a-Mate: a VaM plugin (draggable themed panels, Wizra chat, VITURE head tracking, side-by-side 3D, hand grabbing) and a relay on the PC. See `vam/README.md`. Not part of Breneland.
 - `pipeline/` - everything that builds `site/`:
   - `poser/index.html` - the builder source (one file, Three.js r181 from CDN). `<!--MODELS-->` is filled by the build.
   - `scripts/build.py` - builds `poser/index_embedded.html` and the data files, and a test copy in `/home/claude/ptest`.
