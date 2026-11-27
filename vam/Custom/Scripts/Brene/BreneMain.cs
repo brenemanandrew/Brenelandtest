@@ -119,7 +119,7 @@ namespace Brene
 
             pScene = new Panel(root, "scene", "Scene", new Vector2(20, -20), new Vector2(340, 250), true);
             pGlasses = new Panel(root, "glasses", "Glasses", new Vector2(20, -290), new Vector2(340, 250), true);
-            pLayout = new Panel(root, "layout", "Layout", new Vector2(20, -560), new Vector2(340, 250), true);
+            pLayout = new Panel(root, "layout", "Layout", new Vector2(380, -360), new Vector2(340, 250), true);
             pPeople = new Panel(root, "people", "People", new Vector2(380, -20), new Vector2(240, 320), false);
             pChat = new Panel(root, "chat", "Wizra", new Vector2(-1, -20), new Vector2(460, 520), false);
             pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(BreneEdit.On);
@@ -145,7 +145,7 @@ namespace Brene
             var v = peopleList.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 6; v.childForceExpandHeight = false; v.childControlHeight = true; v.childControlWidth = true;
 
             // Wizra: the log, a box to type in and Send
-            var logArea = Ui.Rect("Log", pChat.Body); Ui.Fill(logArea, 0, 0, 0, 62); Ui.Box(logArea, Role.Field);
+            var logArea = Ui.Rect("Log", pChat.Body); Ui.Fill(logArea, 0, 56, 0, 62);   // 56 at the top: the who / body / voice bar Ui.Box(logArea, Role.Field);
             RectTransform logContent; chatScroll = Scroll(logArea, out logContent);
             var lv = logContent.gameObject.AddComponent<VerticalLayoutGroup>(); lv.childControlHeight = true; lv.childControlWidth = true; lv.padding = new RectOffset(10, 10, 8, 8);
             chatLog = Ui.Label(logContent, "Say something to Wizra. Her words come from the PC model through the Brene relay.", 21, Role.Text, TextAnchor.UpperLeft);
@@ -161,8 +161,10 @@ namespace Brene
             // status line along the bottom of the dock
             var st = Ui.Rect("Status", pDock.Root); st.anchorMin = new Vector2(0, 0); st.anchorMax = new Vector2(1, 0); st.pivot = new Vector2(0, 0); st.sizeDelta = new Vector2(0, 30);
             status = Ui.Label(st, "", 16, Role.Dim, TextAnchor.MiddleLeft);
-            Ui.Fill((RectTransform)pDock.Body, 10, 54, 10, 34);
+            Ui.Fill((RectTransform)pDock.Body, 10, 54, 10, 34); pDock.FootPad = 44;
 
+            foreach (var p in Panel.All) p.Fit();
+            pGlasses.Root.anchoredPosition = new Vector2(20, pScene.Root.anchoredPosition.y - pScene.Root.sizeDelta.y - 16);
             PlaceRight(pChat, 20); PlaceBottomRight(pDock);
             foreach (var p in Panel.All) p.Fit();
             Refresh();

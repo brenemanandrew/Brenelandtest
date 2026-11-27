@@ -19,7 +19,7 @@ namespace Brene
             Add("glassflow", "Glasses setup", () => glassFlow.Open(0), null);
             Add("help", "Help", OpenHelp, null);
             MakeButton("sceneflow", pDock); MakeButton("glassflow", pDock); MakeButton("help", pDock);
-            pDock.Root.sizeDelta = new Vector2(500, 300); pDock.Fit(); PlaceBottomRight(pDock);
+            pDock.Root.sizeDelta = new Vector2(500, 300); pDock.FootPad = 44; pDock.Fit(); PlaceBottomRight(pDock);
 
             sceneFlow = new Flow(root, "sceneflow", "Set up a scene", new Vector2(380, -60));
             SceneSteps(); sceneFlow.Build();

@@ -3,7 +3,7 @@ project: brenai
 by: Claude (Brenebase session)
 date: 2026-11-27
 branch: claude/multi-agent-work-router-w9jzlg
-title: Brene for VaM - first real load in VaM 1.22: checker fix
+title: Brene for VaM - first real load in VaM 1.22: fixes until it loads
 ---
 ## Done
 - Andrew's first load (VaM 1.22.0.13, Brene Loader scene) reached VaM's compiler. VaM's plugin checker refused `Dictionary<,>.ValueCollection.Enumerator` (BreneViture.cs 170). All dictionary loops now walk a List copy; the JSON trait loop uses a list from the relay (`traitList`).
@@ -20,8 +20,11 @@ title: Brene for VaM - first real load in VaM 1.22: checker fix
 - Bisect round 1 (Andrew): tests with BreneUIKit.cs crashed VaM's compiler, the one without it loaded. BreneUIKit changed: the Role enum (a MonoBehaviour field) is now int constants, the helper classes `UI` and `Editor` are renamed `Ui` and `BreneEdit`, anonymous `delegate { }` replaced by lambdas. Round 2 tests P (fixed file alone), Q (drag handlers), R (colour table) sent with the fixed Brene.
 - VaM's security setting "Allow Plugins Network Access" must be on for Brene's relay link.
 
+- CONFIRMED: Brene loads and runs in Andrew's VaM 1.22 (panels, dock, Welcome tour on screen). The crash was in BreneUIKit.cs; the exact construct among the three changed was not isolated.
+- Layout fixes from his first screenshot: button panels grow to fit their buttons (and refit when buttons are dragged between panels), Layout panel moved off the bottom, Wizra chat text no longer covers its who / body / voice bar.
+
 ## Broken
-- VaM 1.22 crashed compiling the full Brene; fix candidate sent, not yet confirmed.
+- None known.
 ## Open
 - Next VaM load result.
 ## Settings changed

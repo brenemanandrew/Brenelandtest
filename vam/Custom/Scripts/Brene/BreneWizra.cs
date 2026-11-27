@@ -76,7 +76,6 @@ namespace Brene
             var c = Ui.Rect("Voice", bar); c.anchorMin = new Vector2(0.8f, 0); c.anchorMax = new Vector2(1, 1); c.offsetMin = c.offsetMax = Vector2.zero;
             voiceBtn = Ui.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Flow.Stretch(voiceBtn); Ui.SetOn(voiceBtn, voiceOn.val);
             voiceBtn.GetComponentInChildren<Text>().fontSize = 16;
-            for (int i = 0; i < pChat.Body.childCount; i++) { var r = (RectTransform)pChat.Body.GetChild(i); if (r.name == "Log") r.offsetMax = new Vector2(0, -56); }
             ShowBody();
         }
         void ShowBody()

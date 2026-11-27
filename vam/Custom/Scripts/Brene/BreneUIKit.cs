@@ -198,12 +198,19 @@ namespace Brene
         public void ShowEdit(bool on) { Resize.SetActive(on); Hide.SetActive(on && CanHide); }
 
         // fit the grid's cells to the panel's width so buttons grow with the panel
+        public float FootPad = 10;   // room under the buttons (the dock keeps its status line there)
+
+        // fit the grid's cells to the panel's width so buttons grow with the panel, and the panel's height to its buttons
         public void Fit()
         {
             var g = Body.GetComponent<GridLayoutGroup>(); if (g == null) return;
             float w = Root.sizeDelta.x - 20; int cols = Mathf.Max(1, Mathf.FloorToInt((w + 8) / 158f));
             g.cellSize = new Vector2(Mathf.Floor((w - (cols - 1) * 8) / cols), 56);
+            int n = 0; for (int i = 0; i < Body.childCount; i++) if (Body.GetChild(i).gameObject.activeSelf) n++;
+            int rows = Mathf.Max(1, (n + cols - 1) / cols);
+            Root.sizeDelta = new Vector2(Root.sizeDelta.x, 54 + rows * 56 + (rows - 1) * 8 + FootPad);
         }
+        public static void FitAll() { foreach (var p in new List<Panel>(All)) p.Fit(); }
     }
 
     public class PanelTag : MonoBehaviour { public Panel panel; }
@@ -265,6 +272,7 @@ namespace Brene
             if (dropParent == null) { dropParent = homeParent; dropIndex = homeIndex; }
             transform.SetParent(dropParent, false);
             if (dropIndex >= 0) transform.SetSiblingIndex(dropIndex); else transform.SetAsLastSibling();
+            Panel.FitAll();   // both panels resize to their new number of buttons
             BreneEdit.Changed();
         }
     }
