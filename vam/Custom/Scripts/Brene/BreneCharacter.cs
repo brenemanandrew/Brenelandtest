@@ -65,7 +65,7 @@ namespace Brene
             var bar = Ui.Rect("Steps", b); StepsRt = bar; bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1);
             bar.sizeDelta = new Vector2(0, 52); bar.anchoredPosition = new Vector2(0, -54);
             var g = bar.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(64, 52); g.spacing = new Vector2(3, 0);
-            for (int k = 0; k < STEPS.Length; k++) { var name = STEPS[k]; var tb = Ui.Button(bar, (k + 1) + "\n" + (name == "Personality" ? "Person-\nality" : name == "Reactions" ? "React" : name), () => Show(name)); tb.GetComponentInChildren<Text>().fontSize = 14; tabs[name] = tb; }
+            for (int k = 0; k < STEPS.Length; k++) { var name = STEPS[k]; var tb = Ui.Button(bar, (k + 1) + "\n" + (name == "Personality" ? "Traits" : name == "Reactions" ? "React" : name), () => Show(name)); tb.GetComponentInChildren<Text>().fontSize = 14; tabs[name] = tb; }
             // search
             var sr = Ui.Rect("Search", b); sr.anchorMin = new Vector2(0, 1); sr.anchorMax = new Vector2(1, 1); sr.pivot = new Vector2(0.5f, 1);
             sr.sizeDelta = new Vector2(0, 44); sr.anchoredPosition = new Vector2(0, -146);

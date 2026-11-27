@@ -209,7 +209,7 @@ namespace Brene
             lessons.Clear();
             var w = new Lesson("Welcome", "a 1 minute tour of Brene"); lessons.Add(w);
             w.Steps.Add(new CoachStep("Welcome to Brene", "Brene puts VaM's tools into big, clear panels and step-by-step flows. Nothing of VaM's is taken away: its own menus are still one tap away.\n\nThis tour takes about a minute. Skip any time."));
-            w.Steps.Add(new CoachStep("Your dock", "Everything starts here: the menu, Character, scene and glasses setup, Help, and Edit layout. The line at the bottom says what is connected.") { Target = () => pDock.Root, Enter = () => pDock.Root.gameObject.SetActive(true) });
+            w.Steps.Add(new CoachStep("Your dock", "Everything starts here. Brene starts calm: just this dock. Tools shows the quick-button panels (scene, glasses, layout, people), Wizra opens her chat, and Character, Set up scene, Glasses setup, Story and Help each open one window at a time. The line at the bottom says what is connected.") { Target = () => pDock.Root, Enter = () => pDock.Root.gameObject.SetActive(true) });
             w.Steps.Add(new CoachStep("The radial menu", "Hold the <b>" + KeyName() + "</b> key, move the mouse toward a choice and let go. Two flicks reach anything.\n\n<b>Try it now:</b> hold the key.") { Done = () => radial.Open });
             w.Steps.Add(new CoachStep("Character", "Makes and changes a person in eleven steps: who, a starting look, body, face, skin, hair, clothes, pose, personality, reactions, save. The \"Build Wizra\" tutorial in Help walks you through making Wizra herself.") { Target = () => Btn("character") });
             w.Steps.Add(new CoachStep("Set up a scene", "A flow for the whole scene: open one, people, poses, lights, how you view it, play and save.") { Target = () => Btn("sceneflow") });
@@ -257,8 +257,8 @@ namespace Brene
 
             var lay = new Lesson("Layout", "move and restyle everything"); lessons.Add(lay);
             lay.Steps.Add(new CoachStep("Edit layout", "Turn on edit mode.\n\n<b>Try it:</b> press Edit layout.") { Target = () => Btn("edit"), Done = () => BreneEdit.On });
-            lay.Steps.Add(new CoachStep("Move and resize", "Drag a panel's title bar to move it. Drag the coloured corner to resize. x hides a panel.") { Target = () => pScene.Root });
-            lay.Steps.Add(new CoachStep("Move buttons", "Drag a button onto another panel, or between two buttons, to put it there.") { Target = () => pScene.Body });
+            lay.Steps.Add(new CoachStep("Move and resize", "Drag a panel's title bar to move it. Drag the coloured corner to resize. x hides a panel.") { Target = () => pScene.Root, Enter = () => { if (!AnyTool()) ToggleTools(); } });
+            lay.Steps.Add(new CoachStep("Move buttons", "Drag a button onto another panel, or between two buttons, to put it there.") { Target = () => pScene.Body, Enter = () => { if (!AnyTool()) ToggleTools(); } });
             lay.Steps.Add(new CoachStep("Done", "Press Edit layout again to finish. Your layout is saved.\n\n<b>Try it now.</b>") { Target = () => Btn("edit"), Done = () => !BreneEdit.On });
         }
         string KeyName() { return menuKey.val == "BackQuote" ? "` (under Esc)" : menuKey.val == "Mouse4" ? "mouse back button" : menuKey.val; }

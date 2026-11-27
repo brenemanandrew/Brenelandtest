@@ -98,6 +98,8 @@ namespace Brene
             Add("smaller", "Smaller", () => uiSize.val = Mathf.Max(0.6f, uiSize.val - 0.15f), null);
             Add("savelayout", "Save layout", SaveLayout, null);
             Add("panels", "Show all", ShowAll, null);
+            Add("tools", "Tools", ToggleTools, () => AnyTool());
+            Add("chat", "Wizra", () => { pChat.Root.gameObject.SetActive(!pChat.Root.gameObject.activeSelf); if (pChat.Root.gameObject.activeSelf) pChat.Root.SetAsLastSibling(); }, () => pChat != null && pChat.Root.gameObject.activeSelf);
             Add("fitless", "VaM menu smaller", () => menuFit.val = Mathf.Min(45f, menuFit.val + 8f), null);
             Add("fitmore", "VaM menu bigger", () => menuFit.val = Mathf.Max(0f, menuFit.val - 8f), null);
             Add("radial", "Menu", () => radial.OpenAtCentre(), null);
@@ -127,7 +129,7 @@ namespace Brene
             foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
             foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
             foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels", "fitless", "fitmore" }) MakeButton(id, pLayout);
-            MakeButton("radial", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
+            MakeButton("radial", pDock); MakeButton("tools", pDock); MakeButton("chat", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
             chr = new Character(this, link, ApplyPreset); chr.Build(root);
             BuildGuides(root);
             // the radial menu has its own canvas so it still opens when the panels are hidden
@@ -163,6 +165,13 @@ namespace Brene
             status = Ui.Label(st, "", 16, Role.Dim, TextAnchor.MiddleLeft);
             Ui.Fill((RectTransform)pDock.Body, 10, 54, 10, 34); pDock.FootPad = 44;
 
+            // calm start: only the dock. Tools, Wizra and the flows open from the dock or the radial menu
+            pDock.Kind = "dock"; pChat.Kind = "chat";
+            foreach (var p in new[] { chr.Panel, sceneFlow.Panel, glassFlow.Panel, pStory, pLaptop, pHelp }) p.Kind = "window";
+            foreach (var p in new[] { pChoice, pickFlow.Panel, pCall }) p.Kind = "dialog";
+            foreach (var p in Panel.All) if (p.Kind != "dock") p.Root.gameObject.SetActive(false);
+            // the dock in a sensible order
+            int at = 0; foreach (var id in new[] { "radial", "tools", "chat", "character", "sceneflow", "glassflow", "story", "help", "edit" }) { Act a; if (acts.TryGetValue(id, out a) && a.btn != null) { a.btn.transform.SetParent(pDock.Body, false); a.btn.transform.SetSiblingIndex(at++); } }
             foreach (var p in Panel.All) p.Fit();
             pGlasses.Root.anchoredPosition = new Vector2(20, pScene.Root.anchoredPosition.y - pScene.Root.sizeDelta.y - 16);
             PlaceRight(pChat, 20); PlaceBottomRight(pDock);
@@ -301,7 +310,10 @@ namespace Brene
             if (!on) SaveLayout();
             Refresh();
         }
-        void ShowAll() { foreach (var p in Panel.All) p.Root.gameObject.SetActive(true); BreneEdit.Changed(); }
+        // Show all brings back the quick-button panels only (flows and pop-ups open when they are needed)
+        void ShowAll() { foreach (var p in Panel.All) if (p.Kind == "tool") p.Root.gameObject.SetActive(true); BreneEdit.Changed(); Refresh(); }
+        bool AnyTool() { foreach (var p in Panel.All) if (p.Kind == "tool" && p.Root.gameObject.activeSelf) return true; return false; }
+        void ToggleTools() { bool on = !AnyTool(); foreach (var p in Panel.All) if (p.Kind == "tool") { p.Root.gameObject.SetActive(on); if (on) p.Root.SetAsLastSibling(); } BreneEdit.Changed(); Refresh(); }
         void NextTheme()
         {
             int i = Array.IndexOf(Theme.Names, Theme.Name); Theme.Name = Theme.Names[(i + 1) % Theme.Names.Length];
@@ -319,7 +331,7 @@ namespace Brene
         {
             try
             {
-                var j = new JSONClass(); j["theme"] = Theme.Name; j["tutorialSeen"].AsBool = tutorialSeen; j["size"].AsFloat = uiSize.val;
+                var j = new JSONClass(); j["v"].AsInt = 2; j["theme"] = Theme.Name; j["tutorialSeen"].AsBool = tutorialSeen; j["size"].AsFloat = uiSize.val;
                 var ps = new JSONClass();
                 foreach (var p in Panel.All)
                 {
@@ -358,7 +370,7 @@ namespace Brene
                     var o = ps[p.Id]; if (o == null || o["x"] == null) continue;
                     p.Root.anchoredPosition = new Vector2(o["x"].AsFloat, o["y"].AsFloat);
                     p.Root.sizeDelta = new Vector2(Mathf.Max(180, o["w"].AsFloat), Mathf.Max(110, o["h"].AsFloat));
-                    p.Root.gameObject.SetActive(!o["hidden"].AsBool);
+                    if (j["v"].AsInt >= 2 && (p.Kind == "tool" || p.Kind == "chat")) p.Root.gameObject.SetActive(!o["hidden"].AsBool);   // older layouts: the calm defaults instead
                 }
                 // buttons: put each where it was saved, in order (an action not in the file stays where it was built)
                 foreach (var p in Panel.All)

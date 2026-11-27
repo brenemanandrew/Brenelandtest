@@ -75,14 +75,14 @@ namespace Brene
             bodyBtn = Ui.Button(b, "", NextBody); Flow.Stretch(bodyBtn);
             var c = Ui.Rect("Voice", bar); c.anchorMin = new Vector2(0.8f, 0); c.anchorMax = new Vector2(1, 1); c.offsetMin = c.offsetMax = Vector2.zero;
             voiceBtn = Ui.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Flow.Stretch(voiceBtn); Ui.SetOn(voiceBtn, voiceOn.val);
-            voiceBtn.GetComponentInChildren<Text>().fontSize = 16;
+            voiceBtn.GetComponentInChildren<Text>().fontSize = 16; whoBtn.GetComponentInChildren<Text>().fontSize = 17; bodyBtn.GetComponentInChildren<Text>().fontSize = 17;
             ShowBody();
         }
         void ShowBody()
         {
-            if (whoBtn != null) Ui.SetText(whoBtn, "Talking to: " + Nice(talkTo));
+            if (whoBtn != null) Ui.SetText(whoBtn, "To: " + Nice(talkTo));
             if (bodyBtn == null) return; var a = BodyOf(talkTo);
-            Ui.SetText(bodyBtn, a != null ? Nice(talkTo) + "'s body: " + a.uid : "Pick " + Nice(talkTo) + "'s body (tap)"); Ui.SetOn(bodyBtn, a != null);
+            Ui.SetText(bodyBtn, a != null ? "Body: " + a.uid : "Pick her body"); Ui.SetOn(bodyBtn, a != null);
         }
         public void TalkTo(string who) { if (Array.IndexOf(CAST, who) >= 0) { talkTo = who; ShowBody(); } }
         void NextWho() { talkTo = CAST[(Array.IndexOf(CAST, talkTo) + 1) % CAST.Length]; ShowBody(); }

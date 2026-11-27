@@ -153,7 +153,10 @@ namespace Brene
         public RectTransform Root, Body, Bar;
         public GameObject Resize, Hide;
         public bool Droppable;   // other buttons can be dropped into it (button panels)
-        public bool CanHide = true;   // the dock holds Edit layout, so it is never hidden
+        public bool CanHide = true;
+        // tool = a quick-button panel (shown together by Tools / Show all); window = a big flow or page, one open at a time;
+        // dialog = pops up when needed (a choice, a picker, a call); chat and dock stand on their own
+        public string Kind = "tool";   // the dock holds Edit layout, so it is never hidden
         public static readonly List<Panel> All = new List<Panel>();
 
         public Panel(Transform canvas, string id, string title, Vector2 pos, Vector2 size, bool grid)
@@ -213,7 +216,16 @@ namespace Brene
         public static void FitAll() { foreach (var p in new List<Panel>(All)) p.Fit(); }
     }
 
-    public class PanelTag : MonoBehaviour { public Panel panel; }
+    public class PanelTag : MonoBehaviour
+    {
+        public Panel panel;
+        // one window at a time: opening one puts the others away
+        void OnEnable()
+        {
+            if (panel == null || panel.Kind != "window") return;
+            foreach (var p in new List<Panel>(Panel.All)) if (p != panel && p.Kind == "window" && p.Root != null && p.Root.gameObject.activeSelf) p.Root.gameObject.SetActive(false);
+        }
+    }
     public class DropZone : MonoBehaviour { public Panel panel; }
 
     public class DragMove : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
