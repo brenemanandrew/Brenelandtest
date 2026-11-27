@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Arden DC Trainer - PIT, Pick, Pack, Ship</title>
+<style>
+/* Hubbell house style: black topbar, logo yellow, Calibri */
+:root{--y:#FDDB33;--k:#000;--ink:#1a1a1a;--gray:#595959;--line:#D9D9D9;--ok:#2E7D32;--red:#C00000}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#000;font-family:Calibri,Carlito,"Segoe UI",Arial,sans-serif;color:var(--ink)}
+canvas{display:block}
+#top{position:fixed;top:0;left:0;right:0;height:46px;background:var(--k);color:#fff;display:flex;align-items:center;gap:14px;padding:0 14px;z-index:5}
+#top b{color:var(--y);font-size:20px;letter-spacing:.5px}
+#top .sub{color:#ccc;font-size:15px}
+#top .sp{flex:1}
+#top button{background:#222;color:#fff;border:1px solid #555;border-radius:4px;padding:5px 10px;font-size:14px;cursor:pointer}
+#top button:hover{border-color:var(--y)}
+#hud{position:fixed;left:12px;bottom:12px;width:min(470px,calc(100vw - 24px));max-height:calc(100vh - 80px);overflow:auto;background:rgba(255,255,255,.96);border-top:6px solid var(--y);border-radius:6px;box-shadow:0 4px 18px rgba(0,0,0,.35);padding:12px 14px;z-index:4}
+#hTitle{font-weight:700;font-size:18px}
+#hSub{font-size:13px;color:var(--gray);margin-bottom:6px}
+#hText{font-size:16px;line-height:1.3;white-space:pre-line}
+#hRF{display:none;margin:8px 0;background:#10233a;color:#9fe39f;font-family:Consolas,monospace;font-size:14px;padding:8px;border-radius:4px;white-space:pre}
+#hWhy{display:none;margin-top:8px;font-size:14px;color:#333;background:#FEF6CC;border-left:4px solid var(--y);padding:6px 8px}
+#hBtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+#hBtns button{flex:1 1 45%;background:#fff;border:2px solid #000;border-radius:5px;padding:7px 8px;font-size:15px;text-align:left;cursor:pointer}
+#hBtns button:hover{background:var(--y)}
+#hBtns button .n{display:inline-block;min-width:18px;font-weight:700;color:var(--gray)}
+#hFoot{margin-top:8px;font-size:13px;color:var(--gray)}
+#cross{position:fixed;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;z-index:3;pointer-events:none;display:none}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#cross:before{left:10px;top:2px;width:2px;height:18px}#cross:after{top:10px;left:2px;height:2px;width:18px}
+#look{position:fixed;left:50%;top:calc(50% + 18px);transform:translateX(-50%);color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;font-size:15px;z-index:3;pointer-events:none}
+#toast{position:fixed;top:58px;left:50%;transform:translateX(-50%);padding:8px 16px;border-radius:5px;font-size:16px;font-weight:700;z-index:6;display:none;max-width:90vw;text-align:center}
+#toast.bad{background:var(--red);color:#fff}#toast.good{background:var(--ok);color:#fff}#toast.info{background:#000;color:var(--y)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9}
+#modal.hidden{display:none}
+#mbox{background:#fff;border-top:6px solid var(--y);border-radius:6px;padding:18px;width:min(760px,94vw);max-height:88vh;overflow:auto}
+#mbox h2{margin-bottom:8px}#mbox p{margin:6px 0}
+#mbox input,#mbox textarea{width:100%;font:inherit;font-size:16px;padding:6px;border:1px solid #888;border-radius:4px;margin:6px 0}
+#mbox button{background:#000;color:var(--y);border:0;border-radius:4px;padding:8px 14px;font-size:15px;cursor:pointer;margin:4px 6px 4px 0}
+#mbox table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+#mbox th,#mbox td{border:1px solid var(--line);padding:4px 6px;text-align:left}
+#mbox th{background:#F2F2F2}
+#help{position:fixed;right:12px;bottom:12px;background:rgba(0,0,0,.75);color:#fff;font-size:13px;line-height:1.35;padding:8px 10px;border-radius:5px;z-index:3;max-width:300px}
+#help b{color:var(--y)}
+@media (max-width:700px){#help{display:none}#top .sub{display:none}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.181.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="top"><b>ARDEN DC TRAINER</b><span class="sub">PIT · Pick · Pack · Ship · Kaizen</span><span class="sp"></span><span id="who" class="sub"></span><button id="menuBtn">Menu</button><button id="recBtn">Records</button><button id="nameBtn">Trainee</button></div>
+<div id="hud"><div id="hTitle"></div><div id="hSub"></div><div id="hText"></div><div id="hRF"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
+<div id="cross"></div><div id="look"></div><div id="toast"></div>
+<div id="help"><b>PC:</b> click the view to look around, WASD to walk, click or E to use what the crosshair is on, 1-9 for the panel buttons, Esc to free the mouse.<br><b>Forklift:</b> W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.<br><b>Quest 3:</b> Enter VR. Trigger uses things and presses panel buttons. Left stick walks, right stick turns. X brings the panel back. In the forklift: left stick drives and steers, right stick lifts and tilts, A is the horn.</div>
+<div id="modal" class="hidden"><div id="mbox"></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+/* ============================================================
+   Arden DC Trainer
+   One file. Three.js r181 + WebXR (Quest 3 browser) with a PC fallback.
+   Content: Andrew's standard work (Pallet Land Pick, Flow Rack Pick,
+   Induction, Short Pick deviation: Draft 1.0 10/17/2026; Parcel and
+   Truck core pack process: Kaizen 03 rev 0.6). PIT content is generic
+   (OSHA 1910.178 basics) until Arden has its own PIT SW.
+   ============================================================ */
+
+const $ = s => document.querySelector(s);
+const EYE = 1.65;
+const LS_NAME = 'arden.trainer.name', LS_REC = 'arden.trainer.records', LS_IDEA = 'arden.trainer.ideas', LS_GUIDE = 'arden.trainer.guide';
+
+/* ---------- renderer, scene, rig ---------- */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+document.body.appendChild(renderer.domElement);
+const vrBtn = VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] });
+document.body.appendChild(vrBtn);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xd9dee2);
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
+const rig = new THREE.Group(); rig.add(camera); scene.add(rig);
+camera.position.y = EYE;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(8, 20, 6); scene.add(sun);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+/* ---------- helpers ---------- */
+const MATS = {};
+function M(color, o = {}) { const k = color + JSON.stringify(o); return MATS[k] || (MATS[k] = new THREE.MeshStandardMaterial({ color, roughness: .8, metalness: 0, ...o })); }
+const GEO = new THREE.BoxGeometry(1, 1, 1);
+const HIDDEN = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+let ROOT = null;   /* when set, helpers add to this group instead of the scene */
+function box(w, h, d, mat, x = 0, y = 0, z = 0, parent = ROOT || scene) {   /* y = bottom */
+  const m = new THREE.Mesh(GEO, typeof mat === 'number' ? M(mat) : mat);
+  m.scale.set(w, h, d); m.position.set(x, y + h / 2, z); parent.add(m); return m;
+}
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  draw && draw(g, w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return { tex: t, c, g, redraw(fn) { fn(g, w, h); t.needsUpdate = true; } };
+}
+function hash(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function drawBars(g, code, x, y, w, h) {
+  let r = hash(code); g.fillStyle = '#000'; let px = x;
+  while (px < x + w) { r = (r * 1103515245 + 12345) >>> 0; const bw = 2 + (r % 4) * 2; g.fillRect(px, y, bw, h); px += bw + 2 + ((r >> 8) % 3) * 2; }
+}
+/* a flat sign or label; opt.code makes it a scannable barcode label */
+function label(text, wM, hM, opt = {}) {
+  const px = 256, W = Math.round(px * wM / Math.min(wM, hM)), H = Math.round(px * hM / Math.min(wM, hM));
+  const ct = canvasTex(W, H, (g, w, h) => {
+    g.fillStyle = opt.bg || '#fff'; g.fillRect(0, 0, w, h);
+    if (opt.border !== false) { g.strokeStyle = opt.fg || '#000'; g.lineWidth = 6; g.strokeRect(3, 3, w - 6, h - 6); }
+    g.fillStyle = opt.fg || '#000'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const lines = String(text).split('\n');
+    const fs = opt.fs || Math.min(h * (opt.code ? .38 : .7) / lines.length, w / (Math.max(...lines.map(l => l.length)) * .6));
+    g.font = `bold ${fs}px Calibri, Arial, sans-serif`;
+    const top = opt.code ? h * .08 : (h - fs * lines.length * 1.1) / 2;
+    lines.forEach((l, i) => g.fillText(l, w / 2, top + fs * (i + .55) * 1.1));
+    if (opt.code) drawBars(g, opt.code, w * .1, h * .5, w * .8, h * .38);
+  });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(wM, hM), new THREE.MeshBasicMaterial({ map: ct.tex, side: opt.both ? THREE.DoubleSide : THREE.FrontSide }));
+  m.userData.ct = ct; return m;
+}
+function place(m, x, y, z, ry = 0, parent = scene) { m.position.set(x, y, z); m.rotation.y = ry; parent.add(m); return m; }
+function wrapText(g, text, maxW) {
+  const out = [];
+  for (const para of String(text).split('\n')) {
+    let line = '';
+    for (const word of para.split(' ')) { const t = line ? line + ' ' + word : word; if (g.measureText(t).width > maxW && line) { out.push(line); line = word; } else line = t; }
+    out.push(line);
+  }
+  return out;
+}
+
+/* ---------- interactables ---------- */
+const INTER = [];           /* meshes the ray can hit */
+const OBJ = {};             /* iid -> object */
+function reg(obj, iid, name, extra = {}) {
+  obj.userData.iid = iid; obj.userData.name = name; Object.assign(obj.userData, extra);
+  OBJ[iid] = obj;
+  obj.traverse(o => { if (o.isMesh) { o.userData.iidOwner = iid; INTER.push(o); } });
+  return obj;
+}
+function barcode(code, wM, hM, text) { const m = label(text || code, wM, hM, { code }); return reg(m, 'bc:' + code, 'Barcode ' + code, { code }); }
+const MOV = [];             /* movable things, reset per module */
+function movable(o) { MOV.push({ o, parent: o.parent, p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone(), vis: o.visible }); return o; }
+function resetMovables() { for (const m of MOV) { m.parent.add(m.o); m.o.position.copy(m.p); m.o.quaternion.copy(m.q); m.o.scale.copy(m.s); m.o.visible = m.vis; } }
+
+/* ---------- solids for walking and driving ---------- */
+const SOLIDS = [];
+function solid(minX, maxX, minZ, maxZ, who = 'all') { SOLIDS.push({ minX, maxX, minZ, maxZ, who }); }
+function hitsSolid(x, z, r, who) {
+  for (const s of SOLIDS) {
+    if (s.who !== 'all' && s.who !== who) continue;
+    const cx = Math.max(s.minX, Math.min(x, s.maxX)), cz = Math.max(s.minZ, Math.min(z, s.maxZ));
+    if ((x - cx) ** 2 + (z - cz) ** 2 < r * r) return true;
+  }
+  return false;
+}
+function inRect(x, z, r) { return x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]; }
+
+/* ============================================================
+   THE WAREHOUSE (meters; x east, z south; door and dock to the south)
+   ============================================================ */
+const C = { brown: 0xa77b4f, cardboard: 0xc49a6c, rackBlue: 0x1f4fa8, beam: 0xf07c00, pallet: 0xb48a58, conc: 0xb9bcbd, yellow: 0xfddb33, green: 0x2e9d3a, red: 0xc0392b, blue: 0x2a6fd6, orange: 0xf28c28, black: 0x111111, white: 0xffffff, gray: 0x777777 };
+const ZONE = {
+  walkway: [1, 2.5, -7, 16.5], intersection: [-5.8, -3.8, -13.4, -9.6], aisle: [-22, -5.8, -13.4, -9.6],
+  charger: [-3.6, -0.4, 10, 14.2], hospital: [3.6, 6.4, -4.5, -1.5], receive: [-6.2, -3.8, 4, 7]
+};
+/* floor and walls */
+box(60, .02, 34, M(C.conc), 0, -.02, 1);
+function floorPaint(r, color, y = .002) { const m = box(r[1] - r[0], .003, r[3] - r[2], M(color), (r[0] + r[1]) / 2, y, (r[2] + r[3]) / 2); return m; }
+function floorText(text, x, z, w, h, ry = 0, opt = {}) { const m = label(text, w, h, { bg: opt.bg || 'rgba(0,0,0,0)', fg: opt.fg || '#111', border: false }); m.material.transparent = true; m.rotation.x = -Math.PI / 2; m.rotation.z = ry; m.position.set(x, .01, z); scene.add(m); return m; }
+const wallM = M(0xeceae4);
+box(60, 8, .3, wallM, 0, 0, -16.15); solid(-30, 30, -16.3, -16);
+box(.3, 8, 34, wallM, -30.15, 0, 1); solid(-30.3, -30, -16, 18);
+box(.3, 8, 34, wallM, 30.15, 0, 1); solid(30, 30.3, -16, 18);
+box(14.5, 8, .3, wallM, -22.75, 0, 18.15); box(42.5, 8, .3, wallM, 8.75, 0, 18.15); box(3, 4.5, .3, wallM, -14, 3.5, 18.15);
+solid(-30, -15.5, 18, 18.3); solid(-12.5, 30, 18, 18.3);
+/* ceiling lights (just visual) */
+for (let x = -24; x <= 24; x += 8) for (let z = -12; z <= 14; z += 7) box(2.4, .08, .4, new THREE.MeshBasicMaterial({ color: 0xffffff }), x, 7.6, z);
+
+floorPaint(ZONE.walkway, 0x2e9d3a); floorPaint([ZONE.walkway[0] + .1, ZONE.walkway[1] - .1, ZONE.walkway[2], ZONE.walkway[3]], 0x55c25f, .004);
+for (let z = -5; z < 16; z += 6) floorText('WALKWAY\nNO PIT', 1.75, z, 1.3, 1.1, Math.PI / 2, { fg: '#fff' });
+/* intersection stripes */
+{ const r = ZONE.intersection; for (let i = 0; i < 8; i++) { const m = box(.25, .004, r[3] - r[2], M(i % 2 ? C.black : C.yellow), r[0] + .125 + i * .25, .003, (r[2] + r[3]) / 2); } }
+{ const post = box(.08, 2.2, .08, M(C.gray), -3.6, 0, -9.3); const s = label('STOP\nSOUND HORN', .7, .7, { bg: '#c0392b', fg: '#fff' }); place(s, -3.6, 2.4, -9.25, Math.PI / 2); const s2 = s.clone(); place(s2, -3.6, 2.4, -9.35, -Math.PI / 2); }
+floorPaint(ZONE.charger, C.yellow); floorPaint([ZONE.charger[0] + .12, ZONE.charger[1] - .12, ZONE.charger[2] + .12, ZONE.charger[3] - .12], C.conc, .004);
+place(label('PIT CHARGING', 1.6, .45, { bg: '#FDDB33' }), -2, 2.6, 14.5, Math.PI); box(.08, 2.4, .08, M(C.gray), -2, 0, 14.6);
+box(.6, 1.4, .4, M(0x333333), -3.2, 0, 14.6);   /* charger */
+floorPaint(ZONE.hospital, 0xc0392b); floorPaint([ZONE.hospital[0] + .12, ZONE.hospital[1] - .12, ZONE.hospital[2] + .12, ZONE.hospital[3] - .12], C.conc, .004);
+place(label('NON CONF\nPICK HOSPITAL', 1.6, .8, { bg: '#c0392b', fg: '#fff' }), 5, 2.2, -4.6); box(.08, 2, .08, M(C.gray), 5, 0, -4.7);
+const hospitalPad = box(2.6, .02, 2.8, HIDDEN, 5, .01, -3);
+reg(hospitalPad, 'hospital', 'Non Conf area (pick hospital)');
+floorPaint(ZONE.receive, 0x8e44ad); floorText('RECEIVING DROP', -5, 7.4, 2.2, .4);
+
+/* ---------- pallets and cartons ---------- */
+function makePallet(withLoad = 0, opt = {}) {
+  const g = new THREE.Group();
+  const pm = M(C.pallet);
+  for (const x of [-.55, 0, .55]) box(.12, .1, 1.0, pm, x, 0, 0, g);           /* stringers */
+  for (let i = 0; i < 7; i++) box(1.2, .03, .11, pm, 0, .1, -.45 + i * .15, g);  /* deck boards */
+  box(1.2, .02, .1, pm, 0, 0, -.45, g); box(1.2, .02, .1, pm, 0, 0, .45, g);
+  if (withLoad) {
+    const cm = M(opt.color || C.cardboard);
+    const nx = 2, nz = 2; let n = 0;
+    for (let y = 0; y < withLoad; y++) for (let ix = 0; ix < nx; ix++) for (let iz = 0; iz < nz; iz++) { box(.56, .3, .47, cm, -.29 + ix * .58, .13 + y * .31, -.245 + iz * .49, g); n++; }
+    if (opt.wrap) { const w = new THREE.Mesh(GEO, new THREE.MeshStandardMaterial({ color: 0xdfe8ee, transparent: true, opacity: .35 })); w.scale.set(1.18, withLoad * .31, .98); w.position.y = .13 + withLoad * .155; g.add(w); }
+  }
+  return g;
+}
+function carton(w, h, d, color = C.cardboard, text) {
+  const g = new THREE.Group(); box(w, h, d, M(color), 0, 0, 0, g);
+  if (text) { const l = label(text, Math.min(w * .8, .3), Math.min(h * .6, .14), { fs: 60 }); l.position.set(0, h / 2, d / 2 + .002); g.add(l); }
+  return g;
+}
+
+/* ---------- Pallet Land: rack rows A (north, faces aisle) and B ---------- */
+const BAY = 2.7, RX0 = -22, BAYS = 6, LEVELS = [0, 1.6, 3.2];
+const SLOTS = {};
+function rackRow(rowName, zFront, facing /* +1 faces +z */, firstNum) {
+  const depth = 1.1, zBack = zFront - facing * depth, zc = (zFront + zBack) / 2;
+  const um = M(C.rackBlue), bm = M(C.beam);
+  for (let i = 0; i <= BAYS; i++) { const x = RX0 + i * BAY; box(.1, 4.6, .1, um, x, 0, zFront - facing * .05); box(.1, 4.6, .1, um, x, 0, zBack + facing * .05); for (const y of [1, 2.5, 4]) box(.06, .06, depth, um, x, y, zc); }
+  for (let b = 0; b < BAYS; b++) {
+    const xc = RX0 + (b + .5) * BAY, num = firstNum + b;
+    for (let li = 0; li < LEVELS.length; li++) {
+      const y = LEVELS[li], lv = 'ABC'[li];
+      if (y > 0) { box(BAY - .1, .12, .06, bm, xc, y - .12, zFront - facing * .05); box(BAY - .1, .12, .06, bm, xc, y - .12, zBack + facing * .05); }
+      const id = `P${num}-${lv}`;
+      SLOTS[id] = { id, x: xc, y, z: zc, ry: facing > 0 ? 0 : Math.PI, filled: null, row: rowName };
+    }
+    /* location labels at standing height, facing the aisle */
+    const code = `P${num}-01-A`;
+    const lab = barcode(code, .32, .16, code); place(lab, xc - .6, 1.25, zFront + facing * .01, facing > 0 ? 0 : Math.PI);
+    const labB = label(`P${num}-01-B`, .32, .1, { code: `P${num}-01-B` }); place(labB, xc + .6, 1.6 - .06, zFront + facing * .04, facing > 0 ? 0 : Math.PI);
+    place(label(`P${num}`, .5, .25, { bg: '#FDDB33' }), xc, 4.5, zFront + facing * .02, facing > 0 ? 0 : Math.PI);
+  }
+  solid(RX0 - .05, RX0 + BAYS * BAY + .05, Math.min(zFront, zBack), Math.max(zFront, zBack));
+}
+rackRow('A', -13.4, +1, 101);
+rackRow('B', -9.6, -1, 111);
+place(label('PALLET LAND\nZONE P100', 1.4, .7, { bg: '#FDDB33' }), -5.6, 3.2, -11.5, Math.PI / 2);
+/* decor pallets in the rack */
+for (const id in SLOTS) {
+  const s = SLOTS[id];
+  if (id === 'P104-B' || id === 'P104-A' || id === 'P106-A') continue;
+  if ((hash(id) % 10) < 7) { const p = makePallet(1 + hash(id) % 3); p.position.set(s.x, s.y, s.z); p.rotation.y = s.ry; scene.add(p); s.filled = p; }
+}
+/* pick locations used by the Pick module */
+const PICK = {};
+function pickFace(slotId, part, qty) {
+  const s = SLOTS[slotId]; const p = makePallet(0); p.position.set(s.x, s.y, s.z); p.rotation.y = s.ry; scene.add(p); s.filled = p;
+  const g = new THREE.Group(); g.position.set(s.x, .13, s.z + (s.ry ? -1 : 1) * .1); scene.add(g);
+  const items = [];
+  for (let i = 0; i < qty; i++) { const c = carton(.36, .24, .3, C.cardboard, part); c.position.set(-.4 + (i % 3) * .4, Math.floor(i / 3) * .25, 0); c.rotation.y = s.ry; g.add(c); items.push(c); }
+  const lbl = barcode(part, .24, .12, part); place(lbl, s.x + .45, .75, s.z + (s.ry ? -1 : 1) * .58, s.ry);
+  PICK[slotId] = { g, items, part, qty };
+  reg(g, 'stock:' + slotId, `${part} cartons in ${slotId}`);
+  movable(g); items.forEach(movable);
+  return g;
+}
+pickFace('P104-A', 'HBL5262', 6);
+pickFace('P106-A', 'HBL2621', 4);
+
+/* ---------- induction flow rack and THORs ---------- */
+{
+  const ix = 3.6, iz = -12.6;
+  box(2.4, .05, 1, M(0x888888), ix, .8, iz); box(2.4, .05, 1, M(0x888888), ix, 1.5, iz);
+  for (const x of [-1.2, 1.2]) for (const z of [-.5, .5]) box(.06, 1.8, .06, M(C.gray), ix + x, 0, iz + z);
+  place(label('INDUCTION\nFLOW RACK', 1.1, .5, { bg: '#FDDB33' }), ix, 2.1, iz + .5);
+  const totes = [];
+  for (let i = 0; i < 4; i++) {
+    const t = new THREE.Group(); box(.55, .3, .38, M(0x6b4a2b), 0, 0, 0, t);
+    for (const [k, col] of [[0, C.green], [1, C.orange], [2, C.blue]]) { const cone = new THREE.Mesh(new THREE.ConeGeometry(.04, .12, 10), M(col)); cone.position.set(-.15 + k * .15, .36, 0); t.add(cone); }
+    t.position.set(ix - .9 + i * .6, .85, iz + .1); scene.add(t);
+    const bc = barcode('T-1023' + i, .2, .1, 'T-1023' + i); bc.position.set(0, .16, .195); t.add(bc);
+    totes.push(t); movable(t);
+  }
+  OBJ.indTotes = totes;
+}
+function makeThor(id, battery) {
+  const g = new THREE.Group();
+  box(.75, .25, 1.0, M(C.yellow), 0, 0, -.6, g);                     /* power unit */
+  box(.8, .08, .7, M(0x333333), 0, .05, -.6, g);                     /* platform */
+  box(.1, 1.15, .1, M(0x333333), 0, .25, -.95, g);                   /* control mast */
+  box(.5, .08, .12, M(0x333333), 0, 1.4, -.95, g);
+  for (const x of [-.3, .3]) box(.16, .06, 1.15, M(0x555555), x, .03, .5, g);   /* forks */
+  const ct = canvasTex(256, 128); const scr = new THREE.Mesh(new THREE.PlaneGeometry(.22, .11), new THREE.MeshBasicMaterial({ map: ct.tex }));
+  scr.position.set(0, 1.25, -.89); g.add(scr); g.userData.screen = ct;
+  const pal = makePallet(0); pal.position.set(0, .09, .5); g.add(pal);
+  reg(pal, id + '_pallet', 'Pallet on the THOR');
+  g.userData.setBattery = b => ct.redraw((x, w, h) => { x.fillStyle = '#111'; x.fillRect(0, 0, w, h); x.fillStyle = b < 20 ? '#ff4040' : '#5fe35f'; x.font = 'bold 52px Arial'; x.textAlign = 'center'; x.fillText('BATT ' + b + '%', w / 2, 80); });
+  g.userData.setBattery(battery);
+  const body = g.children[0];
+  reg(body, id, id === 'thor1' ? 'THOR 1' : 'THOR 2');
+  return g;
+}
+const thor1 = makeThor('thor1', 12); thor1.position.set(-1.2, 0, -5); scene.add(thor1);
+const thor2 = makeThor('thor2', 91); thor2.position.set(.2, 0, -5); scene.add(thor2);
+movable(thor1); movable(thor2);
+{ const card = box(.25, .04, .18, M(0xffffff), 0, 0, 0); card.position.set(5.8, .9, -1.9); box(.8, .9, .5, M(0x666666), 5.8, 0, -1.9); reg(card, 'disc_card', 'Discrepancy cards'); place(label('DISCREPANCY\nCARDS', .5, .2), 5.8, 1.15, -1.64); }
+
+/* ---------- flow rack zone D (decor and waste hunt) ---------- */
+for (let i = 0; i < 4; i++) {
+  const x0 = 8 + i * 3;
+  const fr = new THREE.Group(); fr.position.set(x0 + 1.4, 0, -14.4); scene.add(fr);
+  for (let l = 0; l < 4; l++) { const s = box(2.8, .04, 1, M(0x999999), 0, .5 + l * .45, 0, fr); s.rotation.x = .12; for (let k = 0; k < 5; k++) box(.45, .3, .5, M(C.cardboard), -1.1 + k * .55, .56 + l * .45, .2, fr); }
+  place(label('D' + (1 + i) + '00', .5, .25, { bg: '#FDDB33' }), x0 + 1.4, 2.6, -13.85);
+}
+solid(8, 20, -15, -13.8);
+box(12, .7, .6, M(0x555555), 14, 0, -12.9); solid(8, 20, -13.2, -12.6);   /* pick conveyor */
+
+/* ---------- pack stations ---------- */
+function packBench(x, z, name) {
+  box(2.4, .9, .8, M(0x8d6e4f), x, 0, z); solid(x - 1.2, x + 1.2, z - .4, z + .4);
+  place(label(name, .5, .25, { bg: '#FDDB33' }), x, 2.3, z - .45); box(.06, 2.2, .06, M(C.gray), x, 0, z - .45);
+}
+packBench(8, 3, 'PK03'); packBench(12, 3, 'PK04');
+box(14, .75, .6, M(0x555555), 12, 0, 1.9); solid(5, 19, 1.6, 2.2);             /* outfeed conveyor behind benches */
+for (let x = 5.3; x < 19; x += .3) box(.06, .04, .55, M(0x999999), x, .75, 1.9);
+const outfeed = box(1.2, .05, .6, HIDDEN, 12, .78, 1.9);
+reg(outfeed, 'pk_outfeed', 'Outfeed conveyor');
+/* PK04 details */
+const PK = {};
+{
+  const bx = 12, bz = 3, top = .9;
+  const mon = canvasTex(640, 400); const monM = new THREE.Mesh(new THREE.PlaneGeometry(.62, .39), new THREE.MeshBasicMaterial({ map: mon.tex }));
+  monM.position.set(bx - .8, top + .45, bz - .2); monM.rotation.y = 0; scene.add(monM); box(.66, .43, .04, M(0x111111), bx - .8, top + .24, bz - .24); box(.06, .25, .06, M(0x111111), bx - .8, top, bz - .24);
+  reg(monM, 'pk_monitor', 'Pack station screen (EWM)'); PK.mon = mon;
+  /* scale with display */
+  const scale = new THREE.Group(); box(.5, .06, .45, M(0x555555), 0, 0, 0, scale); scale.position.set(bx + .3, top, bz + .05); scene.add(scale);
+  const sd = canvasTex(256, 96); const sdm = new THREE.Mesh(new THREE.PlaneGeometry(.16, .06), new THREE.MeshBasicMaterial({ map: sd.tex })); sdm.position.set(0, .04, .23); sdm.rotation.x = -.6; scale.add(sdm);
+  reg(scale, 'pk_scale', 'Scale'); PK.scaleDisp = sd; PK.scale = scale;
+  /* infeed tote rollers */
+  box(.9, .85, .6, M(0x555555), bx - 1.75, 0, bz); for (let k = 0; k < 6; k++) box(.05, .03, .55, M(0x999999), bx - 2.1 + k * .14, .85, bz);
+  const tote = new THREE.Group(); box(.55, .3, .38, M(C.blue), 0, 0, 0, tote); tote.position.set(bx - 1.75, .88, bz); scene.add(tote);
+  const tbc = barcode('HU8000451', .2, .1, 'HU 8000451'); tbc.position.set(0, .16, .195); tote.add(tbc); PK.tote = tote; movable(tote);
+  const tote2 = new THREE.Group(); box(.55, .3, .38, M(C.blue), 0, 0, 0, tote2); tote2.position.set(bx - 1.75, .88, bz - .1); scene.add(tote2);
+  const tbc2 = barcode('HU8000452', .2, .1, 'HU 8000452'); tbc2.position.set(0, .16, .195); tote2.add(tbc2); tote2.visible = false; PK.tote2 = tote2; movable(tote2);
+  /* product pieces (appear on the bench after Unpack HU) */
+  const items = new THREE.Group(); for (let i = 0; i < 4; i++) box(.13, .05, .1, M(0xd8c7a0), -.08 + (i % 2) * .15, Math.floor(i / 2) * .055, 0, items);
+  items.position.set(bx - .3, top, bz + .15); scene.add(items); items.visible = false; reg(items, 'pk_items', 'Product (4 pieces, 5 x 4 x 2 in)'); PK.items = items; movable(items);
+  /* box stock shelf: placeholder sizes */
+  const sizes = { 2: [.23, .1, .15, '9 x 6 x 4'], 3: [.3, .15, .23, '12 x 9 x 6'], 4: [.36, .2, .3, '14 x 12 x 8'], 6: [.46, .3, .36, '18 x 14 x 12'] };
+  box(.6, 1.6, .5, M(0x777777), bx + 1.6, 0, bz - .1); solid(bx + 1.3, bx + 1.9, bz - .35, bz + .15);
+  let yy = .2;
+  for (const n of [2, 3, 4, 6]) {
+    const [w, h, d, dims] = sizes[n]; const c = carton(w, h, d, C.cardboard); c.position.set(bx + 1.6, yy, bz + .02); scene.add(c);
+    const l = label('#' + n + '\n' + dims, .22, .12, { fs: 44 }); l.position.set(bx + 1.6, yy + h + .08, bz + .16); scene.add(l);
+    reg(c, 'box' + n, `Box #${n} (${dims} in)`); movable(c); PK['box' + n] = c; yy += .4;
+  }
+  const tape = new THREE.Group(); box(.08, .14, .2, M(C.red), 0, 0, 0, tape); tape.position.set(bx + .85, top, bz + .25); scene.add(tape); reg(tape, 'pk_tape', 'Tape gun'); movable(tape);
+  const dun = new THREE.Group(); box(.4, .25, .3, M(0xe9e2d0), 0, 0, 0, dun); dun.position.set(bx - .9, top, bz + .2); scene.add(dun); reg(dun, 'pk_dunnage', 'Dunnage (paper)');
+  const printer = new THREE.Group(); box(.32, .2, .3, M(0x2b2b2b), 0, 0, 0, printer); printer.position.set(bx + .85, top, bz - .2); scene.add(printer); reg(printer, 'pk_printer', 'Label and packing-list printer');
+  const plist = new THREE.Group(); box(.21, .005, .28, M(0xffffff), 0, 0, 0, plist); plist.position.set(bx + .85, top + .21, bz - .2); scene.add(plist); plist.visible = false; reg(plist, 'pk_plist', 'Packing list'); PK.plist = plist; movable(plist);
+}
+function setScale(txt, color = '#5fe35f') { PK.scaleDisp.redraw((g, w, h) => { g.fillStyle = '#111'; g.fillRect(0, 0, w, h); g.fillStyle = color; g.font = 'bold 64px Consolas, monospace'; g.textAlign = 'center'; g.fillText(txt, w / 2, 70); }); }
+function setMonitor(title, lines, hi) {
+  PK.mon.redraw((g, w, h) => {
+    g.fillStyle = '#e8eef5'; g.fillRect(0, 0, w, h); g.fillStyle = '#0a3d7a'; g.fillRect(0, 0, w, 54);
+    g.fillStyle = '#fff'; g.font = 'bold 30px Arial'; g.fillText(title, 16, 37);
+    g.fillStyle = '#111'; g.font = '26px Arial';
+    lines.forEach((l, i) => { if (hi === i) { g.fillStyle = '#FDDB33'; g.fillRect(10, 72 + i * 40, w - 20, 36); g.fillStyle = '#111'; } g.fillText(l, 18, 98 + i * 40); });
+  });
+}
+
+/* ---------- truck pack area PK10 (Ship module) ---------- */
+const TK = {};
+{
+  const ax = 12, az = 9.5;
+  floorPaint([ax - 2.5, ax + 2.5, az - 1.5, az + 1.5], C.yellow); floorPaint([ax - 2.4, ax + 2.4, az - 1.4, az + 1.4], C.conc, .004);
+  place(label('PK10 TRUCK PACK', 1.6, .4, { bg: '#FDDB33' }), ax, 2.6, az - 1.6); box(.06, 2.5, .06, M(C.gray), ax, 0, az - 1.65);
+  const pal = makePallet(0); pal.position.set(ax, 0, az); scene.add(pal); reg(pal, 'tk_pallet', 'Empty pallet'); TK.pallet = pal;
+  const totes = new THREE.Group(); for (let i = 0; i < 2; i++) box(.55, .3, .38, M(0x6b4a2b), 0, i * .31, 0, totes); totes.position.set(ax - 1.8, 0, az + .8); scene.add(totes);
+  const tbc = barcode('HU8000777', .2, .1, 'HU 8000777'); tbc.position.set(0, .45, .195); totes.add(tbc); TK.totes = totes;
+  const c48 = carton(.55, .4, .45, C.cardboard, '48 LB'), c20 = carton(.5, .3, .4, C.cardboard, '20 LB'), c6 = carton(.35, .25, .3, C.cardboard, 'LOOSE PARTS');
+  c48.position.set(ax + 1.6, 0, az - .7); c20.position.set(ax + 1.6, 0, az); c6.position.set(ax + 1.6, 0, az + .7);
+  for (const [c, id, n] of [[c48, 'tk_c48', '48 lb case'], [c20, 'tk_c20', '20 lb case'], [c6, 'tk_c6', 'Repack carton (loose parts)']]) { scene.add(c); reg(c, id, n); movable(c); TK[id] = c; }
+  const wrap = new THREE.Group(); box(.1, 1.2, .1, M(0x444444), 0, 0, 0, wrap); const roll = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, .5, 16), new THREE.MeshStandardMaterial({ color: 0xdfe8ee, transparent: true, opacity: .7 })); roll.position.set(.12, 1, 0); wrap.add(roll);
+  wrap.position.set(ax - 1.4, 0, az - .9); scene.add(wrap); reg(wrap, 'tk_wrap', 'Stretch wrap');
+  const pr = new THREE.Group(); box(.5, .9, .4, M(0x666666), 0, 0, 0, pr); box(.32, .2, .3, M(0x2b2b2b), 0, .9, 0, pr); pr.position.set(ax + 2.1, 0, az + 1.1); scene.add(pr); reg(pr, 'tk_printer', 'BOL printer');
+  const bol = new THREE.Group(); box(.21, .01, .28, M(0xffffff), 0, 0, 0, bol); bol.position.set(ax + 2.1, 1.12, az + 1.1); scene.add(bol); bol.visible = false; reg(bol, 'tk_bol', 'Packing list, shipping label and BOL'); TK.bol = bol; movable(bol);
+  const wrapSkin = new THREE.Mesh(GEO, new THREE.MeshStandardMaterial({ color: 0xdfe8ee, transparent: true, opacity: .35 })); wrapSkin.scale.set(1.25, .85, 1.05); wrapSkin.position.set(0, .55, 0); pal.add(wrapSkin); wrapSkin.visible = false; TK.wrapSkin = wrapSkin;
+}
+/* staging lanes */
+const LANES = [];
+for (let i = 0; i < 5; i++) {
+  const x = -20 + i * 2.5, id = 'L0' + (i + 1);
+  floorPaint([x - 1.05, x - .95, 4, 12], C.yellow); floorPaint([x + .95, x + 1.05, 4, 12], C.yellow);
+  const lb = barcode('LANE-' + id, .5, .25, id); lb.rotation.x = -Math.PI / 2 + .5; lb.position.set(x, .3, 12.4); scene.add(lb);
+  box(.5, .3, .1, M(0x333333), x, 0, 12.55);
+  LANES.push({ id, x });
+}
+place(label('LEAD HUB', 1.2, .4, { bg: '#FDDB33' }), -7.5, 2.4, 12.6, Math.PI); box(1.4, 1, .6, M(0x445566), -7.5, 0, 12.8); solid(-8.2, -6.8, 12.5, 13.1);
+place(label('STAGING', 1.4, .4, { bg: '#FDDB33' }), -15, 3, 3.6);
+/* dock and trailer */
+{
+  floorPaint([-15.5, -12.5, 16.5, 18], C.yellow);
+  const dl = new THREE.Group(); box(.3, .4, .1, M(0x222222), 0, 0, 0, dl); const lamp = new THREE.Mesh(new THREE.SphereGeometry(.06, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff2020 })); lamp.position.set(0, .2, .07); dl.add(lamp);
+  dl.position.set(-11.8, 1.3, 17.95); dl.rotation.y = Math.PI; scene.add(dl); reg(dl, 'dock_lock', 'Dock lock and light'); TK.lamp = lamp;
+  place(label('DOOR 4', .8, .3, { bg: '#FDDB33' }), -14, 4.3, 17.95, Math.PI);
+  const tr = new THREE.Group(); tr.position.set(-14, 0, 18.3); scene.add(tr);
+  box(2.6, .05, 12, M(0x8a7a66), 0, -.02, 6, tr); box(.08, 2.8, 12, M(0xbfc5c9), -1.3, 0, 6, tr); box(.08, 2.8, 12, M(0xbfc5c9), 1.3, 0, 6, tr); box(2.6, .08, 12, M(0xbfc5c9), 0, 2.8, 6, tr); box(2.6, 2.8, .08, M(0xbfc5c9), 0, 0, 12, tr);
+  solid(-15.4, -15.2, 18, 30.5); solid(-12.8, -12.6, 18, 30.5); solid(-15.4, -12.6, 30.3, 30.6);
+}
+
+/* ---------- people (simple mannequins) ---------- */
+function person(x, z, ry, vest = 0xc6ff2e) {
+  const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CapsuleGeometry(.2, .9, 4, 10), M(vest)); body.position.y = .85; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.13, 14, 10), M(0xd9a982)); head.position.y = 1.62; g.add(head);
+  const legs = box(.32, .6, .2, M(0x2b3a55), 0, 0, 0, g);
+  g.position.set(x, 0, z); g.rotation.y = ry; (ROOT || scene).add(g); return g;
+}
+
+/* ============================================================
+   THE FORKLIFT (counterbalance, sit-down). Forks point to local +z.
+   ============================================================ */
+const F = { pos: new THREE.Vector3(-2, 0, 12.2), heading: Math.PI, v: 0, steer: 0, h: .05, tilt: 0, load: null, onboard: false, honkT: -99, inserted: null, lookYaw: 0, defect: null, lastV: {}, prevIn: {} };
+const truck = new THREE.Group(); scene.add(truck);
+const TR_ = {};
+{
+  const y = M(C.yellow), k = M(0x1b1b1b), g = M(0x444444);
+  box(1.1, .55, 1.7, y, 0, .25, -.15, truck);                 /* body */
+  box(1.1, .55, .45, k, 0, .25, -1.15, truck);                /* counterweight */
+  box(.55, .1, .5, k, 0, .95, -.35, truck);                   /* seat */
+  box(.55, .55, .1, k, 0, .95, -.62, truck);                  /* seat back */
+  const wheel = new THREE.CylinderGeometry(.28, .28, .2, 18); wheel.rotateZ(Math.PI / 2);
+  for (const [x, z, r] of [[-.6, .55, .28], [.6, .55, .28], [-.55, -.95, .22], [.55, -.95, .22]]) { const w = new THREE.Mesh(wheel, k); w.scale.setScalar(r / .28); w.position.set(x, r, z); truck.add(w); if (x > 0 && z > 0) TR_.tireR = w; }
+  for (const [x, z] of [[-.5, .45], [.5, .45], [-.5, -.75], [.5, -.75]]) box(.06, 1.35, .06, k, x, .8, z, truck);   /* overhead guard posts */
+  box(1.06, .06, 1.26, k, 0, 2.12, -.15, truck);
+  const sw = new THREE.Mesh(new THREE.TorusGeometry(.14, .02, 8, 20), k); sw.position.set(0, 1.25, .12); sw.rotation.x = -1.0; truck.add(sw);
+  box(.3, .25, .2, k, 0, .8, .25, truck);                     /* dash */
+  /* mast group pivots at the front axle for tilt */
+  const mast = new THREE.Group(); mast.position.set(0, .28, .72); truck.add(mast); TR_.mast = mast;
+  for (const x of [-.36, .36]) box(.09, 2.3, .12, g, x, -.25, 0, mast);
+  const carriage = new THREE.Group(); mast.add(carriage); TR_.carriage = carriage;
+  box(.85, .4, .06, g, 0, -.28, .08, carriage);
+  const forkM = M(0x2a2a2a);
+  TR_.forkL = box(.11, .05, 1.1, forkM, -.3, -.33, .65, carriage); box(.11, .5, .05, forkM, -.3, -.33, .1, carriage);
+  TR_.forkR = box(.11, .05, 1.1, forkM, .3, -.33, .65, carriage); box(.11, .5, .05, forkM, .3, -.33, .1, carriage);
+  const chain = box(.03, 2.0, .03, M(0x999999), -.15, -.2, -.05, mast); TR_.chain = chain; box(.03, 2.0, .03, M(0x999999), .15, -.2, -.05, mast);
+  const hose = box(.04, 1.8, .04, M(0x000000), .22, -.25, -.08, mast); TR_.hose = hose;
+  const blue = new THREE.Mesh(new THREE.SphereGeometry(.05, 10, 8), new THREE.MeshBasicMaterial({ color: 0x3060ff })); blue.position.set(0, 2.2, -.8); truck.add(blue); TR_.blue = blue;
+  const plate = label('DATA PLATE\nCAP 5000 LB @ 24 IN', .3, .14); plate.position.set(.56, .55, -.2); plate.rotation.y = Math.PI / 2; truck.add(plate); TR_.plate = plate;
+  /* defect visuals */
+  TR_.puddle = new THREE.Mesh(new THREE.CircleGeometry(.45, 24), new THREE.MeshStandardMaterial({ color: 0x3a2a10, roughness: .1, metalness: .3 })); TR_.puddle.rotation.x = -Math.PI / 2; TR_.puddle.position.set(.1, .006, .7); truck.add(TR_.puddle);
+  TR_.crack = box(.115, .02, .04, M(0xff2020), -.3, -.31, .2, carriage);
+  TR_.chunk = box(.06, .12, .16, M(C.yellow), .7, .38, .55, truck);
+  /* inspection hotspots */
+  const hot = (id, name, x, yy, z, parent = truck) => { const m = new THREE.Mesh(new THREE.SphereGeometry(.08, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfddb33, transparent: true, opacity: .85 })); m.position.set(x, yy, z); parent.add(m); reg(m, id, name); TR_[id] = m; return m; };
+  hot('insp_forks', 'Forks', 0, -.2, 1.0, carriage); hot('insp_chains', 'Lift chains', -.15, 1.4, .05, mast); hot('insp_hyd', 'Hydraulic hoses', .22, .5, .02, mast);
+  hot('insp_tires', 'Tires and wheels', .78, .3, .55); hot('insp_horn', 'Horn', 0, 1.0, .38); hot('insp_lights', 'Lights and blue spot', 0, 2.25, -.8);
+  hot('insp_belt', 'Seatbelt', .32, 1.15, -.4); hot('insp_plate', 'Data plate', .62, .55, -.2);
+  const seatHit = box(.6, .7, .6, HIDDEN, 0, .9, -.4, truck); reg(seatHit, 'fl_seat', 'Forklift seat');
+}
+const INSP = [
+  { id: 'insp_forks', name: 'Forks', ok: 'Both forks straight. No cracks at the heel. Locking pins in.', bad: 'A crack runs across the heel of the left fork.' },
+  { id: 'insp_chains', name: 'Lift chains', ok: 'Both chains even and oiled. No kinks or broken links.', bad: 'The left lift chain hangs slack and has a stiff, kinked link.' },
+  { id: 'insp_hyd', name: 'Hydraulic hoses', ok: 'Hoses dry. Nothing under the mast.', bad: 'Fluid drips from a mast hose. There is a puddle under the truck.' },
+  { id: 'insp_tires', name: 'Tires and wheels', ok: 'Tires whole. No chunks missing. Lug nuts tight.', bad: 'A large chunk is missing from the right drive tire.' },
+  { id: 'insp_horn', name: 'Horn', ok: 'You press it: loud and clear.', bad: 'You press it: nothing.' },
+  { id: 'insp_lights', name: 'Lights and blue spot', ok: 'Headlights, strobe and blue spot all work.', bad: 'The blue warning spot does not come on.' },
+  { id: 'insp_belt', name: 'Seatbelt', ok: 'Latches, holds and retracts. No fraying.', bad: 'The webbing is frayed and the latch does not hold.' },
+  { id: 'insp_plate', name: 'Data plate', ok: 'Data plate there and readable: 5000 lb at 24 in.', bad: 'The data plate is painted over. You cannot read the capacity.' }
+];
+function setDefect(id) {
+  F.defect = id;
+  TR_.puddle.visible = id === 'insp_hyd'; TR_.crack.visible = id === 'insp_forks'; TR_.chunk.visible = id === 'insp_tires';
+  TR_.blue.material.color.set(id === 'insp_lights' ? 0x222222 : 0x3060ff);
+  TR_.chain.scale.y = id === 'insp_chains' ? 1.7 : 2.0;
+}
+function inspHotspots(on) { for (const it of INSP) TR_[it.id].visible = on; }
+/* the pallet the forklift module moves */
+const recvPallet = makePallet(2); scene.add(recvPallet);
+recvPallet.position.set(-5, 0, 5.5); movable(recvPallet);
+const PALLETS = [recvPallet];
+function resetTruck() {
+  F.pos.set(-2, 0, 12.2); F.heading = Math.PI; F.v = 0; F.steer = 0; F.h = .05; F.tilt = 0; F.onboard = false; F.honkT = -99; F.inserted = null; F.lookYaw = 0; F.prevIn = {};
+  if (F.load) { scene.attach(F.load); F.load = null; }
+  for (const s of Object.values(SLOTS)) if (PALLETS.includes(s.filled)) s.filled = null;
+  setDefect(null); inspHotspots(false); placeTruck();
+}
+function placeTruck() {
+  truck.position.copy(F.pos); truck.rotation.y = F.heading;
+  TR_.carriage.position.y = F.h; TR_.mast.rotation.x = -F.tilt;
+  truck.updateMatrixWorld(true);
+}
+resetTruck();
+
+/* ============================================================
+   UI PANEL: one state drawn to the PC HUD and to a 3D panel for VR
+   ============================================================ */
+const PW = 1024, PH = 1024;
+const panelCT = canvasTex(PW, PH);
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(.8, .8), new THREE.MeshBasicMaterial({ map: panelCT.tex }));
+panel.visible = false; scene.add(panel);
+let P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '' };
+let panelRects = [];
+let toastMsg = null;
+function setPanel(p) { P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; drawPanel(); drawHud(); }
+function drawPanel() {
+  panelCT.redraw((g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = '#fff'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, 96); g.fillStyle = '#FDDB33'; g.fillRect(0, 96, w, 10);
+    g.fillStyle = '#FDDB33'; g.font = 'bold 44px Calibri, Arial'; g.fillText(P.title.slice(0, 40), 24, 62);
+    let y = 150; g.fillStyle = '#595959'; g.font = '30px Calibri, Arial'; if (P.sub) { g.fillText(P.sub, 24, y); y += 46; }
+    g.fillStyle = '#111'; g.font = '36px Calibri, Arial';
+    for (const l of wrapText(g, P.text, w - 48)) { g.fillText(l, 24, y); y += 42; }
+    if (P.rf) { const lines = P.rf; const hh = 20 + lines.length * 36; g.fillStyle = '#10233a'; g.fillRect(24, y, w - 48, hh); g.fillStyle = '#9fe39f'; g.font = '30px Consolas, monospace'; lines.forEach((l, i) => g.fillText(l, 40, y + 42 + i * 36)); y += hh + 16; }
+    if (P.why) { g.font = '30px Calibri, Arial'; const wl = wrapText(g, 'WHY: ' + P.why, w - 72); g.fillStyle = '#FEF6CC'; g.fillRect(24, y, w - 48, 16 + wl.length * 34); g.fillStyle = '#FDDB33'; g.fillRect(24, y, 8, 16 + wl.length * 34); g.fillStyle = '#333'; wl.forEach((l, i) => g.fillText(l, 44, y + 38 + i * 34)); y += 30 + wl.length * 34; }
+    /* buttons, 2 columns, bottom up */
+    panelRects = [];
+    const n = P.btns.length, cols = n > 3 ? 2 : 1, bw = cols === 2 ? (w - 72) / 2 : w - 48, bh = 74;
+    const rows = Math.ceil(n / cols); let by = Math.max(y + 10, h - 70 - rows * (bh + 12));
+    g.font = 'bold 32px Calibri, Arial';
+    P.btns.forEach((b, i) => {
+      const cx = 24 + (i % cols) * (bw + 24), cy = by + Math.floor(i / cols) * (bh + 12);
+      g.fillStyle = b.hot ? '#FDDB33' : '#fff'; g.fillRect(cx, cy, bw, bh); g.strokeStyle = '#000'; g.lineWidth = 4; g.strokeRect(cx, cy, bw, bh);
+      g.fillStyle = '#000'; const lines = wrapText(g, b.label, bw - 30).slice(0, 2);
+      lines.forEach((l, k) => g.fillText(l, cx + 16, cy + (lines.length === 1 ? 48 : 32 + k * 32)));
+      panelRects.push({ x: cx, y: cy, w: bw, h: bh, i });
+    });
+    if (toastMsg) { g.fillStyle = toastMsg.kind === 'bad' ? '#C00000' : toastMsg.kind === 'good' ? '#2E7D32' : '#000'; g.fillRect(0, h - 64, w, 64); g.fillStyle = '#fff'; g.font = 'bold 30px Calibri, Arial'; g.fillText(toastMsg.text.slice(0, 60), 20, h - 22); }
+    else if (P.foot) { g.fillStyle = '#595959'; g.font = '28px Calibri, Arial'; g.fillText(P.foot.slice(0, 70), 24, h - 22); }
+  });
+}
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function drawHud() {
+  $('#hTitle').textContent = P.title; $('#hSub').textContent = P.sub; $('#hText').textContent = P.text;
+  const rf = $('#hRF'); rf.style.display = P.rf ? 'block' : 'none'; rf.textContent = P.rf ? P.rf.join('\n') : '';
+  const wy = $('#hWhy'); wy.style.display = P.why ? 'block' : 'none'; wy.textContent = P.why ? 'Why: ' + P.why : '';
+  const bb = $('#hBtns'); bb.innerHTML = '';
+  P.btns.forEach((b, i) => { const e = document.createElement('button'); e.innerHTML = `<span class="n">${i + 1}</span> ${esc(b.label)}`; e.onclick = () => b.fn(); bb.appendChild(e); });
+  $('#hFoot').textContent = P.foot;
+}
+let toastTimer = 0;
+function toast(text, kind = 'info', secs = 2.6) {
+  const t = $('#toast'); t.textContent = text; t.className = kind; t.style.display = 'block';
+  toastMsg = { text, kind }; drawPanel(); clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.display = 'none'; toastMsg = null; drawPanel(); }, secs * 1000);
+}
+function pressPanelButton(i) { const b = P.btns[i]; if (b) { beep(800, .05); b.fn(); } }
+addEventListener('keydown', e => { if (e.key >= '1' && e.key <= '9') pressPanelButton(+e.key - 1); });
+
+/* ---------- sound ---------- */
+let AC = null;
+function beep(f = 1200, d = .08, type = 'square', vol = .06) {
+  try { AC = AC || new AudioContext(); const o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.value = f; g.gain.value = vol; o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime + d); } catch (e) { }
+}
+const honk = () => { beep(392, .35, 'sawtooth', .08); beep(494, .35, 'sawtooth', .05); F.honkT = now(); };
+const now = () => performance.now() / 1000;
+
+/* ============================================================
+   STEP ENGINE
+   ============================================================ */
+const S = { mod: null, i: 0, k: 0, t0: 0, mistakes: [], viol: [], held: null, sub: null, inspected: {}, phase: 'menu', guide: localStorage.getItem(LS_GUIDE) !== '0', found: {} };
+const cur = () => S.mod && S.mod.steps[S.i];
+function mistake(msg) { S.mistakes.push({ step: S.i + 1, title: cur() ? cur().title : '', msg }); beep(160, .25, 'sawtooth', .07); toast(msg, 'bad', 3.4); }
+function violation(msg, key) {
+  const t = now(); if (F.lastV[key] && t - F.lastV[key] < 4) return; F.lastV[key] = t;
+  S.viol.push({ step: S.i + 1, msg }); beep(140, .4, 'sawtooth', .08); toast('SAFETY: ' + msg, 'bad', 3.6);
+}
+function good(msg) { beep(1400, .06); beep(1800, .06); if (msg) toast(msg, 'good', 1.6); }
+
+const MODS = {};
+function startModule(id) {
+  const m = MODS[id]; S.mod = m; S.i = 0; S.k = 0; S.t0 = now(); S.mistakes = []; S.viol = []; S.held = null; S.sub = null; S.inspected = {}; S.found = {}; S.phase = 'run';
+  resetMovables(); resetTruck(); setupScene(id);
+  m.setup && m.setup();
+  placePlayer(m.start.x, m.start.z, m.start.yaw);
+  enterStep();
+}
+function enterStep() {
+  const st = cur(); if (!st) return finish();
+  if (st.skipIf && st.skipIf()) { S.i++; return enterStep(); }
+  S.k = 0; S.sub = null;
+  st.enter && st.enter();
+  showStep();
+  if (renderer.xr.isPresenting) placePanelVR(true);
+}
+function next() { const st = cur(); st && st.after && st.after(); S.i++; enterStep(); }
+function showStep() {
+  const st = cur(), m = S.mod; if (!st) return;
+  if (S.sub) return setPanel(S.sub);
+  let btns = [];
+  if (st.type === 'info') btns = [{ label: st.btn || 'Continue', fn: next }];
+  else if (st.type === 'choice') btns = st.opts.map((o, j) => ({ label: o, fn: () => answer(j) }));
+  else if (st.type === 'keys') btns = st.pad.map(k => ({ label: k, fn: () => pressKey(k) }));
+  else if (st.type === 'inspect') btns = [];
+  const doing = { interact: 'Use the highlighted item.', scan: 'Point at the barcode and pull the trigger (PC: click it).', carry: S.held ? 'Now put it where it goes.' : 'Pick it up.', order: 'Load them in the right order.', drive: '', inspect: `Checked ${Object.keys(S.inspected).length} of ${INSP.length}. Use each yellow dot.` }[st.type] || '';
+  setPanel({ title: st.title, sub: `${m.name} · step ${S.i + 1} of ${m.steps.length}`, text: st.text + (doing && st.type !== 'drive' ? '\n\n' + doing : ''), why: st.why || '', rf: typeof st.rf === 'function' ? st.rf() : st.rf || null, btns, foot: footText() });
+}
+function footText() { const t = Math.round(now() - S.t0); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}  ·  mistakes ${S.mistakes.length}  ·  safety ${S.viol.length}` + (F.onboard ? `  ·  ${Math.abs(F.v).toFixed(1)} m/s  forks ${(F.h * 39.37).toFixed(0)} in  ${F.tilt < -.02 ? 'tilt back' : F.tilt > .02 ? 'tilt fwd' : 'level'}` : ''); }
+function isCorrect(st, j) { return Array.isArray(st.correct) ? st.correct.includes(j) : st.correct === j; }
+function answer(j) {
+  const st = cur(); if (!st || st.type !== 'choice') return;
+  if (isCorrect(st, j)) { good(); st.onDone && st.onDone(j); next(); }
+  else { const fb = st.fb && st.fb[j]; if (st.critical) violation(fb || 'Not safe.', 'c' + S.i + j); else mistake(fb || 'Not what the SW says. Read the step again.'); }
+}
+function pressKey(k) {
+  const st = cur(); if (!st || st.type !== 'keys') return;
+  if (st.seq[S.k] === k) { beep(1000, .04); S.k++; if (S.k >= st.seq.length) { good(); st.onDone && st.onDone(); next(); } else toast(st.seq.slice(0, S.k).join(' > ') + ' ...', 'info', 1.2); }
+  else { S.k = 0; mistake(st.fb || `Wrong key. The SW says: ${st.seq.join(', ')}.`); }
+}
+function onInteract(iid, hand) {
+  if (S.phase === 'hunt') return huntHit(iid);
+  const st = cur(); if (!st) return;
+  const o = OBJ[iid], name = o ? o.userData.name : iid;
+  const want = t => Array.isArray(t) ? t.includes(iid) : t === iid;
+  if (st.type === 'interact') {
+    if (want(st.target)) { good(); st.onHit && st.onHit(); next(); }
+    else if (st.wrong && st.wrong[iid]) mistake(st.wrong[iid]);
+    else toast(name, 'info', 1.2);
+  } else if (st.type === 'scan') {
+    if (!o || !o.userData.code) return toast(name + ' (not a barcode)', 'info', 1.2);
+    if (o.userData.code === st.code) { beep(1900, .07, 'sine', .1); st.onHit && st.onHit(); next(); }
+    else mistake(`Scanned ${o.userData.code}. The RF wants ${st.codeShow || st.code}.`);
+  } else if (st.type === 'carry') {
+    if (!S.held && iid === st.item) { hold(o, hand); good(); showStep(); }
+    else if (S.held && want(st.dest)) { drop(st); good(); next(); }
+    else if (S.held) toast('That is not where it goes.', 'info', 1.4);
+    else toast(name, 'info', 1.2);
+  } else if (st.type === 'order') {
+    if (iid === st.seq[S.k]) { st.place(iid, S.k); good(); S.k++; if (S.k >= st.seq.length) next(); else showStep(); }
+    else if (st.seq.includes(iid)) mistake(st.fb || 'Wrong order.');
+    else toast(name, 'info', 1.2);
+  } else if (st.type === 'inspect') {
+    const it = INSP.find(x => x.id === iid); if (!it) return toast(name, 'info', 1.2);
+    const bad = F.defect === iid;
+    S.sub = { title: it.name, sub: 'Pre-shift inspection', text: 'You look: ' + (bad ? it.bad : it.ok), btns: [
+      { label: 'OK', fn: () => inspAnswer(it, false) }, { label: 'Defect: report it', fn: () => inspAnswer(it, true) }], foot: footText() };
+    setPanel(S.sub); if (renderer.xr.isPresenting) placePanelVR(true);
+  }
+}
+function inspAnswer(it, saidBad) {
+  const bad = F.defect === it.id;
+  if (bad && !saidBad) violation(`Missed a defect: ${it.name}. ${it.bad}`, 'insp' + it.id);
+  else if (!bad && saidBad) mistake(`${it.name} was fine: ${it.ok}`);
+  else good();
+  if (bad === saidBad || bad) { S.inspected[it.id] = 1; TR_[it.id].visible = false; }
+  S.sub = null;
+  if (Object.keys(S.inspected).length >= INSP.length) { inspHotspots(false); next(); } else showStep();
+}
+function hold(o, hand) {
+  S.held = o; const h = hand && hand.isObject3D ? hand : camera;
+  o.userData.s0 = o.scale.clone(); h.attach(o); o.scale.copy(o.userData.s0).multiplyScalar(.5); o.position.set(0, h === camera ? -.25 : 0, h === camera ? -.55 : -.12); o.quaternion.identity(); if (h === camera) o.rotation.y = 0;
+}
+function drop(st) {
+  const o = S.held; S.held = null; if (o.userData.s0) o.scale.copy(o.userData.s0);
+  if (st.dropAt) { scene.attach(o); const p = st.dropAt(); o.position.copy(p); o.rotation.set(0, 0, 0); }
+  else o.visible = false;
+}
+
+/* results, records and the kaizen card */
+function finish() {
+  const m = S.mod, secs = Math.round(now() - S.t0);
+  const score = Math.max(0, 100 - 5 * S.mistakes.length - 10 * S.viol.length), pass = score >= 80 && !S.viol.some(v => /Missed a defect|struck/i.test(v.msg));
+  const rec = { name: trainee(), module: m.name, date: new Date().toISOString().slice(0, 16).replace('T', ' '), secs, mistakes: S.mistakes.length, safety: S.viol.length, score, pass: pass ? 'PASS' : 'RETRY', notes: [...S.viol, ...S.mistakes].map(x => `#${x.step} ${x.msg}`).join(' | ') };
+  const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'); recs.push(rec); localStorage.setItem(LS_REC, JSON.stringify(recs));
+  S.phase = 'done'; S.lastRec = rec;
+  const top = [...S.viol.map(v => 'SAFETY #' + v.step + ': ' + v.msg), ...S.mistakes.map(x => '#' + x.step + ': ' + x.msg)].slice(0, 5);
+  setPanel({ title: `${m.name}: ${pass ? 'PASS' : 'RETRY'}`, sub: `${trainee()} · ${Math.floor(secs / 60)} min ${secs % 60} s`, text: `Score ${score} of 100. Mistakes ${S.mistakes.length}, safety ${S.viol.length}.` + (top.length ? '\n\n' + top.join('\n') : '\n\nClean run.') + (m.target ? '\n\nFloor target: ' + m.target : ''), btns: [{ label: 'Kaizen card: what slowed you down?', fn: kaizenCard, hot: true }, { label: 'Run it again', fn: () => startModule(m.id) }, { label: 'Menu', fn: menu }] });
+  if (renderer.xr.isPresenting) placePanelVR(true);
+}
+const TIMWOODS = ['Transport', 'Inventory', 'Motion', 'Waiting', 'Overproduction', 'Over-processing', 'Defects', 'Skills (unused talent)'];
+function kaizenCard() {
+  setPanel({ title: 'Kaizen card', sub: S.mod.name, text: 'Which waste did you notice in this process? Pick one. It goes on the idea list for the CI board.' + (renderer.xr.isPresenting ? '' : '\nOn a PC you can add a note after you pick.'), btns: [...TIMWOODS.map(w => ({ label: w, fn: () => saveIdea(w) })), { label: 'Nothing to add', fn: menu }] });
+}
+function saveIdea(waste) {
+  let note = '';
+  if (!renderer.xr.isPresenting) { document.exitPointerLock && document.exitPointerLock(); note = prompt(`${waste}: what did you see, and what would you change?`) || ''; }
+  const ideas = JSON.parse(localStorage.getItem(LS_IDEA) || '[]'); ideas.push({ name: trainee(), module: S.mod ? S.mod.name : 'Waste hunt', date: new Date().toISOString().slice(0, 16).replace('T', ' '), waste, note }); localStorage.setItem(LS_IDEA, JSON.stringify(ideas));
+  toast('Saved to the idea list.', 'good'); menu();
+}
+function menu() {
+  S.phase = 'menu'; S.mod = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
+  setPanel({ title: 'Arden DC Trainer', sub: trainee() ? 'Trainee: ' + trainee() : 'Set your name with Trainee', text: 'Pick a module. Every step follows the current standard work, and each one tells you why.', btns: [
+    { label: '1 Forklift (PIT): inspect, drive, put away', fn: () => startModule('pit') },
+    { label: '2 Pick: induction and Pallet Land', fn: () => startModule('pick') },
+    { label: '3 Pack: parcel core process', fn: () => startModule('pack') },
+    { label: '4 Ship: truck pack, stage, dock', fn: () => startModule('ship') },
+    { label: '5 Gemba waste hunt (TIMWOODS)', fn: startHunt },
+    { label: 'Guide arrows: ' + (S.guide ? 'on' : 'off'), fn: () => { S.guide = !S.guide; localStorage.setItem(LS_GUIDE, S.guide ? '1' : '0'); menu(); } }] });
+  if (renderer.xr.isPresenting) placePanelVR(true);
+}
+function setupScene(id) {
+  inspHotspots(false); setDefect(null);
+  setScale('0.0 lb'); setMonitor('SAP EWM - Pack station', ['Log in to start.']);
+  TK.wrapSkin.visible = false; TK.lamp.material.color.set(0xff2020); thor1.userData.setBattery(12);
+  for (const sid of ['P104-B']) SLOTS[sid].filled = null;
+}
+
+/* ============================================================
+   MODULES (content from Andrew's SW; PIT is generic until Arden PIT SW exists)
+   ============================================================ */
+const info = (title, text, why, o = {}) => ({ type: 'info', title, text, why, ...o });
+const choice = (title, text, opts, correct, why, o = {}) => ({ type: 'choice', title, text, opts, correct, why, ...o });
+const act = (title, text, target, why, o = {}) => ({ type: 'interact', title, text, target, why, ...o });
+const scan = (title, text, code, why, o = {}) => ({ type: 'scan', title, text, code, why, target: 'bc:' + code, ...o });
+const keys = (title, text, seq, pad, why, o = {}) => ({ type: 'keys', title, text, seq, pad, why, ...o });
+const carry = (title, text, item, dest, why, o = {}) => ({ type: 'carry', title, text, item, dest, why, target: item, ...o });
+const drive = (title, text, check, why, o = {}) => ({ type: 'drive', title, text, check, why, ...o });
+
+/* ---------- 1. Forklift ---------- */
+const SLOT_T = 'P104-B';
+MODS.pit = {
+  id: 'pit', name: 'Forklift (PIT)', start: { x: 0, z: 12.5, yaw: Math.PI / 2 },
+  target: 'zero safety calls. PIT is the one training Arden refreshes on a schedule.',
+  setup() { setDefect(Math.random() < .85 ? INSP[Math.floor(Math.random() * INSP.length)].id : null); },
+  steps: [
+    info('Before you start', 'This module covers a sit-down counterbalance truck: pre-shift inspection, travel rules, picking up a pallet, putting it away at height and parking.\n\nThe PIT rules here are general OSHA basics. Where Arden has its own PIT standard work, that wins.', 'You learn the order of the job before you touch the truck.'),
+    choice('Who may drive', 'Who is allowed to operate a forklift here?', ['Anyone with a driver\'s license', 'Only operators trained and evaluated on this type of truck', 'Anyone a coworker has shown how to drive', 'Anyone, if the lead says it is busy'], 1, 'OSHA requires training and a hands-on evaluation for each truck type, and a refresher at least every 3 years.', { critical: true, fb: ['A car license does not cover a PIT.', '', 'Being shown is not being trained and evaluated.', 'Being busy never changes who is qualified.'] }),
+    act('Walk to the truck', 'Walk to the yellow forklift parked in PIT Charging.', 'insp_forks', 'The inspection happens before the shift, at the truck, with the truck off.', { target: ['insp_forks', 'insp_chains', 'insp_hyd', 'insp_tires', 'insp_horn', 'insp_lights', 'insp_belt', 'insp_plate', 'fl_seat'], enter() { inspHotspots(true); }, onHit() { } }),
+    { type: 'inspect', title: 'Pre-shift inspection', text: 'Check every yellow dot on the truck. Each one: OK, or a defect you report.', why: 'A defect found in the charging area is a work order. The same defect found in the aisle is an incident.', enter() { inspHotspots(true); S.inspected = {}; } },
+    choice('You found a defect', 'The truck failed inspection. What do you do?', ['Use it carefully and report it at break', 'Tag it out of service, leave it parked, tell your lead, take another truck', 'Fix it yourself so you can start', 'Use it, the next shift will catch it'], 1, 'A tagged truck cannot hurt anyone. Maintenance fixes it, not the operator.', { critical: true, skipIf: () => !F.defect, fb: ['Driving a known defect is how incidents happen.', '', 'Operators do not repair trucks.', 'Never pass a defect on.'], onDone() { setDefect(null); toast('Truck tagged out. A spare truck of the same type is assigned.', 'good', 3); } }),
+    act('Get on', 'Get on the truck: use the seat.', 'fl_seat', 'Mount facing the truck.'),
+    choice('Mounting', 'How do you get on and off?', ['Face the truck, three points of contact, use the step and grab handle', 'Jump up from the side', 'Step up on the forks', 'Whatever is fastest'], 0, 'Most PIT injuries off the job site are slips getting on and off.', { fb: ['', 'Jumping is how ankles go.', 'Never stand on the forks.', 'Three points of contact, every time.'], onDone() { mountTruck(); } }),
+    choice('Seated', 'First thing once you are seated?', ['Fasten the seatbelt', 'Raise the forks so you are ready', 'Drive off, the belt slows you down', 'Sound the horn'], 0, 'In a tip-over the belt keeps you inside the overhead guard. Jumping out is what kills.', { critical: true, fb: ['', 'Forks stay low.', 'Belt first. Always.', 'Belt first.'] }),
+    info('Controls', 'PC: W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.\nQuest: left stick drives and steers, right stick up/down lifts, right stick left/right tilts, A is the horn.\n\nTravel with the forks 4 to 6 in off the floor. The panel bottom shows speed and fork height.', 'Forks low and tilted back keep the load stable and the forks out of people\'s legs.'),
+    drive('Drive to the pallet', 'Drive to the receiving drop (purple square). Forks low. Stay out of the green walkway.', () => F.pos.distanceTo(recvPallet.position) < 4.2, 'Pedestrians own the walkway. A PIT never enters it.', { target: 'recv' }),
+    drive('Pick up the pallet', 'Square up to the pallet. Forks flat at floor height, drive straight in until the pallet touches the carriage, lift a few inches, tilt back.', () => F.load === recvPallet && F.h > .12, 'Forks all the way in spreads the load on the forks. Tilt back cradles it.', { target: 'recv' }),
+    drive('Go to Pallet Land', 'Take the pallet to the Pallet Land aisle. Stop at the striped intersection and sound the horn before you enter.', () => F.load === recvPallet && inRect(F.pos.x, F.pos.z, ZONE.aisle), 'Rack ends are blind corners. The horn tells people you are coming.', { target: 'aisleStop' }),
+    drive('Put it away in P104-B', `Put the pallet on level B (beam at 1.6 m) of bay P104, north side. Stop square to the rack, raise the load above the beam, ease in, lower it onto the beam, then back straight out.`, () => SLOTS[SLOT_T].filled === recvPallet && !F.load, 'Raise only when stopped and square. Lower onto the beam before you back out, or you drag the pallet off the rack.', { target: 'slot' }),
+    drive('Park it', 'Lower the forks to the floor, back out of the aisle (horn at the intersection) and park in PIT Charging. Come to a full stop.', () => inRect(F.pos.x, F.pos.z, ZONE.charger) && F.h < .07 && Math.abs(F.v) < .05, 'A parked truck with forks up is a trip and shin hazard.', { target: 'charger' }),
+    choice('Shut down', 'Before you get off, the truck must be:', ['Forks flat on the floor, neutral, park brake set, power off', 'Forks raised so the next driver is ready', 'Left running for the next person', 'Parked in the walkway so it is easy to find'], 0, 'A truck left running or with forks up can move or be hit. Off and flat is the only safe state.', { critical: true, fb: ['', 'Forks up is a hazard.', 'Never leave it running unattended.', 'Never in the walkway.'], onDone() { dismountTruck(); } })
+  ]
+};
+
+/* ---------- 2. Pick ---------- */
+const RF_HEAD = '415  RF  W/H 0103';
+MODS.pick = {
+  id: 'pick', name: 'Pick: Pallet Land', start: { x: .5, z: -2, yaw: 0 }, target: 'lines per hour. Accuracy first: scan confirms the part, your eyes confirm the count.',
+  setup() { thor1.userData.setBattery(12); },
+  steps: [
+    info('Pallet Land Pick', 'Core process, Draft 1.0 (10/17/2026). Tools: THOR, handheld scanner, safety knife, marker, pen. Deviations (Short Pick, Add-On Tote, Scan and System Errors) have their own sheets.', 'One sheet for the normal job; the exceptions have their own so this one stays short.'),
+    choice('PPE', 'What PPE does Pallet Land Pick require?', ['General PPE, bump cap, cut-resistant gloves', 'General PPE only', 'Hard hat and harness', 'Gloves only'], 0, 'Bump cap for the rack beams, cut gloves for the safety knife and carton edges.'),
+    act('1. Get your equipment', 'Get a THOR and check it. Start with THOR 1.', 'thor1', 'A THOR that fails mid-pick strands an open order.', { wrong: { thor2: 'Check THOR 1 first.' } }),
+    choice('1. Check the THOR', 'THOR 1 shows BATT 12%. What do you do?', ['Use it, it will last', 'Don\'t use it. Tell your lead, take another THOR', 'Charge it during the pick', 'Swap batteries yourself'], 1, 'Damaged or not charged? Don\'t use it. Tell your lead before you start.', { fb: ['A dead THOR strands an open order.', '', 'You cannot pick and charge at once.', 'Tell your lead.'] }),
+    act('1. Take THOR 2', 'Take THOR 2 (91%). Nothing rides on the operator platform but you.', 'thor2', 'Boxes, totes or trash on the platform are a trip hazard.'),
+    keys('2. Log in', 'Type the resource transaction and press Enter.', ['415', 'Enter'], ['415', '514', '451', 'Enter', 'F4', 'F7'], 'The zone decides which tasks the system gives you.', { rf: ['SAP EWM RF', 'Transaction: ____'] }),
+    choice('2. Check your zone', 'The RF shows zone D300. The sign at the end of the rack says P100.', ['Keep D300, the system knows best', 'Press F7, type P100, press Enter', 'Pick from D300 anyway', 'Log out and back in'], 1, 'Wrong zone means wasted travel and misrouted picks.', { rf: [RF_HEAD, 'Zone: D300', 'F7 = change zone'] }),
+    choice('3. Totes', 'At induction: how many totes do you take for an LTL order?', ['1 tote', 'Up to 4 totes', 'As many as fit', 'None, LTL goes straight on the pallet'], 0, '1 tote for LTL, up to 4 for parcel.'),
+    scan('3. Scan the tote', 'Take your tote from the induction flow rack and scan it.', 'T-10230', 'The tote ties the order to you.', { rf: [RF_HEAD, 'Zone P100', 'Scan tote:'], codeShow: 'T-10230 (first tote)' }),
+    keys('3. Confirm', 'Totes scanned. Confirm.', ['F4'], ['F1', 'F4', 'F7', 'F8', 'Enter'], 'F4 confirms the tote on the order.', { rf: [RF_HEAD, 'Tote T-10230 OK', 'F4 = confirm'] }),
+    choice('3. Cones', 'What goes in each tote?', ['1 green, 1 orange and 1 blue cone', '3 green cones', 'No cones, the THOR has them', '1 red cone'], 0, 'Without the cones you cannot mark the order later.'),
+    choice('3. Tote colors', 'A red tote comes down the line. What is it?', ['Hot order: it goes first', 'International', 'Static / flow rack', 'Pallet Land'], 0, 'Brown Pallet Land, orange Grainger/SLW, green international, red hot order, blue static/flow rack.'),
+    scan('4. Scan the location', 'Drive to SRCBIN P104-01-A in the Pallet Land aisle and scan the location label.', 'P104-01-A', 'Scanning the location proves you are at the right bin before you touch product.', { rf: [RF_HEAD, 'SRCBIN  P104-01-A', 'Prod    HBL5262', 'Qty     6 EA'] }),
+    scan('5. Scan the product', 'Scan the part number on the box.', 'HBL5262', 'The scan confirms the part.', { rf: [RF_HEAD, 'SRCBIN  P104-01-A', 'Scan product:'] }),
+    choice('5. Count', 'The RF wants 6 EA of HBL5262. Count the cartons in the location with your eyes. How many will you pull?', ['6, it matches the count', '5', 'Whatever is there, confirm 6 anyway', 'Skip the count, the scan already checked it'], 0, 'Never confirm without checking the count. Your eyes confirm the count.', { fb: ['', 'Count again.', 'Never confirm a quantity you do not have.', 'The scan only checks the part, not the count.'] }),
+    carry('6. Build the pallet', 'Full cases go on the pallet. Pick up the HBL5262 cartons and put them on the pallet on THOR 2.', 'stock:P104-A', 'thor2_pallet', 'Heaviest on the bottom, labels out, nothing hanging off.', { dropAt: () => thor2.localToWorld(new THREE.Vector3(0, .25, .5)) }),
+    keys('5. Confirm the line', 'Scan the tote then press F4.', ['F4'], ['F1', 'F4', 'F8', 'Enter'], 'F4 confirms the line against your tote.', { rf: [RF_HEAD, 'HBL5262  6/6', 'Scan tote, F4 = confirm'] }),
+    scan('Next line', 'Next task: SRCBIN P106-01-A. Go there and scan the location.', 'P106-01-A', 'Same check every location.', { rf: [RF_HEAD, 'SRCBIN  P106-01-A', 'Prod    HBL2621', 'Qty     10 EA'] }),
+    choice('Short!', 'The RF wants 10 EA of HBL2621. Only 4 are in the location.', ['Confirm 10, inventory will sort it out', 'Confirm 4 and keep going', 'Stop. Don\'t confirm the line. Follow the Short Pick SW', 'Take 6 from the next bin'], 2, 'CRITICAL STOP. A confirmed short ships an incomplete order and hides the inventory problem.', { fb: ['Never confirm a quantity you don\'t have.', 'Confirming a short hides it.', '', 'Never pick from a location the RF did not give you.'] }),
+    act('Short Pick 2. Discrepancy card', 'Fill out a discrepancy card: part, location, quantity needed, quantity found. The cards are at the Non Conf area.', 'disc_card', 'Inventory can\'t fix a location they don\'t know about. The card starts the count.'),
+    choice('Short Pick 3. Cone', 'Which cone goes on the short order?', ['Blue: audit before it ships', 'Green: order done', 'Orange: more picks to come', 'No cone'], 0, 'Cones: green order done, orange more picks to come, blue short.'),
+    act('Short Pick 3. Stage it', 'Stage the order in the Non Conf area (pick hospital, red square) and tell your lead.', 'hospital', 'Blue means the order gets fully audited before it ships.'),
+    choice('Short Pick 4. Follow up', 'When do you check the order shortage outbox?', ['Start of shift and every other hour (7:00, 9:00, 11:00, 13:00)', 'Only when the lead asks', 'End of shift', 'Never, inventory finishes it'], 0, 'The order is waiting on you once inventory finds the stock.'),
+    choice('7. Complete an order', 'Another order: all lines picked, Order Pick Complete. What goes on the first pallet?', ['Green cone, then stage it', 'Orange cone', 'Blue cone', 'Nothing'], 0, 'The cone tells the material handler what is ready to build.'),
+    choice('8. Stage the pallet', 'Where does a finished pallet go?', ['An open lane closest to the Lead Hub. Scan the lane label. More pallets for the same order go in the same lane', 'Any open floor space', 'On the conveyor', 'Back in the rack'], 0, 'One order in one lane is how it gets built and packed without mixing. Over 35 lb never goes on the conveyor.'),
+    keys('9. End your shift', 'Shift is over. Free your resource.', ['F1', 'F1', 'Save'], ['F1', 'F4', 'F7', 'Save', 'Enter'], 'Skip F1, F1, Save and the next shift can\'t use your resource.', { rf: [RF_HEAD, 'F1 = back', 'Save = log off resource'] })
+  ]
+};
+
+/* ---------- 3. Pack (parcel core process, Kaizen 03 rev 0.6) ---------- */
+MODS.pack = {
+  id: 'pack', name: 'Pack: parcel', start: { x: 12, z: 4.6, yaw: 0 }, target: '35 s per parcel carton (Kaizen 03 pilot, down from 44 s).',
+  setup() { setScale('2.3 kg', '#ffb040'); setMonitor('Windows - Okta', ['Sign in to start.']); },
+  steps: [
+    info('Parcel core process', 'Kaizen 03 rev 0.6: 10 steps. Built on the scale, labels on top, most old stickers gone. The same steps run on the station app in English and Spanish.', 'One way is the whole point. Doing it the same way every time is what took the carton from 44 s to 35 s.'),
+    act('1. Log in', 'Log into the computer, then Okta. Use the pack station screen.', 'pk_monitor', 'Everything you pack is tied to this station.', { onHit() { setMonitor('PS1 - SAP EWM', ['Work Center Initial Screen', 'Warehouse: ____', 'Work center: ____'], 1); } }),
+    choice('1. Warehouse and work center', 'Your station sign says PK04. What do you enter?', ['Warehouse 0103, work center PK04, F8', 'Warehouse 0301, work center PK04, F8', 'Warehouse 0103, work center PK40, F8', 'Leave the last station\'s entry'], 0, 'The wrong station puts your cartons under somebody else.', { onDone() { setMonitor('Work center PK04 - W/H 0103', ['Move HU', 'Scan HU: ____'], 1); } }),
+    act('1. Check the scale', 'QUALITY: check the scale.', 'pk_scale', 'A wrong scale prints a wrong label.'),
+    choice('1. Scale reads 2.3 kg', 'The empty scale reads 2.3 kg.', ['Zero it and switch it to lb', 'Fine, the system converts it', 'Zero it, kg is fine', 'Tell maintenance and wait'], 0, 'Zero the scale and make sure it reads lb, not kg.', { onDone() { setScale('0.0 lb'); } }),
+    scan('2. Scan the tote', 'Open Move HU and scan the tote into the HU field.', 'HU8000451', 'A missing tote is product that won\'t ship.', { rf: ['Move HU', 'Order 4400123 totes:', '  HU8000451', '  HU8000452'], onHit() { setMonitor('Move HU - order 4400123', ['HU8000451  scanned', 'HU8000452  NOT SCANNED'], 1); } }),
+    choice('2. Tote missing', 'The order lists 2 totes. Only one is at your station.', ['Stop and tell your lead', 'Pack what is here and press F8', 'Mark the order complete', 'Go pick it yourself'], 0, 'A missing tote stops the order. Catching it here takes seconds.', { fb: ['', 'That ships short.', 'That ships short.', 'Your lead runs it down; you stay at the station.'], onDone() { PK.tote2.visible = true; toast('Your lead brings the second tote.', 'info', 2.5); } }),
+    scan('2. Scan the second tote', 'Scan the tote your lead brought.', 'HU8000452', 'Every tote on the list, then F8.', { rf: ['Move HU', '  HU8000451  OK', '  HU8000452  ?'] }),
+    keys('2. Confirm', 'Every tote is on the list. Confirm.', ['F8'], ['F4', 'F7', 'F8', 'Enter'], 'F8 confirms on the pack screens.', { onDone() { setMonitor('Pack - order 4400123', ['HU8000451 / HU8000452', '[Unpack HU]  (open-box icon)'], 1); } }),
+    act('3. Unpack HU', 'Select the tote lines and click Unpack HU (the open-box icon) on the screen.', 'pk_monitor', 'Unpack HU moves the items to your station in the system.', { onHit() { PK.items.visible = true; PK.tote.visible = false; PK.tote2.visible = false; setMonitor('Pack - station PK04', ['4 EA  HBL1221  (bench)', '[Create HU]'], 1); } }),
+    choice('3. Blind pack', 'The product is on the bench. Do you count it against the screen?', ['No. This is a blind pack. Counting belongs to the audit pack', 'Yes, every line', 'Only if it looks short', 'Count, then recount'], 0, 'Everyday packing is blind, so the audit pack gets its own sheet.'),
+    keys('4. Create HU', 'On Create HU, confirm.', ['F8'], ['F4', 'F8', 'Enter'], 'The carton HU is what the packing list says is in the box.'),
+    act('4. Pick the box', 'Select the smallest box that fits the product: 4 pieces, each 5 x 4 x 2 in. (Box sizes in this trainer are placeholders.)', 'box3', 'The right size box is safer to handle.', { wrong: { box2: 'Too small: 10 x 8 in of product does not fit 9 x 6.', box4: 'Fits, but #3 is smaller.', box6: 'Too big. Smallest box that fits.' } }),
+    act('4. Tape the bottom', 'Tape the bottom of the box.', 'pk_tape', 'Taped first, so nothing drops through.'),
+    act('4. Box on the scale', 'Set the box on the scale. Build it there.', 'pk_scale', 'Building on the scale means you don\'t move the product twice.', { onHit() { const b = PK.box3; b.position.set(PK.scale.position.x, PK.scale.position.y + .06, PK.scale.position.z); setScale('0.9 lb'); } }),
+    carry('5. Move the items', 'Drag the item lines into the carton HU on the screen, then put the product in the box.', 'pk_items', 'box3', 'Move each item in the system as it goes in.', { dropAt: () => PK.box3.position.clone().add(new THREE.Vector3(0, .02, 0)), after() { setScale('3.8 lb'); } }),
+    act('6. Dunnage', 'Pack dunnage so the product cannot shift.', 'pk_dunnage', 'Product that shifts arrives damaged.'),
+    choice('6. Mark the carton', 'Where do the box count and weight go?', ['#/# and weight in the upper-right corner of the top', 'On the side', 'On the packing list only', 'Nowhere, the label prints it'], 0, 'On a multi-box order the written weight goes in the system in step 7. The shipping label goes over it later. Hand-writing stays until the label prints it (Rec. 1).'),
+    choice('6. Last carton', 'This is the only carton. What now?', ['Leave it open for the packing list', 'Tape it shut', 'Create another HU', 'Put it on the conveyor'], 0, 'The packing list goes inside the last carton in step 9.'),
+    choice('7. Weight', 'Ship > Full Ship Screen. One carton, still on the scale. What do you do?', ['Leave it on the scale and press F8', 'Type the weight in', 'Weigh it on another scale', 'Skip the weight'], 0, 'One carton reads off the scale. Only multi-carton orders get typed weights.', { onDone() { PK.plist.visible = true; } }),
+    choice('8. Error pops up', 'While printing, EWM pops up "Invalid carrier".', ['Stop. Follow the deviation SW for that error, or tell your lead if there isn\'t one', 'Click OK and keep packing', 'Change the carrier yourself', 'Reprint until it goes away'], 0, 'CRITICAL STOP. Errors have their own sheets, so this one stays short.'),
+    carry('9. Packing list in', 'Repack carton: take the packing list from the printer and put it inside the last carton.', 'pk_plist', 'box3', 'The customer needs it inside.', { dropAt: () => PK.box3.position.clone().add(new THREE.Vector3(0, .05, 0)) }),
+    act('9. Tape it shut', 'Tape the last carton shut.', 'pk_tape', 'Closed carton, ready for labels.'),
+    choice('9. Labels', 'Where do the labels go?', ['Both on top: shipping label upper-right over your writing, "Packing list inside" lower-left', 'Shipping label on the side', 'Anywhere flat', 'Inside the box'], 0, 'With both labels on top the dock and the customer read them without flipping the box.'),
+    choice('9. Stickers', 'Which other stickers still go on?', ['Only pink (FedEx), yellow (international), Heavy (lower-right) and mixed-carton', 'All the old colored stickers', 'None at all', 'Whatever the last packer used'], 0, 'Most old colored stickers are gone. These four stay.'),
+    act('10. Send it', 'Put the carton on the conveyor, label up.', 'pk_outfeed', 'The conveyor sorts to the door.', { onHit() { PK.box3.position.set(12, .8, 1.9); } }),
+    choice('10. Too big', 'Next order: a #6 carton at 42 lb. Where does it go?', ['On a pallet', 'On the conveyor', 'In a tote', 'Split it on the floor'], 0, 'Bigger than a #6 or over 35 lb goes on a pallet. Smaller than a #2 goes in a tote. 35 lb max per repack carton.')
+  ]
+};
+
+/* ---------- 4. Ship (truck core process, Kaizen 03 rev 0.6, + staging and dock) ---------- */
+MODS.ship = {
+  id: 'ship', name: 'Ship: truck pack and dock', start: { x: 12, z: 12, yaw: 0 }, target: 'no skid-weight wait. System weight plus pallet weight.',
+  setup() { },
+  steps: [
+    info('Truck core process', 'Kaizen 03 rev 0.6: 10 steps at a truck pack station, then staging and the dock. Same login as parcel (PS1, Work Center Initial Screen, 0103, PK + station, F8).', 'A truck order ships once, so a pallet built wrong gets rebuilt or ships short.'),
+    choice('1. Scale', 'Truck step 1 has the same quality check as parcel. Which?', ['Zero the scale, make sure it reads lb', 'Weigh an empty pallet', 'None', 'Calibrate it'], 0, 'Every pallet is tied to this station: labels, BOL and dashboard pull from it.'),
+    scan('2. Scan the totes', 'Open Move HU and scan the totes for the order.', 'HU8000777', 'The list must match the totes on the floor.', { rf: ['Move HU', 'Order 4400555: 3 totes', '  HU8000777', '  HU8000778', '  HU8000779 (in transit)'] }),
+    choice('2. Totes on the way', 'Two of three totes are here. The third shows in transit.', ['Wait for all of them. Tell your lead if one is missing', 'Start the pallet now', 'Ship what is here', 'Close the order'], 0, 'Don\'t start the pallet on a partial order. It gets rebuilt or ships short.'),
+    choice('3. Heavy item', 'Unpacking the totes, a case feels well over 35 lb.', ['Test the weight first, lift it with two people', 'Lift it alone, quickly', 'Drag it off the tote', 'Leave it in the tote'], 0, 'SAFETY: over 35 lb or awkward, two people.', { critical: true, fb: ['', 'That is how backs go.', 'Dragging damages product and backs.', 'It still has to ship.'] }),
+    choice('4. Create the pallet HU', 'Create HU screen. What must it show?', ['Packaging material PALLET_SSCC, number of HUs 1, then F8', 'CARTON, 1', 'PALLET_SSCC, 3', 'Anything, it can be fixed later'], 0, 'The BOL counts HUs, so the system has to match the dock.'),
+    { type: 'order', title: '5. Build the pallet', text: 'Stack heavy on the bottom, light on top, labels out. Use the cases in the right order: heaviest first, the repack carton of loose parts last.', seq: ['tk_c48', 'tk_c20', 'tk_c6'], fb: 'Heavy on the bottom, light on top. Small parts go on last.', why: 'A square pallet loads faster and arrives in one piece.', target: ['tk_c48', 'tk_c20', 'tk_c6'],
+      place(iid, k) { const c = OBJ[iid]; scene.attach(c); const p = TK.pallet.position; const ys = [.14, .54, .84]; c.position.set(p.x + [-.25, .2, -.2][k], ys[k], p.z + [0, 0, .1][k]); c.rotation.set(0, 0, 0); } },
+    choice('5. Height', 'How high can you build the pallet?', ['No higher than 50 in, stack square', 'As high as it stays up', '72 in', 'Up to the rack beam'], 0, 'SAFETY: build no higher than 50 in and keep the stack square.'),
+    choice('6. Mixed carton', 'The repack carton has two different products in it.', ['Add a mixed-carton label', 'Nothing extra', 'Split them into two cartons', 'Write "mixed" on it'], 0, 'Loose parts on a pallet get lost; fewer cartons and a clear label mean fewer pieces to track.'),
+    act('7. Wrap it', 'Stretch wrap the center and top of the pallet.', 'tk_wrap', 'Wrap holds the load.', { onHit() { TK.wrapSkin.visible = true; } }),
+    choice('7. Banding', 'This order goes to Ohio. Standard product, no cabinets.', ['No bands. Wrap only', '4 bands', '2 bands across the width', 'Band every pallet'], 0, 'Band only UK (4 bands), long product (its own SW), and cabinets 24-50 in (2 bands across the width). Banding every pallet was the biggest waste on the team\'s wall.'),
+    choice('8. Weight', 'Last Shipment > Capacity shows 612 lb of product. Standard pallet. What do you write on the pallet label?', ['652 lb', '612 lb', '682 lb', 'Weigh it on the floor scale'], 0, 'System weight plus 40 lb for a standard pallet (70 lb for long). Written top-right of the pallet label.', { fb: ['', 'Add the pallet: 40 lb standard.', '70 lb is for a long pallet.', 'Truck ships on system weights now. No skid-weight wait.'] }),
+    act('9. Ship it', 'Full Ship Screen: enter the weight, Enter, F8. Get the paperwork from the printer.', 'tk_printer', 'The packing list, shipping label and BOL print.', { onHit() { TK.bol.visible = true; } }),
+    carry('9. Pin the paperwork', 'Sign the BOL and push-pin all three to the top of the pallet, facing the aisle.', 'tk_bol', 'tk_pallet', 'If the paperwork isn\'t on top, the pallet sits.', { dropAt: () => TK.pallet.position.clone().add(new THREE.Vector3(0, 1.12, .1)) }),
+    choice('10. Label every piece', 'On each pallet and loose carton label:', ['Weight top-right, #/# middle, #P or #L bottom-left, then a big C around the #/# when done', 'Just the weight', 'Only the order number', 'The weight in the middle'], 0, 'The label tells the dock which piece this is and how many go together. The C says it is ready to load.'),
+    scan('Stage it', 'Stage the pallet in the open lane closest to the Lead Hub (L05) and scan the lane label.', 'LANE-L05', 'One order in one lane.', { rf: ['Stage HU', 'Scan lane:'], wrongNote: true }),
+    choice('More pallets', 'A second pallet for the same order is done.', ['Same lane as the first', 'The next open lane', 'Anywhere close to the dock', 'Leave it at the station'], 0, 'More pallets for the same order go in the same lane. Lane full? Start a new one.'),
+    act('Dock: check the trailer', 'Before any truck enters the trailer at Door 4, check the dock lock light.', 'dock_lock', 'A trailer that creeps away from the dock drops the forklift between dock and trailer.', { onHit() { } }),
+    choice('Dock: red light', 'The dock light is red. The trailer is not locked or chocked.', ['Don\'t enter. Get the trailer locked or chocked and the plate set, then check the trailer floor', 'Go in quickly', 'Go in, the driver is still in the cab', 'Honk and go'], 0, 'Generic dock safety (OSHA). Replace with the Arden loading SW when written.', { critical: true, fb: ['', 'Never enter an unsecured trailer.', 'Drivers pull away.', 'A horn does not secure a trailer.'], onDone() { TK.lamp.material.color.set(0x20ff40); toast('Trailer locked. Light green.', 'good'); } })
+  ]
+};
+/* the lane scan wants the lane closest to the Lead Hub */
+
+/* ---------- 5. Waste hunt ---------- */
+const HUNT = [];
+const HP = new THREE.Group(); HP.visible = false; scene.add(HP);
+function huntSpot(id, x, y, z, answer, what, propFn) {
+  if (propFn) { ROOT = HP; propFn(); ROOT = null; }
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.18, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfddb33 }));
+  const q = label('?', .3, .3, { bg: '#000', fg: '#FDDB33', border: false }); q.position.y = .32; m.add(q);
+  m.position.set(x, y, z); m.visible = false; scene.add(m); reg(m, id, 'Something to look at');
+  HUNT.push({ id, m, answer, what });
+}
+huntSpot('w_stickers', 8, 1.4, 3, ['Over-processing'], 'A carton covered in old colored stickers. Most of them were removed in Kaizen 03.', () => { const c = carton(.4, .3, .3); c.position.set(8.3, .9, 3); HP.add(c); for (let i = 0; i < 6; i++) { const s = box(.08, .005, .06, M([C.red, C.yellow, C.green, 0xff66cc, C.blue, C.orange][i]), 8.15 + (i % 3) * .1, 1.2, 2.95 + Math.floor(i / 3) * .08); } });
+huntSpot('w_boxstock', 18, 1.6, 6, ['Motion'], 'Box stock for PK03 kept here, 10 m from the bench. Every carton is a walk.', () => { for (let i = 0; i < 3; i++) box(.6, .5, .5, M(C.cardboard), 18, i * .5, 6.5); });
+huntSpot('w_pallets', 6, 2.6, -8, ['Inventory'], 'Empty pallets stacked far past the 3 stacks of about 10 the Induction SW calls for.', () => { for (let s = 0; s < 6; s++) for (let i = 0; i < 16; i++) box(1.2, .14, 1, M(C.pallet), 5 + (s % 3) * 1.3, i * .145, -8.6 + Math.floor(s / 3) * 1.1); });
+huntSpot('w_waiting', 2.2, 2.0, -11.2, ['Waiting'], 'A picker standing at an empty induction rack. No totes inducted, nothing to pick.', () => { person(2.2, -11.2, Math.PI); });
+huntSpot('w_banding', -17.5, 1.6, 8, ['Over-processing'], 'Every pallet in this lane is banded. Only UK, long product and 24-50 in cabinets need bands.', () => { for (let i = 0; i < 2; i++) { const p = makePallet(2, { wrap: true }); p.position.set(-17.5, 0, 6 + i * 1.6); HP.add(p); for (const x of [-.3, .3]) box(.03, .02, 1.02, M(0x111111), -17.5 + x, .75, 6 + i * 1.6); } });
+huntSpot('w_damaged', 14.5, 1.3, 1.9, ['Defects'], 'A crushed carton riding the outfeed conveyor. It will be refused or claimed.', () => { const c = carton(.4, .2, .35, 0x9b7a50); c.position.set(14.5, .8, 1.9); c.rotation.z = .3; HP.add(c); });
+huntSpot('w_prebuilt', 16, 2.2, 4.4, ['Overproduction'], 'A tower of cartons built hours ahead of any order. They take space and get crushed.', () => { for (let i = 0; i < 7; i++) box(.5, .3, .4, M(C.cardboard), 16, i * .3, 4.6); });
+huntSpot('w_double', 1.75, 1.2, 9, ['Transport'], 'A pallet dropped in the walkway to be moved again later: moved twice, and blocking people.', () => { const p = makePallet(1); p.position.set(1.75, 0, 9); HP.add(p); });
+huntSpot('w_retype', -7.5, 2.0, 12, ['Over-processing', 'Skills (unused talent)'], 'The lead is re-typing hand-written carton weights into EWM. The weight should carry from the scale (Rec. 1).', () => { person(-6.6, 12.3, Math.PI, 0xff8c00); });
+function huntMarkers(on) { HP.visible = on; HUNT.forEach(h => { h.m.visible = on && !S.found[h.id]; }); }
+function startHunt() {
+  S.mod = { id: 'hunt', name: 'Gemba waste hunt', steps: [] }; S.phase = 'hunt'; S.found = {}; S.mistakes = []; S.viol = []; S.t0 = now();
+  resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 4, 0); huntPanel();
+}
+function huntPanel() {
+  const n = Object.keys(S.found).length;
+  setPanel({ title: 'Gemba waste hunt', sub: `${n} of ${HUNT.length} found`, text: 'Walk the floor. Each yellow ? marks something worth a second look. Use it, then name the waste.\nTIMWOODS: Transport, Inventory, Motion, Waiting, Overproduction, Over-processing, Defects, Skills.', why: 'We study the process, not the person.', btns: [{ label: 'Done for now', fn: huntDone }], foot: footText() });
+}
+function huntHit(iid) {
+  const h = HUNT.find(x => x.id === iid); if (!h || S.found[iid]) return;
+  S.sub = { title: 'What waste is this?', sub: 'Gemba waste hunt', text: h.what, btns: TIMWOODS.map(w => ({ label: w, fn: () => {
+    if (h.answer.includes(w)) { S.found[iid] = 1; h.m.visible = false; good('Yes: ' + h.answer.join(' / ')); if (Object.keys(S.found).length >= HUNT.length) huntDone(); else huntPanel(); }
+    else mistake(`Not ${w}. Look again.`);
+  } })) };
+  setPanel(S.sub); if (renderer.xr.isPresenting) placePanelVR(true);
+}
+function huntDone() {
+  huntMarkers(false); S.phase = 'run';
+  S.mod.steps = []; const n = Object.keys(S.found).length;
+  const secs = Math.round(now() - S.t0); const score = Math.max(0, Math.round(100 * n / HUNT.length) - 5 * S.mistakes.length);
+  const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'); recs.push({ name: trainee(), module: 'Gemba waste hunt', date: new Date().toISOString().slice(0, 16).replace('T', ' '), secs, mistakes: S.mistakes.length, safety: 0, score, pass: n === HUNT.length ? 'PASS' : 'RETRY', notes: `found ${n}/${HUNT.length}` }); localStorage.setItem(LS_REC, JSON.stringify(recs));
+  setPanel({ title: 'Waste hunt done', sub: `${n} of ${HUNT.length} found`, text: `Score ${score}. Pick the waste you see most on your own shift for the idea list.`, btns: [{ label: 'Kaizen card', fn: kaizenCard, hot: true }, { label: 'Menu', fn: menu }] });
+}
+
+/* ============================================================
+   PLAYER: walking, mounting, driving
+   ============================================================ */
+let yaw = 0, pitch = 0;
+function placePlayer(x, z, ry) { rig.position.set(x, 0, z); yaw = ry; rig.rotation.y = ry; pitch = 0; camera.rotation.set(0, 0, 0); if (!renderer.xr.isPresenting) camera.position.set(0, EYE, 0); }
+function mountTruck() {
+  F.onboard = true; F.lookYaw = 0;
+  if (!renderer.xr.isPresenting) camera.position.set(0, 1.0, 0);
+}
+function dismountTruck() {
+  F.onboard = false; const p = truck.localToWorld(new THREE.Vector3(1.3, 0, -.3)); rig.position.set(p.x, 0, p.z); yaw = F.heading + Math.PI; rig.rotation.y = yaw;
+  if (!renderer.xr.isPresenting) camera.position.set(0, EYE, 0);
+}
+const keyDown = {};
+addEventListener('keydown', e => { keyDown[e.code] = true; if (e.code === 'KeyE') selectFrom('desk'); if (e.code === 'KeyH' && F.onboard) honk(); });
+addEventListener('keyup', e => { keyDown[e.code] = false; });
+const cvs = renderer.domElement;
+cvs.addEventListener('mousedown', () => { if (document.pointerLockElement !== cvs) { cvs.requestPointerLock && cvs.requestPointerLock(); } else selectFrom('desk'); });
+document.addEventListener('pointerlockchange', () => { $('#cross').style.display = document.pointerLockElement === cvs ? 'block' : 'none'; });
+document.addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== cvs) return;
+  if (F.onboard) F.lookYaw -= e.movementX * .0025; else yaw -= e.movementX * .0025;
+  pitch = Math.max(-1.3, Math.min(1.3, pitch - e.movementY * .0025));
+});
+const XRIN = { left: null, right: null };
+function readXR() {
+  XRIN.left = XRIN.right = null;
+  const s = renderer.xr.getSession(); if (!s) return;
+  for (const src of s.inputSources) if (src.gamepad && src.handedness) XRIN[src.handedness] = src.gamepad;
+}
+const dz = v => Math.abs(v) < .15 ? 0 : v;
+const stick = (gp) => gp ? [dz(gp.axes[2] || 0), dz(gp.axes[3] || 0)] : [0, 0];
+let snapReady = true, xBtnPrev = false, aBtnPrev = false;
+function walk(dt) {
+  let fx = 0, fz = 0, sp = keyDown.ShiftLeft ? 4 : 2.2;
+  if (renderer.xr.isPresenting) {
+    const [lx, ly] = stick(XRIN.left), [rx] = stick(XRIN.right);
+    if (Math.abs(rx) > .7 && snapReady) { yaw -= Math.sign(rx) * Math.PI / 6; snapReady = false; } if (Math.abs(rx) < .3) snapReady = true;
+    const hq = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); const a = yaw + hq.y;
+    fx = (-Math.sin(a) * -ly + Math.cos(a) * lx); fz = (-Math.cos(a) * -ly - Math.sin(a) * lx);
+  } else {
+    const f = (keyDown.KeyW ? 1 : 0) - (keyDown.KeyS ? 1 : 0), r = (keyDown.KeyD ? 1 : 0) - (keyDown.KeyA ? 1 : 0);
+    fx = -Math.sin(yaw) * f + Math.cos(yaw) * r; fz = -Math.cos(yaw) * f - Math.sin(yaw) * r;
+  }
+  const len = Math.hypot(fx, fz); if (len > 1) { fx /= len; fz /= len; }
+  const nx = rig.position.x + fx * sp * dt, nz = rig.position.z + fz * sp * dt;
+  if (!hitsSolid(nx, rig.position.z, .3, 'walk')) rig.position.x = nx;
+  if (!hitsSolid(rig.position.x, nz, .3, 'walk')) rig.position.z = nz;
+  rig.rotation.y = yaw;
+  if (!renderer.xr.isPresenting) camera.rotation.set(pitch, 0, 0, 'YXZ');
+}
+let INPUT_OVERRIDE = null;
+function truckInput() {
+  if (INPUT_OVERRIDE) return INPUT_OVERRIDE;
+  let t = 0, s = 0, l = 0, q = 0, horn = false;
+  if (renderer.xr.isPresenting) {
+    const [lx, ly] = stick(XRIN.left), [rx, ry] = stick(XRIN.right);
+    t = -ly; s = -lx; l = -ry; q = rx;
+    const a = !!(XRIN.right && XRIN.right.buttons[4] && XRIN.right.buttons[4].pressed); horn = a && !aBtnPrev; aBtnPrev = a;
+  } else {
+    t = (keyDown.KeyW ? 1 : 0) - (keyDown.KeyS ? 1 : 0); s = (keyDown.KeyA ? 1 : 0) - (keyDown.KeyD ? 1 : 0);
+    l = (keyDown.KeyR ? 1 : 0) - (keyDown.KeyF ? 1 : 0); q = (keyDown.KeyG ? 1 : 0) - (keyDown.KeyT ? 1 : 0);
+  }
+  return { t, s, l, q, horn };
+}
+const WB = 1.25, VMAX = 3, VREV = 1.6;
+const _v = new THREE.Vector3(), _w = new THREE.Vector3();
+function driveTruck(dt) {
+  const inp = truckInput(); if (inp.horn) honk();
+  const tgt = inp.t >= 0 ? inp.t * VMAX : inp.t * VREV;
+  const rate = (Math.sign(tgt) !== Math.sign(F.v) && F.v !== 0) || tgt === 0 ? 3.2 : 1.3;
+  F.v += Math.max(-rate * dt * 2, Math.min(rate * dt * 2, (tgt - F.v) * Math.min(1, dt * 2.5)));
+  if (Math.abs(F.v) < .01 && tgt === 0) F.v = 0;
+  F.steer += (inp.s * .85 - F.steer) * Math.min(1, dt * 5);
+  /* rear-wheel steer: the front axle point goes straight, the body swings around it */
+  const old = { x: F.pos.x, z: F.pos.z, h: F.heading };
+  const fx = Math.sin(F.heading), fz = Math.cos(F.heading);
+  const ax = F.pos.x + fx * .55 + fx * F.v * dt, az = F.pos.z + fz * .55 + fz * F.v * dt;
+  F.heading += F.v * Math.tan(F.steer) / WB * dt;
+  F.pos.x = ax - Math.sin(F.heading) * .55; F.pos.z = az - Math.cos(F.heading) * .55;
+  if (hitsSolid(F.pos.x, F.pos.z, .85, 'truck')) {
+    if (Math.abs(F.v) > .6) violation('Struck the rack or a wall. Slow down near racks.', 'struck');
+    F.pos.x = old.x; F.pos.z = old.z; F.heading = old.h; F.v = 0;
+  }
+  const prevH = F.h;
+  F.h = Math.max(.05, Math.min(4, F.h + inp.l * .45 * dt));
+  F.tilt = Math.max(-.1, Math.min(.06, F.tilt + inp.q * .15 * dt));
+  placeTruck();
+  palletLogic(inp, prevH, old);
+  rules();
+}
+function forkMid() { return TR_.carriage.localToWorld(_v.set(0, -.31, .7)); }
+function palletLogic(inp, prevH, old) {
+  const fm = forkMid().clone();
+  if (!F.load) {
+    for (const p of PALLETS) {
+      const local = p.worldToLocal(_w.copy(fm));
+      const inside = Math.abs(local.x) < .55 && Math.abs(local.z) < .5;
+      const rel = local.y;
+      if (inside && rel > -.06 && rel < .135) {
+        F.inserted = p;
+        const heel = p.worldToLocal(TR_.carriage.localToWorld(_w.set(0, -.31, .14)));
+        if (Math.abs(heel.x) < .6 && Math.abs(heel.z) < .5 && F.v > 0) { F.pos.x = old.x; F.pos.z = old.z; F.heading = old.h; F.v = 0; placeTruck(); }
+        if (rel >= .115 && F.h > prevH) attachLoad(p);
+      }
+      else if (inside && rel >= .135 && rel < 1.0) {
+        if (Math.abs(F.v) > .05 || F.h !== prevH) violation('Forks struck the pallet or load. Line up at pocket height before you drive in.', 'forkhit');
+        F.pos.x = old.x; F.pos.z = old.z; F.heading = old.h; F.v = 0; F.h = prevH; placeTruck();
+      }
+      else if (F.inserted === p && !inside) F.inserted = null;
+    }
+  } else {
+    const p = F.load, wp = p.getWorldPosition(_w);
+    let support = 0, slot = null;
+    for (const s of Object.values(SLOTS)) { if (s.filled && s.filled !== p) continue; if (Math.hypot(wp.x - s.x, wp.z - s.z) < .4 && s.y > 0 && wp.y >= s.y - .02) { support = s.y; slot = s; break; } }
+    if (wp.y <= support + .001 && F.h < prevH) detachLoad(p, slot, support);
+  }
+}
+function attachLoad(p) {
+  for (const s of Object.values(SLOTS)) if (s.filled === p) s.filled = null;
+  TR_.carriage.attach(p); F.load = p; F.inserted = null; good('Load on the forks.');
+}
+function detachLoad(p, slot, y) {
+  scene.attach(p); F.load = null; p.position.y = y;
+  if (slot) { p.position.x = slot.x; p.position.z = slot.z; p.rotation.set(0, slot.ry, 0); slot.filled = p; good('Pallet set on the beam.'); }
+  else { const e = new THREE.Euler().setFromQuaternion(p.quaternion, 'YXZ'); p.rotation.set(0, e.y, 0); }
+}
+function rules() {
+  const sp = Math.abs(F.v);
+  if (sp > .8 && F.h > .3) violation('Traveling with the forks raised. Keep them 4 to 6 in off the floor.', 'forksup');
+  if (F.load && sp > 2.3) violation('Too fast with a load.', 'fastload');
+  if (F.load && sp > .8 && F.tilt > -.02) violation('Traveling loaded without tilting back.', 'tilt');
+  const inI = inRect(F.pos.x, F.pos.z, ZONE.intersection);
+  if (inI && !F.prevIn.i) { if (now() - F.honkT > 4) violation('No horn at the intersection.', 'horn'); if (sp > 1.5) violation('Not slowed at the intersection.', 'slowI'); }
+  F.prevIn.i = inI;
+  const w = ZONE.walkway; const inW = F.pos.x + .85 > w[0] && F.pos.x - .85 < w[1] && F.pos.z > w[2] && F.pos.z < w[3];
+  if (inW && !F.prevIn.w) violation('PIT in the pedestrian walkway.', 'walk');
+  F.prevIn.w = inW;
+}
+function seatRig() {
+  const seat = truck.localToWorld(_v.set(0, .95, -.35));
+  if (renderer.xr.isPresenting) { rig.position.set(seat.x, 0, seat.z); rig.position.y = Math.max(-.6, 1.95 - camera.position.y); }
+  else { rig.position.set(seat.x, .95, seat.z); camera.rotation.set(pitch, 0, 0, 'YXZ'); }
+  rig.rotation.y = F.heading + Math.PI + (renderer.xr.isPresenting ? 0 : F.lookYaw);
+}
+
+/* ============================================================
+   RAYS: hover and select (PC crosshair, Quest controllers)
+   ============================================================ */
+const ray = new THREE.Raycaster(); ray.far = 14;
+const ctrls = [0, 1].map(i => {
+  const c = renderer.xr.getController(i); rig.add(c);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xfddb33 }));
+  line.scale.z = 3; c.add(line); c.userData.line = line;
+  c.addEventListener('select', () => selectFrom(i));
+  const grip = renderer.xr.getControllerGrip(i); grip.add(new XRControllerModelFactory().createControllerModel(grip)); rig.add(grip);
+  return c;
+});
+const reticle = new THREE.Mesh(new THREE.RingGeometry(.02, .035, 24), new THREE.MeshBasicMaterial({ color: 0xfddb33, depthTest: false, side: THREE.DoubleSide })); reticle.renderOrder = 10; scene.add(reticle);
+const HITS = {};
+function castFrom(src) {
+  if (src === 'desk') { ray.setFromCamera({ x: 0, y: 0 }, camera); }
+  else { const c = ctrls[src]; c.updateMatrixWorld(); ray.ray.origin.setFromMatrixPosition(c.matrixWorld); ray.ray.direction.set(0, 0, -1).transformDirection(c.matrixWorld); }
+  const targets = panel.visible ? [panel, ...INTER] : INTER;
+  const hits = ray.intersectObjects(targets, false).filter(h => h.object === panel || isVisible(h.object));
+  const h = hits[0]; if (!h) return null;
+  if (h.object === panel) return { panel: true, uv: h.uv, point: h.point, dist: h.distance };
+  return { iid: h.object.userData.iidOwner, point: h.point, dist: h.distance, normal: h.face ? h.face.normal : null };
+}
+function isVisible(o) { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; }
+const REACH = 4.5;
+function selectFrom(src) {
+  const h = HITS[src] || castFrom(src); if (!h) return;
+  if (h.panel) { const px = h.uv.x * PW, py = (1 - h.uv.y) * PH; const r = panelRects.find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h); if (r) pressPanelButton(r.i); return; }
+  const far = S.phase === 'hunt' ? 14 : REACH;
+  if (h.dist > far) return toast('Move closer.', 'info', 1);
+  const hand = src === 'desk' ? camera : ctrls[src];
+  onInteract(h.iid, hand);
+}
+function updateHover() {
+  let shown = false;
+  const srcs = renderer.xr.isPresenting ? [0, 1] : ['desk'];
+  for (const s of srcs) {
+    const h = castFrom(s); HITS[s] = h;
+    if (s !== 'desk') ctrls[s].userData.line.scale.z = h ? h.dist : 3;
+    if (h && !shown) {
+      shown = true; reticle.visible = true; reticle.position.copy(h.point); reticle.lookAt(camera.getWorldPosition(_w));
+      if (s === 'desk') { const o = h.panel ? null : OBJ[h.iid]; $('#look').textContent = o ? o.userData.name + (h.dist > REACH && S.phase !== 'hunt' ? ' (move closer)' : '') : ''; }
+    }
+  }
+  if (!shown) { reticle.visible = false; $('#look').textContent = ''; }
+}
+/* guide arrow over the current target */
+const arrow = new THREE.Mesh(new THREE.ConeGeometry(.16, .4, 16), new THREE.MeshBasicMaterial({ color: 0xfddb33 })); arrow.rotation.x = Math.PI; scene.add(arrow);
+const TARGET_POS = {
+  recv: () => recvPallet.getWorldPosition(new THREE.Vector3()), aisleStop: () => new THREE.Vector3(-4.8, 0, -11.5),
+  slot: () => { const s = SLOTS[SLOT_T]; return new THREE.Vector3(s.x, s.y, s.z + .6); }, charger: () => new THREE.Vector3(-2, 0, 12)
+};
+function updateGuide(t) {
+  const st = cur(); arrow.visible = false;
+  if (!S.guide || !st || S.phase !== 'run' || S.sub) return;
+  let tgt = st.type === 'carry' && S.held ? st.dest : st.target; if (Array.isArray(tgt)) tgt = st.type === 'order' ? st.seq[S.k] : tgt[0];
+  let p = null;
+  if (TARGET_POS[tgt]) p = TARGET_POS[tgt]();
+  else if (OBJ[tgt]) { const o = OBJ[tgt]; if (!isVisible(o)) return; p = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()); p.y = new THREE.Box3().setFromObject(o).max.y; }
+  if (!p) return;
+  arrow.visible = true; arrow.position.set(p.x, p.y + .45 + Math.sin(t * 4) * .08, p.z);
+}
+/* VR panel placement */
+function placePanelVR(force) {
+  if (!renderer.xr.isPresenting) { panel.visible = false; return; }
+  panel.visible = true;
+  if (F.onboard) {
+    if (panel.parent !== truck) truck.add(panel);
+    panel.position.set(-.55, 1.65, .55); panel.rotation.set(0, Math.PI + .5, 0); panel.scale.setScalar(.75); return;
+  }
+  if (panel.parent !== scene) { scene.attach(panel); panel.scale.setScalar(1); }
+  const head = camera.getWorldPosition(new THREE.Vector3()), dir = camera.getWorldDirection(new THREE.Vector3()); dir.y = 0; dir.normalize();
+  const want = head.clone().add(dir.multiplyScalar(1.0)); want.y = head.y - .15;
+  if (force || panel.position.distanceTo(want) > 2.2) { panel.position.copy(want); panel.lookAt(head.x, panel.position.y, head.z); }
+}
+renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); $('#hud').style.display = 'none'; setTimeout(() => placePanelVR(true), 300); });
+renderer.xr.addEventListener('sessionend', () => { panel.visible = false; $('#hud').style.display = ''; camera.position.set(0, F.onboard ? 1.0 : EYE, 0); });
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+const clock = new THREE.Clock(); let hudT = 0;
+function tick(dt) {
+  const t = now();
+  readXR();
+  if (renderer.xr.isPresenting) { const x = !!(XRIN.left && XRIN.left.buttons[4] && XRIN.left.buttons[4].pressed); if (x && !xBtnPrev) placePanelVR(true); xBtnPrev = x; placePanelVR(false); }
+  if (F.onboard) { driveTruck(dt); seatRig(); } else walk(dt);
+  updateHover(); updateGuide(t);
+  const st = cur();
+  if (S.phase === 'run' && st && st.type === 'drive' && st.check()) { good(); st.onDone && st.onDone(); next(); }
+  hudT += dt; if (hudT > .25) { hudT = 0; if (S.phase === 'run' || S.phase === 'hunt') { P.foot = footText(); $('#hFoot').textContent = P.foot; if (renderer.xr.isPresenting && !toastMsg) drawPanel(); } }
+}
+renderer.setAnimationLoop(() => { const dt = Math.min(clock.getDelta(), .05); tick(dt); renderer.render(scene, camera); });
+
+/* ============================================================
+   TRAINEE, RECORDS, EXPORT
+   ============================================================ */
+function trainee() { return localStorage.getItem(LS_NAME) || ''; }
+function showWho() { $('#who').textContent = trainee() ? 'Trainee: ' + trainee() : ''; }
+function modal(html) { $('#mbox').innerHTML = html; $('#modal').classList.remove('hidden'); document.exitPointerLock && document.exitPointerLock(); }
+function closeModal() { $('#modal').classList.add('hidden'); }
+function askName() {
+  modal(`<h2>Trainee</h2><p>Name as it appears on the roster. Records stay on this device until you export them.</p><input id="nm" value="${esc(trainee())}" placeholder="First Last"><button id="nmOk">Save</button>`);
+  $('#nm').focus(); $('#nmOk').onclick = () => { localStorage.setItem(LS_NAME, $('#nm').value.trim()); showWho(); closeModal(); if (S.phase === 'menu') menu(); };
+}
+function csv(rows, cols) { return [cols.join(','), ...rows.map(r => cols.map(c => '"' + String(r[c] ?? '').replace(/"/g, '""') + '"').join(','))].join('\r\n'); }
+function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click(); }
+function showRecords() {
+  const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'), ideas = JSON.parse(localStorage.getItem(LS_IDEA) || '[]');
+  modal(`<h2>Training records</h2><p>${recs.length} runs on this device.</p>
+  <table><tr><th>Date</th><th>Trainee</th><th>Module</th><th>Time</th><th>Mistakes</th><th>Safety</th><th>Score</th><th>Result</th></tr>
+  ${recs.slice(-30).reverse().map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.module)}</td><td>${Math.floor(r.secs / 60)}:${String(r.secs % 60).padStart(2, '0')}</td><td>${r.mistakes}</td><td>${r.safety}</td><td>${r.score}</td><td>${r.pass}</td></tr>`).join('')}</table>
+  <button id="exR">Export records (CSV)</button>
+  <h2 style="margin-top:14px">Kaizen ideas</h2><p>${ideas.length} ideas.</p>
+  <table><tr><th>Date</th><th>Trainee</th><th>Module</th><th>Waste</th><th>Note</th></tr>${ideas.slice(-20).reverse().map(r => `<tr><td>${esc(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.module)}</td><td>${esc(r.waste)}</td><td>${esc(r.note)}</td></tr>`).join('')}</table>
+  <button id="exI">Export ideas (CSV)</button><button id="clr" style="background:#C00000;color:#fff">Clear this device</button><button id="cls">Close</button>`);
+  $('#exR').onclick = () => download('arden-trainer-records.csv', csv(recs, ['date', 'name', 'module', 'secs', 'mistakes', 'safety', 'score', 'pass', 'notes']));
+  $('#exI').onclick = () => download('arden-trainer-ideas.csv', csv(ideas, ['date', 'name', 'module', 'waste', 'note']));
+  $('#clr').onclick = () => { if (confirm('Delete all records and ideas on this device?')) { localStorage.removeItem(LS_REC); localStorage.removeItem(LS_IDEA); showRecords(); } };
+  $('#cls').onclick = closeModal;
+}
+$('#recBtn').onclick = showRecords; $('#nameBtn').onclick = askName; $('#menuBtn').onclick = () => { if (F.onboard) dismountTruck(); menu(); };
+showWho(); menu();
+if (!trainee() && !/[?&]test/.test(location.search)) askName();
+
+/* test hook for the headless checks */
+window.TR = { S, MODS, F, OBJ, SLOTS, PALLETS, recvPallet, startModule, answer, pressKey, onInteract, next, menu, tick, cur, startHunt, huntHit, HUNT, ZONE,
+  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera };
+</script>
+</body>
+</html>
