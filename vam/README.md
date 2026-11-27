@@ -4,7 +4,9 @@ A VaM plugin plus a small helper app on the PC:
 - **Library:** a cleaner, visual front for VaM's Hub, your scene collection and your looks and poses. It's a page on the PC or your phone, and VaM loads what you tap.
 - **Panels:** big, themed panels you can drag around, in place of VaM's tiny menus.
 - **Radial menu:** hold the ` key (under Esc), flick toward a choice, let go. Two flicks reach anything.
-- **Character panel:** VaM's character editor in plain words (Body, Face, Skin, Hair, Clothes, Looks).
+- **Character panel:** VaM's character editor in plain words, as a 9-step flow.
+- **Flows:** "Set up a scene" and "Glasses setup", step by step with live checks.
+- **Tutorials:** a spotlight tour that dims everything but the thing being explained, with steps that wait for you to try it. Welcome runs on the first start; the rest are in Help. The Library page has its own tour too.
 - **Wizra:** her chat inside VaM.
 - **VITURE glasses:** head tracking (3DOF, or 6DOF on the Luma Ultra), side-by-side 3D and hand control.
 
@@ -19,6 +21,9 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 | `BreneViture.cs` | Head tracking on VaM's desktop camera, side-by-side 3D, hand grabbing. |
 | `BreneRadial.cs` | The radial menu. |
 | `BreneCharacter.cs` | The Character panel. |
+| `BreneFlow.cs` | The step-by-step flow panel (numbered steps, live check, Back/Next). |
+| `BreneCoach.cs` | The tutorial engine (spotlight, card, "try it" steps). |
+| `BreneGuides.cs` | The Set up a scene and Glasses setup flows, the Help panel and the six tutorials. |
 | `BreneLink.cs` | Talks to the relay on this PC. |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
@@ -34,6 +39,15 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
    - **Without `BRENAI_PIN`:** she runs on LM Studio on this PC with her persona, but no memory. Her full persona needs the relay run from inside the repo (`vam/relay`); otherwise it uses a short stand-in.
 4. **Glasses.** Run `start-viture.bat` (Brenai's VITURE helper, see `brenai/VITURE.md`). The relay finds it on port 8766.
 5. **Hands.** Open `http://127.0.0.1:8767/hands` in Chrome or Edge on the PC and press Start camera. Leave the tab open.
+
+## Flows
+- **Set up a scene** (dock or radial): Start (keep or open a saved scene), People (select, send to Character, add a person), Pose, Lights (brightness and reach per light, add a light), View (glasses switches), Play & save.
+- **Glasses setup**: Relay, Glasses, Straight ahead, Directions (flip any axis), 3D (layout, swap eyes, eye spacing), Hands. Steps that can be checked turn green by themselves ("Ready") or say what is missing.
+
+## Tutorials
+- **Welcome** runs once on the first start (about a minute): the dock, the radial menu (it waits for you to hold the key), Character, scenes, Library, layout, Help.
+- **In Help (dock):** Make a character, Set up a scene, Glasses, Library, Layout. Each dims the screen except the part being explained; "try it" steps move on by themselves once you've done it.
+- **Library page:** its own tour on the first visit; the ? button in the corner replays it.
 
 ## Radial menu
 - **Hold and flick:** hold the menu key (default ` under Esc; change it in the plugin's settings: Tab, Q, F1 or the mouse's back button). A ring opens around the mouse. Move toward a choice and let go.
@@ -115,6 +129,8 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
   - **VaM may refuse a call:** VaM checks plugins when it loads them. If it refuses `UnityEngine.Networking` (web requests to the relay), the plugin will not load at all. The fix is a file-based link instead: tell the coding session.
   - **Some buttons may do nothing:** Undo, Redo, Save scene, Open scene, VaM menu and Freeze call VaM by method name. If a name differs in your VaM version, that button simply does nothing. Report which.
   - **Character panel unknowns:** it reaches shapes as float settings on the person's `geometry`. If Body and Face show "No shapes found", that route is wrong for your VaM. The friendly names are guesses at VaM's morph names; the note says how many matched. Skin, hair and clothing use `SkinPresets`, `HairPresets` and `ClothingPresets`.
+  - **Adding atoms may not work:** "Add a person" and "Add a light" ask VaM by name (`AddAtomByType`). If nothing appears, use VaM's Add Atom and report it. Light sliders use the light's `Light` settings `intensity` and `range`.
+  - **Tutorial spotlight not tried:** its placement has not been seen on a real screen.
   - **Menu key may clash:** if VaM already uses the menu key, pick another in the plugin's settings.
   - **Library loading may not work:** it calls VaM's `Load`, `RescanPackages` and the person's `AppearancePresets` / `PosePresets` with `presetBrowsePath` and `LoadPreset`. If a look or pose does not apply, the page shows VaM's answer.
   - **Head tracking may misbehave:** it assumes the desktop camera is `MonitorCenterCamera`. If the view jitters or fights the mouse, report it.

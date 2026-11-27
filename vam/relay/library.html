@@ -47,6 +47,10 @@ main{padding:14px 16px 90px}
 .ok{color:var(--acc2)}.bad{color:var(--warn)}
 .bar{height:8px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:12px}.bar i{display:block;height:100%;background:var(--acc2);width:0;transition:width .3s}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(120px);background:#222a40;border:1px solid #39456a;padding:12px 18px;border-radius:14px;z-index:20;transition:transform .2s;max-width:90vw}.toast.on{transform:translateX(-50%)}
+.tour-hole{position:fixed;z-index:30;border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.66);outline:3px solid var(--acc);transition:all .25s;pointer-events:none}
+.tour-card{position:fixed;z-index:31;width:min(360px,92vw);background:#151a2b;border:1px solid #3a3f6a;border-radius:18px;padding:16px 18px;box-shadow:0 10px 40px #000a}
+.tour-card h3{margin:0 0 6px;color:var(--acc);font-size:20px}.tour-card p{margin:0 0 14px;color:#d8dbea}
+.tour-card .tdots{color:var(--dim);font-size:13px;flex:1}.tour-card .trow{display:flex;gap:8px;align-items:center}.tour-card .btn{padding:10px 16px;font-size:15px}
 @media(min-width:900px){.grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}}
 </style></head>
 <body>
@@ -64,6 +68,7 @@ main{padding:14px 16px 90px}
 <main id="main"></main>
 <div class="sheet-bg" id="sbg"></div><div class="sheet" id="sheet"></div>
 <div class="toast" id="toast"></div>
+<button class="chip" id="helpbtn" style="position:fixed;right:14px;bottom:14px;z-index:6;background:var(--card);font-size:18px;width:48px;height:48px;padding:0" title="Show me around">?</button>
 <script>
 const $ = s => document.querySelector(s), esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const api = async (u, body) => { const r = await fetch(u, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; };   // a 200 may still carry a note in .error (an unreadable package): shown, not fatal
@@ -179,5 +184,32 @@ async function hubOpen(id) {
     } catch (e) { $('#jmsg').innerHTML = `<span class="bad">${esc(e.message)}</span>`; $('#inst').disabled = false; }
   };
 }
+// ---- the tour: dims the page, a bright window on one thing at a time, a card that says what it is (first visit, and the ? button) ----
+const TOUR = [
+  { el: '.tabs', t: 'Four places', p: 'Scenes, Looks, Poses, and the VaM Hub. Tap one to switch.' },
+  { el: '.search', t: 'Find anything', p: 'Type a word: names, creators and packages are all searched.' },
+  { el: '#chips', t: 'Narrow it down', p: 'Favourites, Recent, only your own files, or only packages. In Looks you also pick whole look, skin, hair or clothes.' },
+  { el: '.tile', t: 'Tap a picture', p: 'Then Load (scenes) or Apply (looks, poses) and VaM does it straight away. The star keeps it in Favourites.' },
+  { el: '#vampill', t: 'Is VaM listening?', p: 'Green when VaM is open with the Brene plugin. Commands sent while it is grey wait up to a minute.' },
+  { el: '.tab[data-tab="hub"]', t: 'The Hub', p: 'Browse with big pictures, sort by what is hot, and Install: the package and anything it needs land in VaM.' },
+];
+let tourAt = -1;
+function tour(i) {
+  document.querySelectorAll('.tour-hole,.tour-card').forEach(e => e.remove());
+  if (i < 0 || i >= TOUR.length) { tourAt = -1; localStorage.breneTour = '1'; return; }
+  tourAt = i; const s = TOUR[i], el = document.querySelector(s.el);
+  const hole = document.createElement('div'); hole.className = 'tour-hole'; const card = document.createElement('div'); card.className = 'tour-card';
+  card.innerHTML = `<h3>${esc(s.t)}</h3><p>${esc(s.p)}</p><div class="trow"><span class="tdots">${TOUR.map((_, k) => k === i ? '●' : '○').join(' ')}</span>${i ? '<button class="btn alt" id="tb">Back</button>' : ''}<button class="btn alt" id="ts">Skip</button><button class="btn" id="tn">${i === TOUR.length - 1 ? 'Finish' : 'Next'}</button></div>`;
+  document.body.append(hole, card);
+  const r = el ? el.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0, bottom: innerHeight / 2 };
+  Object.assign(hole.style, { left: r.left - 6 + 'px', top: r.top - 6 + 'px', width: r.width + 12 + 'px', height: r.height + 12 + 'px' });
+  const below = r.bottom + 16 + card.offsetHeight < innerHeight;
+  Object.assign(card.style, { left: Math.max(10, Math.min(innerWidth - card.offsetWidth - 10, r.left)) + 'px', top: (below ? r.bottom + 16 : Math.max(10, r.top - card.offsetHeight - 16)) + 'px' });
+  card.querySelector('#tn').onclick = () => tour(i + 1); card.querySelector('#ts').onclick = () => tour(-1);
+  const b = card.querySelector('#tb'); if (b) b.onclick = () => tour(i - 1);
+}
+addEventListener('resize', () => { if (tourAt >= 0) tour(tourAt); });
+$('#helpbtn').onclick = () => tour(0);
+if (!localStorage.breneTour) setTimeout(() => tour(0), 900);
 chips(); load();
 </script></body></html>

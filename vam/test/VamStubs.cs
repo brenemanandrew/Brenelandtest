@@ -11,7 +11,7 @@ namespace UnityEngine
     public class Object { public string name; public static void Destroy(Object o) { } public static implicit operator bool(Object o) { return o != null; } }
     public class Component : Object { public Transform transform; public GameObject gameObject; public T GetComponent<T>() { return default(T); } public T GetComponentInParent<T>() { return default(T); } public T GetComponentInChildren<T>() { return default(T); } public T[] GetComponentsInChildren<T>(bool inactive) { return new T[0]; } public void SendMessage(string m, SendMessageOptions o) { } public void SendMessage(string m, object a, SendMessageOptions o) { } }
     public class Behaviour : Component { public bool enabled; }
-    public class MonoBehaviour : Behaviour { public Coroutine StartCoroutine(IEnumerator e) { return null; } }
+    public class MonoBehaviour : Behaviour { public Coroutine StartCoroutine(IEnumerator e) { return null; } public Coroutine StartCoroutine(string m, object a) { return null; } }
     public class Coroutine { }
     public class YieldInstruction { }
     public class WaitForSeconds : YieldInstruction { public WaitForSeconds(float s) { } }
@@ -40,7 +40,7 @@ namespace UnityEngine
         public void SetAsLastSibling() { } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
         public IEnumerator GetEnumerator() { yield break; }
     }
-    public class RectTransform : Transform { public Vector2 anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax; public Rect rect; }
+    public class RectTransform : Transform { public void GetWorldCorners(Vector3[] c) { } public Vector2 anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax; public Rect rect; }
     public struct Vector2 { public float x, y; public float magnitude; public Vector2(float x, float y) { this.x = x; this.y = y; magnitude = 0; } public static Vector2 zero, one;
         public static Vector2 operator +(Vector2 a, Vector2 b) { return a; } public static Vector2 operator -(Vector2 a, Vector2 b) { return a; } public static Vector2 operator /(Vector2 a, float b) { return a; } public static Vector2 operator *(Vector2 a, float b) { return a; } public static Vector2 operator *(float b, Vector2 a) { return a; } public static implicit operator Vector2(Vector3 v) { return new Vector2(v.x, v.y); } public static float Distance(Vector2 a, Vector2 b) { return 0; } }
     public struct Vector3 { public float x, y, z; public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; } public static Vector3 zero, one;
@@ -53,7 +53,7 @@ namespace UnityEngine
         public static bool operator ==(Quaternion a, Quaternion b) { return true; } public static bool operator !=(Quaternion a, Quaternion b) { return false; } public override bool Equals(object o) { return true; } public override int GetHashCode() { return 0; } }
     public struct Color { public static Color white; public float r, g, b, a; public Color(float r, float g, float b) { this.r = r; this.g = g; this.b = b; a = 1; } public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; } }
     public struct Color32 { public Color32(byte r, byte g, byte b, byte a) { } }
-    public struct Rect { public Rect(float x, float y, float w, float h) { size = new Vector2(w, h); } public Vector2 size; }
+    public struct Rect { public float x, y, width, height; public Vector2 size; public Rect(float x, float y, float w, float h) { this.x = x; this.y = y; width = w; height = h; size = new Vector2(w, h); } }
     public class RectOffset { public RectOffset(int l, int r, int t, int b) { } }
     public struct Ray { public Vector3 origin, direction; }
     public static class Mathf { public const float PI = 3.14159f; public static float Clamp(float v, float a, float b) { return v; } public static int Clamp(int v, int a, int b) { return v; } public static float Clamp01(float v) { return v; } public static float Sqrt(float v) { return v; } public static float Max(float a, float b) { return a; } public static int Max(int a, int b) { return a; } public static float Min(float a, float b) { return a; } public static int FloorToInt(float v) { return 0; } public static int RoundToInt(float v) { return 0; } public static float Floor(float v) { return v; } public static float Atan2(float y, float x) { return 0; } public static float Cos(float a) { return 0; } public static float Sin(float a) { return 0; } }
@@ -89,7 +89,7 @@ namespace UnityEngine.UI
     public class Graphic : Behaviour { public Color color; public bool raycastTarget; public RectTransform rectTransform; }
     public class RawImage : Graphic { public Texture texture; }
     public class Slider : Selectable { public enum Direction { LeftToRight } public RectTransform fillRect, handleRect; public Direction direction; public float minValue, maxValue, value; public UnityEngine.Events.UnityEvent<float> onValueChanged; }
-    public class Image : Graphic { public enum Type { Simple, Sliced } public Sprite sprite; public Type type; }
+    public class Image : Graphic { public enum Type { Simple, Sliced } public Sprite sprite; public Type type; public bool fillCenter; }
     public class Text : Graphic { public Font font; public int fontSize; public string text; public TextAnchor alignment; public HorizontalWrapMode horizontalOverflow; public VerticalWrapMode verticalOverflow; public FontStyle fontStyle; public bool supportRichText; }
     public struct ColorBlock { public Color highlightedColor, pressedColor; }
     public class Selectable : Behaviour { public Graphic targetGraphic; public ColorBlock colors; }

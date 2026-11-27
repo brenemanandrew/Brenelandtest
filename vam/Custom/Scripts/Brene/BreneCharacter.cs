@@ -62,7 +62,7 @@ namespace Brene
             who = UI.Label(top, "", 22, Role.Text, TextAnchor.MiddleLeft); who.fontStyle = FontStyle.Bold; ((RectTransform)who.transform).offsetMax = new Vector2(-260, 0);
             Small(top, "Next person", 260, 130, NextPerson); Small(top, "Reset shapes", 125, 125, Reset);
             // the steps, numbered, in order
-            var bar = UI.Rect("Steps", b); bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1);
+            var bar = UI.Rect("Steps", b); StepsRt = bar; bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1);
             bar.sizeDelta = new Vector2(0, 52); bar.anchoredPosition = new Vector2(0, -54);
             var g = bar.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(67, 52); g.spacing = new Vector2(3, 0);
             for (int k = 0; k < STEPS.Length; k++) { var name = STEPS[k]; var tb = UI.Button(bar, (k + 1) + "\n" + (name == "Start" ? "Start" : name), () => Show(name)); tb.GetComponentInChildren<Text>().fontSize = 15; tabs[name] = tb; }
@@ -88,13 +88,15 @@ namespace Brene
             var back = UI.Rect("Back", nav); back.anchorMin = new Vector2(0, 0); back.anchorMax = new Vector2(0.32f, 1); back.offsetMin = back.offsetMax = Vector2.zero;
             var bb = UI.Button(back, "< Back", () => Step(-1)); Stretch(bb);
             var next = UI.Rect("Next", nav); next.anchorMin = new Vector2(0.36f, 0); next.anchorMax = new Vector2(1, 1); next.offsetMin = next.offsetMax = Vector2.zero;
-            nextBtn = UI.Button(next, "Next >", () => Step(1)); Stretch(nextBtn); UI.SetOn(nextBtn, true);
+            NextRt = next; nextBtn = UI.Button(next, "Next >", () => Step(1)); Stretch(nextBtn); UI.SetOn(nextBtn, true);
             var nr = UI.Rect("Note", b); nr.anchorMin = new Vector2(0, 0); nr.anchorMax = new Vector2(1, 0); nr.pivot = new Vector2(0.5f, 0); nr.sizeDelta = new Vector2(0, 28);
             note = UI.Label(nr, "", 16, Role.Dim, TextAnchor.MiddleLeft);
             Panel.Root.gameObject.SetActive(false);
         }
 
         Button nextBtn;
+        public RectTransform StepsRt, NextRt, AllShapesRt;   // for the tutorial's spotlight
+        public string Section { get { return section; } }
         static void Stretch(Button bt) { var br = (RectTransform)bt.transform; br.anchorMin = Vector2.zero; br.anchorMax = Vector2.one; br.sizeDelta = Vector2.zero; }
         void Step(int d)
         {
@@ -228,7 +230,7 @@ namespace Brene
             // every other shape in this region, sorted by clean name, a page at a time: nothing of VaM's is out of reach
             var region = new List<string>(); foreach (var n in names) if (IsFace(Clean(n)) == face) region.Add(n);
             region.Sort((x, y) => string.Compare(Clean(x), Clean(y), StringComparison.OrdinalIgnoreCase));
-            var tg = UI.Rect("All", content); tg.gameObject.AddComponent<LayoutElement>().minHeight = 52;
+            var tg = UI.Rect("All", content); AllShapesRt = tg; tg.gameObject.AddComponent<LayoutElement>().minHeight = 52;
             Stretch(UI.Button(tg, (showAll ? "Hide " : "Show ") + "all " + region.Count + (face ? " face" : " body") + " shapes", () => { showAll = !showAll; allPage = 0; Show(section); }));
             if (showAll)
             {

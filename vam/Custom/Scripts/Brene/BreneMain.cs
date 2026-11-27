@@ -15,7 +15,7 @@ using MVR.FileManagementSecure;
 
 namespace Brene
 {
-    public class BreneMain : MVRScript
+    public partial class BreneMain : MVRScript
     {
         const string DIR = "Saves/PluginData/Brene", FILE = "Saves/PluginData/Brene/layout.json";
 
@@ -123,6 +123,7 @@ namespace Brene
             foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels" }) MakeButton(id, pLayout);
             MakeButton("radial", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
             chr = new Character(this, link, ApplyPreset); chr.Build(root);
+            BuildGuides(root);
             // the radial menu has its own canvas so it still opens when the panels are hidden
             if (radialGo == null)
             {
@@ -314,7 +315,7 @@ namespace Brene
         {
             try
             {
-                var j = new JSONClass(); j["theme"] = Theme.Name; j["size"].AsFloat = uiSize.val;
+                var j = new JSONClass(); j["theme"] = Theme.Name; j["tutorialSeen"].AsBool = tutorialSeen; j["size"].AsFloat = uiSize.val;
                 var ps = new JSONClass();
                 foreach (var p in Panel.All)
                 {
@@ -346,6 +347,7 @@ namespace Brene
                 if (j == null) return;
                 if (j["theme"] != null && Array.IndexOf(Theme.Names, j["theme"].Value) >= 0) { Theme.Name = j["theme"].Value; Theme.ApplyAll(canvasGo.transform); }
                 if (j["size"] != null) uiSize.val = j["size"].AsFloat;
+                tutorialSeen = j["tutorialSeen"].AsBool;
                 var ps = j["panels"];
                 foreach (var p in Panel.All)
                 {
@@ -381,6 +383,7 @@ namespace Brene
         void Update()
         {
             if (radial != null) radial.Tick(MenuKey());
+            TickGuides();
             if (saveAt > 0 && Time.realtimeSinceStartup > saveAt) { saveAt = -1; SaveLayout(); }
             if (Time.realtimeSinceStartup > nextPeople) { nextPeople = Time.realtimeSinceStartup + 2f; RefreshPeople(); Refresh(); }
             if (status != null && Time.realtimeSinceStartup > nextStatus)
@@ -400,6 +403,7 @@ namespace Brene
             if (vit != null) vit.Shutdown();
             if (canvasGo != null) Destroy(canvasGo);
             if (radialGo != null) Destroy(radialGo);
+            if (coach != null) coach.Destroy();
             Panel.All.Clear(); Editor.On = false;
         }
     }

@@ -126,12 +126,17 @@ try {
     for (const [name, vp, tab] of [['phone-scenes', { width: 390, height: 844 }, 'scene'], ['phone-hub', { width: 390, height: 844 }, 'hub'], ['pc-looks', { width: 1280, height: 800 }, 'look']]) {
       const p = await br.newPage({ viewport: vp });
       await p.route('**/img.jpg', rt => rt.fulfill({ contentType: 'image/jpeg', body: JPG }));
+      await p.addInitScript(() => { if (!location.hash) localStorage.breneTour = '1'; });
       await p.goto(B + '/library'); await p.waitForTimeout(600);
       if (tab !== 'scene') { await p.click(`.tab[data-tab="${tab}"]`); await p.waitForTimeout(700); }
       await p.screenshot({ path: path.join(dir, name + '.png') });
       if (name === 'phone-scenes') { await p.click('.tile'); await p.waitForTimeout(400); await p.screenshot({ path: path.join(dir, 'phone-sheet.png') }); }
       await p.close();
     }
+    { const p = await br.newPage({ viewport: { width: 390, height: 844 } }); await p.goto(B + '/library#tour'); await p.waitForTimeout(1600);
+      const shown = await p.$('.tour-card'); ok(!!shown, 'first visit starts the tour'); await p.screenshot({ path: path.join(dir, 'phone-tour1.png') });
+      await p.click('#tn'); await p.click('#tn'); await p.click('#tn'); await p.waitForTimeout(400); await p.screenshot({ path: path.join(dir, 'phone-tour4.png') });
+      for (let i = 0; i < 3; i++) await p.click('#tn'); ok(!(await p.$('.tour-card')) && await p.evaluate(() => localStorage.breneTour === '1'), 'Finish closes the tour and it does not come back'); await p.close(); }
     await br.close(); console.log('pictures in ' + dir);
   }
 } catch (e) { fail++; console.log('FAIL ' + (e.stack || e)); console.log(out); }
