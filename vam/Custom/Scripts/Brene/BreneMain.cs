@@ -57,6 +57,7 @@ namespace Brene
                 CreateButton("Re-centre head", true).button.onClick.AddListener(() => vit.Recenter());
                 CreateButton("Reset panel layout", true).button.onClick.AddListener(ResetLayout);
 
+                InitWizra();
                 Actions();
                 BuildCanvas();
                 LoadLayout();
@@ -200,10 +201,12 @@ namespace Brene
         {
             var text = chatIn.text.Trim(); if (text == "" || chatBusy) return;
             chatIn.text = ""; chatBusy = true; Line("<b>You:</b> " + Esc(text)); Line("<i>Wizra is thinking...</i>");
-            StartCoroutine(link.Chat(text, (reply, err) =>
+            StartCoroutine(link.Chat(text, voiceOn.val, (reply, err, voiceId) =>
             {
                 chatBusy = false; chatLines.RemoveAt(chatLines.Count - 1);
-                if (err != null) Line("<color=#ff8a8a>" + Esc(err) + "</color>"); else Line("<b>Wizra:</b> " + Esc(reply));
+                if (err != null) { Line("<color=#ff8a8a>" + Esc(err) + "</color>"); return; }
+                Line("<b>Wizra:</b> " + Esc(reply));
+                Heard(reply, voiceId);   // her body: expression from her actions, then her voice with lip sync
             }));
             chatIn.ActivateInputField();
         }
@@ -404,6 +407,7 @@ namespace Brene
             if (canvasGo != null) Destroy(canvasGo);
             if (radialGo != null) Destroy(radialGo);
             if (coach != null) coach.Destroy();
+            DropWizra();
             Panel.All.Clear(); Editor.On = false;
         }
     }

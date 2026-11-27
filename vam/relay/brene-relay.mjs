@@ -106,6 +106,18 @@ async function askLocal(text) {
   history.push({ role: 'assistant', content: out }); return out;
 }
 let chatting = false;
+// what she says out loud: her words without the *actions*
+const spokenOf = t => String(t || '').replace(/\*[^*]*\*/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800);
+const voices = new Map(); let nextVoice = 1;
+async function makeVoice(id, text) {
+  try {
+    const r = await fetch(BRENAI + '/api/tts', { method: 'POST', headers: { 'content-type': 'application/json', cookie: cookieHeader() }, body: JSON.stringify({ text }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || 'voice ' + r.status); }
+    const wav = Buffer.from(await r.arrayBuffer()); if (wav.toString('latin1', 0, 4) !== 'RIFF') throw new Error('the voice did not come back as a WAV');
+    voices.set(id, { state: 'ready', wav });
+  } catch (e) { voices.set(id, { state: 'failed', error: 'No voice: ' + (e.message || e) + ' (is her voice running on the PC?)' }); }
+  for (const k of [...voices.keys()]) if (+k < +id - 20) voices.delete(k);   // keep the last 20
+}
 
 // ---- the server ----
 const send = (res, code, obj, type = 'application/json') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(typeof obj === 'string' ? obj : JSON.stringify(obj)); };
@@ -130,13 +142,26 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/hands' && req.method === 'POST') { hands = cleanHands((await readBody(req)).hands); handsAt = Date.now(); return send(res, 200, { ok: true }); }
     if (url.pathname === '/hands') return send(res, 200, fs.readFileSync(path.join(HERE, 'hands.html'), 'utf8'), 'text/html; charset=utf-8');
     if (url.pathname === '/chat' && req.method === 'POST') {
-      const text = String((await readBody(req)).text || '').trim().slice(0, 4000);
+      const b = await readBody(req), text = String(b.text || '').trim().slice(0, 4000);
       if (!text) return send(res, 400, { error: 'Say something first' });
       if (chatting) return send(res, 409, { error: 'She is still answering' });
       chatting = true;
-      try { return send(res, 200, { text: WIZRA === 'brenai' ? await askBrenai(text) : await askLocal(text) }); }
+      try {
+        const reply = WIZRA === 'brenai' ? await askBrenai(text) : await askLocal(text);
+        // her voice: Brenai's own voice (the same one as in the app), made while VaM shows the text; fetched with GET /voice?id=
+        let voice = null; const spoken = spokenOf(reply);
+        if (b.voice && WIZRA === 'brenai' && spoken) { voice = String(nextVoice++); voices.set(voice, { state: 'making' }); makeVoice(voice, spoken); }
+        return send(res, 200, { text: reply, voice });
+      }
       catch (e) { return send(res, 200, { error: String(e.message || e) }); }
       finally { chatting = false; }
+    }
+    if (url.pathname === '/voice') {
+      const v = voices.get(url.searchParams.get('id') || '');
+      if (!v) return send(res, 404, { error: 'no such voice' });
+      if (v.state === 'making') return send(res, 202, { pending: true });
+      if (v.state === 'failed') return send(res, 200, { error: v.error });
+      res.writeHead(200, { 'content-type': 'audio/wav', 'content-length': v.wav.length, 'cache-control': 'no-store' }); return res.end(v.wav);
     }
     if (url.pathname === '/') {
       const s = `<!doctype html><meta name=viewport content="width=device-width"><title>Brene relay</title><body style="font:18px system-ui;background:#111;color:#eee;padding:20px">

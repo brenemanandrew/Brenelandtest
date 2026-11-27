@@ -7,7 +7,7 @@ A VaM plugin plus a small helper app on the PC:
 - **Character panel:** VaM's character editor in plain words, as a 9-step flow.
 - **Flows:** "Set up a scene" and "Glasses setup", step by step with live checks.
 - **Tutorials:** a spotlight tour that dims everything but the thing being explained, with steps that wait for you to try it. Welcome runs on the first start; the rest are in Help. The Library page has its own tour too.
-- **Wizra:** her chat inside VaM.
+- **Wizra:** the same Wizra as in Brenai (her save, memory and story), with her own voice, in a VaM person you pick as her body: lip sync, expressions from her actions, eyes on you.
 - **VITURE glasses:** head tracking (3DOF, or 6DOF on the Luma Ultra), side-by-side 3D and hand control.
 
 Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs a SteamVR or Oculus headset.
@@ -24,6 +24,7 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 | `BreneFlow.cs` | The step-by-step flow panel (numbered steps, live check, Back/Next). |
 | `BreneCoach.cs` | The tutorial engine (spotlight, card, "try it" steps). |
 | `BreneGuides.cs` | The Set up a scene and Glasses setup flows, the Help panel and the six tutorials. |
+| `BreneWizra.cs` | Wizra's body: voice from her head, lip sync, expressions, looking at you. |
 | `BreneLink.cs` | Talks to the relay on this PC. |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
@@ -39,6 +40,13 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
    - **Without `BRENAI_PIN`:** she runs on LM Studio on this PC with her persona, but no memory. Her full persona needs the relay run from inside the repo (`vam/relay`); otherwise it uses a short stand-in.
 4. **Glasses.** Run `start-viture.bat` (Brenai's VITURE helper, see `brenai/VITURE.md`). The relay finds it on port 8766.
 5. **Hands.** Open `http://127.0.0.1:8767/hands` in Chrome or Edge on the PC and press Start camera. Leave the tab open.
+
+## Wizra in VaM
+- **Same Wizra:** with `BRENAI_PIN` set, the relay talks to brenai.fly.dev as you, so it's the Wizra from Brenai: same save, memory, mood and story. What you say in VaM is in your Brenai history too.
+- **Her body:** in the Wizra panel tap **Pick her body** (cycles through the people in the scene), or use **Make her Wizra** at the end of the Character flow.
+- **Her voice:** Brenai's own voice for her, made on the PC as in the app (Voice: on/off in the panel). It plays from her head, and her mouth moves with it. Only with Brenai; LM Studio mode has no voice.
+- **Her face:** actions in her reply show for a few seconds (*smiles*, *laughs*, *blushes* = smile; *rolls her eyes*, *pouts*, *sighs* = frown; *gasps* = surprise). She looks at you while she talks.
+- **The Build Wizra tutorial** (Help) walks through the Character flow using her description from Brenai (about 5'4", black hair, pale skin, hourglass figure, goth style) and ends by making that person her body and saying hi.
 
 ## Flows
 - **Set up a scene** (dock or radial): Start (keep or open a saved scene), People (select, send to Character, add a person), Pose, Lights (brightness and reach per light, add a light), View (glasses switches), Play & save.
@@ -120,7 +128,7 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
     - a stand-in Hub: list, detail, install with dependencies, a login page refused, downloads from other sites refused.
     - It also takes phone and PC pictures of the page (`--shots <dir>`).
   - The real Hub API answered through the relay (list and detail). No real download into a real VaM.
-  - `relay.test.mjs`, 17 checks:
+  - `relay.test.mjs`, 21 checks (including her voice through a stand-in Brenai `/api/tts`, with *actions* left out of what is voiced):
     - the real `viture-bridge.py --fake --6dof` pose reaching `/state`, with a moving position;
     - hands cleaned and timing out;
     - Wizra through a stand-in Brenai (password, PIN, streamed reply, cookies, wrong PIN);
@@ -129,6 +137,7 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
   - **VaM may refuse a call:** VaM checks plugins when it loads them. If it refuses `UnityEngine.Networking` (web requests to the relay), the plugin will not load at all. The fix is a file-based link instead: tell the coding session.
   - **Some buttons may do nothing:** Undo, Redo, Save scene, Open scene, VaM menu and Freeze call VaM by method name. If a name differs in your VaM version, that button simply does nothing. Report which.
   - **Character panel unknowns:** it reaches shapes as float settings on the person's `geometry`. If Body and Face show "No shapes found", that route is wrong for your VaM. The friendly names are guesses at VaM's morph names; the note says how many matched. Skin, hair and clothing use `SkinPresets`, `HairPresets` and `ClothingPresets`.
+  - **Wizra's body unknowns:** her voice uses `UnityWebRequestMultimedia` (the same check as web requests). Lip sync and expressions guess VaM's morph names ("Mouth Open", "Smile", "Frown", "Surprise"). Eyes use the person's `Eyes` setting `lookMode` = "Player". None of it has been seen in VaM.
   - **Adding atoms may not work:** "Add a person" and "Add a light" ask VaM by name (`AddAtomByType`). If nothing appears, use VaM's Add Atom and report it. Light sliders use the light's `Light` settings `intensity` and `range`.
   - **Tutorial spotlight not tried:** its placement has not been seen on a real screen.
   - **Menu key may clash:** if VaM already uses the menu key, pick another in the plugin's settings.

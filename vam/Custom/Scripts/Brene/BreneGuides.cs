@@ -11,7 +11,7 @@ namespace Brene
     public partial class BreneMain
     {
         Flow sceneFlow, glassFlow; Coach coach; Panel pHelp; readonly List<Lesson> lessons = new List<Lesson>();
-        bool tutorialSeen; float welcomeAt = -1; string lightPick = "";
+        bool tutorialSeen; float welcomeAt = -1; int replyMark; string lightPick = "";
 
         void BuildGuides(Transform root)
         {
@@ -28,6 +28,8 @@ namespace Brene
 
             pHelp = new Panel(root, "help", "Help and tutorials", new Vector2(420, -120), new Vector2(520, 560), false);
             var vl = pHelp.Body.gameObject.AddComponent<VerticalLayoutGroup>(); vl.spacing = 8; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = false;
+            BuildWizraBar();
+            chr.MakeWizra = a => { MakeWizra(a); ShowBody(); };
             if (coach != null) coach.Destroy();
             coach = new Coach(uiSize.val); coach.Finished = n => { if (n == "Welcome") { tutorialSeen = true; SaveLayout(); } };
             Lessons();
@@ -49,6 +51,7 @@ namespace Brene
             if (coach != null) coach.Tick();
             if (sceneFlow != null) sceneFlow.Tick();
             if (glassFlow != null) glassFlow.Tick();
+            TickWizra();
         }
 
         // ---- helpers ----
@@ -203,19 +206,24 @@ namespace Brene
             w.Steps.Add(new CoachStep("Welcome to Brene", "Brene puts VaM's tools into big, clear panels and step-by-step flows. Nothing of VaM's is taken away: its own menus are still one tap away.\n\nThis tour takes about a minute. Skip any time."));
             w.Steps.Add(new CoachStep("Your dock", "Everything starts here: the menu, Character, scene and glasses setup, Help, and Edit layout. The line at the bottom says what is connected.") { Target = () => pDock.Root, Enter = () => pDock.Root.gameObject.SetActive(true) });
             w.Steps.Add(new CoachStep("The radial menu", "Hold the <b>" + KeyName() + "</b> key, move the mouse toward a choice and let go. Two flicks reach anything.\n\n<b>Try it now:</b> hold the key.") { Done = () => radial.Open });
-            w.Steps.Add(new CoachStep("Character", "Makes and changes a person in nine steps: who, a starting look, body, face, skin, hair, clothes, pose, save.") { Target = () => Btn("character") });
+            w.Steps.Add(new CoachStep("Character", "Makes and changes a person in nine steps: who, a starting look, body, face, skin, hair, clothes, pose, save. The \"Build Wizra\" tutorial in Help walks you through making Wizra herself.") { Target = () => Btn("character") });
             w.Steps.Add(new CoachStep("Set up a scene", "A flow for the whole scene: open one, people, poses, lights, how you view it, play and save.") { Target = () => Btn("sceneflow") });
             w.Steps.Add(new CoachStep("Library", "Your scenes, looks and poses as picture tiles, and the VaM Hub with one-tap install. It's a web page, so it also works on your phone:\n\n<b>127.0.0.1:8767/library</b> on this PC (needs the relay running)."));
             w.Steps.Add(new CoachStep("Make it yours", "Edit layout lets you drag panels, resize them and move buttons between them. Theme changes the colours.") { Target = () => Btn("edit") });
-            w.Steps.Add(new CoachStep("Help is here", "Every tour is in Help, any time: Character, Scene, Glasses, Library, Layout.") { Target = () => Btn("help") });
+            w.Steps.Add(new CoachStep("Help is here", "Every tour is in Help, any time: Build Wizra, Scene, Glasses, Library, Layout.") { Target = () => Btn("help") });
 
-            var ch = new Lesson("Make a character", "the Character flow, step by step"); lessons.Add(ch);
-            ch.Steps.Add(new CoachStep("The Character flow", "Character walks you through making a person. Let's open it.") { Enter = () => chr.Open("Who"), Target = () => chr.Panel.Root });
-            ch.Steps.Add(new CoachStep("The steps", "Nine numbered steps. Tap any number to jump, or just go in order.") { Target = () => chr.StepsRt });
-            ch.Steps.Add(new CoachStep("Next", "Next takes you to the following step. Back goes the other way.\n\n<b>Try it:</b> press Next.") { Target = () => chr.NextRt, Done = () => chr.Section != "Who" });
-            ch.Steps.Add(new CoachStep("Shapes", "Body and Face have simple sliders. The small grey name under each is the real VaM shape it moves.") { Enter = () => chr.Open("Body"), Target = () => chr.Panel.Root });
-            ch.Steps.Add(new CoachStep("Every shape is still here", "This button lists all of VaM's shapes for this part of the body, 60 at a time. Search finds any by a word.") { Target = () => chr.AllShapesRt });
-            ch.Steps.Add(new CoachStep("Pictures for the rest", "Skin, Hair, Clothes and Pose show your saved ones as pictures. Tap one to put it on. Finish saves the look.") { Enter = () => chr.Open("Hair"), Target = () => chr.Panel.Root });
+            // the character tutorial builds Wizra herself (her description is Brenai's own: persona.mjs)
+            var ch = new Lesson("Build Wizra", "make Wizra from Brenai, step by step"); lessons.Add(ch);
+            ch.Steps.Add(new CoachStep("Let's build Wizra", "The same Wizra you talk to in Brenai. From her own description:\n\n22, about <b>5'4\"</b>, <b>dark black hair</b>, <b>pale skin</b>, an <b>hourglass figure</b>. She leans goth: <b>skirts, heeled boots, hoodies, dark layers</b>.\n\nWe'll go through the Character flow and build her."));
+            ch.Steps.Add(new CoachStep("Who becomes her", "Tap the person who will be Wizra.") { Enter = () => chr.Open("Who"), Target = () => chr.Panel.Root, Done = () => chr.Section != "Who" });
+            ch.Steps.Add(new CoachStep("A starting point", "Start from a saved look that is close to her (showing ones with \"goth\" in the name), or keep the person as they are. Then press Next on this card.") { Enter = () => { chr.Open("Start"); chr.Find("goth"); }, Target = () => chr.Panel.Root });
+            ch.Steps.Add(new CoachStep("Her body", "About 5'4\": nudge <b>Height</b> down a little. Hourglass: <b>Waist</b> in, <b>Hips</b> and <b>Bust</b> up a little.\n\n<b>Try it:</b> move any slider.") { Enter = () => chr.Open("Body"), Target = () => chr.Panel.Root, Done = () => chr.Changed > 0 });
+            ch.Steps.Add(new CoachStep("Her face", "Brenai doesn't fix her face: it's yours to decide. Small moves go a long way. \"Show all face shapes\" has every shape VaM has.") { Enter = () => chr.Open("Face"), Target = () => chr.Panel.Root });
+            ch.Steps.Add(new CoachStep("Pale skin", "Showing skins with \"pale\" in the name. Clear the search to see them all. Tap one.") { Enter = () => { chr.Open("Skin"); chr.Find("pale"); }, Target = () => chr.Panel.Root });
+            ch.Steps.Add(new CoachStep("Dark black hair", "Showing hair with \"black\" in the name; try \"dark\" or \"long\" too.\n\n<b>Try it:</b> tap a hairstyle.") { Enter = () => { chr.Open("Hair"); chr.Find("black"); }, Target = () => chr.Panel.Root, Done = () => chr.LastApplied == "hair" });
+            ch.Steps.Add(new CoachStep("Her style", "Hoodies, skirts, heeled boots, dark layers. Showing \"hoodie\"; search \"skirt\" or \"boots\" for the rest.") { Enter = () => { chr.Open("Clothes"); chr.Find("hoodie"); }, Target = () => chr.Panel.Root });
+            ch.Steps.Add(new CoachStep("Make her Wizra", "Save the look as <b>Wizra</b>, then tap <b>Make her Wizra</b>. From then on Wizra's voice comes from this body, her lips move when she talks, and her face follows what she does.\n\n<b>Try it:</b> tap Make her Wizra.") { Enter = () => { chr.SaveName = "Wizra"; chr.Open("Finish"); }, Target = () => chr.Panel.Root, Done = () => Body() != null });
+            ch.Steps.Add(new CoachStep("Say hi", "Now talk to her in the Wizra panel. She remembers everything from Brenai.\n\n<b>Try it:</b> send her a message.") { Enter = () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); replyMark = WizraReplies; }, Target = () => pChat.Root, Done = () => WizraReplies > replyMark });
 
             var sc = new Lesson("Set up a scene", "the scene flow"); lessons.Add(sc);
             sc.Steps.Add(new CoachStep("Scene flow", "Six steps from an empty room to a saved scene.") { Enter = () => sceneFlow.Open(0), Target = () => sceneFlow.Panel.Root });

@@ -96,6 +96,10 @@ namespace Brene
 
         Button nextBtn;
         public RectTransform StepsRt, NextRt, AllShapesRt;   // for the tutorial's spotlight
+        public string SaveName, LastApplied = "";              // the name Finish offers; the kind of the last tile tapped
+        public Action<Atom> MakeWizra;                         // Finish's "Make her Wizra"
+        public int Changed { get { return original.Count; } }
+        public void Find(string q) { search.text = q; Show(section, true); }
         public string Section { get { return section; } }
         static void Stretch(Button bt) { var br = (RectTransform)bt.transform; br.anchorMin = Vector2.zero; br.anchorMax = Vector2.one; br.sizeDelta = Vector2.zero; }
         void Step(int d)
@@ -130,9 +134,10 @@ namespace Brene
             int i = list.IndexOf(person); person = list[(i + 1) % list.Count]; Show(section);
         }
 
-        void Show(string sec)
+        void Show(string sec) { Show(sec, false); }
+        void Show(string sec, bool keepSearch)
         {
-            if (sec != section) { showAll = false; allPage = 0; search.text = ""; }
+            if (sec != section && !keepSearch) { showAll = false; allPage = 0; search.text = ""; }
             section = sec; build++;
             foreach (var kv in tabs) UI.SetOn(kv.Value, kv.Key == sec);
             for (int i = content.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(content.GetChild(i).gameObject);
@@ -167,11 +172,12 @@ namespace Brene
         {
             var row = Row2("Look name"); var nameRt = UI.Rect("Name", row); nameRt.anchorMin = new Vector2(0.3f, 0); nameRt.anchorMax = new Vector2(1, 1); nameRt.offsetMin = nameRt.offsetMax = Vector2.zero;
             UI.Box(nameRt, Role.Field); var nameIn = nameRt.gameObject.AddComponent<InputField>();
-            var tx = UI.Label(nameRt, "", 20, Role.Text, TextAnchor.MiddleLeft); tx.raycastTarget = true; nameIn.textComponent = tx; nameIn.text = person.uid + " look";
+            var tx = UI.Label(nameRt, "", 20, Role.Text, TextAnchor.MiddleLeft); tx.raycastTarget = true; nameIn.textComponent = tx; nameIn.text = !string.IsNullOrEmpty(SaveName) ? SaveName : person.uid + " look";
             var grid = Grid(new Vector2(200, 60));
             UI.SetOn(UI.Button(grid, "Save look", () => note.text = SaveLook(nameIn.text)), true);
             UI.Button(grid, "Save scene", () => SuperController.singleton.gameObject.SendMessage("SaveSceneDialog", SendMessageOptions.DontRequireReceiver));
             UI.Button(grid, "Start over", () => Show("Who"));
+            if (MakeWizra != null) UI.SetOn(UI.Button(grid, "Make her Wizra", () => { MakeWizra(person); note.text = person.uid + " is Wizra's body now: her voice, lips and face."; }), true);
             note.text = original.Count + " shape(s) changed on " + person.uid + ". Reset shapes puts them back.";
         }
         // VaM's appearance preset store: name it, then its store action. Not yet checked inside VaM.
@@ -198,7 +204,7 @@ namespace Brene
 
         // ---- shapes ----
         JSONStorable Geometry() { return person != null ? person.GetStorableByID("geometry") : null; }
-        static string Clean(string n)
+        public static string Clean(string n)
         {
             int c = n.LastIndexOf(':'); if (c >= 0) n = n.Substring(c + 1);
             int s = Math.Max(n.LastIndexOf('/'), n.LastIndexOf('\\')); if (s >= 0) n = n.Substring(s + 1);
@@ -242,7 +248,7 @@ namespace Brene
         }
 
         // the morph for a friendly slider: an exact (clean, any case) name first, then the shortest name holding all the words
-        static string Match(List<string> names, string[] entry)
+        public static string Match(List<string> names, string[] entry)
         {
             for (int k = 1; k < entry.Length; k++) foreach (var n in names) if (string.Equals(Clean(n), entry[k], StringComparison.OrdinalIgnoreCase)) return n;
             string best = null;
@@ -306,7 +312,7 @@ namespace Brene
                 var it = items[i]; var path = it["path"].Value; var name = it["name"].Value;
                 var tile = UI.Rect("Tile " + name, grid); var bg = UI.Box(tile, Role.Button);
                 var btn = tile.gameObject.AddComponent<Button>(); btn.targetGraphic = bg;
-                btn.onClick.AddListener(() => { var err = apply(kind, path, person != null ? person.uid : ""); note.text = err ?? ("Applied " + name); });
+                btn.onClick.AddListener(() => { var err = apply(kind, path, person != null ? person.uid : ""); note.text = err ?? ("Applied " + name); if (err == null) LastApplied = kind; });
                 var pic = UI.Rect("Pic", tile); pic.anchorMin = new Vector2(0, 0); pic.anchorMax = new Vector2(1, 1); pic.offsetMin = new Vector2(6, 34); pic.offsetMax = new Vector2(-6, -6);
                 var raw = pic.gameObject.AddComponent<RawImage>(); raw.color = new Color(1, 1, 1, 0.08f); raw.raycastTarget = false;
                 var cap = UI.Rect("Cap", tile); cap.anchorMin = new Vector2(0, 0); cap.anchorMax = new Vector2(1, 0); cap.pivot = new Vector2(0.5f, 0); cap.sizeDelta = new Vector2(0, 32);

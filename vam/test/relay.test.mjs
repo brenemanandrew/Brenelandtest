@@ -16,12 +16,13 @@ const listen = (handler) => new Promise(r => { const s = http.createServer(handl
 const body = req => new Promise(r => { let s = ''; req.on('data', c => s += c); req.on('end', () => r(s ? JSON.parse(s) : {})); });
 
 // stand-in Brenai: password "pw", PIN 1234, streams two deltas then done
-let chats = 0, sawCookie = '';
+let chats = 0, sawCookie = '', ttsText = '';
 const brenai = await listen(async (req, res) => {
   const b = await body(req);
   if (req.url === '/api/login') { if (b.password !== 'pw') { res.writeHead(401); return res.end('{"error":"wrong password"}'); } res.writeHead(200, { 'set-cookie': 'brenai=tok123; Path=/; HttpOnly' }); return res.end('{"ok":true}'); }
   if (req.url === '/api/pin') { if (!String(req.headers.cookie).includes('brenai=tok123')) { res.writeHead(401); return res.end('{"error":"login"}'); } if (b.pin !== '1234') { res.writeHead(404); return res.end('{"error":"No save with that PIN."}'); } res.writeHead(200, { 'set-cookie': 'brenai_u=p1.sig; Path=/' }); return res.end('{"ok":true}'); }
-  if (req.url === '/api/chat') { sawCookie = String(req.headers.cookie); chats++; res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('data: {"t":"delta","text":"Hi "}\n\n'); res.write('data: {"t":"delta","text":"there"}\n\n'); return res.end(`data: {"t":"done","text":"Hi there, you said ${b.text}"}\n\n`); }
+  if (req.url === '/api/tts') { ttsText = b.text; if (!String(req.headers.cookie).includes('brenai_u=')) { res.writeHead(401); return res.end('{"error":"login"}'); } res.writeHead(200, { 'content-type': 'audio/wav' }); return res.end(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(40)])); }
+  if (req.url === '/api/chat') { sawCookie = String(req.headers.cookie); chats++; res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('data: {"t":"delta","text":"Hi "}\n\n'); res.write('data: {"t":"delta","text":"there"}\n\n'); return res.end(`data: {"t":"done","text":"*smiles* Hi there, you said ${b.text}"}\n\n`); }
   res.writeHead(404); res.end();
 });
 // stand-in LM Studio
@@ -59,9 +60,14 @@ try {
 
   // Wizra via Brenai
   let c = await post(18767, '/chat', { text: 'hello' });
-  ok(c.text === 'Hi there, you said hello', 'chat: reply from Brenai (signed in with password and PIN, read the streamed "done")');
+  ok(c.text === '*smiles* Hi there, you said hello' && c.voice === null, 'chat: reply from Brenai (signed in with password and PIN, read the streamed "done"); no voice unless asked');
   ok(sawCookie.includes('brenai=tok123') && sawCookie.includes('brenai_u=p1.sig'), 'chat: both Brenai cookies sent');
-  c = await post(18767, '/chat', { text: 'again' }); ok(c.text && chats === 2, 'chat: second message reuses the sign-in');
+  c = await post(18767, '/chat', { text: 'again', voice: true }); ok(c.text && chats === 2 && c.voice, 'chat: second message reuses the sign-in and starts her voice');
+  let vr; for (let i = 0; i < 20; i++) { vr = await fetch('http://127.0.0.1:18767/voice?id=' + c.voice); if (vr.status !== 202) break; await sleep(100); }
+  const wav = Buffer.from(await vr.arrayBuffer());
+  ok(vr.status === 200 && vr.headers.get('content-type') === 'audio/wav' && wav.toString('latin1', 0, 4) === 'RIFF', 'voice: her WAV from Brenai /api/tts');
+  ok(ttsText === 'Hi there, you said again', 'voice: only her spoken words are voiced (the *action* is left out): ' + ttsText);
+  ok((await fetch('http://127.0.0.1:18767/voice?id=999')).status === 404, 'voice: unknown id is a 404');
   c = await post(18767, '/chat', { text: '' }); ok(!!c.error, 'chat: empty message refused');
   const home = await (await fetch('http://127.0.0.1:18767/')).text(); ok(home.includes('connected') && home.includes('6DOF'), 'status page shows the glasses helper in 6DOF');
   ok(!r1.out().includes('pw') || !/\bpw\b/.test(r1.out()), 'the password is never printed');
@@ -75,6 +81,7 @@ try {
   run('node', [RELAY, '--port', '18769', '--bridge', 'ws://127.0.0.1:18799', '--wizra', 'local', '--lmstudio', L]);
   await sleep(600); c = await post(18769, '/chat', { text: 'yo' });
   ok(c.text === 'Local reply to yo', 'chat local: LM Studio reply, thinking stripped');
+  c = await post(18769, '/chat', { text: 'again', voice: true }); ok(c.voice === null, 'chat local: no voice (only Brenai has her voice)');
   ok(lmSystem.startsWith('You are Wizra.') && lmSystem.length > 1000, 'chat local: uses her full persona from brenai/persona.mjs');
 
   // relay 4: local mode with LM Studio off
