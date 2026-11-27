@@ -210,7 +210,7 @@ namespace Brene
             w.Steps.Add(new CoachStep("Set up a scene", "A flow for the whole scene: open one, people, poses, lights, how you view it, play and save.") { Target = () => Btn("sceneflow") });
             w.Steps.Add(new CoachStep("Library", "Your scenes, looks and poses as picture tiles, and the VaM Hub with one-tap install. It's a web page, so it also works on your phone:\n\n<b>127.0.0.1:8767/library</b> on this PC (needs the relay running)."));
             w.Steps.Add(new CoachStep("Make it yours", "Edit layout lets you drag panels, resize them and move buttons between them. Theme changes the colours.") { Target = () => Btn("edit") });
-            w.Steps.Add(new CoachStep("Help is here", "Every tour is in Help, any time: Build Wizra, Scene, Glasses, Library, Layout.") { Target = () => Btn("help") });
+            w.Steps.Add(new CoachStep("Help is here", "Every tour is in Help, any time: Build Wizra, Scene, Glasses, In the headset, Library, Layout.") { Target = () => Btn("help") });
 
             // the character tutorial builds Wizra herself (her description is Brenai's own: persona.mjs)
             var ch = new Lesson("Build Wizra", "make Wizra from Brenai, step by step"); lessons.Add(ch);
@@ -236,6 +236,11 @@ namespace Brene
             gl.Steps.Add(new CoachStep("Glasses setup", "Six steps, each checked live: relay, glasses, straight ahead, directions, 3D, hands.") { Enter = () => glassFlow.Open(0), Target = () => glassFlow.Panel.Root });
             gl.Steps.Add(new CoachStep("Green means go", "Each step turns green by itself when it works. If it stays orange, it says what is missing.") { Target = () => glassFlow.Panel.Root });
             gl.Steps.Add(new CoachStep("Work through it", "Press Next at each step. You can come back any time from the dock.") { Target = () => glassFlow.NextRt });
+
+            var vrl = new Lesson("In the headset", "the board, the wrist dock, pointing"); lessons.Add(vrl);
+            vrl.Steps.Add(new CoachStep("Everything is on a board", "In a headset, Brene's panels sit on a board floating in front of you: the same panels, flows and menu as on the monitor. Point with VaM's laser and pull the trigger to press."));
+            vrl.Steps.Add(new CoachStep("Your wrist", "Raise your left hand and look at it: a dock appears on your wrist. Board shows or hides the board, Menu opens the ring, Wizra opens her chat, Bring board here moves the board in front of you.\n\n<b>Try it:</b> look at your left wrist.") { Done = () => !InVR || (wristGo != null && wristGo.activeSelf) });
+            vrl.Steps.Add(new CoachStep("Talking to Wizra", "Her voice comes from her body in the room. With no keyboard, use the quick lines under her chat (Hey, Tell me more...). A real keyboard still works for anything else.") { Target = () => pChat.Root, Enter = () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); } });
 
             var lib = new Lesson("Library", "scenes, looks and the Hub"); lessons.Add(lib);
             lib.Steps.Add(new CoachStep("The Library page", "Open <b>127.0.0.1:8767/library</b> in a browser on this PC, or on your phone if the relay was started with --lan (it prints the link).\n\nFirst time: paste your VaM folder."));

@@ -24,35 +24,36 @@ namespace Brene
         readonly Stack<List<RItem>> trail = new Stack<List<RItem>>(); readonly Stack<string> titles = new Stack<string>();
         Text coreText; Vector2 center; int hot = -1; float openedAt; bool sticky;
         public bool Open { get { return root != null; } }
+        public bool World; public Vector2 WorldSize;   // VR: the ring opens on the board and is clicked with VaM's pointer
 
         public Radial(Transform canvas, Func<List<RItem>> items) { this.canvas = canvas; rootItems = items; }
 
         // key: the hold-to-pick key, checked every frame by the plugin
         public void Tick(KeyCode key)
         {
-            if (Input.GetKeyDown(key)) { if (Open && sticky) Close(); else { Show(Input.mousePosition, rootItems(), "Brene"); sticky = false; openedAt = Time.realtimeSinceStartup; } }
+            if (Input.GetKeyDown(key)) { if (Open && sticky) Close(); else if (World) OpenAtCentre(); else { Show(Input.mousePosition, rootItems(), "Brene"); sticky = false; openedAt = Time.realtimeSinceStartup; } }
             if (!Open) return;
-            Track();
+            if (!World) Track();
             if (Input.GetKeyUp(key) && !sticky)
             {
                 if (Time.realtimeSinceStartup - openedAt < 0.25f && hot < 0) sticky = true;   // a tap: leave it open for clicking
                 else Pick();
             }
-            if (sticky && Input.GetMouseButtonDown(0)) Pick();
+            if (sticky && !World && Input.GetMouseButtonDown(0)) Pick();
             if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape)) Back();
         }
 
-        public void OpenAtCentre() { Show(new Vector2(Screen.width / 2f, Screen.height / 2f), rootItems(), "Brene"); sticky = true; }
+        public void OpenAtCentre() { Show(World ? WorldSize / 2f : new Vector2(Screen.width / 2f, Screen.height / 2f), rootItems(), "Brene"); sticky = true; }
 
         void Show(Vector2 screenPos, List<RItem> items, string title)
         {
             Close(false);
             center = screenPos; shown.Clear(); shown.AddRange(items); petals.Clear(); hot = -1;
-            float k = Editor.Scale;
+            float k = World ? 1f : Editor.Scale; float SW = World ? WorldSize.x : Screen.width, SH = World ? WorldSize.y : Screen.height;
             root = UI.Rect("Radial", canvas); root.anchorMin = root.anchorMax = Vector2.zero; root.pivot = new Vector2(0.5f, 0.5f);
             // keep the whole ring on screen
             float m = (R + PETAL / 2 + 8) * k;
-            center = new Vector2(Mathf.Clamp(center.x, m, Screen.width - m), Mathf.Clamp(center.y, m, Screen.height - m));
+            center = new Vector2(Mathf.Clamp(center.x, m, SW - m), Mathf.Clamp(center.y, m, SH - m));
             root.anchoredPosition = center / k; root.sizeDelta = Vector2.one * (R * 2 + PETAL);
             root.SetAsLastSibling();
 
@@ -68,6 +69,8 @@ namespace Brene
                 var label = items[i].Label + (items[i].Kids != null ? "  >" : "");
                 var t = UI.Label(p, label, 19, Role.Text, TextAnchor.MiddleCenter); t.fontStyle = FontStyle.Bold;
                 petals.Add(img);
+                // a petal is also a button: clicked with the mouse on a monitor, or with VaM's pointer in VR
+                int idx = i; var pb = p.gameObject.AddComponent<Button>(); pb.targetGraphic = img; pb.onClick.AddListener(() => { hot = idx; Pick(); });
             }
             var core = UI.Rect("Core", root); core.anchorMin = core.anchorMax = new Vector2(0.5f, 0.5f); core.sizeDelta = Vector2.one * CORE;
             var ci = UI.Box(core, Role.Title); ci.sprite = Circle; ci.type = Image.Type.Simple;

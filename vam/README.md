@@ -10,7 +10,7 @@ A VaM plugin plus a small helper app on the PC:
 - **Wizra:** the same Wizra as in Brenai (her save, memory and story), with her own voice, in a VaM person you pick as her body: lip sync, expressions from her actions, eyes on you.
 - **VITURE glasses:** head tracking (3DOF, or 6DOF on the Luma Ultra), side-by-side 3D and hand control.
 
-Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs a SteamVR or Oculus headset.
+Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, Index and so on through SteamVR or Oculus).
 
 ## What is in it
 | Path | What |
@@ -25,6 +25,7 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 | `BreneCoach.cs` | The tutorial engine (spotlight, card, "try it" steps). |
 | `BreneGuides.cs` | The Set up a scene and Glasses setup flows, the Help panel and the six tutorials. |
 | `BreneWizra.cs` | Wizra's body: voice from her head, lip sync, expressions, looking at you. |
+| `BreneVR.cs` | The headset version: the panels on a floating board, the wrist dock, quick lines for Wizra. |
 | `BreneLink.cs` | Talks to the relay on this PC. |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
@@ -47,6 +48,14 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
 - **Her voice:** Brenai's own voice for her, made on the PC as in the app (Voice: on/off in the panel). It plays from her head, and her mouth moves with it. Only with Brenai; LM Studio mode has no voice.
 - **Her face:** actions in her reply show for a few seconds (*smiles*, *laughs*, *blushes* = smile; *rolls her eyes*, *pouts*, *sighs* = frown; *gasps* = surprise). She looks at you while she talks.
 - **The Build Wizra tutorial** (Help) walks through the Character flow using her description from Brenai (about 5'4", black hair, pale skin, hourglass figure, goth style) and ends by making that person her body and saying hi.
+
+## In a VR headset
+- **Automatic:** when VaM runs in a headset, everything Brene shows moves onto a board floating about an arm's length ahead at eye height: the same panels, layout, flows, radial menu and tutorials. Back on the monitor, it returns to the screen.
+- **Pointing:** VaM's own laser pointers press the buttons.
+- **Wrist dock:** raise your left hand and look at it. Board (show or hide), Menu (the ring), Wizra, Bring board here.
+- **Wizra:** her voice comes from her body in the room. Quick lines under her chat (Hey, How's your day?, Tell me more...) for when there is no keyboard.
+- **Switched off in VR:** the glasses' camera control and webcam hands (the headset tracks you itself).
+- **Tutorial:** "In the headset" in Help.
 
 ## Flows
 - **Set up a scene** (dock or radial): Start (keep or open a saved scene), People (select, send to Character, add a person), Pose, Lights (brightness and reach per light, add a light), View (glasses switches), Play & save.
@@ -138,6 +147,7 @@ Not part of Breneland. This is VaM's desktop mode. VaM's own VR mode still needs
   - **Some buttons may do nothing:** Undo, Redo, Save scene, Open scene, VaM menu and Freeze call VaM by method name. If a name differs in your VaM version, that button simply does nothing. Report which.
   - **Character panel unknowns:** it reaches shapes as float settings on the person's `geometry`. If Body and Face show "No shapes found", that route is wrong for your VaM. The friendly names are guesses at VaM's morph names; the note says how many matched. Skin, hair and clothing use `SkinPresets`, `HairPresets` and `ClothingPresets`.
   - **Wizra's body unknowns:** her voice uses `UnityWebRequestMultimedia` (the same check as web requests). Lip sync and expressions guess VaM's morph names ("Mouth Open", "Smile", "Frown", "Surprise"). Eyes use the person's `Eyes` setting `lookMode` = "Player". None of it has been seen in VaM.
+  - **VR unknowns:** the board relies on VaM letting its laser pointers press a plugin's canvases (`AddCanvas`, asked for by name). Dragging panels with the pointer, the board's size and distance, and the wrist dock's position have not been seen in a headset.
   - **Adding atoms may not work:** "Add a person" and "Add a light" ask VaM by name (`AddAtomByType`). If nothing appears, use VaM's Add Atom and report it. Light sliders use the light's `Light` settings `intensity` and `range`.
   - **Tutorial spotlight not tried:** its placement has not been seen on a real screen.
   - **Menu key may clash:** if VaM already uses the menu key, pick another in the plugin's settings.

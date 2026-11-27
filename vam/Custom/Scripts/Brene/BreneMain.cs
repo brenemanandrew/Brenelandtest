@@ -375,6 +375,7 @@ namespace Brene
 
         void ResetLayout()
         {
+            if (vr) LeaveVR();   // rebuilt on the monitor; TickVR moves it back onto the board within a second
             if (FileManagerSecure.FileExists(FILE)) FileManagerSecure.DeleteFile(FILE);
             Theme.Name = "Night"; uiSize.val = 1.25f;
             Panel.All.Clear(); foreach (var a in acts.Values) a.btn = null; if (radial != null) radial.Close();
@@ -387,6 +388,7 @@ namespace Brene
         {
             if (radial != null) radial.Tick(MenuKey());
             TickGuides();
+            TickVR();
             if (saveAt > 0 && Time.realtimeSinceStartup > saveAt) { saveAt = -1; SaveLayout(); }
             if (Time.realtimeSinceStartup > nextPeople) { nextPeople = Time.realtimeSinceStartup + 2f; RefreshPeople(); Refresh(); }
             if (status != null && Time.realtimeSinceStartup > nextStatus)
@@ -408,6 +410,7 @@ namespace Brene
             if (radialGo != null) Destroy(radialGo);
             if (coach != null) coach.Destroy();
             DropWizra();
+            if (vr) LeaveVR();
             Panel.All.Clear(); Editor.On = false;
         }
     }

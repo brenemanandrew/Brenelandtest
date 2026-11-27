@@ -26,6 +26,8 @@ namespace Brene
         readonly GameObject go; readonly RectTransform root; readonly Image[] dims = new Image[4]; RectTransform ring, card;
         Text title, body, dots; Button back, next; Lesson lesson; int index; bool waiting; float doneAt = -1; float k = 1f;
         public bool Running { get { return lesson != null; } }
+        public GameObject CanvasGo { get { return go; } }
+        public Vector2 WorldSize;   // set in VR: the board's size in canvas units (zero on a monitor)
         public Action<string> Finished = delegate { };
 
         public Coach(float scale)
@@ -98,11 +100,13 @@ namespace Brene
         {
             var st = lesson.Steps[index]; RectTransform t = null;
             try { if (st.Target != null) t = st.Target(); } catch (Exception) { }
-            float W = Screen.width, H = Screen.height;
+            bool world = WorldSize.x > 0;
+            float W = world ? WorldSize.x : Screen.width, H = world ? WorldSize.y : Screen.height;
             Rect hole;
             if (t != null && t.gameObject.activeInHierarchy)
             {
-                var c = new Vector3[4]; t.GetWorldCorners(c);   // screen pixels on an overlay canvas
+                var c = new Vector3[4]; t.GetWorldCorners(c);   // screen pixels on an overlay canvas; metres on the VR board
+                if (world) for (int q = 0; q < 4; q++) c[q] = root.InverseTransformPoint(c[q]);   // the board's units, from its bottom-left corner
                 float pad = 10; hole = new Rect(c[0].x - pad, c[0].y - pad, c[2].x - c[0].x + pad * 2, c[2].y - c[0].y + pad * 2);
             }
             else hole = new Rect(W / 2, H / 2, 0, 0);
@@ -114,7 +118,8 @@ namespace Brene
             ring.gameObject.SetActive(hole.width > 0);
             ring.anchoredPosition = new Vector2(hole.x - 4, hole.y - 4); ring.sizeDelta = new Vector2(hole.width + 8, hole.height + 8);
             // the card: beside the hole where there is room, else in the middle
-            float cw = card.sizeDelta.x * k, ch = card.sizeDelta.y * k; Vector2 p;
+            float ck = world ? 1f : k; card.localScale = Vector3.one * ck;
+            float cw = card.sizeDelta.x * ck, ch = card.sizeDelta.y * ck; Vector2 p;
             if (hole.width == 0) p = new Vector2(W / 2, H / 2);
             else if (hole.x + hole.width + cw + 30 < W) p = new Vector2(hole.x + hole.width + 20 + cw / 2, hole.y + hole.height / 2);
             else if (hole.x - cw - 30 > 0) p = new Vector2(hole.x - 20 - cw / 2, hole.y + hole.height / 2);

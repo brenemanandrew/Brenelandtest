@@ -32,6 +32,7 @@ namespace Brene
         // ---- head ----
         public void LateUpdate()
         {
+            if (UnityEngine.XR.XRSettings.enabled) return;   // in a headset the headset moves the view
             var c = Cam; if (c == null) return;
             var t = c.transform;
             // take our last offset back off, unless VaM wrote the camera itself this frame (then its value is the base)

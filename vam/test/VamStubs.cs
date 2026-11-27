@@ -35,7 +35,7 @@ namespace UnityEngine
     }
     public class Transform : Component, IEnumerable
     {
-        public Vector3 position, localPosition, localScale; public Quaternion localRotation, rotation; public Transform parent; public int childCount;
+        public Vector3 position, localPosition, localScale, forward; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
         public void SetParent(Transform p, bool keep) { } public void SetParent(Transform p) { } public Transform GetChild(int i) { return null; }
         public void SetAsLastSibling() { } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
         public IEnumerator GetEnumerator() { yield break; }
@@ -43,12 +43,12 @@ namespace UnityEngine
     public class RectTransform : Transform { public void GetWorldCorners(Vector3[] c) { } public Vector2 anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax; public Rect rect; }
     public struct Vector2 { public float x, y; public float magnitude; public Vector2(float x, float y) { this.x = x; this.y = y; magnitude = 0; } public static Vector2 zero, one;
         public static Vector2 operator +(Vector2 a, Vector2 b) { return a; } public static Vector2 operator -(Vector2 a, Vector2 b) { return a; } public static Vector2 operator /(Vector2 a, float b) { return a; } public static Vector2 operator *(Vector2 a, float b) { return a; } public static Vector2 operator *(float b, Vector2 a) { return a; } public static implicit operator Vector2(Vector3 v) { return new Vector2(v.x, v.y); } public static float Distance(Vector2 a, Vector2 b) { return 0; } }
-    public struct Vector3 { public float x, y, z; public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; } public static Vector3 zero, one;
+    public struct Vector3 { public float x, y, z; public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; } public static Vector3 zero, one, up, forward; public float sqrMagnitude { get { return 0; } } public float magnitude { get { return 0; } } public void Normalize() { } public static float Dot(Vector3 a, Vector3 b) { return 0; } public static Vector3 operator /(Vector3 a, float b) { return a; }
         public static Vector3 operator +(Vector3 a, Vector3 b) { return a; } public static Vector3 operator -(Vector3 a, Vector3 b) { return a; } public static Vector3 operator *(Vector3 a, float b) { return a; } public static Vector3 operator *(float b, Vector3 a) { return a; }
         public static bool operator ==(Vector3 a, Vector3 b) { return true; } public static bool operator !=(Vector3 a, Vector3 b) { return false; } public override bool Equals(object o) { return true; } public override int GetHashCode() { return 0; }
         public static float Distance(Vector3 a, Vector3 b) { return 0; } public static Vector3 ClampMagnitude(Vector3 v, float m) { return v; } }
     public struct Vector4 { public Vector4(float a, float b, float c, float d) { } }
-    public struct Quaternion { public static Quaternion identity; public static Quaternion Euler(float x, float y, float z) { return identity; } public static Quaternion Inverse(Quaternion q) { return q; }
+    public struct Quaternion { public static Quaternion identity; public static Quaternion LookRotation(Vector3 f) { return identity; } public static Quaternion Euler(float x, float y, float z) { return identity; } public static Quaternion Inverse(Quaternion q) { return q; }
         public static Quaternion operator *(Quaternion a, Quaternion b) { return a; } public static Vector3 operator *(Quaternion a, Vector3 b) { return b; }
         public static bool operator ==(Quaternion a, Quaternion b) { return true; } public static bool operator !=(Quaternion a, Quaternion b) { return false; } public override bool Equals(object o) { return true; } public override int GetHashCode() { return 0; } }
     public struct Color { public static Color white; public float r, g, b, a; public Color(float r, float g, float b) { this.r = r; this.g = g; this.b = b; a = 1; } public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; } }
@@ -71,9 +71,9 @@ namespace UnityEngine
     public class Material : Object { public Color color; }
     public class Renderer : Component { public Material material; }
     public class Collider : Component { }
-    public class Camera : Behaviour { public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
+    public class Camera : Behaviour { public static Camera main; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
         public Ray ScreenPointToRay(Vector3 p) { return new Ray(); } public Vector3 WorldToScreenPoint(Vector3 p) { return p; } }
-    public class Canvas : Behaviour { public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public static void ForceUpdateCanvases() { } }
+    public class Canvas : Behaviour { public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
     public class CanvasGroup : Behaviour { public bool blocksRaycasts; public float alpha; }
 }
 namespace UnityEngine.Events { public class UnityEvent { public void AddListener(Action a) { } } public class UnityEvent<T> { public void AddListener(Action<T> a) { } } }
@@ -85,6 +85,12 @@ namespace UnityEngine.EventSystems
     public interface IBeginDragHandler { void OnBeginDrag(PointerEventData e); }
     public interface IDragHandler { void OnDrag(PointerEventData e); }
     public interface IEndDragHandler { void OnEndDrag(PointerEventData e); }
+}
+namespace UnityEngine.XR
+{
+    public static class XRSettings { public static bool enabled, isDeviceActive; }
+    public enum XRNode { Head, LeftHand, RightHand }
+    public static class InputTracking { public static Vector3 GetLocalPosition(XRNode n) { return Vector3.zero; } public static Quaternion GetLocalRotation(XRNode n) { return Quaternion.identity; } }
 }
 namespace UnityEngine.UI
 {
@@ -135,7 +141,7 @@ public class FreeControllerV3 : UnityEngine.MonoBehaviour { public UnityEngine.T
 public class SuperController : UnityEngine.MonoBehaviour
 {
     public enum GameMode { Edit, Play }
-    public static SuperController singleton; public GameMode gameMode; public bool freezeAnimation; public UnityEngine.Camera MonitorCenterCamera;
+    public static SuperController singleton; public UnityEngine.Transform centerCameraTarget; public GameMode gameMode; public bool freezeAnimation; public UnityEngine.Camera MonitorCenterCamera;
     public List<Atom> GetAtoms() { return null; } public Atom GetAtomByUid(string u) { return null; } public Atom GetSelectedAtom() { return null; } public void SelectController(FreeControllerV3 fc) { }
     public void SaveJSON(SimpleJSON.JSONClass j, string p) { } public SimpleJSON.JSONClass LoadJSON(string p) { return null; }
     public static void LogError(string s) { } public static void LogMessage(string s) { }
