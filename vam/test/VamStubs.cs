@@ -63,7 +63,7 @@ namespace UnityEngine
     public static class Resources { public static T GetBuiltinResource<T>(string n) where T : Object { return null; } }
     public class Font : Object { }
     public enum AudioType { WAV }
-    public class AudioClip : Object { }
+    public class AudioClip : Object { public static AudioClip Create(string n, int len, int ch, int rate, bool stream) { return null; } public bool SetData(float[] d, int off) { return true; } }
     public class AudioSource : Behaviour { public AudioClip clip; public bool isPlaying; public float spatialBlend, minDistance, volume; public void Play() { } public void Stop() { } public void GetOutputData(float[] d, int ch) { } }
     public class Texture : Object { }
     public class Texture2D : Texture { public TextureWrapMode wrapMode; public Texture2D(int w, int h) { } public Texture2D(int w, int h, TextureFormat f, bool m) { } public bool LoadImage(byte[] b) { return true; } public void SetPixels32(Color32[] p) { } public void Apply() { } }
@@ -116,8 +116,7 @@ namespace UnityEngine.UI
 }
 namespace UnityEngine.Networking
 {
-    public static class UnityWebRequestMultimedia { public static UnityWebRequest GetAudioClip(string u, UnityEngine.AudioType t) { return null; } }
-    public class DownloadHandlerAudioClip : DownloadHandler { public static UnityEngine.AudioClip GetContent(UnityWebRequest r) { return null; } }
+    // not in VaM: UnityWebRequestMultimedia and DownloadHandlerAudioClip (Unity's audio download module is left out)
     public class UploadHandler { } public class UploadHandlerRaw : UploadHandler { public UploadHandlerRaw(byte[] b) { } }
     public class DownloadHandler { public string text; public byte[] data; } public class DownloadHandlerBuffer : DownloadHandler { }
     public class UnityWebRequestAsyncOperation : YieldInstruction { }

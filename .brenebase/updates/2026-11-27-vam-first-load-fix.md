@@ -8,6 +8,7 @@ title: Brene for VaM - first real load in VaM 1.22: checker fix
 ## Done
 - Andrew's first load (VaM 1.22.0.13, Brene Loader scene) reached VaM's compiler. VaM's plugin checker refused `Dictionary<,>.ValueCollection.Enumerator` (BreneViture.cs 170). All dictionary loops now walk a List copy; the JSON trait loop uses a list from the relay (`traitList`).
 - Second load: VaM's JSONStorableFloat/Bool/String have two callback overloads, so untyped lambdas (`v => ...`) and `null` were ambiguous (BreneMain.cs 48). All callbacks now name their parameter type; the test stand-ins now carry both overloads, so the compile check catches it.
+- Third load: VaM leaves out Unity's audio download module (`UnityWebRequestMultimedia`, BreneWizra.cs 132). Voices are now fetched as bytes and decoded from WAV in the plugin (16, 24, 32-bit and float PCM), checked with mono against real WAV files.
 - `test/compile.sh` now fails on these loop patterns so they don't come back.
 ## Tested
 - Compile check passed; story test 28 passed.

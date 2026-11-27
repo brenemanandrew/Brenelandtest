@@ -129,11 +129,12 @@ namespace Brene
                 if (code != 202) { if (txt.Contains("error")) Line("<color=#ffb070>" + Esc(JSON.Parse(txt)["error"].Value) + "</color>"); yield break; }
                 yield return new WaitForSeconds(0.5f);
             }
-            var req = UnityWebRequestMultimedia.GetAudioClip(url, AudioType.WAV); req.timeout = 20;
+            // VaM leaves out Unity's audio download module, so the WAV is fetched as plain bytes and turned into a clip here
+            var req = UnityWebRequest.Get(url); req.timeout = 20;
             yield return req.SendWebRequest();
             if (req.isNetworkError || req.isHttpError) { req.Dispose(); yield break; }
-            var clip = DownloadHandlerAudioClip.GetContent(req); req.Dispose();
-            if (clip == null) yield break;
+            var clip = WavClip(req.downloadHandler.data, "voice " + who); req.Dispose();
+            if (clip == null) { Line("<color=#ffb070>Her voice came back in a sound format Brene can't read.</color>"); yield break; }
             var v = VoiceOf(who);
             // no body (Margo on a call): heard as a phone voice, not from a place in the room
             v.src.spatialBlend = body != null ? 1f : 0f;
@@ -217,6 +218,33 @@ namespace Brene
             if (cache == null) { var names = geo.GetFloatParamNames(); if (names == null) return; cache = Character.Match(names, candidates); if (cache == null) { cache = ""; return; } }
             if (cache == "") return;
             var f = geo.GetFloatJSONParam(cache); if (f != null) f.val = v;
+        }
+
+        // a WAV file (16-bit, 24-bit or 32-bit float PCM, any rate and channel count) as a Unity clip
+        static AudioClip WavClip(byte[] b, string name)
+        {
+            if (b == null || b.Length < 44 || b[0] != 'R' || b[1] != 'I' || b[2] != 'F' || b[3] != 'F') return null;
+            int fmt = 0, ch = 0, rate = 0, bits = 0, dataAt = -1, dataLen = 0, p = 12;
+            while (p + 8 <= b.Length)
+            {
+                string id = "" + (char)b[p] + (char)b[p + 1] + (char)b[p + 2] + (char)b[p + 3]; int len = BitConverter.ToInt32(b, p + 4);
+                if (id == "fmt ") { fmt = BitConverter.ToInt16(b, p + 8); ch = BitConverter.ToInt16(b, p + 10); rate = BitConverter.ToInt32(b, p + 12); bits = BitConverter.ToInt16(b, p + 22); }
+                else if (id == "data") { dataAt = p + 8; dataLen = Math.Min(len < 0 ? b.Length : len, b.Length - dataAt); break; }
+                p += 8 + len + (len & 1); if (len < 0) break;
+            }
+            if (dataAt < 0 || ch < 1 || rate < 1000) return null;
+            int step = bits / 8; if (step < 2) return null;
+            int n = dataLen / step; var data = new float[n];
+            for (int i = 0, q = dataAt; i < n; i++, q += step)
+            {
+                if (fmt == 3 && bits == 32) data[i] = BitConverter.ToSingle(b, q);
+                else if (bits == 16) data[i] = BitConverter.ToInt16(b, q) / 32768f;
+                else if (bits == 24) data[i] = ((b[q] | (b[q + 1] << 8) | ((sbyte)b[q + 2] << 16))) / 8388608f;
+                else if (bits == 32) data[i] = BitConverter.ToInt32(b, q) / 2147483648f;
+                else return null;
+            }
+            var clip = AudioClip.Create(name, n / ch, ch, rate, false); clip.SetData(data, 0);
+            return clip;
         }
 
         void DropWizra() { foreach (var v in new List<Voice>(voices.Values)) if (v.go != null) Destroy(v.go); voices.Clear(); }
