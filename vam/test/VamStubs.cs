@@ -147,9 +147,9 @@ public class SuperController : UnityEngine.MonoBehaviour
     public void SaveJSON(SimpleJSON.JSONClass j, string p) { } public SimpleJSON.JSONClass LoadJSON(string p) { return null; }
     public static void LogError(string s) { } public static void LogMessage(string s) { }
 }
-public class JSONStorableBool { public bool val; public JSONStorableBool(string n, bool d, Action<bool> cb) { } }
-public class JSONStorableFloat { public float val, min, max; public JSONStorableFloat(string n, float d, Action<float> cb, float min, float max) { } }
-public class JSONStorableString { public string val; public JSONStorableString(string n, string d, Action<string> cb) { } }
+public class JSONStorableBool { public delegate void SetBoolCallback(bool v); public delegate void SetJSONBoolCallback(JSONStorableBool j); public bool val; public JSONStorableBool(string n, bool d, SetBoolCallback cb) { } public JSONStorableBool(string n, bool d, SetJSONBoolCallback cb) { } }
+public class JSONStorableFloat { public delegate void SetFloatCallback(float v); public delegate void SetJSONFloatCallback(JSONStorableFloat j); public float val, min, max; public JSONStorableFloat(string n, float d, SetFloatCallback cb, float min, float max, bool constrain = true, bool interactable = true) { } public JSONStorableFloat(string n, float d, SetJSONFloatCallback cb, float min, float max, bool constrain = true, bool interactable = true) { } }
+public class JSONStorableString { public delegate void SetStringCallback(string v); public delegate void SetJSONStringCallback(JSONStorableString j); public string val; public JSONStorableString(string n, string d, SetStringCallback cb) { } public JSONStorableString(string n, string d, SetJSONStringCallback cb) { } }
 public class UIDynamic { public float height; }
 public class JSONStorableStringChooser { public string val; public JSONStorableStringChooser(string n, List<string> choices, string d, string label) { } }
 public class UIDynamicButton : UIDynamic { public UnityEngine.UI.Button button; }

@@ -37,15 +37,15 @@ namespace Brene
             try
             {
                 link = new Link(); vit = new Viture(link);
-                relayUrl = new JSONStorableString("Relay address", "http://127.0.0.1:8767", s => link.Url = s.TrimEnd('/'));
+                relayUrl = new JSONStorableString("Relay address", "http://127.0.0.1:8767", (string s) => link.Url = s.TrimEnd('/'));
                 RegisterString(relayUrl); CreateTextField(relayUrl).height = 60; link.Url = relayUrl.val;
                 showUi = Bool("Show Brene panels", true, v => { if (canvasGo != null) canvasGo.SetActive(v); });
-                uiSize = new JSONStorableFloat("Panel size", 1.25f, v => { if (scaler != null) scaler.scaleFactor = v; if (radialScaler != null) radialScaler.scaleFactor = v; }, 0.6f, 3f);
+                uiSize = new JSONStorableFloat("Panel size", 1.25f, (float v) => { if (scaler != null) scaler.scaleFactor = v; if (radialScaler != null) radialScaler.scaleFactor = v; }, 0.6f, 3f);
                 RegisterFloat(uiSize); CreateSlider(uiSize);
                 menuKey = new JSONStorableStringChooser("Menu key", new List<string> { "BackQuote", "Tab", "Q", "F1", "Mouse4" }, "BackQuote", "Radial menu key (hold)");
                 RegisterStringChooser(menuKey); CreatePopup(menuKey);
                 // VaM's own menu can run off the top of a short screen: a wider camera view makes it smaller so it fits
-                menuFit = new JSONStorableFloat("Fit VaM menu (wider view)", 0f, v => { }, 0f, 45f); RegisterFloat(menuFit); CreateSlider(menuFit);
+                menuFit = new JSONStorableFloat("Fit VaM menu (wider view)", 0f, (float v) => { }, 0f, 45f); RegisterFloat(menuFit); CreateSlider(menuFit);
                 headOn = Bool("Head tracking (glasses)", true, v => vit.Head = v);
                 handsOn = Bool("Hand control", true, v => vit.HandsOn = v);
                 stereoOn = Bool("3D side by side", false, v => vit.Stereo = v);
@@ -54,8 +54,8 @@ namespace Brene
                 flipYaw = Bool("Flip left/right", false, v => vit.FlipYaw = v);
                 flipPitch = Bool("Flip up/down", false, v => vit.FlipPitch = v);
                 flipRoll = Bool("Flip tilt", false, v => vit.FlipRoll = v);
-                ipd = new JSONStorableFloat("Eye spacing (m)", 0.064f, v => vit.Ipd = v, 0.04f, 0.08f); RegisterFloat(ipd); CreateSlider(ipd, true);
-                posScale = new JSONStorableFloat("6DOF movement scale", 1f, v => vit.PosScale = v, 0f, 3f); RegisterFloat(posScale); CreateSlider(posScale, true);
+                ipd = new JSONStorableFloat("Eye spacing (m)", 0.064f, (float v) => vit.Ipd = v, 0.04f, 0.08f); RegisterFloat(ipd); CreateSlider(ipd, true);
+                posScale = new JSONStorableFloat("6DOF movement scale", 1f, (float v) => vit.PosScale = v, 0f, 3f); RegisterFloat(posScale); CreateSlider(posScale, true);
                 CreateButton("Re-centre head", true).button.onClick.AddListener(() => vit.Recenter());
                 CreateButton("Reset panel layout", true).button.onClick.AddListener(ResetLayout);
 
@@ -71,7 +71,7 @@ namespace Brene
 
         JSONStorableBool Bool(string name, bool def, Action<bool> set)
         {
-            var b = new JSONStorableBool(name, def, v => { set(v); Refresh(); }); RegisterBool(b); CreateToggle(b, name.StartsWith("Flip") || name.StartsWith("Swap") || name.StartsWith("3D"));
+            var b = new JSONStorableBool(name, def, (bool v) => { set(v); Refresh(); }); RegisterBool(b); CreateToggle(b, name.StartsWith("Flip") || name.StartsWith("Swap") || name.StartsWith("3D"));
             set(def); return b;
         }
 

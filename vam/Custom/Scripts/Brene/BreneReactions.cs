@@ -27,7 +27,7 @@ namespace Brene
 
         void InitReactions()
         {
-            reactions = new JSONStorableString("Cast reactions", "{}", null); RegisterString(reactions);
+            reactions = new JSONStorableString("Cast reactions", "{}", (string v) => { }); RegisterString(reactions);
         }
         string CastOf(Atom a) { if (a == null) return null; foreach (var w in CAST) if (BodyUid(w) == a.uid) return w; return null; }
 

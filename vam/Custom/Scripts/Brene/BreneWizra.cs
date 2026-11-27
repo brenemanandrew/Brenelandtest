@@ -38,10 +38,10 @@ namespace Brene
 
         void InitWizra()
         {
-            voiceOn = new JSONStorableBool("Their voices", true, v => { if (voiceBtn != null) { UI.SetOn(voiceBtn, v); UI.SetText(voiceBtn, v ? "Voice: on" : "Voice: off"); } });
+            voiceOn = new JSONStorableBool("Their voices", true, (bool v) => { if (voiceBtn != null) { UI.SetOn(voiceBtn, v); UI.SetText(voiceBtn, v ? "Voice: on" : "Voice: off"); } });
             RegisterBool(voiceOn); CreateToggle(voiceOn);
-            wizraBody = new JSONStorableString("Wizra's body (person)", "", v => ShowBody()); RegisterString(wizraBody);   // kept from before the cast
-            castBodies = new JSONStorableString("Cast bodies", "{}", v => ShowBody()); RegisterString(castBodies);            // {"zoe":"Person#2", ...}
+            wizraBody = new JSONStorableString("Wizra's body (person)", "", (string v) => ShowBody()); RegisterString(wizraBody);   // kept from before the cast
+            castBodies = new JSONStorableString("Cast bodies", "{}", (string v) => ShowBody()); RegisterString(castBodies);            // {"zoe":"Person#2", ...}
         }
 
         // ---- who is whose body ----
