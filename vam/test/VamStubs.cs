@@ -17,7 +17,7 @@ namespace UnityEngine
     public class WaitForSeconds : YieldInstruction { public WaitForSeconds(float s) { } }
     public enum SendMessageOptions { RequireReceiver, DontRequireReceiver }
     public enum PrimitiveType { Sphere, Cube }
-    public enum KeyCode { Return, KeypadEnter, BackQuote, Tab, Q, F1, Mouse3, Escape }
+    public enum KeyCode { None, Return, KeypadEnter, BackQuote, Tab, Q, F1, Mouse3, Escape }
     public enum TextureFormat { RGBA32 }
     public enum TextureWrapMode { Clamp }
     public enum SpriteMeshType { FullRect, Tight }
@@ -83,7 +83,7 @@ namespace UnityEngine.EventSystems
 {
     public class PointerEventData { public UnityEngine.Vector2 delta; }
     public struct RaycastResult { public UnityEngine.GameObject gameObject; }
-    public class EventSystem { public static EventSystem current; public void RaycastAll(PointerEventData e, List<RaycastResult> r) { } }
+    public class EventSystem { public static EventSystem current; public UnityEngine.GameObject currentSelectedGameObject { get { return null; } } public void RaycastAll(PointerEventData e, List<RaycastResult> r) { } }
     public interface IBeginDragHandler { void OnBeginDrag(PointerEventData e); }
     public interface IDragHandler { void OnDrag(PointerEventData e); }
     public interface IEndDragHandler { void OnEndDrag(PointerEventData e); }
@@ -105,7 +105,7 @@ namespace UnityEngine.UI
     public struct ColorBlock { public Color highlightedColor, pressedColor; }
     public class Selectable : Behaviour { public Graphic targetGraphic; public ColorBlock colors; }
     public class Button : Selectable { public class ButtonClickedEvent : UnityEngine.Events.UnityEvent { } public ButtonClickedEvent onClick; }
-    public class InputField : Selectable { public enum LineType { SingleLine, MultiLineNewline } public string text; public Text textComponent; public Graphic placeholder; public LineType lineType; public UnityEngine.Events.UnityEvent<string> onEndEdit, onValueChanged; public void ActivateInputField() { } }
+    public class InputField : Selectable { public enum LineType { SingleLine, MultiLineNewline } public string text; public Text textComponent; public Graphic placeholder; public LineType lineType; public UnityEngine.Events.UnityEvent<string> onEndEdit, onValueChanged; public void ActivateInputField() { } public bool isFocused { get { return false; } } }
     public class ScrollRect : Behaviour { public enum MovementType { Clamped } public RectTransform viewport, content; public bool horizontal; public float scrollSensitivity, verticalNormalizedPosition; public MovementType movementType; }
     public class GridLayoutGroup : Behaviour { public Vector2 cellSize, spacing; public TextAnchor childAlignment; }
     public class VerticalLayoutGroup : Behaviour { public float spacing; public bool childForceExpandHeight, childControlHeight, childControlWidth; public RectOffset padding; }

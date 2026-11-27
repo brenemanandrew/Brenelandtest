@@ -127,6 +127,38 @@ namespace Brene
             s.onValueChanged.AddListener(v => onChange(v));
             return s;
         }
+        // ---- placing: the few ways a part sits in its parent, written once ----
+        // a strip along the top, full width, this high, this far down
+        public static void Top(RectTransform rt, float height, float down)
+        {
+            rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1); rt.sizeDelta = new Vector2(0, height); rt.anchoredPosition = new Vector2(0, -down);
+        }
+        // a strip along the bottom, full width, this high, this far up
+        public static void Bottom(RectTransform rt, float height, float up)
+        {
+            rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(1, 0); rt.pivot = new Vector2(0.5f, 0); rt.sizeDelta = new Vector2(0, height); rt.anchoredPosition = new Vector2(0, up);
+        }
+        // full height, from this share of the width to that one (0 to 1)
+        public static void Span(RectTransform rt, float from, float to)
+        {
+            rt.anchorMin = new Vector2(from, 0); rt.anchorMax = new Vector2(to, 1); rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+        }
+        // a button made inside its own holder fills that holder
+        public static void Stretch(Button bt)
+        {
+            var r = (RectTransform)bt.transform; r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one; r.sizeDelta = Vector2.zero;
+        }
+        // a list that scrolls up and down inside an area: the content grows with what is put in it (sr.content)
+        public static ScrollRect Scroll(RectTransform area)
+        {
+            var vp = Rect("Viewport", area); Fill(vp, 0, 0, 0, 0);
+            vp.gameObject.AddComponent<RectMask2D>();
+            var hit = vp.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0.001f);
+            var content = Rect("Content", vp); content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1); content.sizeDelta = Vector2.zero;
+            var fit = content.gameObject.AddComponent<ContentSizeFitter>(); fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var sr = area.gameObject.AddComponent<ScrollRect>(); sr.viewport = vp; sr.content = content; sr.horizontal = false; sr.scrollSensitivity = 30;
+            return sr;
+        }
         public static void SetOn(Button b, bool on)
         {
             var s = b.GetComponent<Skin>(); if (s == null) return;

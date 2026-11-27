@@ -27,33 +27,29 @@ namespace Brene
         public void Build()
         {
             var b = Panel.Body;
-            StepsRt = Ui.Rect("Steps", b); StepsRt.anchorMin = new Vector2(0, 1); StepsRt.anchorMax = new Vector2(1, 1); StepsRt.pivot = new Vector2(0.5f, 1); StepsRt.sizeDelta = new Vector2(0, 54);
+            StepsRt = Ui.Rect("Steps", b); Ui.Top(StepsRt, 54, 0);
             var g = StepsRt.gameObject.AddComponent<GridLayoutGroup>(); float w = Mathf.Floor((620 - (Steps.Count - 1) * 3) / Steps.Count); g.cellSize = new Vector2(w, 54); g.spacing = new Vector2(3, 0);
             for (int i = 0; i < Steps.Count; i++) { int k = i; var t = Ui.Button(StepsRt, (i + 1) + "\n" + Steps[i].Name, () => Show(k)); t.GetComponentInChildren<Text>().fontSize = 15; tabs.Add(t); }
-            var hr = Ui.Rect("Hint", b); hr.anchorMin = new Vector2(0, 1); hr.anchorMax = new Vector2(1, 1); hr.pivot = new Vector2(0.5f, 1); hr.sizeDelta = new Vector2(0, 40); hr.anchoredPosition = new Vector2(0, -58);
+            var hr = Ui.Rect("Hint", b); Ui.Top(hr, 40, 58);
             hint = Ui.Label(hr, "", 21, Role.Accent, TextAnchor.MiddleLeft); hint.fontStyle = FontStyle.Bold;
-            var cr = Ui.Rect("Check", b); cr.anchorMin = new Vector2(0, 1); cr.anchorMax = new Vector2(1, 1); cr.pivot = new Vector2(0.5f, 1); cr.sizeDelta = new Vector2(0, 30); cr.anchoredPosition = new Vector2(0, -98);
+            var cr = Ui.Rect("Check", b); Ui.Top(cr, 30, 98);
             check = Ui.Label(cr, "", 18, Role.Text, TextAnchor.MiddleLeft); check.supportRichText = true;
             var area = Ui.Rect("Area", b); Ui.Fill(area, 0, 132, 0, 92);
-            var vp = Ui.Rect("Viewport", area); Ui.Fill(vp, 0, 0, 0, 0); vp.gameObject.AddComponent<RectMask2D>();
-            var hit = vp.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0.001f);
-            Content = Ui.Rect("Content", vp); Content.anchorMin = new Vector2(0, 1); Content.anchorMax = new Vector2(1, 1); Content.pivot = new Vector2(0.5f, 1); Content.sizeDelta = Vector2.zero;
-            Content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            Content = Ui.Scroll(area).content;
             var vl = Content.gameObject.AddComponent<VerticalLayoutGroup>(); vl.spacing = 8; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = false;
-            var sc = area.gameObject.AddComponent<ScrollRect>(); sc.viewport = vp; sc.content = Content; sc.horizontal = false; sc.scrollSensitivity = 30;
-            var nav = Ui.Rect("Nav", b); nav.anchorMin = new Vector2(0, 0); nav.anchorMax = new Vector2(1, 0); nav.pivot = new Vector2(0.5f, 0); nav.sizeDelta = new Vector2(0, 54); nav.anchoredPosition = new Vector2(0, 32);
-            var back = Ui.Rect("Back", nav); back.anchorMin = new Vector2(0, 0); back.anchorMax = new Vector2(0.32f, 1); back.offsetMin = back.offsetMax = Vector2.zero;
-            Stretch(Ui.Button(back, "< Back", () => Show(Index - 1)));
-            NextRt = Ui.Rect("Next", nav); NextRt.anchorMin = new Vector2(0.36f, 0); NextRt.anchorMax = new Vector2(1, 1); NextRt.offsetMin = NextRt.offsetMax = Vector2.zero;
-            nextBtn = Ui.Button(NextRt, "Next >", () => { if (Index >= Steps.Count - 1) Panel.Root.gameObject.SetActive(false); else Show(Index + 1); }); Stretch(nextBtn); Ui.SetOn(nextBtn, true);
-            var nr = Ui.Rect("Note", b); nr.anchorMin = new Vector2(0, 0); nr.anchorMax = new Vector2(1, 0); nr.pivot = new Vector2(0.5f, 0); nr.sizeDelta = new Vector2(0, 28);
+            var nav = Ui.Rect("Nav", b); Ui.Bottom(nav, 54, 32);
+            var back = Ui.Rect("Back", nav); Ui.Span(back, 0, 0.32f);
+            Ui.Stretch(Ui.Button(back, "< Back", () => Show(Index - 1)));
+            NextRt = Ui.Rect("Next", nav); Ui.Span(NextRt, 0.36f, 1);
+            nextBtn = Ui.Button(NextRt, "Next >", () => { if (Index >= Steps.Count - 1) Panel.Root.gameObject.SetActive(false); else Show(Index + 1); }); Ui.Stretch(nextBtn); Ui.SetOn(nextBtn, true);
+            var nr = Ui.Rect("Note", b); Ui.Bottom(nr, 28, 0);
             note = Ui.Label(nr, "", 16, Role.Dim, TextAnchor.MiddleLeft);
             Panel.Root.gameObject.SetActive(false);
         }
 
         public void Open(int i) { Panel.Root.gameObject.SetActive(true); Panel.Root.SetAsLastSibling(); Show(i); }
         public void Note(string s) { if (note != null) note.text = s ?? ""; }
-        public void Redraw() { Show(Index); }
+        public void Redraw() { if (Content != null) Show(Index); }   // a late redraw after the panels were rebuilt (Reset layout) is dropped
 
         public void Show(int i)
         {
@@ -78,11 +74,10 @@ namespace Brene
         }
 
         // ---- small builders the steps use ----
-        public static void Stretch(Button bt) { var r = (RectTransform)bt.transform; r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one; r.sizeDelta = Vector2.zero; }
         public static Button Wide(RectTransform parent, string text, Action a, bool on)
         {
             var r = Ui.Rect("Row " + text, parent); r.gameObject.AddComponent<LayoutElement>().minHeight = 56;
-            var b = Ui.Button(r, text, a); Stretch(b); Ui.SetOn(b, on); return b;
+            var b = Ui.Button(r, text, a); Ui.Stretch(b); Ui.SetOn(b, on); return b;
         }
         public static RectTransform Grid(RectTransform parent, Vector2 cell)
         {
@@ -96,7 +91,7 @@ namespace Brene
         public static void SliderRow(RectTransform parent, string label, float min, float max, float val, Action<float> set)
         {
             var row = Ui.Rect("Row " + label, parent); row.gameObject.AddComponent<LayoutElement>().minHeight = 56;
-            var l = Ui.Rect("L", row); l.anchorMin = new Vector2(0, 0); l.anchorMax = new Vector2(0.38f, 1); l.offsetMin = l.offsetMax = Vector2.zero;
+            var l = Ui.Rect("L", row); Ui.Span(l, 0, 0.38f);
             Ui.Label(l, label, 20, Role.Text, TextAnchor.MiddleLeft);
             var s = Ui.Rect("S", row); s.anchorMin = new Vector2(0.38f, 0); s.anchorMax = new Vector2(1, 1); s.offsetMin = new Vector2(6, 8); s.offsetMax = new Vector2(-6, -8);
             Ui.Slider(s, min, max, val, set);

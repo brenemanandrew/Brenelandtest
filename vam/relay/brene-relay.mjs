@@ -66,7 +66,11 @@ const cookieHeader = () => Object.entries(cookies).map(([k, v]) => `${k}=${v}`).
 function keepCookies(res) {
   for (const c of res.headers.getSetCookie ? res.headers.getSetCookie() : []) { const [kv] = c.split(';'); const i = kv.indexOf('='); if (i > 0) cookies[kv.slice(0, i).trim()] = kv.slice(i + 1).trim(); }
 }
-async function signIn() {
+// one sign-in at a time: the story poll and a chat message can both find the relay signed out at the same moment, and a second
+// sign-in starting would wipe the first one's cookie half way through
+let signing = null;
+function signIn() { if (!signing) signing = doSignIn().finally(() => { signing = null; }); return signing; }
+async function doSignIn() {
   cookies = {};
   const pw = process.env.BRENAI_PASSWORD || '', pin = process.env.BRENAI_PIN || '';
   let r = await fetch(BRENAI + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: pw }) });
@@ -129,12 +133,23 @@ const storyRoute = story({
 
 // ---- the server ----
 const send = (res, code, obj, type = 'application/json') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(typeof obj === 'string' ? obj : JSON.stringify(obj)); };
-const readBody = req => new Promise((ok, bad) => { let s = ''; req.on('data', c => { s += c; if (s.length > 1e6) req.destroy(); }); req.on('end', () => { try { ok(s ? JSON.parse(s) : {}); } catch (e) { bad(e); } }); req.on('error', bad); });
+// a request's JSON body: always an object (so a stray null or number cannot trip a route), and never more than about 1 MB.
+// Too much is refused with a plain message instead of cutting the connection, which used to leave the request hanging.
+const MAX_BODY = 1e6;
+const readBody = req => new Promise((ok, bad) => {
+  const parts = []; let size = 0, over = false;
+  req.on('data', c => { size += c.length; if (size > MAX_BODY) { over = true; parts.length = 0; } else if (!over) parts.push(c); });
+  req.on('end', () => {
+    if (over) return bad(new Error('That is too much to send at once (1 MB at most)'));
+    try { const s = Buffer.concat(parts).toString('utf8'), j = s ? JSON.parse(s) : {}; ok(j && typeof j === 'object' && !Array.isArray(j) ? j : {}); } catch { bad(new Error('That was not JSON')); }
+  });
+  req.on('error', bad); req.on('close', () => bad(new Error('The request was cut off')));
+});
 
 const isLocal = req => /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/.test(req.socket.remoteAddress || '');
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x');
   try {
+    const url = new URL(req.url, 'http://x');   // inside the try: an odd address (such as "//") must not stop the relay
     if (!isLocal(req)) {   // only reachable with --lan: the key is needed, from the link (once) or the cookie it sets
       const ck = /(?:^|; )brene=([0-9a-f]+)/.exec(req.headers.cookie || ''), k = url.searchParams.get('k');
       if (k === KEY) res.setHeader('set-cookie', `brene=${KEY}; Path=/; HttpOnly; SameSite=Strict`);
@@ -159,7 +174,7 @@ const server = http.createServer(async (req, res) => {
         const reply = WIZRA === 'brenai' ? await askBrenai(text) : await askLocal(text);
         // her voice: Brenai's own voice (the same one as in the app), made while VaM shows the text; fetched with GET /voice?id=
         let voice = null; const spoken = spokenOf(reply);
-        if (b.voice && WIZRA === 'brenai' && spoken) { voice = String(nextVoice++); voices.set(voice, { state: 'making' }); makeVoice(voice, spoken); }
+        if (b.voice && WIZRA === 'brenai' && spoken) voice = startVoice(spoken);
         return send(res, 200, { text: reply, voice });
       }
       catch (e) { return send(res, 200, { error: String(e.message || e) }); }
@@ -180,7 +195,10 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, s, 'text/html; charset=utf-8');
     }
     send(res, 404, { error: 'not found' });
-  } catch (e) { send(res, 400, { error: String(e.message || e) }); }
+  } catch (e) {
+    // an answer may already be on its way (a picture, a WAV): then there is nothing more to say, only to end it
+    try { if (!res.headersSent) send(res, 400, { error: String(e.message || e) }); else res.end(); } catch {}
+  }
 });
 async function libRoute(req, res, url) {
   const q = Object.fromEntries(url.searchParams);
@@ -193,7 +211,7 @@ async function libRoute(req, res, url) {
   if (url.pathname === '/lib/thumb') { const b = await lib.thumb(q.p); if (!b) return send(res, 404, 'none', 'text/plain'); res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'max-age=3600' }); return res.end(b); }
   if (url.pathname === '/lib/fav' && req.method === 'POST') { const b = await readBody(req); return send(res, 200, { fav: lib.fav(String(b.path || ''), !!b.on) }); }
   if (url.pathname === '/lib/open' && req.method === 'POST') {
-    const b = await readBody(req); if (!['scene', 'look', 'pose', 'skin', 'hair', 'clothing'].includes(b.kind) || typeof b.path !== 'string') return send(res, 400, { error: 'what?' });
+    const b = await readBody(req); if (!['scene', 'look', 'pose', 'skin', 'hair', 'clothing'].includes(b.kind) || typeof b.path !== 'string') return send(res, 400, { error: 'That kind of file cannot be sent to VaM' });
     const c = lib.queue({ kind: b.kind, path: b.path, person: String(b.person || ''), merge: !!b.merge });
     return send(res, 200, { id: c.id, vam: lib.vamState().connected });
   }
@@ -205,6 +223,15 @@ async function libRoute(req, res, url) {
   return send(res, 404, { error: 'not found' });
 }
 
+// a second relay on the same port (start-brene.bat double-clicked twice) says so plainly instead of a stack trace
+server.on('error', e => {
+  if (e.code === 'EADDRINUSE') console.log(`The Brene relay is already running on this PC (port ${PORT} is taken). Use that window, or close it first.`);
+  else console.log('The Brene relay could not start: ' + (e.message || e));
+  process.exit(1);
+});
+// a slip in one request must not close the window for everything else (Node stops on an unhandled rejection otherwise)
+process.on('unhandledRejection', e => console.log('Brene relay: a request failed (' + ((e && e.message) || e) + ')'));
+if (typeof WebSocket === 'undefined') console.log('This Node is too old for the glasses link (' + process.version + '). Install Node 22 or newer from nodejs.org.');
 server.listen(PORT, LAN ? '0.0.0.0' : '127.0.0.1', () => {
   console.log(`Library: http://127.0.0.1:${PORT}/library` + (LAN ? `   On your phone: http://<this PC's address>:${PORT}/library?k=${KEY}` : ''));
   console.log(`Brene relay on http://127.0.0.1:${PORT}  (Wizra: ${WIZRA === 'brenai' ? 'brenai.fly.dev' : 'LM Studio ' + LMSTUDIO})`);

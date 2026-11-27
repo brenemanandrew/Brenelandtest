@@ -15,8 +15,8 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 ## What is in it
 | Path | What |
 |---|---|
-| `Custom/Scripts/Brene/Brene.cslist` | The plugin (load this one file in VaM). It compiles the four `.cs` files beside it. |
-| `BreneUIKit.cs` | Themes, rounded panels, the drag-around editor. |
+| `Custom/Scripts/Brene/Brene.cslist` | The plugin (load this one file in VaM). It compiles the `.cs` files beside it. |
+| `BreneUIKit.cs` | Themes, rounded panels, the drag-around editor, and the shared placing helpers (`Ui.Top`, `Ui.Bottom`, `Ui.Span`, `Ui.Stretch`, `Ui.Scroll`). |
 | `BreneMain.cs` | The plugin itself: panels, buttons, Wizra's chat, layout saving, settings in VaM's plugin screen. |
 | `BreneViture.cs` | Head tracking on VaM's desktop camera, side-by-side 3D, hand grabbing. |
 | `BreneRadial.cs` | The radial menu. |
@@ -30,7 +30,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 | `relay/story.mjs` | The relay's story routes (`/story/*`), talking to Brenai's story routes (provisional shapes until the Brenai session's spec). |
 | `story/margo/` | Margo's selfies and call faces as JPG (VaM cannot read WebP), from the Brenai session's branch. |
 | `BreneReactions.cs` | Personality (from Brenai) and touch reactions for the cast: steps 9 and 10 of the Character flow. |
-| `BreneLink.cs` | Talks to the relay on this PC. |
+| `BreneLink.cs` | Talks to the relay on this PC: the state poll, the one shared JSON request (`Link.Json`), and the picture tiles and their loader (`Pics`, `Link.Thumbs`, `Link.Picture`). |
 | `relay/brene-relay.mjs` | The relay (Node 22, no packages) on `http://127.0.0.1:8767`. Gathers the head pose from `brenai/tools/viture-bridge.py`, hands from its own page and Wizra's replies. |
 | `relay/library.mjs`, `relay/library.html` | The Library: scenes, looks and poses from your VaM folder (packages included, thumbnails read straight out of the `.var` files), and the VaM Hub with big picture tiles, sorting, type filter and one-tap Install (with missing dependencies). |
 | `relay/hands.html` | Hand tracking page (webcam, MediaPipe in the browser, served by the relay at `/hands`). |
@@ -61,7 +61,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 - **Turning points:** when Brenai has a question waiting, a card opens in the middle (on the board in VR) with its 2 to 4 answers.
 - **Margo's call:** her call faces on a screen, changing with what she does in her replies (smiling, stern, delighted, listening); her voice plays like a phone call.
 - **Cabin laptop:** title, text, word count; Save keeps it on the PC (plus a dated copy) and sends it to Brenai; Tell Margo saves, calls her and tells her.
-- **Test:** `node vam/test/story.test.mjs`, 28 checks (including personality and touch): a stand-in Brenai with and without the story routes.
+- **Test:** `node vam/test/story.test.mjs`, 30 checks (including personality and touch): a stand-in Brenai with and without the story routes.
 
 ## In a VR headset
 - **Automatic:** when VaM runs in a headset, everything Brene shows moves onto a board floating about an arm's length ahead at eye height: the same panels, layout, flows, radial menu and tutorials. Back on the monitor, it returns to the screen.
@@ -146,7 +146,7 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 ## What was tested, and what was not
 - **Tested here (Linux, no VaM):**
   - The plugin compiles as C# 5 against stand-ins that copy the Unity and VaM signatures it uses.
-  - `library.test.mjs`, 35 checks:
+  - `library.test.mjs`, 38 checks:
     - a made-up VaM folder with loose files and `.var` packages (stored and compressed, in subfolders, one broken);
     - search, filters, favourites and recent;
     - thumbnails out of packages, and paths outside the VaM folder refused;
@@ -154,16 +154,17 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
     - a stand-in Hub: list, detail, install with dependencies, a login page refused, downloads from other sites refused.
     - It also takes phone and PC pictures of the page (`--shots <dir>`).
   - The real Hub API answered through the relay (list and detail). No real download into a real VaM.
-  - `relay.test.mjs`, 21 checks (including her voice through a stand-in Brenai `/api/tts`, with *actions* left out of what is voiced):
+  - `relay.test.mjs`, 26 checks (including her voice through a stand-in Brenai `/api/tts`, with *actions* left out of what is voiced):
     - the real `viture-bridge.py --fake --6dof` pose reaching `/state`, with a moving position;
     - hands cleaned and timing out;
     - Wizra through a stand-in Brenai (password, PIN, streamed reply, cookies, wrong PIN);
     - Wizra through a stand-in LM Studio (her real persona, thinking stripped, LM Studio off).
+    - things that used to stop or hang the relay: an odd address, a body over 1 MB, a second relay on the same port, two sign-ins at once.
 - **Not tested: nothing has run inside VaM yet.** What could go wrong there:
   - **VaM may refuse a call:** VaM checks plugins when it loads them. If it refuses `UnityEngine.Networking` (web requests to the relay), the plugin will not load at all. The fix is a file-based link instead: tell the coding session.
   - **Some buttons may do nothing:** Undo, Redo, Save scene, Open scene, VaM menu and Freeze call VaM by method name. If a name differs in your VaM version, that button simply does nothing. Report which.
   - **Character panel unknowns:** it reaches shapes as float settings on the person's `geometry`. If Body and Face show "No shapes found", that route is wrong for your VaM. The friendly names are guesses at VaM's morph names; the note says how many matched. Skin, hair and clothing use `SkinPresets`, `HairPresets` and `ClothingPresets`.
-  - **Wizra's body unknowns:** her voice uses `UnityWebRequestMultimedia` (the same check as web requests). Lip sync and expressions guess VaM's morph names ("Mouth Open", "Smile", "Frown", "Surprise"). Eyes use the person's `Eyes` setting `lookMode` = "Player". None of it has been seen in VaM.
+  - **Wizra's body unknowns:** her voice is fetched as plain bytes and decoded by hand (`WavClip`), because VaM has no audio download module. Lip sync and expressions guess VaM's morph names ("Mouth Open", "Smile", "Frown", "Surprise"). Eyes use the person's `Eyes` setting `lookMode` = "Player". None of it has been seen in VaM.
   - **VR unknowns:** the board relies on VaM letting its laser pointers press a plugin's canvases (`AddCanvas`, asked for by name). Dragging panels with the pointer, the board's size and distance, and the wrist dock's position have not been seen in a headset.
   - **Adding atoms may not work:** "Add a person" and "Add a light" ask VaM by name (`AddAtomByType`). If nothing appears, use VaM's Add Atom and report it. Light sliders use the light's `Light` settings `intensity` and `range`.
   - **Tutorial spotlight not tried:** its placement has not been seen on a real screen.

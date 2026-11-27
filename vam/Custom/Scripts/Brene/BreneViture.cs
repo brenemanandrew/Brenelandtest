@@ -64,6 +64,7 @@ namespace Brene
         void UpdateStereo()
         {
             var c = Cam; if (c == null) return;
+            if (stereoBuilt && (left == null || right == null)) { stereoBuilt = false; if (c.cullingMask == 0) c.cullingMask = savedMask; }   // VaM replaced the camera or removed the eyes: build them again
             if (Stereo && !stereoBuilt) BuildStereo(c);
             if (!Stereo && stereoBuilt) DropStereo(c);
             if (!stereoBuilt) return;
@@ -121,7 +122,8 @@ namespace Brene
                     float depth = 0.6f;
                     if (g != null) depth = Mathf.Clamp(g.depth * (h.size > 0 && g.size0 > 0 ? h.size / g.size0 : 1f), 0.15f, 8f);
                     var ray = c.ScreenPointToRay(sp); var at = ray.origin + ray.direction * depth;
-                    if (g != null && g.fc != null) Vam.Ctrl(g.fc).position = at + g.offset;
+                    if (g != null && g.fc == null) { held.Remove(h.id); g = null; }   // what was held is gone (another scene was opened)
+                    if (g != null) Vam.Ctrl(g.fc).position = at + g.offset;
                     Marker(h.id, at, grip, g != null, c);
                 }
             }
@@ -135,6 +137,7 @@ namespace Brene
             foreach (var atom in SuperController.singleton.GetAtoms())
             {
                 if (atom == null || !atom.gameObject.activeInHierarchy) continue;
+                if (atom.freeControllers == null) continue;
                 foreach (var fc in atom.freeControllers)
                 {
                     if (fc == null) continue;
@@ -147,7 +150,7 @@ namespace Brene
             if (best == null) { HandNote = "Nothing to hold under that hand"; return null; }
             float depth = c.WorldToScreenPoint(Vam.Ctrl(best).position).z;
             var ray = c.ScreenPointToRay(sp);
-            HandNote = "Holding " + best.containingAtom.uid + " / " + best.name;
+            HandNote = "Holding " + (best.containingAtom != null ? best.containingAtom.uid + " / " : "") + best.name;
             return new Held { fc = best, depth = depth, size0 = h.size, offset = Vam.Ctrl(best).position - (ray.origin + ray.direction * depth) };
         }
 

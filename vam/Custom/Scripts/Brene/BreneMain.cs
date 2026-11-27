@@ -41,7 +41,7 @@ namespace Brene
                 relayUrl = new JSONStorableString("Relay address", "http://127.0.0.1:8767", (string s) => link.Url = s.TrimEnd('/'));
                 RegisterString(relayUrl); CreateTextField(relayUrl).height = 60; link.Url = relayUrl.val;
                 showUi = Bool("Show Brene panels", true, v => { if (canvasGo != null) canvasGo.SetActive(v); });
-                uiSize = new JSONStorableFloat("Panel size", 1.25f, (float v) => { if (scaler != null) scaler.scaleFactor = v; if (radialScaler != null) radialScaler.scaleFactor = v; }, 0.6f, 3f);
+                uiSize = new JSONStorableFloat("Panel size", 1.25f, (float v) => { if (scaler != null) scaler.scaleFactor = v; if (radialScaler != null) radialScaler.scaleFactor = v; if (coach != null) coach.Scale(v); }, 0.6f, 3f);
                 RegisterFloat(uiSize); CreateSlider(uiSize);
                 menuKey = new JSONStorableStringChooser("Menu key", new List<string> { "BackQuote", "Tab", "Q", "F1", "Mouse4" }, "BackQuote", "Radial menu key (hold)");
                 RegisterStringChooser(menuKey); CreatePopup(menuKey);
@@ -64,7 +64,7 @@ namespace Brene
                 Actions();
                 BuildCanvas();
                 LoadLayout();
-                link.OnCmd = RunCmd; link.Report = SceneReport;
+                link.OnCmd = RunCmd; link.Report = SceneReport; twiceCheckAt = Time.realtimeSinceStartup + 3f;
                 StartCoroutine(link.Poll(() => true));   // always: the library page needs the scene's people and sends commands
             }
             catch (Exception e) { Report("Brene could not start: " + e); }
@@ -153,12 +153,13 @@ namespace Brene
             }
 
             // people: one button per person in the scene, tap to select
-            Scroll(pPeople.Body, out peopleList);
+            peopleList = Scroll(pPeople.Body).content;
             var v = peopleList.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 6; v.childForceExpandHeight = false; v.childControlHeight = true; v.childControlWidth = true;
 
             // Wizra: the log, a box to type in and Send
-            var logArea = Ui.Rect("Log", pChat.Body); Ui.Fill(logArea, 0, 56, 0, 62);   // 56 at the top: the who / body / voice bar Ui.Box(logArea, Role.Field);
-            RectTransform logContent; chatScroll = Scroll(logArea, out logContent);
+            var logArea = Ui.Rect("Log", pChat.Body); Ui.Fill(logArea, 0, 56, 0, 62);   // 56 at the top: the who / body / voice bar
+            Ui.Box(logArea, Role.Field);
+            chatScroll = Scroll(logArea); var logContent = chatScroll.content;
             var lv = logContent.gameObject.AddComponent<VerticalLayoutGroup>(); lv.childControlHeight = true; lv.childControlWidth = true; lv.padding = new RectOffset(10, 10, 8, 8);
             chatLog = Ui.Label(logContent, "Say something to Wizra. Her words come from the PC model through the Brene relay.", 21, Role.Text, TextAnchor.UpperLeft);
             chatLog.verticalOverflow = VerticalWrapMode.Overflow; chatLog.supportRichText = true;
@@ -167,11 +168,11 @@ namespace Brene
             inRt.offsetMin = new Vector2(0, 0); inRt.offsetMax = new Vector2(-110, 54);
             chatIn = Input(inRt, "Type here, Enter to send");
             var sendRt = Ui.Rect("Send", pChat.Body); sendRt.anchorMin = sendRt.anchorMax = new Vector2(1, 0); sendRt.pivot = new Vector2(1, 0); sendRt.sizeDelta = new Vector2(100, 54);
-            var sb = Ui.Button(sendRt, "Send", SendChat); var sbr = (RectTransform)sb.transform; sbr.anchorMin = Vector2.zero; sbr.anchorMax = Vector2.one; sbr.sizeDelta = Vector2.zero;
+            var sb = Ui.Button(sendRt, "Send", SendChat); Ui.Stretch(sb);
             Ui.SetOn(sb, false);
 
             // status line along the bottom of the dock
-            var st = Ui.Rect("Status", pDock.Root); st.anchorMin = new Vector2(0, 0); st.anchorMax = new Vector2(1, 0); st.pivot = new Vector2(0, 0); st.sizeDelta = new Vector2(0, 30);
+            var st = Ui.Rect("Status", pDock.Root); Ui.Bottom(st, 30, 0);
             status = Ui.Label(st, "", 16, Role.Dim, TextAnchor.MiddleLeft);
             Ui.Fill((RectTransform)pDock.Body, 10, 54, 10, 34); pDock.FootPad = 44;
 
@@ -185,7 +186,8 @@ namespace Brene
             foreach (var p in Panel.All) p.Fit();
             pGlasses.Root.anchoredPosition = new Vector2(20, pScene.Root.anchoredPosition.y - pScene.Root.sizeDelta.y - 16);
             PlaceRight(pChat, 20); PlaceBottomRight(pDock);
-            foreach (var p in Panel.All) p.Fit();
+            foreach (var p in Panel.All) { p.Fit(); p.ShowEdit(BreneEdit.On); }   // ShowEdit again: CanHide is set after some panels are made
+            if (chatLines.Count > 0) chatLog.text = string.Join("\n\n", chatLines.ToArray());   // a rebuild (Reset layout) keeps the talk so far
             Refresh();
         }
 
@@ -200,16 +202,8 @@ namespace Brene
             a.btn.gameObject.AddComponent<DragButton>().actionId = id;
         }
 
-        ScrollRect Scroll(RectTransform area, out RectTransform content)
-        {
-            var vp = Ui.Rect("Viewport", area); Ui.Fill(vp, 0, 0, 0, 0);
-            vp.gameObject.AddComponent<RectMask2D>();
-            var hit = vp.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0.001f);
-            content = Ui.Rect("Content", vp); content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1); content.sizeDelta = Vector2.zero;
-            var fit = content.gameObject.AddComponent<ContentSizeFitter>(); fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            var sr = area.gameObject.AddComponent<ScrollRect>(); sr.viewport = vp; sr.content = content; sr.horizontal = false; sr.scrollSensitivity = 30; sr.movementType = ScrollRect.MovementType.Clamped;
-            return sr;
-        }
+        // the panels' own lists stop dead at their ends (no bounce)
+        static ScrollRect Scroll(RectTransform area) { var sr = Ui.Scroll(area); sr.movementType = ScrollRect.MovementType.Clamped; return sr; }
 
         InputField Input(RectTransform rt, string hint)
         {
@@ -307,7 +301,7 @@ namespace Brene
             foreach (var a in names)
             {
                 var atom = a;
-                var b = Ui.Button(peopleList, atom.uid, () => { if (atom.mainController != null) SuperController.singleton.SelectController(atom.mainController); });
+                var b = Ui.Button(peopleList, atom.uid, () => { if (atom != null && atom.mainController != null) SuperController.singleton.SelectController(atom.mainController); });
                 var le = b.gameObject.AddComponent<LayoutElement>(); le.minHeight = 52; le.preferredHeight = 52;
             }
             if (names.Count == 0) { var t = Ui.Label(peopleList, "No people in this scene", 18, Role.Dim, TextAnchor.MiddleLeft); t.gameObject.AddComponent<LayoutElement>().minHeight = 40; }
@@ -372,7 +366,7 @@ namespace Brene
                 var j = SuperController.singleton.LoadJSON(FILE);
                 if (j == null) return;
                 if (j["theme"] != null && Array.IndexOf(Theme.Names, j["theme"].Value) >= 0) { Theme.Name = j["theme"].Value; Theme.ApplyAll(canvasGo.transform); }
-                if (j["size"] != null) uiSize.val = j["size"].AsFloat;
+                if (j["size"] != null) uiSize.val = Mathf.Clamp(j["size"].AsFloat, 0.6f, 3f);
                 tutorialSeen = j["tutorialSeen"].AsBool;
                 if (j["menuSize"] != null) { menuMove = new Vector3(j["menuX"].AsFloat, j["menuY"].AsFloat, j["menuZ"].AsFloat); menuSize = Mathf.Clamp(j["menuSize"].AsFloat, 0.4f, 2.5f); }
                 var ps = j["panels"];
@@ -393,11 +387,24 @@ namespace Brene
                 foreach (var p in Panel.All) p.Fit();
                 Act edit; if (acts.TryGetValue("edit", out edit) && edit.btn != null && !edit.btn.gameObject.activeInHierarchy) edit.btn.transform.SetParent(pDock.Body, false);   // never lose the way back into the editor
                 pDock.Root.gameObject.SetActive(true);
-                // panels saved off screen (a smaller window, an older layout) come back inside it
-                float W = Screen.width / uiSize.val, H = Screen.height / uiSize.val;
-                foreach (var p in Panel.All) { var a = p.Root.anchoredPosition; var z = p.Root.sizeDelta; if (a.x < -z.x + 60 || a.x > W - 60 || -a.y > H - 40 || a.y > 0) p.Root.anchoredPosition = new Vector2(Mathf.Clamp(a.x, 0, Mathf.Max(0, W - z.x)), -Mathf.Clamp(-a.y, 0, Mathf.Max(0, H - z.y))); }
+                KeepOnScreen();
             }
             catch (Exception e) { Report("Brene: could not read the layout: " + e.Message); }
+        }
+
+        // panels left outside the window (a smaller window, a bigger panel size, an older layout) come back inside it.
+        // Run after a layout is read, and again whenever the window or the panel size changes.
+        void KeepOnScreen()
+        {
+            if (vr || canvasGo == null || uiSize == null) return;
+            float W = Screen.width / uiSize.val, H = Screen.height / uiSize.val;
+            foreach (var p in new List<Panel>(Panel.All))
+            {
+                if (p.Root == null) continue; var a = p.Root.anchoredPosition; var z = p.Root.sizeDelta;
+                // the dock is the way back to everything, so it has to be wholly inside; the others only need a part you can grab
+                bool lost = p == pDock ? (a.x < 0 || a.x > W - z.x || -a.y > H - z.y || a.y > 0) : (a.x < -z.x + 60 || a.x > W - 60 || -a.y > H - 40 || a.y > 0);
+                if (lost) p.Root.anchoredPosition = new Vector2(Mathf.Clamp(a.x, 0, Mathf.Max(0, W - z.x)), -Mathf.Clamp(-a.y, 0, Mathf.Max(0, H - z.y)));
+            }
         }
 
         void ResetLayout()
@@ -408,22 +415,48 @@ namespace Brene
             Panel.All.Clear(); foreach (var a in new List<Act>(acts.Values)) a.btn = null; if (radial != null) radial.Close();
             if (canvasGo != null) Destroy(canvasGo);
             BuildCanvas(); canvasGo.SetActive(showUi.val);
+            saveAt = -1; SaveLayout();   // the fresh layout is written at once, so "tutorial seen" and the VaM menu's place are not lost with the old file
         }
 
         // ---- every frame ----
+        // A slip in one frame is reported a few times, not sixty times a second (which would bury VaM's error window and slow it down)
+        int frameErrors; float seenW, seenH, seenSize, twiceCheckAt = -1; bool twice;
+        void FrameError(string where, Exception e) { if (frameErrors++ < 3) Report("Brene " + where + ": " + e); }
         void Update()
         {
-            if (radial != null) radial.Tick(MenuKey());
+            try { Tick(); } catch (Exception e) { FrameError("update", e); }
+        }
+        // typing in any text box (Brene's or VaM's): the menu key is a letter then, not the menu
+        static bool Typing()
+        {
+            var es = EventSystem.current; if (es == null) return false;
+            var go = es.currentSelectedGameObject; if (go == null) return false;
+            var f = go.GetComponent<InputField>(); return f != null && f.isFocused;
+        }
+        void Tick()
+        {
+            if (link == null || vit == null) return;   // Brene could not start (already reported)
+            if (radial != null) radial.Tick(Typing() ? KeyCode.None : MenuKey());
             TickGuides();
             TickVR();
             if (saveAt > 0 && Time.realtimeSinceStartup > saveAt) { saveAt = -1; SaveLayout(); }
-            if (Time.realtimeSinceStartup > nextPeople) { nextPeople = Time.realtimeSinceStartup + 2f; RefreshPeople(); Refresh(); }
+            if (Time.realtimeSinceStartup > nextPeople) { nextPeople = Time.realtimeSinceStartup + 2f; RefreshPeople(); Refresh(); ForgetGoneBodies(); }
+            // the window or the panel size changed: nothing may be left outside it
+            if (uiSize != null && (Screen.width != seenW || Screen.height != seenH || uiSize.val != seenSize)) { seenW = Screen.width; seenH = Screen.height; seenSize = uiSize.val; KeepOnScreen(); }
+            // two copies of Brene at once (a session plugin and one in the scene) fight over the camera and the menu key: say so
+            if (twiceCheckAt > 0 && Time.realtimeSinceStartup > twiceCheckAt)
+            {
+                twiceCheckAt = -1; int copies = 0;
+                foreach (var c in UnityEngine.Object.FindObjectsOfType<Canvas>()) if (c != null && c.name == "Brene menu") copies++;
+                twice = copies > 1; if (twice) Report("Brene is loaded twice (as a session plugin and in this scene?). Remove one copy: two fight over the camera and the menu key.");
+            }
             if (status != null && Time.realtimeSinceStartup > nextStatus)
             {
                 nextStatus = Time.realtimeSinceStartup + 0.5f;
                 string s;
                 if (!link.Connected) s = "Relay: not running (start-brene.bat)";
                 else s = "Glasses: " + (link.Glasses ? (link.HasPos ? "6DOF" : "3DOF") : "none") + "   Hands: " + link.Hands.Count + (vit.HandNote != "" ? "   " + vit.HandNote : "");
+                if (twice) s = "Brene is loaded twice: remove one copy";
                 if (BreneEdit.On) s = "Editing: drag titles to move, corners to resize, buttons between panels";
                 status.text = s;
             }
@@ -436,17 +469,27 @@ namespace Brene
             if (menuFit.val <= 0.01f) { if (fovWrote >= 0) { cam.fieldOfView = fovBase; fovWrote = -1; } return; }
             cam.fieldOfView = Mathf.Clamp(fovBase + menuFit.val, 10f, 120f); fovWrote = cam.fieldOfView;
         }
-        void LateUpdate() { FitMenu(); TickVamMenu(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } }
+        void LateUpdate()
+        {
+            if (menuFit == null) return;   // Brene could not start
+            try { FitMenu(); TickVamMenu(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } } catch (Exception e) { FrameError("late update", e); }
+        }
 
+        // leaving (plugin removed or reloaded, scene closed): everything Brene changed in VaM is put back, each part on its own so
+        // one that fails cannot leave the panels or the camera behind
         void OnDestroy()
         {
-            if (vit != null) vit.Shutdown();
+            try { if (vit != null) vit.Shutdown(); } catch (Exception e) { Report("Brene closing (camera): " + e.Message); }
+            try { if (vr) LeaveVR(); } catch (Exception e) { Report("Brene closing (headset): " + e.Message); }
+            try { RestoreVamMenu(); } catch (Exception) { }
+            // the wider view of "Fit VaM menu": back to VaM's own, or the next start would widen an already widened view
+            try { if (fovWrote >= 0) { var cam = Vam.MonitorCam(); if (cam != null && Mathf.Abs(cam.fieldOfView - fovWrote) < 0.01f) cam.fieldOfView = fovBase; fovWrote = -1; } } catch (Exception) { }
+            try { if (radial != null) radial.Close(); } catch (Exception) { }
             if (canvasGo != null) Destroy(canvasGo);
             if (radialGo != null) Destroy(radialGo);
-            if (coach != null) coach.Destroy();
-            DropWizra();
-            if (vr) LeaveVR();
-            Panel.All.Clear(); BreneEdit.On = false;
+            try { if (coach != null) coach.Destroy(); } catch (Exception) { }
+            try { DropWizra(); } catch (Exception) { }
+            Panel.All.Clear(); BreneEdit.On = false; BreneEdit.Changed = () => { };
         }
     }
 }

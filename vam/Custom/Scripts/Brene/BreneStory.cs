@@ -20,7 +20,7 @@ namespace Brene
         static readonly string[] PLACES = { "Rental cabin", "Peak Pizza", "Casa Belinda", "Main Street", "Library", "Wizra's flat", "Lodge", "Trail", "Lake" };
         Panel pStory, pChoice, pCall, pLaptop; Flow pickFlow; string storyPlace = "", pickFor = "", shownChoice = "";
         Text storyLine, choiceText, callCaption, laptopCount, laptopNote; RectTransform storyPlaces, choiceAnswers; RawImage callFace;
-        InputField laptopTitle, laptopText; JSONNode storyState, margoInfo; float nextStory; bool storyBusy;
+        InputField laptopTitle, laptopText; JSONNode storyState, margoInfo; float nextStory; bool storyBusy; int faceAsk;
         readonly Dictionary<string, Texture2D> pics = new Dictionary<string, Texture2D>();
 
         void BuildStory(Transform root)
@@ -43,10 +43,10 @@ namespace Brene
 
             // the scene picker for a place (one step of the flow panel)
             pickFlow = new Flow(root, "pickscene", "Pick a scene", new Vector2(420, -60));
-            pickFlow.Steps.Add(new FlowStep("Scene", "Tap the scene for this place.", c => StartCoroutine(FlowTiles(pickFlow.Note, c, "scene", (path, name) =>
+            pickFlow.Steps.Add(new FlowStep("Scene", "Tap the scene for this place.", c => FlowTiles(pickFlow.Note, c, "scene", (path, name) =>
             {
                 StartCoroutine(Json("POST", "/story/places", Obj("place", pickFor, "scene", path), (j, e) => { pickFlow.Note(e ?? (pickFor + " is now " + name)); RefreshPlaces(); }));
-            }))));
+            })));
             pickFlow.Build();
 
             // a turning point: the question and its answers, in the middle
@@ -61,22 +61,22 @@ namespace Brene
             pCall = new Panel(root, "call", "Margo (video call)", new Vector2(700, -40), new Vector2(420, 560), false);
             var fr = Ui.Rect("Face", pCall.Body); Ui.Fill(fr, 0, 0, 0, 120); Ui.Box(fr, Role.Field);
             var fi = Ui.Rect("Img", fr); Ui.Fill(fi, 6, 6, 6, 6); callFace = fi.gameObject.AddComponent<RawImage>(); callFace.color = new Color(1, 1, 1, 0.1f);
-            var cc = Ui.Rect("Caption", pCall.Body); cc.anchorMin = new Vector2(0, 0); cc.anchorMax = new Vector2(1, 0); cc.pivot = new Vector2(0.5f, 0); cc.sizeDelta = new Vector2(0, 56); cc.anchoredPosition = new Vector2(0, 60);
+            var cc = Ui.Rect("Caption", pCall.Body); Ui.Bottom(cc, 56, 60);
             callCaption = Ui.Label(cc, "", 18, Role.Dim, TextAnchor.MiddleCenter);
-            var hb = Ui.Rect("Hang up", pCall.Body); hb.anchorMin = new Vector2(0, 0); hb.anchorMax = new Vector2(1, 0); hb.pivot = new Vector2(0.5f, 0); hb.sizeDelta = new Vector2(0, 52);
-            Flow.Stretch(Ui.Button(hb, "Hang up", () => { pCall.Root.gameObject.SetActive(false); TalkTo("wizra"); }));
+            var hb = Ui.Rect("Hang up", pCall.Body); Ui.Bottom(hb, 52, 0);
+            Ui.Stretch(Ui.Button(hb, "Hang up", () => { pCall.Root.gameObject.SetActive(false); TalkTo("wizra"); }));
             pCall.Root.gameObject.SetActive(false);
 
             // the cabin laptop
             pLaptop = new Panel(root, "laptop", "Cabin laptop", new Vector2(380, -40), new Vector2(760, 640), false);
-            var tr = Ui.Rect("Title", pLaptop.Body); tr.anchorMin = new Vector2(0, 1); tr.anchorMax = new Vector2(1, 1); tr.pivot = new Vector2(0.5f, 1); tr.sizeDelta = new Vector2(0, 46);
+            var tr = Ui.Rect("Title", pLaptop.Body); Ui.Top(tr, 46, 0);
             laptopTitle = Field(tr, "Chapter title", 22, false);
             var tx = Ui.Rect("Text", pLaptop.Body); Ui.Fill(tx, 0, 54, 0, 96);
             laptopText = Field(tx, "Write here...", 20, true);
             laptopText.onValueChanged.AddListener(s => Count());
-            var nr = Ui.Rect("Note", pLaptop.Body); nr.anchorMin = new Vector2(0, 0); nr.anchorMax = new Vector2(1, 0); nr.pivot = new Vector2(0.5f, 0); nr.sizeDelta = new Vector2(0, 30); nr.anchoredPosition = new Vector2(0, 60);
+            var nr = Ui.Rect("Note", pLaptop.Body); Ui.Bottom(nr, 30, 60);
             laptopCount = Ui.Label(nr, "0 words", 17, Role.Dim, TextAnchor.MiddleLeft);
-            var lb = Ui.Rect("Buttons", pLaptop.Body); lb.anchorMin = new Vector2(0, 0); lb.anchorMax = new Vector2(1, 0); lb.pivot = new Vector2(0.5f, 0); lb.sizeDelta = new Vector2(0, 54);
+            var lb = Ui.Rect("Buttons", pLaptop.Body); Ui.Bottom(lb, 54, 0);
             var lg = lb.gameObject.AddComponent<GridLayoutGroup>(); lg.cellSize = new Vector2(240, 54); lg.spacing = new Vector2(8, 0);
             Ui.SetOn(Ui.Button(lb, "Save", SaveWriting), true); Ui.Button(lb, "Tell Margo", TellMargo); Ui.Button(lb, "Close", () => pLaptop.Root.gameObject.SetActive(false));
             laptopNote = laptopCount;
@@ -97,23 +97,13 @@ namespace Brene
 
         // ---- talking to the relay ----
         static JSONClass Obj(params string[] kv) { var j = new JSONClass(); for (int i = 0; i + 1 < kv.Length; i += 2) j[kv[i]] = kv[i + 1]; return j; }
-        IEnumerator Json(string method, string path, JSONNode body, Action<JSONNode, string> done)
+        // a story question to the relay (the shared request in BreneLink, 15 seconds at most); done(answer, error)
+        IEnumerator Json(string method, string path, JSONNode body, Action<JSONNode, string> done) { return link.Json(method, path, body, 15, done); }
+        // a story picture, kept once fetched (a handful of call faces); done is only run when there is a picture
+        void Picture(string rel, Action<Texture2D> done)
         {
-            var req = new UnityWebRequest(link.Url + path, method); req.downloadHandler = new DownloadHandlerBuffer(); req.timeout = 15;
-            if (body != null) { req.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(body.ToString())); req.SetRequestHeader("Content-Type", "application/json"); }
-            yield return req.SendWebRequest();
-            if (req.isNetworkError) { done(null, "The Brene relay is not running (start-brene.bat)"); req.Dispose(); yield break; }
-            JSONNode j = null; try { j = JSON.Parse(req.downloadHandler.text); } catch (Exception) { }
-            req.Dispose();
-            if (j == null) done(null, "Bad answer from the relay"); else if (j["error"] != null && j["error"].Value != "") done(j, j["error"].Value); else done(j, null);
-        }
-        IEnumerator Picture(string rel, Action<Texture2D> done)
-        {
-            Texture2D t; if (pics.TryGetValue(rel, out t) && t != null) { done(t); yield break; }
-            var req = UnityWebRequest.Get(link.Url + "/story/media?p=" + UnityWebRequest.EscapeURL(rel)); req.timeout = 10;
-            yield return req.SendWebRequest();
-            if (!req.isNetworkError && !req.isHttpError) { t = new Texture2D(2, 2); if (t.LoadImage(req.downloadHandler.data)) { pics[rel] = t; done(t); } }
-            req.Dispose();
+            Texture2D t; if (pics.TryGetValue(rel, out t) && t != null) { done(t); return; }
+            StartCoroutine(link.Picture("/story/media?p=" + UnityWebRequest.EscapeURL(rel), (Texture2D tex) => { if (tex == null) return; pics[rel] = tex; done(tex); }));
         }
 
         // ---- every couple of seconds: the story's state, and a turning point if one is waiting ----
@@ -202,7 +192,8 @@ namespace Brene
             if (file == null && calls.Count > 0) file = calls[0]["file"].Value;
             if (file == null) return;
             callCaption.text = caption != "" ? caption : "Margo · " + mood;
-            StartCoroutine(Picture("margo/" + file, t => { callFace.texture = t; callFace.color = Color.white; }));
+            int ask = ++faceAsk;   // a slower, older face must not land on top of a newer one
+            Picture("margo/" + file, (Texture2D t) => { if (ask == faceAsk && callFace != null) Pics.Show(callFace, t, false); });
         }
 
         // ---- the laptop ----

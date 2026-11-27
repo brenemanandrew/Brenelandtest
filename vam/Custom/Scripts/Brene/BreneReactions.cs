@@ -64,7 +64,7 @@ namespace Brene
         void Bar(RectTransform parent, string label, float v)
         {
             var row = Ui.Rect("Trait " + label, parent); row.gameObject.AddComponent<LayoutElement>().minHeight = 34;
-            var l = Ui.Rect("L", row); l.anchorMin = new Vector2(0, 0); l.anchorMax = new Vector2(0.34f, 1); l.offsetMin = l.offsetMax = Vector2.zero; Ui.Label(l, label, 18, Role.Text, TextAnchor.MiddleLeft);
+            var l = Ui.Rect("L", row); Ui.Span(l, 0, 0.34f); Ui.Label(l, label, 18, Role.Text, TextAnchor.MiddleLeft);
             var track = Ui.Rect("Track", row); track.anchorMin = new Vector2(0.36f, 0.3f); track.anchorMax = new Vector2(1, 0.7f); track.offsetMin = track.offsetMax = Vector2.zero; Ui.Box(track, Role.Field);
             var fill = Ui.Rect("Fill", track); fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(Mathf.Clamp01(v), 1); fill.offsetMin = fill.offsetMax = Vector2.zero; Ui.Box(fill, Role.Accent);
         }
@@ -108,9 +108,17 @@ namespace Brene
         // where each part is on a body (from its physics parts, found by name; any VaM version)
         Transform Part(Atom a, string name)
         {
-            Dictionary<string, Transform> d;
-            if (!parts.TryGetValue(a, out d)) { d = new Dictionary<string, Transform>(); foreach (var rb in a.GetComponentsInChildren<Rigidbody>(true)) if (!d.ContainsKey(rb.name)) d[rb.name] = rb.transform; parts[a] = d; }
-            Transform t; return d.TryGetValue(name, out t) ? t : null;
+            Dictionary<string, Transform> d; Transform t;
+            // looked up once per body; looked up again if a part it remembered is gone (the look was changed and VaM rebuilt her)
+            if (!parts.TryGetValue(a, out d) || (d.TryGetValue(name, out t) && t == null))
+            { d = new Dictionary<string, Transform>(); foreach (var rb in a.GetComponentsInChildren<Rigidbody>(true)) if (rb != null && !d.ContainsKey(rb.name)) d[rb.name] = rb.transform; parts[a] = d; }
+            return d.TryGetValue(name, out t) ? t : null;
+        }
+        // people who left the scene (another scene was opened) are dropped, so a long session does not keep every body it has seen
+        void ForgetGoneBodies()
+        {
+            if (parts.Count == 0) return;
+            foreach (var a in new List<Atom>(parts.Keys)) if (a == null) parts.Remove(a);
         }
         List<Vector3> ZonePoints(Atom a, string zone)
         {

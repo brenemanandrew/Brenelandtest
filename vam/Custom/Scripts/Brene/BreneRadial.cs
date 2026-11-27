@@ -24,8 +24,8 @@ namespace Brene
         readonly Stack<List<RItem>> trail = new Stack<List<RItem>>(); readonly Stack<string> titles = new Stack<string>();
         Text coreText; Vector2 center; int hot = -1; float openedAt; bool sticky;
         public bool Open { get { return root != null; } }
-        public bool World; public Vector2 WorldSize;
-        public Action BeforeRun;   // the plugin makes sure its panels are showing before a choice opens one   // VR: the ring opens on the board and is clicked with VaM's pointer
+        public bool World; public Vector2 WorldSize;   // VR: the ring opens on the board and is clicked with VaM's pointer
+        public Action BeforeRun;   // the plugin makes sure its panels are showing before a choice opens one
 
         public Radial(Transform canvas, Func<List<RItem>> items) { this.canvas = canvas; rootItems = items; }
 
@@ -100,7 +100,7 @@ namespace Brene
 
         void Pick()
         {
-            if (hot < 0) { if (!sticky) Close(); return; }
+            if (hot < 0 || hot >= shown.Count) { if (!sticky || hot >= shown.Count) Close(); return; }
             var it = shown[hot];
             if (it.Kids != null)
             {

@@ -58,18 +58,16 @@ namespace Brene
             Panel = new Panel(canvas, "character", "Character", new Vector2(380, -300), new Vector2(760, 720), false);
             var b = Panel.Body;
             // the person, Next person, Reset shapes
-            var top = Ui.Rect("Top", b); top.anchorMin = new Vector2(0, 1); top.anchorMax = new Vector2(1, 1); top.pivot = new Vector2(0.5f, 1); top.sizeDelta = new Vector2(0, 48);
+            var top = Ui.Rect("Top", b); Ui.Top(top, 48, 0);
             who = Ui.Label(top, "", 22, Role.Text, TextAnchor.MiddleLeft); who.fontStyle = FontStyle.Bold; ((RectTransform)who.transform).offsetMax = new Vector2(-260, 0);
             Small(top, "Next person", 260, 130, NextPerson); Small(top, "Reset shapes", 125, 125, Reset);
             // the steps, numbered, in order
-            var bar = Ui.Rect("Steps", b); StepsRt = bar; bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1);
-            bar.sizeDelta = new Vector2(0, 52); bar.anchoredPosition = new Vector2(0, -54);
+            var bar = Ui.Rect("Steps", b); StepsRt = bar; Ui.Top(bar, 52, 54);
             var g = bar.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(64, 52); g.spacing = new Vector2(3, 0);
             for (int k = 0; k < STEPS.Length; k++) { var name = STEPS[k]; var tb = Ui.Button(bar, (k + 1) + "\n" + (name == "Personality" ? "Traits" : name == "Reactions" ? "React" : name), () => Show(name)); tb.GetComponentInChildren<Text>().fontSize = 14; tabs[name] = tb; }
             // search
-            var sr = Ui.Rect("Search", b); sr.anchorMin = new Vector2(0, 1); sr.anchorMax = new Vector2(1, 1); sr.pivot = new Vector2(0.5f, 1);
-            sr.sizeDelta = new Vector2(0, 44); sr.anchoredPosition = new Vector2(0, -146);
-            var hr = Ui.Rect("Hint", b); hr.anchorMin = new Vector2(0, 1); hr.anchorMax = new Vector2(1, 1); hr.pivot = new Vector2(0.5f, 1); hr.sizeDelta = new Vector2(0, 36); hr.anchoredPosition = new Vector2(0, -110);
+            var sr = Ui.Rect("Search", b); Ui.Top(sr, 44, 146);
+            var hr = Ui.Rect("Hint", b); Ui.Top(hr, 36, 110);
             hint = Ui.Label(hr, "", 20, Role.Accent, TextAnchor.MiddleLeft); hint.fontStyle = FontStyle.Bold;
             Ui.Box(sr, Role.Field); search = sr.gameObject.AddComponent<InputField>();
             var ph = Ui.Label(sr, "Search", 20, Role.Dim, TextAnchor.MiddleLeft); ph.fontStyle = FontStyle.Italic;
@@ -77,19 +75,15 @@ namespace Brene
             search.textComponent = tx; search.placeholder = ph; search.onEndEdit.AddListener(s => Show(section));
             // the list
             var area = Ui.Rect("Area", b); Ui.Fill(area, 0, 196, 0, 92);
-            var vp = Ui.Rect("Viewport", area); Ui.Fill(vp, 0, 0, 0, 0); vp.gameObject.AddComponent<RectMask2D>();
-            var hit = vp.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0.001f);
-            content = Ui.Rect("Content", vp); content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1); content.pivot = new Vector2(0.5f, 1); content.sizeDelta = Vector2.zero;
-            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            content = Ui.Scroll(area).content;
             var vl = content.gameObject.AddComponent<VerticalLayoutGroup>(); vl.spacing = 6; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = false;
-            var scroll = area.gameObject.AddComponent<ScrollRect>(); scroll.viewport = vp; scroll.content = content; scroll.horizontal = false; scroll.scrollSensitivity = 30;
             // Back and Next
-            var nav = Ui.Rect("Nav", b); nav.anchorMin = new Vector2(0, 0); nav.anchorMax = new Vector2(1, 0); nav.pivot = new Vector2(0.5f, 0); nav.sizeDelta = new Vector2(0, 54); nav.anchoredPosition = new Vector2(0, 32);
-            var back = Ui.Rect("Back", nav); back.anchorMin = new Vector2(0, 0); back.anchorMax = new Vector2(0.32f, 1); back.offsetMin = back.offsetMax = Vector2.zero;
-            var bb = Ui.Button(back, "< Back", () => Step(-1)); Stretch(bb);
-            var next = Ui.Rect("Next", nav); next.anchorMin = new Vector2(0.36f, 0); next.anchorMax = new Vector2(1, 1); next.offsetMin = next.offsetMax = Vector2.zero;
-            NextRt = next; nextBtn = Ui.Button(next, "Next >", () => Step(1)); Stretch(nextBtn); Ui.SetOn(nextBtn, true);
-            var nr = Ui.Rect("Note", b); nr.anchorMin = new Vector2(0, 0); nr.anchorMax = new Vector2(1, 0); nr.pivot = new Vector2(0.5f, 0); nr.sizeDelta = new Vector2(0, 28);
+            var nav = Ui.Rect("Nav", b); Ui.Bottom(nav, 54, 32);
+            var back = Ui.Rect("Back", nav); Ui.Span(back, 0, 0.32f);
+            var bb = Ui.Button(back, "< Back", () => Step(-1)); Ui.Stretch(bb);
+            var next = Ui.Rect("Next", nav); Ui.Span(next, 0.36f, 1);
+            NextRt = next; nextBtn = Ui.Button(next, "Next >", () => Step(1)); Ui.Stretch(nextBtn); Ui.SetOn(nextBtn, true);
+            var nr = Ui.Rect("Note", b); Ui.Bottom(nr, 28, 0);
             note = Ui.Label(nr, "", 16, Role.Dim, TextAnchor.MiddleLeft);
             Panel.Root.gameObject.SetActive(false);
         }
@@ -105,7 +99,6 @@ namespace Brene
         public int Changed { get { return original.Count; } }
         public void Find(string q) { search.text = q; Show(section, true); }
         public string Section { get { return section; } }
-        static void Stretch(Button bt) { var br = (RectTransform)bt.transform; br.anchorMin = Vector2.zero; br.anchorMax = Vector2.one; br.sizeDelta = Vector2.zero; }
         void Step(int d)
         {
             int i = Array.IndexOf(STEPS, section) + d;
@@ -117,7 +110,7 @@ namespace Brene
         {
             var r = Ui.Rect(text, parent); r.anchorMin = r.anchorMax = new Vector2(1, 0.5f); r.pivot = new Vector2(1, 0.5f); r.sizeDelta = new Vector2(w, 42);
             r.anchoredPosition = new Vector2(-(fromRight - w), 0);
-            var bt = Ui.Button(r, text, a); var br = (RectTransform)bt.transform; br.anchorMin = Vector2.zero; br.anchorMax = Vector2.one; br.sizeDelta = Vector2.zero;
+            var bt = Ui.Button(r, text, a); Ui.Stretch(bt);
             bt.GetComponentInChildren<Text>().fontSize = 17;
         }
 
@@ -157,7 +150,7 @@ namespace Brene
             else if (sec == "Personality") { if (BuildPersonality != null) BuildPersonality(content, person); }
             else if (sec == "Reactions") { if (BuildReactions != null) BuildReactions(content, person); }
             else if (sec == "Body" || sec == "Face") Shapes(sec == "Face", q);
-            else host.StartCoroutine(Tiles(KIND[sec], q, build));
+            else Tiles(KIND[sec], q, build);
         }
 
         // step 1: big buttons, one per person in the scene
@@ -167,7 +160,7 @@ namespace Brene
             foreach (var a in SuperController.singleton.GetAtoms())
             {
                 if (a == null || a.type != "Person") continue; var atom = a; n++;
-                var bt = Ui.Button(grid, atom.uid, () => { person = atom; SuperController.singleton.SelectController(atom.mainController); Show("Start"); });
+                var bt = Ui.Button(grid, atom.uid, () => { if (atom == null) { Show("Who"); return; } person = atom; if (atom.mainController != null) SuperController.singleton.SelectController(atom.mainController); Show("Start"); });
                 Ui.SetOn(bt, atom == person);
             }
             note.text = n == 0 ? "There is no person in this scene. Add one in VaM (Add Atom > People)." : "Tap one to start.";
@@ -176,7 +169,7 @@ namespace Brene
         // step 9: save
         void Finish()
         {
-            var row = Row2("Look name"); var nameRt = Ui.Rect("Name", row); nameRt.anchorMin = new Vector2(0.3f, 0); nameRt.anchorMax = new Vector2(1, 1); nameRt.offsetMin = nameRt.offsetMax = Vector2.zero;
+            var row = Row2("Look name"); var nameRt = Ui.Rect("Name", row); Ui.Span(nameRt, 0.3f, 1);
             Ui.Box(nameRt, Role.Field); var nameIn = nameRt.gameObject.AddComponent<InputField>();
             var tx = Ui.Label(nameRt, "", 20, Role.Text, TextAnchor.MiddleLeft); tx.raycastTarget = true; nameIn.textComponent = tx; nameIn.text = !string.IsNullOrEmpty(SaveName) ? SaveName : person.uid + " look";
             var grid = Grid(new Vector2(200, 60));
@@ -199,7 +192,7 @@ namespace Brene
         RectTransform Row2(string label)
         {
             var row = Ui.Rect("Row " + label, content); row.gameObject.AddComponent<LayoutElement>().minHeight = 56;
-            var lt = Ui.Rect("L", row); lt.anchorMin = new Vector2(0, 0); lt.anchorMax = new Vector2(0.3f, 1); lt.offsetMin = lt.offsetMax = Vector2.zero;
+            var lt = Ui.Rect("L", row); Ui.Span(lt, 0, 0.3f);
             Ui.Label(lt, label, 20, Role.Text, TextAnchor.MiddleLeft);
             return row;
         }
@@ -244,12 +237,12 @@ namespace Brene
             var region = new List<string>(); foreach (var n in names) if (IsFace(Clean(n)) == face) region.Add(n);
             region.Sort((x, y) => string.Compare(Clean(x), Clean(y), StringComparison.OrdinalIgnoreCase));
             var tg = Ui.Rect("All", content); AllShapesRt = tg; tg.gameObject.AddComponent<LayoutElement>().minHeight = 52;
-            Stretch(Ui.Button(tg, (showAll ? "Hide " : "Show ") + "all " + region.Count + (face ? " face" : " body") + " shapes", () => { showAll = !showAll; allPage = 0; Show(section); }));
+            Ui.Stretch(Ui.Button(tg, (showAll ? "Hide " : "Show ") + "all " + region.Count + (face ? " face" : " body") + " shapes", () => { showAll = !showAll; allPage = 0; Show(section); }));
             if (showAll)
             {
                 int end = Math.Min(region.Count, (allPage + 1) * 60);
                 for (int i = 0; i < end; i++) Row(geo, region[i], Clean(region[i]));
-                if (end < region.Count) { var mg = Ui.Rect("More", content); mg.gameObject.AddComponent<LayoutElement>().minHeight = 52; Stretch(Ui.Button(mg, "Show more (" + (region.Count - end) + " left)", () => { allPage++; Show(section); })); }
+                if (end < region.Count) { var mg = Ui.Rect("More", content); mg.gameObject.AddComponent<LayoutElement>().minHeight = 52; Ui.Stretch(Ui.Button(mg, "Show more (" + (region.Count - end) + " left)", () => { allPage++; Show(section); })); }
             }
             note.text = found + " of " + list.Length + " simple sliders found. Every other shape is under \"all shapes\", or search.";
         }
@@ -296,49 +289,31 @@ namespace Brene
         }
 
         // ---- picture tiles from the library ----
-        IEnumerator Tiles(string kind, string q, int myBuild)
+        void Tiles(string kind, string q, int myBuild)
         {
             if (kind == "look")
             {
                 var kr = Ui.Rect("Keep", content); kr.gameObject.AddComponent<LayoutElement>().minHeight = 52;
-                Stretch(Ui.Button(kr, "Keep " + person.uid + " as they are  >", () => Show("Body")));
+                Ui.Stretch(Ui.Button(kr, "Keep " + person.uid + " as they are  >", () => Show("Body")));
             }
             var grid = Grid(new Vector2(132, 158));
             note.text = "Loading...";
-            var req = UnityWebRequest.Get(link.Url + "/lib/items?limit=60&kind=" + kind + "&q=" + WWW_Escape(q)); req.timeout = 10;
-            yield return req.SendWebRequest();
-            if (myBuild != build) { req.Dispose(); yield break; }
-            if (req.isNetworkError || req.isHttpError) { note.text = "Start the Brene relay (start-brene.bat) and set your VaM folder in the Library page."; req.Dispose(); yield break; }
-            var j = JSON.Parse(req.downloadHandler.text); req.Dispose();
-            var items = j["items"].AsArray; int total = j["total"].AsInt;
-            if (items == null || items.Count == 0) { note.text = j["vam"].Value == "" ? "Set your VaM folder in the Library page first (127.0.0.1:8767/library)." : "None found"; yield break; }
-            note.text = total + " found" + (total > items.Count ? " (first " + items.Count + "; search to narrow)" : "") + ". Tap one to put it on " + person.uid + ".";
-            var thumbs = new List<KeyValuePair<RawImage, string>>();
-            for (int i = 0; i < items.Count; i++)
+            host.StartCoroutine(link.Json("GET", "/lib/items?limit=60&kind=" + kind + "&q=" + UnityWebRequest.EscapeURL(q ?? ""), null, 10, (JSONNode j, string e) =>
             {
-                var it = items[i]; var path = it["path"].Value; var name = it["name"].Value;
-                var tile = Ui.Rect("Tile " + name, grid); var bg = Ui.Box(tile, Role.Button);
-                var btn = tile.gameObject.AddComponent<Button>(); btn.targetGraphic = bg;
-                btn.onClick.AddListener(() => { var err = apply(kind, path, person != null ? person.uid : ""); note.text = err ?? ("Applied " + name); if (err == null) LastApplied = kind; });
-                var pic = Ui.Rect("Pic", tile); pic.anchorMin = new Vector2(0, 0); pic.anchorMax = new Vector2(1, 1); pic.offsetMin = new Vector2(6, 34); pic.offsetMax = new Vector2(-6, -6);
-                var raw = pic.gameObject.AddComponent<RawImage>(); raw.color = new Color(1, 1, 1, 0.08f); raw.raycastTarget = false;
-                var cap = Ui.Rect("Cap", tile); cap.anchorMin = new Vector2(0, 0); cap.anchorMax = new Vector2(1, 0); cap.pivot = new Vector2(0.5f, 0); cap.sizeDelta = new Vector2(0, 32);
-                Ui.Label(cap, name, 15, Role.Text, TextAnchor.MiddleCenter);
-                if (it["thumb"].Value != "") thumbs.Add(new KeyValuePair<RawImage, string>(raw, it["thumb"].Value));
-            }
-            foreach (var t in thumbs)
-            {
-                if (myBuild != build) yield break;
-                var tr = UnityWebRequest.Get(link.Url + "/lib/thumb?p=" + WWW_Escape(t.Value)); tr.timeout = 10;
-                yield return tr.SendWebRequest();
-                if (myBuild == build && !tr.isNetworkError && !tr.isHttpError && t.Key != null)
+                if (myBuild != build || grid == null) return;   // the list was redrawn while the relay was answering
+                if (j == null || e != null) { note.text = "Start the Brene relay (start-brene.bat) and set your VaM folder in the Library page."; return; }
+                var items = j["items"].AsArray; int total = j["total"].AsInt;
+                if (items == null || items.Count == 0) { note.text = j["vam"].Value == "" ? "Set your VaM folder in the Library page first (127.0.0.1:8767/library)." : q != "" ? "Nothing matches \"" + q + "\". Clear the search to see them all." : "None found"; return; }
+                note.text = total + " found" + (total > items.Count ? " (first " + items.Count + "; search to narrow)" : "") + ". Tap one to put it on " + (person != null ? person.uid : "the person") + ".";
+                var tiles = new List<RawImage>(); var thumbs = new List<string>();
+                for (int i = 0; i < items.Count; i++)
                 {
-                    var tex = new Texture2D(2, 2);
-                    if (tex.LoadImage(tr.downloadHandler.data)) { t.Key.texture = tex; t.Key.color = Color.white; }
+                    var it = items[i]; var path = it["path"].Value; var name = it["name"].Value;
+                    var raw = Pics.Tile(grid, name, () => { var err = apply(kind, path, person != null ? person.uid : ""); note.text = err ?? ("Applied " + name); if (err == null) LastApplied = kind; });
+                    if (it["thumb"].Value != "") { tiles.Add(raw); thumbs.Add(it["thumb"].Value); }
                 }
-                tr.Dispose();
-            }
+                host.StartCoroutine(link.Thumbs(tiles, thumbs));
+            }));
         }
-        static string WWW_Escape(string s) { return UnityWebRequest.EscapeURL(s ?? ""); }
     }
 }

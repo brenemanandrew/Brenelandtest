@@ -26,7 +26,7 @@ namespace Brene
         class Voice { public GameObject go; public AudioSource src; public float mouth; public string mouthParam; public Atom atom; public string exprParam; public float exprUntil, exprAmt; }
         readonly Dictionary<string, Voice> voices = new Dictionary<string, Voice>();
         readonly float[] voiceBuf = new float[256];
-        JSONStorableBool voiceOn; JSONStorableString wizraBody, castBodies; string talkTo = "wizra";
+        JSONStorableBool voiceOn; JSONStorableString wizraBody, castBodies; string talkTo = "wizra"; int chatWaiting;
         Button bodyBtn, voiceBtn, whoBtn;
         public int WizraReplies;   // counts replies from anyone (the tutorial waits on it)
         static readonly string[] MOUTH = { "Mouth", "Mouth Open", "Mouth Open Wide", "Lips Part", "Jaw Open" };
@@ -45,11 +45,12 @@ namespace Brene
         }
 
         // ---- who is whose body ----
+        JSONNode castRead; string castReadFrom;   // the cast list as last read: asked many times a frame, so only read again when it changes
         string BodyUid(string who)
         {
             if (who == "wizra" && !string.IsNullOrEmpty(wizraBody.val)) return wizraBody.val;
-            try { var j = JSON.Parse(castBodies.val); if (j != null && j[who] != null) return j[who].Value; } catch (Exception) { }
-            return "";
+            if (castReadFrom != castBodies.val) { castReadFrom = castBodies.val; castRead = null; try { castRead = JSON.Parse(castReadFrom); } catch (Exception) { } }
+            return castRead != null && castRead[who] != null ? castRead[who].Value : "";
         }
         void SetBody(string who, string uid)
         {
@@ -68,13 +69,13 @@ namespace Brene
         // the bar along the top of the chat panel: talking to whom, her body, voice on or off
         void BuildWizraBar()
         {
-            var bar = Ui.Rect("WizraBar", pChat.Body); bar.anchorMin = new Vector2(0, 1); bar.anchorMax = new Vector2(1, 1); bar.pivot = new Vector2(0.5f, 1); bar.sizeDelta = new Vector2(0, 48);
-            var a = Ui.Rect("Who", bar); a.anchorMin = new Vector2(0, 0); a.anchorMax = new Vector2(0.33f, 1); a.offsetMin = a.offsetMax = Vector2.zero;
-            whoBtn = Ui.Button(a, "", NextWho); Flow.Stretch(whoBtn); Ui.SetOn(whoBtn, true);
-            var b = Ui.Rect("Body", bar); b.anchorMin = new Vector2(0.35f, 0); b.anchorMax = new Vector2(0.78f, 1); b.offsetMin = b.offsetMax = Vector2.zero;
-            bodyBtn = Ui.Button(b, "", NextBody); Flow.Stretch(bodyBtn);
-            var c = Ui.Rect("Voice", bar); c.anchorMin = new Vector2(0.8f, 0); c.anchorMax = new Vector2(1, 1); c.offsetMin = c.offsetMax = Vector2.zero;
-            voiceBtn = Ui.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Flow.Stretch(voiceBtn); Ui.SetOn(voiceBtn, voiceOn.val);
+            var bar = Ui.Rect("WizraBar", pChat.Body); Ui.Top(bar, 48, 0);
+            var a = Ui.Rect("Who", bar); Ui.Span(a, 0, 0.33f);
+            whoBtn = Ui.Button(a, "", NextWho); Ui.Stretch(whoBtn); Ui.SetOn(whoBtn, true);
+            var b = Ui.Rect("Body", bar); Ui.Span(b, 0.35f, 0.78f);
+            bodyBtn = Ui.Button(b, "", NextBody); Ui.Stretch(bodyBtn);
+            var c = Ui.Rect("Voice", bar); Ui.Span(c, 0.8f, 1);
+            voiceBtn = Ui.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Ui.Stretch(voiceBtn); Ui.SetOn(voiceBtn, voiceOn.val);
             voiceBtn.GetComponentInChildren<Text>().fontSize = 16; whoBtn.GetComponentInChildren<Text>().fontSize = 17; bodyBtn.GetComponentInChildren<Text>().fontSize = 17;
             ShowBody();
         }
@@ -97,10 +98,13 @@ namespace Brene
         // ---- sending and hearing ----
         void SayTo(string who, string text, Action<string> after)
         {
-            chatBusy = true; Line("<b>You</b> to " + Nice(who) + ": " + Esc(text)); Line("<i>" + Nice(who) + " is thinking...</i>");
+            // more than one can be on its way (Tell Margo while Wizra is still answering): each takes away its own "thinking" line
+            var thinking = "<i>" + Nice(who) + " is thinking...</i>";
+            chatWaiting++; chatBusy = true; Line("<b>You</b> to " + Nice(who) + ": " + Esc(text)); Line(thinking);
             StartCoroutine(link.Say(who, text, storyPlace, Present(), voiceOn.val, (reply, err, voiceId) =>
             {
-                chatBusy = false; chatLines.RemoveAt(chatLines.Count - 1);
+                if (chatWaiting > 0) chatWaiting--; chatBusy = chatWaiting > 0;
+                int at = chatLines.LastIndexOf(thinking); if (at >= 0) chatLines.RemoveAt(at);
                 if (err != null) { Line("<color=#ff8a8a>" + Esc(err) + "</color>"); return; }
                 Line("<b>" + Nice(who) + ":</b> " + Esc(reply));
                 Heard(who, reply, voiceId);
@@ -117,27 +121,34 @@ namespace Brene
             if (voiceId != null) StartCoroutine(PlayVoice(who, body, voiceId));
         }
 
+        // her voice for one reply. The relay answers 202 while the voice is being made, then the WAV itself, or its reason in words.
         IEnumerator PlayVoice(string who, Atom body, string id)
         {
-            var url = link.Url + "/voice?id=" + id;
-            for (int i = 0; i < 120; i++)   // up to a minute for the voice to be made on the PC
+            var url = link.Url + "/voice?id=" + id; byte[] wav = null; float until;
+            for (int i = 0; i < 120 && wav == null; i++)   // up to a minute for the voice to be made on the PC
             {
-                var head = UnityWebRequest.Get(url); head.timeout = 5; yield return head.SendWebRequest();
-                var code = head.responseCode; var txt = head.downloadHandler != null && code != 200 ? head.downloadHandler.text : ""; head.Dispose();
-                if (code == 200) break;
-                if (code != 202) { if (txt.Contains("error")) Line("<color=#ffb070>" + Esc(JSON.Parse(txt)["error"].Value) + "</color>"); yield break; }
-                yield return new WaitForSeconds(0.5f);
+                var req = UnityWebRequest.Get(url); req.timeout = 20; yield return req.SendWebRequest();
+                long code = req.responseCode; byte[] data = req.downloadHandler != null ? req.downloadHandler.data : null;
+                bool isWav = code == 200 && data != null && data.Length >= 12 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F';
+                string txt = !isWav && code != 202 && req.downloadHandler != null ? req.downloadHandler.text : "";
+                req.Dispose();
+                if (isWav) { wav = data; break; }
+                if (code == 202) { until = Time.realtimeSinceStartup + 0.5f; while (Time.realtimeSinceStartup < until) yield return null; continue; }
+                // no sound came: say why in the relay's own words when it gave any
+                string why = ""; try { var j = JSON.Parse(txt ?? ""); if (j != null && j["error"] != null) why = j["error"].Value; } catch (Exception) { }
+                if (why == "") why = code == 0 ? "Her voice could not be fetched: the relay stopped answering." : "Her voice came back in a sound format Brene can't read.";
+                Line("<color=#ffb070>" + Esc(why) + "</color>"); yield break;
             }
-            // VaM leaves out Unity's audio download module, so the WAV is fetched as plain bytes and turned into a clip here
-            var req = UnityWebRequest.Get(url); req.timeout = 20;
-            yield return req.SendWebRequest();
-            if (req.isNetworkError || req.isHttpError) { req.Dispose(); yield break; }
-            var clip = WavClip(req.downloadHandler.data, "voice " + who); req.Dispose();
+            if (wav == null) { Line("<color=#ffb070>Her voice is taking too long to make. Her words are above.</color>"); yield break; }
+            // VaM leaves out Unity's audio download module, so the WAV arrives as plain bytes and is turned into a clip here
+            var clip = WavClip(wav, "voice " + who);
             if (clip == null) { Line("<color=#ffb070>Her voice came back in a sound format Brene can't read.</color>"); yield break; }
             var v = VoiceOf(who);
             // no body (Margo on a call): heard as a phone voice, not from a place in the room
             v.src.spatialBlend = body != null ? 1f : 0f;
+            var old = v.src.clip;
             v.src.Stop(); v.src.clip = clip; v.src.Play();
+            if (old != null) Destroy(old);   // the line before this one: freed, so a long talk does not fill memory with old sound
         }
         Voice VoiceOf(string who)
         {
@@ -233,7 +244,8 @@ namespace Brene
             }
             if (dataAt < 0 || ch < 1 || rate < 1000) return null;
             int step = bits / 8; if (step < 2) return null;
-            int n = dataLen / step; var data = new float[n];
+            int n = dataLen / step; n -= n % ch; if (n < ch) return null;   // whole frames only (a cut-off file must not upset Unity)
+            var data = new float[n];
             for (int i = 0, q = dataAt; i < n; i++, q += step)
             {
                 if (fmt == 3 && bits == 32) data[i] = BitConverter.ToSingle(b, q);
@@ -246,6 +258,12 @@ namespace Brene
             return clip;
         }
 
-        void DropWizra() { foreach (var v in new List<Voice>(voices.Values)) if (v.go != null) Destroy(v.go); voices.Clear(); }
+        void DropWizra()
+        {
+            foreach (var v in new List<Voice>(voices.Values)) { if (v.src != null && v.src.clip != null) Destroy(v.src.clip); if (v.go != null) Destroy(v.go); }
+            voices.Clear();
+            foreach (var t in new List<Texture2D>(pics.Values)) if (t != null) Destroy(t);
+            pics.Clear();
+        }
     }
 }

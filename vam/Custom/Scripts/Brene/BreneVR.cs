@@ -39,6 +39,7 @@ namespace Brene
         void EnterVR()
         {
             vr = true; vit.Head = false; vit.Stereo = false; vit.HandsOn = false;
+            RestoreVamMenu();   // the monitor's menu offset is not used in the headset
             foreach (var c in Canvases()) { ToWorld(c); Send("AddCanvas", c); }
             BuildWrist(); BuildQuick(); PlaceBoard();
             if (coach != null) coach.WorldSize = BoardSize();
@@ -54,7 +55,7 @@ namespace Brene
             if (quickRow != null) Destroy(quickRow); quickRow = null;
             if (pChat != null) for (int i = 0; i < pChat.Body.childCount; i++) { var c = (RectTransform)pChat.Body.GetChild(i); if (c.name == "Log") c.offsetMin = new Vector2(0, 62); }
             if (coach != null) coach.WorldSize = Vector2.zero;
-            radial.World = false;
+            if (radial != null) radial.World = false;
         }
         List<Canvas> Canvases()
         {
@@ -78,7 +79,6 @@ namespace Brene
         Camera Cam() { return Camera.main; }
         Transform HeadT()
         {
-            var sc = SuperController.singleton;
             var ct = Vam.CenterTarget(); if (ct != null) return ct;
             var cam = Cam(); return cam != null ? cam.transform : null;
         }
@@ -142,8 +142,7 @@ namespace Brene
         void BuildQuick()
         {
             if (pChat == null) return;
-            var row = Ui.Rect("Quick", pChat.Body); row.anchorMin = new Vector2(0, 0); row.anchorMax = new Vector2(1, 0); row.pivot = new Vector2(0.5f, 0);
-            row.sizeDelta = new Vector2(0, 50); row.anchoredPosition = new Vector2(0, 60);
+            var row = Ui.Rect("Quick", pChat.Body); Ui.Bottom(row, 50, 60);
             var g = row.gameObject.AddComponent<GridLayoutGroup>(); g.cellSize = new Vector2(140, 46); g.spacing = new Vector2(6, 6);
             foreach (var q in QUICK) { var line = q; var b = Ui.Button(row, line, () => { chatIn.text = line; SendChat(); }); b.GetComponentInChildren<Text>().fontSize = 17; }
             quickRow = row.gameObject;

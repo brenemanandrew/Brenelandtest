@@ -32,7 +32,7 @@ namespace Brene
             Add("mm_reset", "Reset", () => { menuMove = Vector3.zero; menuSize = 1f; BreneEdit.Changed(); }, null);
             pVamMenu = new Panel(root, "vammenu", "Move VaM menu", new Vector2(380, -60), new Vector2(340, 250), true);
             foreach (var id in new[] { "mm_up", "mm_down", "mm_left", "mm_right", "mm_closer", "mm_further", "mm_smaller", "mm_bigger", "mm_reset" }) MakeButton(id, pVamMenu);
-            var nr = Ui.Rect("Note", pVamMenu.Root); nr.anchorMin = new Vector2(0, 0); nr.anchorMax = new Vector2(1, 0); nr.pivot = new Vector2(0.5f, 0); nr.sizeDelta = new Vector2(0, 30);
+            var nr = Ui.Rect("Note", pVamMenu.Root); Ui.Bottom(nr, 30, 0);
             vamMenuNote = Ui.Label(nr, "", 15, Role.Dim, TextAnchor.MiddleLeft); pVamMenu.FootPad = 40;
             MakeButton("movemenu", pLayout);
         }
@@ -61,6 +61,18 @@ namespace Brene
             }
             menuParts.Clear(); menuParts.AddRange(keep);
             if (vamMenuNote != null) vamMenuNote.text = menuParts.Count == 0 ? "No VaM menu found to move (tell the coding session)" : "Moving " + menuParts.Count + " VaM menu part(s)";
+        }
+
+        // VaM's menus back where VaM had them (Brene is going away, or the headset took over)
+        void RestoreVamMenu()
+        {
+            foreach (var m in menuParts)
+            {
+                if (m.t == null || !m.wrote) continue;
+                if (m.t.position == m.wrotePos) m.t.position = m.basePos;
+                if (m.t.localScale == m.wroteScale) m.t.localScale = m.baseScale;
+                m.wrote = false;
+            }
         }
 
         // every frame, after VaM has placed its menus

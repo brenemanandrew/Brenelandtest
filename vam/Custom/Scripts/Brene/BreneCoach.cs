@@ -63,7 +63,7 @@ namespace Brene
         Button Btn(string text, Vector2 fromBottomRight, float w, Action a)
         {
             var r = Ui.Rect(text, card); r.anchorMin = r.anchorMax = new Vector2(1, 0); r.pivot = new Vector2(1, 0); r.sizeDelta = new Vector2(w, 54); r.anchoredPosition = fromBottomRight;
-            var b = Ui.Button(r, text, a); var rr = (RectTransform)b.transform; rr.anchorMin = Vector2.zero; rr.anchorMax = Vector2.one; rr.sizeDelta = Vector2.zero; return b;
+            var b = Ui.Button(r, text, a); Ui.Stretch(b); return b;
         }
 
         public void Start(Lesson l) { lesson = l; go.SetActive(true); Theme.ApplyAll(root); Show(0); }
@@ -130,6 +130,8 @@ namespace Brene
         }
         static void SetR(Image im, float x, float y, float w, float h) { var r = im.rectTransform; r.anchoredPosition = new Vector2(x, y); r.sizeDelta = new Vector2(w, h); }
 
+        // the panel size changed (Bigger, Smaller, a layout read): the card follows
+        public void Scale(float scale) { k = Mathf.Max(0.6f, scale); }
         public void Destroy() { if (go != null) UnityEngine.Object.Destroy(go); }
     }
 }

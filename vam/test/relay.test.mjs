@@ -16,10 +16,10 @@ const listen = (handler) => new Promise(r => { const s = http.createServer(handl
 const body = req => new Promise(r => { let s = ''; req.on('data', c => s += c); req.on('end', () => r(s ? JSON.parse(s) : {})); });
 
 // stand-in Brenai: password "pw", PIN 1234, streams two deltas then done
-let chats = 0, sawCookie = '', ttsText = '';
+let chats = 0, sawCookie = '', ttsText = '', logins = 0;
 const brenai = await listen(async (req, res) => {
   const b = await body(req);
-  if (req.url === '/api/login') { if (b.password !== 'pw') { res.writeHead(401); return res.end('{"error":"wrong password"}'); } res.writeHead(200, { 'set-cookie': 'brenai=tok123; Path=/; HttpOnly' }); return res.end('{"ok":true}'); }
+  if (req.url === '/api/login') { logins++; await sleep(60); if (b.password !== 'pw') { res.writeHead(401); return res.end('{"error":"wrong password"}'); } res.writeHead(200, { 'set-cookie': 'brenai=tok123; Path=/; HttpOnly' }); return res.end('{"ok":true}'); }
   if (req.url === '/api/pin') { if (!String(req.headers.cookie).includes('brenai=tok123')) { res.writeHead(401); return res.end('{"error":"login"}'); } if (b.pin !== '1234') { res.writeHead(404); return res.end('{"error":"No save with that PIN."}'); } res.writeHead(200, { 'set-cookie': 'brenai_u=p1.sig; Path=/' }); return res.end('{"ok":true}'); }
   if (req.url === '/api/tts') { ttsText = b.text; if (!String(req.headers.cookie).includes('brenai_u=')) { res.writeHead(401); return res.end('{"error":"login"}'); } res.writeHead(200, { 'content-type': 'audio/wav' }); return res.end(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(40)])); }
   if (req.url === '/api/chat') { sawCookie = String(req.headers.cookie); chats++; res.writeHead(200, { 'content-type': 'text/event-stream' }); res.write('data: {"t":"delta","text":"Hi "}\n\n'); res.write('data: {"t":"delta","text":"there"}\n\n'); return res.end(`data: {"t":"done","text":"*smiles* Hi there, you said ${b.text}"}\n\n`); }
@@ -88,6 +88,26 @@ try {
   run('node', [RELAY, '--port', '18770', '--bridge', 'ws://127.0.0.1:18799', '--wizra', 'local', '--lmstudio', 'http://127.0.0.1:1']);
   await sleep(600); c = await post(18770, '/chat', { text: 'yo' });
   ok(c.error && c.error.includes('LM Studio is not running'), 'chat local: LM Studio off gives a plain error');
+
+  // ---- things that used to stop or hang the relay ----
+  // an odd address must not stop it
+  const raw = (port, p) => new Promise(r => { const q = http.request({ host: '127.0.0.1', port, path: p }, res => { res.resume(); res.on('end', () => r(res.statusCode)); }); q.on('error', () => r(0)); q.end(); });
+  const odd = await raw(18767, '//'); s = await get(18767, '/state').catch(() => null);
+  ok(odd === 400 && s && Array.isArray(s.hands), 'an odd address ("//") gets a plain 400 and the relay keeps running');
+  // too much text is refused in words, not left hanging
+  const big = await Promise.race([post(18767, '/chat', { text: 'x'.repeat(1200000) }).catch(e => ({ thrown: String(e) })), sleep(4000).then(() => ({ hung: true }))]);
+  ok(big.error && /too much/i.test(big.error), 'a body over 1 MB is refused with a plain message: ' + JSON.stringify(big).slice(0, 80));
+  const nul = await (await fetch('http://127.0.0.1:18767/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: 'null' })).json();
+  ok(nul.error === 'Say something first', 'a body that is not an object is treated as empty');
+  // a second relay on the same port says so and stops
+  const twice = run('node', [RELAY, '--port', '18767', '--bridge', 'ws://127.0.0.1:18799', '--brenai', B]);
+  const code = await new Promise(r => twice.on('exit', r));
+  ok(code === 1 && /already running/.test(twice.out()) && !/at Server|node:net/.test(twice.out()), 'a second relay on the same port says it is already running (no stack trace)');
+  // two requests that both need the sign-in share one (a second sign-in used to wipe the first one's cookie half way)
+  run('node', [RELAY, '--port', '18771', '--bridge', 'ws://127.0.0.1:18799', '--brenai', B], { BRENAI_PASSWORD: 'pw', BRENAI_PIN: '1234' });
+  await sleep(600); const before = logins;
+  const [c1, s1] = await Promise.all([post(18771, '/chat', { text: 'one' }), get(18771, '/story/state')]);
+  ok(c1.text && !c1.error && logins - before === 1 && /no story routes/i.test(s1.note), `chat and the story poll at the same moment: one sign-in, both answered (${logins - before} sign-in(s), ${c1.error || 'ok'})`);
 } finally {
   for (const p of procs) p.kill(); brenai.close(); lm.close();
 }

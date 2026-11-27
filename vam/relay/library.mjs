@@ -8,6 +8,8 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 export const HUB_API = 'https://hub.virtamate.com/citizenx/api.php';
 const HUB_HOSTS = new Set(['hub.virtamate.com']);
@@ -64,7 +66,9 @@ export class Library {
     if (vamDir) this.data.vam = vamDir;
     this.items = []; this.scanned = 0; this.scanning = null; this.scanError = '';
     this.zips = new Map();    // var path -> { mtime, entries }
-    this.cmds = []; this.nextCmd = 1; this.vam = { at: 0, people: [], selected: '' }; this.results = new Map();
+    // command ids start from the clock, not from 1: the plugin remembers the last id it ran, so after a relay restart a fresh
+    // "1" could match it and the first Load or Apply would be ignored. (Seconds, so the id fits the plugin's whole number.)
+    this.cmds = []; this.nextCmd = Math.floor(Date.now() / 1000) % 1000000000 + 1; this.vam = { at: 0, people: [], selected: '' }; this.results = new Map();
     this.jobs = new Map(); this.nextJob = 1;
   }
   save() { try { fs.writeFileSync(this.dataFile, JSON.stringify(this.data, null, 1)); } catch {} }
@@ -146,6 +150,7 @@ export class Library {
   // ---- commands for the VaM plugin ----
   queue(cmd) {
     const c = { id: this.nextCmd++, ...cmd, at: Date.now() }; this.cmds.push(c); while (this.cmds.length > 20) this.cmds.shift();
+    while (this.results.size > 200) this.results.delete(this.results.keys().next().value);   // old answers are not kept for ever
     if (cmd.path) { this.data.recent = [cmd.path, ...this.data.recent.filter(x => x !== cmd.path)].slice(0, 40); this.save(); }
     return c;
   }
@@ -194,9 +199,14 @@ export class Library {
         const u = new URL(f.url); if (u.protocol !== 'https:' || !HUB_HOSTS.has(u.hostname)) throw new Error('Download not from the Hub: ' + u.hostname);
         const r = await this.fetch(f.url, { headers: { cookie: 'vamhubconsent=yes' }, redirect: 'follow' });
         if (!r.ok) throw new Error(`Download failed (${r.status}) for ${name}`);
-        const buf = Buffer.from(await r.arrayBuffer());
-        if (buf.readUInt32LE(0) !== 0x04034b50) throw new Error(`${name} did not download as a package (the Hub may want a login for it)`);
-        const tmp = path.join(dir, name + '.part'); await fsp.writeFile(tmp, buf); await fsp.rename(tmp, path.join(dir, name));
+        // straight to disk as it arrives (packages can be several GB, more than fits in memory), as .part until it is whole
+        const tmp = path.join(dir, name + '.part');
+        try {
+          if (r.body) await pipeline(Readable.fromWeb(r.body), fs.createWriteStream(tmp)); else await fsp.writeFile(tmp, Buffer.from(await r.arrayBuffer()));
+          const fh = await fsp.open(tmp, 'r'), head = Buffer.alloc(4); try { await fh.read(head, 0, 4, 0); } finally { await fh.close(); }
+          if (head.readUInt32LE(0) !== 0x04034b50) throw new Error(`${name} did not download as a package (the Hub may want a login for it)`);
+          await fsp.rename(tmp, path.join(dir, name));
+        } catch (e) { await fsp.unlink(tmp).catch(() => {}); throw e; }
         job.got.push(name); job.done++;
       }
       job.state = 'done'; job.file = '';

@@ -86,7 +86,7 @@ try {
   // the plugin round trip
   await post('/vam', { people: ['Person', 'Person#2'], selected: 'Person#2' });
   s = await get('/lib/state'); ok(s.vam.connected && s.vam.people.length === 2 && s.vam.selected === 'Person#2', 'the plugin\'s report shows people and the selected one');
-  r = await post('/lib/open', { kind: 'look', path: elf.path, person: 'Person' }); ok(r.id && r.vam, 'look queued');
+  r = await post('/lib/open', { kind: 'look', path: elf.path, person: 'Person' }); ok(r.id && r.vam, 'look queued'); ok(r.id > 100000, 'command ids start from the clock, so a restarted relay cannot repeat an id VaM already ran: ' + r.id);
   let st = await get('/state'); ok(st.cmd && st.cmd.kind === 'look' && st.cmd.person === 'Person' && st.cmd.path === elf.path, '/state hands the command to the plugin');
   st = await get('/state'); ok(st.cmd && st.cmd.id === r.id, 'a look stays queued until the plugin reports it done');
   await post('/vam', { people: ['Person'], done: r.id, error: 'This VaM version names the preset path differently' });

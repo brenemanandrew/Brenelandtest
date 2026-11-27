@@ -40,7 +40,7 @@ namespace Brene
             foreach (var l in lessons)
             {
                 var lesson = l; var r = Ui.Rect("Lesson " + l.Name, pHelp.Body); r.gameObject.AddComponent<LayoutElement>().minHeight = 70;
-                var b = Ui.Button(r, l.Name + "  -  " + l.About, () => { pHelp.Root.gameObject.SetActive(false); coach.Start(lesson); }); Flow.Stretch(b);
+                var b = Ui.Button(r, l.Name + "  -  " + l.About, () => { pHelp.Root.gameObject.SetActive(false); coach.Start(lesson); }); Ui.Stretch(b);
                 b.GetComponentInChildren<Text>().fontSize = 19;
             }
             pHelp.Root.gameObject.SetActive(false);
@@ -69,38 +69,29 @@ namespace Brene
             catch (Exception e) { f.Note("VaM would not add it here (" + e.Message + "). Use VaM's own Add Atom."); }
             StartCoroutine(RedrawSoon(f));
         }
-        System.Collections.IEnumerator RedrawSoon(Flow f) { yield return new WaitForSeconds(1.2f); f.Redraw(); }
+        // real time, so VaM's time scale or a frozen scene cannot hold it back
+        System.Collections.IEnumerator RedrawSoon(Flow f) { float until = Time.realtimeSinceStartup + 1.2f; while (Time.realtimeSinceStartup < until) yield return null; f.Redraw(); }
         RectTransform Btn(string id) { Act a; return acts.TryGetValue(id, out a) && a.btn != null ? (RectTransform)a.btn.transform : null; }
 
         // library tiles (scenes, poses) in a flow step; tap runs pick(path, name)
-        System.Collections.IEnumerator FlowTiles(Action<string> note, RectTransform parent, string kind, Action<string, string> pick)
+        void FlowTiles(Action<string> note, RectTransform parent, string kind, Action<string, string> pick)
         {
             var grid = Flow.Grid(parent, new Vector2(140, 164));
-            var req = UnityEngine.Networking.UnityWebRequest.Get(link.Url + "/lib/items?limit=48&kind=" + kind); req.timeout = 10;
-            yield return req.SendWebRequest();
-            if (req.isNetworkError || req.isHttpError) { note("Start the Brene relay and set your VaM folder in the Library page to see your saved ones here."); req.Dispose(); yield break; }
-            var items = JSON.Parse(req.downloadHandler.text)["items"].AsArray; req.Dispose();
-            if (items == null || items.Count == 0) { note("None found in your VaM folder."); yield break; }
-            var thumbs = new List<KeyValuePair<RawImage, string>>();
-            for (int i = 0; i < items.Count; i++)
+            StartCoroutine(link.Json("GET", "/lib/items?limit=48&kind=" + kind, null, 10, (JSONNode j, string e) =>
             {
-                var path = items[i]["path"].Value; var name = items[i]["name"].Value;
-                var tile = Ui.Rect("Tile " + name, grid); var bg = Ui.Box(tile, Role.Button);
-                var bt = tile.gameObject.AddComponent<Button>(); bt.targetGraphic = bg; bt.onClick.AddListener(() => pick(path, name));
-                var pic = Ui.Rect("Pic", tile); pic.anchorMin = Vector2.zero; pic.anchorMax = Vector2.one; pic.offsetMin = new Vector2(6, 34); pic.offsetMax = new Vector2(-6, -6);
-                var raw = pic.gameObject.AddComponent<RawImage>(); raw.color = new Color(1, 1, 1, 0.08f); raw.raycastTarget = false;
-                var cap = Ui.Rect("Cap", tile); cap.anchorMin = new Vector2(0, 0); cap.anchorMax = new Vector2(1, 0); cap.pivot = new Vector2(0.5f, 0); cap.sizeDelta = new Vector2(0, 32);
-                Ui.Label(cap, name, 15, Role.Text, TextAnchor.MiddleCenter);
-                if (items[i]["thumb"].Value != "") thumbs.Add(new KeyValuePair<RawImage, string>(raw, items[i]["thumb"].Value));
-            }
-            foreach (var t in thumbs)
-            {
-                if (t.Key == null) yield break;
-                var tr = UnityEngine.Networking.UnityWebRequest.Get(link.Url + "/lib/thumb?p=" + UnityEngine.Networking.UnityWebRequest.EscapeURL(t.Value)); tr.timeout = 10;
-                yield return tr.SendWebRequest();
-                if (t.Key != null && !tr.isNetworkError && !tr.isHttpError) { var tex = new Texture2D(2, 2); if (tex.LoadImage(tr.downloadHandler.data)) { t.Key.texture = tex; t.Key.color = Color.white; } }
-                tr.Dispose();
-            }
+                if (grid == null) return;   // the step was redrawn while the relay was answering
+                if (j == null || e != null) { note("Start the Brene relay and set your VaM folder in the Library page to see your saved ones here."); return; }
+                var items = j["items"].AsArray;
+                if (items == null || items.Count == 0) { note("None found in your VaM folder."); return; }
+                var tiles = new List<RawImage>(); var thumbs = new List<string>();
+                for (int i = 0; i < items.Count; i++)
+                {
+                    var path = items[i]["path"].Value; var name = items[i]["name"].Value;
+                    var raw = Pics.Tile(grid, name, () => pick(path, name));
+                    if (items[i]["thumb"].Value != "") { tiles.Add(raw); thumbs.Add(items[i]["thumb"].Value); }
+                }
+                StartCoroutine(link.Thumbs(tiles, thumbs));
+            }));
         }
 
         // ---- Set up a scene ----
@@ -111,7 +102,7 @@ namespace Brene
             {
                 Flow.Wide(c, "Keep the scene I have  >", () => f.Show(1), true);
                 Flow.Say(c, "Or tap a saved scene to open it:");
-                StartCoroutine(FlowTiles(f.Note, c, "scene", (path, name) => { Send("Load", path); f.Note("Opening " + name + "..."); }));
+                FlowTiles(f.Note, c, "scene", (path, name) => { Send("Load", path); f.Note("Opening " + name + "..."); });
             }));
             f.Steps.Add(new FlowStep("People", "Who is in the scene. Shape anyone with Character.", c =>
             {
@@ -133,7 +124,7 @@ namespace Brene
                 var chips = Flow.Grid(c, new Vector2(150, 48));
                 foreach (var a in people) { var atom = a; Ui.SetOn(Ui.Button(chips, atom.uid, () => { SuperController.singleton.SelectController(atom.mainController); f.Redraw(); }), atom == who); }
                 var target = who;
-                StartCoroutine(FlowTiles(f.Note, c, "pose", (path, name) => { var err = ApplyPreset("pose", path, target.uid); f.Note(err ?? (name + " on " + target.uid)); }));
+                FlowTiles(f.Note, c, "pose", (path, name) => { var err = ApplyPreset("pose", path, target.uid); f.Note(err ?? (name + " on " + target.uid)); });
             }));
             f.Steps.Add(new FlowStep("Lights", "Brighten or soften the lights.", c =>
             {

@@ -13,15 +13,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms)); const procs = [], serve
 const T = fs.mkdtempSync(path.join(os.tmpdir(), 'brene-story-'));
 
 function brenai(withStory) {
-  const seen = { say: [], tts: [], choose: [], writing: [] };
+  const seen = { say: [], tts: [], choose: [], writing: [], state: 0, pins: 0, expire: false };
   return new Promise(r => { const s = http.createServer(async (req, res) => {
     let raw = ''; for await (const c of req) raw += c; const b = raw ? JSON.parse(raw) : {}; const j = (code, o) => { res.writeHead(code, { 'content-type': 'application/json', ...(o.cookie ? { 'set-cookie': o.cookie } : {}) }); res.end(JSON.stringify(o)); };
     if (req.url === '/api/login') return j(200, { ok: true, cookie: 'brenai=t; Path=/' });
+    if (req.url === '/api/pin') seen.pins++;
     if (req.url === '/api/pin') return j(200, { ok: true, cookie: 'brenai_u=p.s; Path=/' });
     if (req.url === '/api/chat') { res.writeHead(200, { 'content-type': 'text/event-stream' }); return res.end(`data: {"t":"done","text":"*grins* chat says ${b.text}"}\n\n`); }
     if (req.url === '/api/tts') { seen.tts.push(b); res.writeHead(200, { 'content-type': 'audio/wav' }); return res.end(Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(40)])); }
     if (req.url === '/api/touch') { seen.touch = (seen.touch || []).concat(b); return j(200, { ok: true }); }
     if (req.url === '/api/robot') return j(200, { sheet: { traits: { warmth: 65, sarcasm: 45 } }, mood: 'cozy', feeling: '' });
+    if (req.url === '/api/story/state') seen.state++;
+    if (seen.expire && req.url.startsWith('/api/story/')) { seen.expire = false; return j(401, { error: 'login' }); }   // the sign-in ran out, once
     if (!withStory) return j(404, { error: 'not found' });
     if (req.url === '/api/story/personality?who=zoe') return j(200, { traits: { dryness: 90 }, mood: 'busy' });
     if (req.url === '/api/story/touch') { seen.stouch = (seen.stouch || []).concat(b); return j(200, { ok: true }); }
@@ -52,6 +55,11 @@ try {
   r = await post(18791, '/story/choose', { id: 'tp4', answer: 0 }); ok(r.ok && A.seen.choose[0].id === 'tp4' && A.seen.choose[0].answer === 0, 'choose: the answer reaches Brenai');
   r = await post(18791, '/story/say', { who: 'zoe', text: '' }); ok(r.error, 'say: empty refused');
 
+  // a sign-in that ran out: the relay signs in again and asks once more
+  A.seen.expire = true; const pinsBefore = A.seen.pins;
+  r = await post(18791, '/story/say', { who: 'zoe', text: 'Still there?' });
+  ok(r.text === '*shrugs* zoe heard: Still there?' && A.seen.pins === pinsBefore + 1, 'say: when the sign-in has run out the relay signs in again and still gets her answer');
+
   // places
   r = await post(18791, '/story/places', { place: 'Peak Pizza', scene: 'Saves/scene/pizza.json' }); ok(r.places['Peak Pizza'] === 'Saves/scene/pizza.json' && r.all.length === 9, 'places: a scene set for a place (9 places)');
   r = await post(18791, '/story/places', { place: 'Mars', scene: 'x' }); ok(r.error, 'places: unknown place refused');
@@ -81,6 +89,8 @@ try {
   r = await post(18792, '/story/say', { who: 'wizra', text: 'yo', voice: true }); ok(r.text === '*grins* chat says yo' && r.voice, 'no story routes: Wizra still answers through her chat, with voice');
   r = await post(18792, '/story/touch', { who: 'wizra', zone: 'face' }); ok(r.ok && B.seen.touch[0].kind === 'poke', 'no story routes: Wizra\'s face poke still reaches her');
   r = await post(18792, '/story/touch', { who: 'wizra', zone: 'hand' }); ok(!r.ok && /needs the story routes/.test(r.note), 'no story routes: other parts say plainly they cannot be told yet');
+  await sleep(1700); const asked = B.seen.state; await get(18792, '/story/state'); await get(18792, '/story/state');
+  ok(asked === 1 && B.seen.state === 1, 'no story routes: Brenai is not asked again every poll (' + B.seen.state + ' ask(s) after 3 polls)');
   r = await post(18792, '/story/say', { who: 'belinda', text: 'hola' }); ok(r.error && /Belinda isn't connected yet/.test(r.error), 'no story routes: Belinda says she is not connected yet');
 } catch (e) { fail++; console.log('FAIL ' + (e.stack || e)); }
 finally { for (const p of procs) p.kill(); for (const s of servers) s.close(); fs.rmSync(T, { recursive: true, force: true }); }

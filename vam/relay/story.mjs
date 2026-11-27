@@ -31,11 +31,11 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
   let live = null;   // null = not tried, true / false = Brenai has (or lacks) the story routes
 
   // ---- Brenai (provisional route shapes) ----
-  async function call(method, p, body) {
+  async function call(method, p, body, again = true) {
     if (!brenai.signedIn()) await brenai.signIn();
     const r = await fetch(brenai.url + p, { method, headers: { 'content-type': 'application/json', cookie: brenai.cookie() }, body: body ? JSON.stringify(body) : undefined });
     if (r.status === 404) { live = false; const e = new Error('Brenai has no story routes yet'); e.notYet = true; throw e; }
-    if (r.status === 401) { await brenai.signIn(); }
+    if (r.status === 401 && again) { await brenai.signIn(); return call(method, p, body, false); }   // the sign-in ran out: sign in and ask once more
     const j = await r.json().catch(() => ({})); if (!r.ok || j.error) throw new Error(j.error || 'Brenai answered ' + r.status);
     live = true; return j;
   }
@@ -43,12 +43,14 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
   const brenaiSay = b => call('POST', '/api/story/say', b);
   const brenaiChoose = b => call('POST', '/api/story/choose', b);
 
-  let last = { at: 0, j: null };
+  // the plugin asks for the state every 2 seconds. Brenai is asked at most every 1.5 s while it answers; after a failure the
+  // relay waits before asking again (a wrong PIN must not be tried every 2 s, and missing story routes will not appear in a minute)
+  let last = { at: 0, j: null, wait: 1500 };
   return async function route(req, res, url, { send, readBody }) {
     const p = url.pathname;
     if (p === '/story/state') {
       let j = null, note = '';
-      if (brenai.enabled && Date.now() - last.at > 1500) { try { j = await brenaiState(); last = { at: Date.now(), j }; } catch (e) { note = e.message; last = { at: Date.now(), j: null, note }; } }
+      if (brenai.enabled && Date.now() - last.at > last.wait) { try { j = await brenaiState(); last = { at: Date.now(), j, wait: 1500 }; } catch (e) { note = e.message; last = { at: Date.now(), j: null, note, wait: e.notYet ? 60000 : 15000 }; } }
       else { j = last.j; note = last.note || (brenai.enabled ? '' : 'Set BRENAI_PIN on this PC for the story'); }
       return send(res, 200, { live: !!j, ...(j || {}), place: s.place || (j && j.place) || '', places: s.places, note: j ? '' : note });
     }
