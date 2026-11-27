@@ -8,6 +8,7 @@ import { buildPlaces, cel } from './places.js';
 import { bodyFix } from './bodyfix.js';
 import { addTongue } from './tongue.js';
 import { boneCloth } from './bonecloth.js';
+import { meshCloth } from './meshcloth.js';
 import { buildBeach, RUN_Z } from './beach.js';
 import { fineFace, WHOLE } from './fineface.js';
 
@@ -199,7 +200,10 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     photoFade(1);   /* the camera goes anywhere and she stays solid (the fade below hip level was taken out at Andrew's request, 2026-11-24) */
     camera.position.set(c.tx + Math.sin(c.yaw) * cp * c.dist, cy, c.tz + Math.cos(c.yaw) * cp * c.dist); camera.up.set(0, 1, 0); camera.lookAt(c.tx, c.ty, c.tz); if (c.roll) camera.rotateZ(c.roll); if (camera.fov !== c.fov) { camera.fov = c.fov; camera.updateProjectionMatrix(); } }
   let cloth = null; try { cloth = boneCloth(THREE, vrm); if (cloth && vrm.springBoneManager) { const man = vrm.springBoneManager, r0 = man.reset.bind(man); man.reset = () => { r0(); try { cloth.reset(); } catch {} }; } } catch (e) { console.warn('bone cloth', e); }
-  const settleCloth = () => { if (!cloth) return; try { for (let i = 0; i < 90; i++) cloth.tick(1 / 60, build.v, surfAt); vrm.scene.updateMatrixWorld(true); } catch {} };   /* a picture is one frozen moment: let the cloth fall into place for it first, so skirts and coats are drawn draped and not in their stiff rest shape */
+  // On top of it, the skirt's own vertices as cloth (meshcloth.js): folds, ripples and flutter between the strips. Off, or over its time
+  // budget, it leaves bone cloth exactly as it was. Its reset rides on bone cloth's.
+  let mcloth = null; try { if (cloth) { mcloth = meshCloth(THREE, vrm, cloth); if (mcloth) { const r1 = cloth.reset; cloth.reset = () => { r1(); try { mcloth.reset(); } catch {} }; } } } catch (e) { console.warn('mesh cloth', e); mcloth = null; }
+  const settleCloth = () => { if (!cloth) return; try { for (let i = 0; i < 90; i++) cloth.tick(1 / 60, build.v, surfAt); vrm.scene.updateMatrixWorld(true); if (mcloth && mcloth.on) mcloth.settle(240); } catch {} };   /* a picture is one frozen moment: let the cloth fall into place for it first, so skirts and coats are drawn draped and not in their stiff rest shape */
   // What cloth can come to rest on: the tops of the furniture in the room she is in (seats, armrests, tables, beds, cushions), as a
   // map of heights. It is measured by looking straight down on a 6 cm grid, a few rows a frame, the first time a room is shown.
   const surf = { key: '', x0: 0, z0: 0, nx: 0, nz: 0, cell: 0.06, h: null, row: 0, ray: new THREE.Raycaster(), from: new THREE.Vector3(), down: new THREE.Vector3(0, -1, 0), list: [] };
@@ -209,7 +213,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
       for (const g of [room, places.groups[here]]) if (g && g.visible) g.traverse(o => { if (o.isMesh && o.visible && !o.isSkinnedMesh && !(o.material && o.material.transparent && o.material.depthWrite === false) && !(o.material && o.material.blending === THREE.AdditiveBlending)) surf.list.push(o); }); }
     if (!surf.h || surf.row >= surf.nz) return; surf.ray.far = 1.4;
     for (let n = 0; n < 4 && surf.row < surf.nz; n++, surf.row++) for (let i = 0; i < surf.nx; i++) { surf.from.set(surf.x0 + (i + 0.5) * surf.cell, floorY + 1.3, surf.z0 + (surf.row + 0.5) * surf.cell); surf.ray.set(surf.from, surf.down); const hit = surf.ray.intersectObjects(surf.list, false)[0]; if (hit && hit.point.y > floorY + 0.06) surf.h[surf.row * surf.nx + i] = hit.point.y; } }   /* (the floor itself and rugs are left to the floor rule) */
-  const clothTick = dt => { if (cloth) { try { surfTick(); cloth.tick(dt, build.v, surfAt); } catch (e) { console.warn('bone cloth', e); cloth = null; } } };
+  const clothTick = dt => { if (cloth) { try { surfTick(); cloth.tick(dt, build.v, surfAt); } catch (e) { console.warn('bone cloth', e); cloth = null; } } if (cloth && mcloth) { try { mcloth.tick(dt); } catch (e) { console.warn('mesh cloth', e); try { mcloth.off('error ' + String(e).slice(0, 80)); } catch {} mcloth = null; } } };
   // Her mouth: this model's inside-of-the-mouth picture is plain grey (teeth, a grey cavity, a grey tongue), which shows as a grey
   // mouth whenever she smiles wide or talks. Repaint it as it is drawn here: dark red inside, a pink tongue, the teeth left white.
   // (Only the picture used on screen changes; her model file is untouched.)
@@ -965,7 +969,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   let zoomWant = Number(localStorage.getItem('brenai.zoom')) || 0, zoom = 0, camYaw = 0;
   const aim = new THREE.Vector3();
   // ---- visiting: you are in the room with her and see it through your own eyes. Drag to look, tap the floor (or WASD) to walk. ----
-  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 }; if (window.WIZRA_STILL) window.WIZRA_T = { fp, vrm, cloth };   /* test hook: lets a headless check place the first-person camera */
+  const fp = { on: false, x: 0, z: 0, yaw: 0, pitch: 0, cx: 0, cz: 0, ch: places.eyeH, goal: null, sit: null, keys: new Set(), bob: 0 }; if (window.WIZRA_STILL) window.WIZRA_T = { fp, vrm, cloth, get mcloth() { return mcloth; } };   /* test hook: lets a headless check place the first-person camera */
   let here = 'dorm', pickable = [], faceYaw = 0, facePitch = 0; daylight();
   const mugDorm = REST_AT.mug[0].clone();
   function setPlace(name) {

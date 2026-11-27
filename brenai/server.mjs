@@ -783,7 +783,7 @@ async function comeBack(onDelta) {
 
 // ---------- http ----------
 // changes whenever a new version is deployed: pages left open use it to reload themselves
-const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/bonecloth.js', 'public/places.js', 'public/sound.js', 'pics.mjs', 'public/mapkit.js', 'public/uiedit.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
+const BUILD = String(Math.round(Math.max(...['server.mjs', 'away.mjs', 'persona.mjs', 'public/index.html', 'public/avatar.js', 'public/avatar-vrm.js', 'public/bonecloth.js', 'public/meshcloth.js', 'public/places.js', 'public/sound.js', 'pics.mjs', 'public/mapkit.js', 'public/uiedit.js'].map(f => { try { return fs.statSync(path.join(here, f)).mtimeMs; } catch { return 0; } }))));
 // Sending text-like files (code, JSON clips) compressed when the browser accepts it: gzip once, kept in memory by file and change time.
 const GZ = new Map();
 function sendFile(req, res, file, type, cache) { let st; try { st = fs.statSync(file); } catch { res.writeHead(404); return res.end('not found'); }
