@@ -9,6 +9,7 @@ import { bodyFix } from './bodyfix.js';
 import { addTongue } from './tongue.js';
 import { boneCloth } from './bonecloth.js';
 import { meshCloth } from './meshcloth.js';
+import { xrHands } from './xrhands.js';
 import { buildBeach, RUN_Z } from './beach.js';
 import { fineFace, WHOLE } from './fineface.js';
 
@@ -112,7 +113,7 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
   // WebXR (a headset browser, such as Chrome on the VITURE neckband): the browser draws both eyes and moves the view with your head itself.
   // The game still decides where the camera is; each frame the XR rig is put there (level, facing the same way) and your head's pose
   // is added on top. The game's frame is driven by the XR session while it runs (see avatar.js).
-  const XR = { on: false, session: null, rig: new THREE.Group(), frame: null, onEnd: null, off: new THREE.Vector3(), grabs: new Map(), vis: [], selects: 0, p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') }; scene.add(XR.rig);
+  const XR = { on: false, session: null, rig: new THREE.Group(), frame: null, onEnd: null, off: new THREE.Vector3(), grabs: new Map(), vis: [], selects: 0, yaw: 0, mode: localStorage.getItem('brenai.xrMode') === 'hands' ? 'hands' : 'stick', held: new Map(), btn: new Map(), lastT: 0, p: new THREE.Vector3(), q: new THREE.Quaternion(), e: new THREE.Euler(0, 0, 0, 'YXZ') }; scene.add(XR.rig);
   async function xrStart(kind) { if (XR.on) return ''; if (!navigator.xr) return 'This browser has no WebXR.'; kind = kind === 'ar' ? 'immersive-ar' : 'immersive-vr';
     try { if (!(await navigator.xr.isSessionSupported(kind))) return 'This browser cannot do ' + kind + '.'; } catch {}
     let ses; try { ses = await navigator.xr.requestSession(kind, { optionalFeatures: ['local-floor', 'hand-tracking'] }); } catch (e) { return 'The headset view could not start: ' + (e.message || e.name); }
@@ -121,12 +122,12 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
        older, plain way (one XRWebGLLayer) is used, which every WebXR browser shows. */
     if (localStorage.getItem('brenai.xrLayers') !== '1' && window.XRWebGLBinding && 'createProjectionLayer' in XRWebGLBinding.prototype) { try { XR.cpl = XRWebGLBinding.prototype.createProjectionLayer; delete XRWebGLBinding.prototype.createProjectionLayer; } catch {} }   /* (three looks for createProjectionLayer to decide) */
     renderer.xr.enabled = true; renderer.xr.setReferenceSpaceType('local'); try { renderer.xr.setFramebufferScaleFactor(+localStorage.getItem('brenai.xrScale') || 1); } catch {}   /* the headset's own size: the neckband showed black at 1.5x (1920x1080); brenai.xrScale can try more on other headsets */ try { await renderer.xr.setSession(ses); } catch (e) { renderer.xr.enabled = false; try { ses.end(); } catch {} return 'The headset view could not start: ' + (e.message || e.name); }
-    XR.on = true; XR.session = ses; XR.was = sbs.mode; sbs.mode = ''; XR.off.set(0, 0, 0); xrInputs(ses);
+    XR.on = true; XR.session = ses; XR.was = sbs.mode; sbs.mode = ''; XR.off.set(0, 0, 0); XR.yaw = 0; XR.lastT = 0; xrInputs(ses); setTimeout(() => { try { xrSay(XR.mode === 'stick' ? 'Joystick mode (X or A to switch)' : 'Hands mode (X or A to switch)'); } catch {} }, 1500);
     XR.st = { frames: 0, errs: [], views: null }; const ce = console.error; console.error = (...a) => { if (XR.on && XR.st.errs.length < 8) XR.st.errs.push(a.map(x => String(x && x.message || x)).join(' ').slice(0, 200)); ce.apply(console, a); };
     renderer.setAnimationLoop((t, xf) => { XR.st.frames++; if (xf && !XR.st.views) { try { const pose = xf.getViewerPose(renderer.xr.getReferenceSpace()), bl = ses.renderState.baseLayer; if (pose) XR.st.views = pose.views.map(v => { const vp = bl && bl.getViewport(v); return { eye: v.eye, vp: vp ? [vp.x, vp.y, vp.width, vp.height] : null, pos: [v.transform.position.x, v.transform.position.y, v.transform.position.z].map(n => +n.toFixed(2)) }; }); XR.st.layer = bl ? [bl.framebufferWidth, bl.framebufferHeight] : null; } catch (e) { XR.st.errs.push('pose: ' + e.message); } }
       try { xrPoint(xf); } catch (e) { if (XR.st.errs.length < 8) XR.st.errs.push('input: ' + e.message); } try { XR.frame && XR.frame(t); } catch (e) { XR.st.errs.push(String(e.message || e)); } });
     setTimeout(() => { try { const r = renderer.info.render; XR.st.clearA = renderer.getClearAlpha(); navigator.sendBeacon('/api/clientlog', JSON.stringify({ xr: kind, ...XR.st, cam: camera.position.toArray().map(n => +n.toFixed(2)), feats: ses.enabledFeatures ? [...ses.enabledFeatures] : null, inputs: [...ses.inputSources].map(x => ({ mode: x.targetRayMode, hand: !!x.hand, side: x.handedness, prof: (x.profiles || []).slice(0, 2) })), selects: XR.selects, rig: XR.rig.position.toArray().map(n => +n.toFixed(2)), calls: r.calls, tris: r.triangles, near: camera.near, far: camera.far, here, bh: bh.on, ua: navigator.userAgent })); } catch {} }, 4000);   /* a report on the first seconds, for working out a headset that shows nothing */
-    ses.addEventListener('end', () => { console.error = ce; XR.on = false; for (const v of XR.vis) v.visible = false; XR.grabs.clear(); XR.session = null; renderer.setAnimationLoop(null); renderer.xr.enabled = false; size = ''; if (XR.onEnd) XR.onEnd(); });
+    ses.addEventListener('end', () => { console.error = ce; XR.on = false; for (const v of XR.vis) v.visible = false; XR.grabs.clear(); XR.held.clear(); xrh.hide(); XR.yaw = 0; if (xrLabel) xrLabel.visible = false; XR.session = null; renderer.setAnimationLoop(null); renderer.xr.enabled = false; size = ''; if (XR.onEnd) XR.onEnd(); });
     return ''; }
   // Posing in the headset view. Anything that points (a tracked hand's pinch, the neckband's touch, a controller) is a WebXR input
   // source with a ray. Each shows a thin ray and a dot on the part of her it is pointing at. Pinch or press (select) to grab: her hands
@@ -145,13 +146,53 @@ function setBuild(pct, slim) { if (window.WIZRA_BUILD != null) pct = window.WIZR
     const to = target.clone().sub(xrP).normalize(), qW = new THREE.Quaternion().setFromUnitVectors(from, to); const lim = useForward ? 1 : 0.35; if (2 * Math.acos(Math.min(1, Math.abs(qW.w))) > lim) qW.slerp(new THREE.Quaternion(), 1 - lim / (2 * Math.acos(Math.min(1, Math.abs(qW.w)))));   /* turns a little at a time: the part follows your hand smoothly */
     b.parent.getWorldQuaternion(xrQ); b.getWorldQuaternion(xrQ2); b.quaternion.copy(xrQ.invert()).multiply(qW).multiply(xrQ2); b.updateWorldMatrix(false, true); phTouched(); }
   function xrPoint(xf) { if (!xf || !XR.session) return; let i = 0; XR.rays.clear(); vrm.scene.updateMatrixWorld(true);
-    for (const src of XR.session.inputSources) { const r = xrRay(src, xf); if (!r) continue; XR.rays.set(src, r); const v = xrVis(i++), g = XR.grabs.get(src), hit = g ? null : xrPick(src); const gaze = src.targetRayMode === 'gaze'; v.visible = !gaze; v.position.copy(r.o); v.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), r.d); const len = g ? g.d : hit ? hit.d : 2; v.line.scale.setScalar(len);   /* a gaze pointer (the neckband: where you look) shows only a dot, not a ray: a ray from between your eyes is a line down the middle */
+    xrHandsFrame(xf);   /* controllers and tracked hands: glowing hands that reach in and grab (below); the rays here are only for gaze and screen pointers */
+    for (const src of XR.session.inputSources) { if (src.targetRayMode === 'tracked-pointer') continue; const r = xrRay(src, xf); if (!r) continue; XR.rays.set(src, r); const v = xrVis(i++), g = XR.grabs.get(src), hit = g ? null : xrPick(src); const gaze = src.targetRayMode === 'gaze'; v.visible = !gaze; v.position.copy(r.o); v.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), r.d); const len = g ? g.d : hit ? hit.d : 2; v.line.scale.setScalar(len);   /* a gaze pointer (the neckband: where you look) shows only a dot, not a ray: a ray from between your eyes is a line down the middle */
       v.dot.visible = gaze || !!(g ? g.n : hit); v.dot.scale.setScalar(gaze && !(g ? g.n : hit) ? 0.5 : 1); v.dot.position.copy(r.o).addScaledVector(r.d, len); v.line.material.color.set(g ? '#ffd166' : '#7dffb0'); v.dot.material.color.copy(v.line.material.color);
       if (!g) continue; const tgt = r.o.clone().addScaledVector(r.d, g.d); if (!g.started) { g.started = true; g.last.copy(tgt); continue; } const dl = tgt.clone().sub(g.last); g.last.copy(tgt);
       if (!g.n) { dl.y = 0; XR.off.sub(dl); continue; }   /* empty space: pull the room past you */
       const end = XR_END(g.n); if (end) API.photoReach(end, 0, 0, 0, tgt); else if (g.n === 'hips') { dl.y = 0; vrm.scene.position.add(dl); ph.off.x += dl.x; ph.off.z += dl.z; phTouched(); } else xrAim(g.n, tgt, g.n === 'head' || g.n === 'neck'); }
     for (let k = i; k < XR.vis.length; k++) { XR.vis[k].visible = false; XR.vis[k].dot.visible = false; } }
-  function renderView() { if (XR.on) { const par = camera.parent; XR.p.copy(camera.position); XR.q.copy(camera.quaternion); XR.e.setFromQuaternion(XR.q, 'YXZ'); XR.e.x = XR.e.z = 0;
+  // Your hands in the headset. Controllers and tracked hands show as glowing hands (xrhands.js). Put a hand on any part of her and
+  // squeeze (grip, trigger or pinch) to take hold of it, the way VaM's hands do: her hand, foot or head follows where yours goes and how
+  // it turns; her hips carry all of her (where she stands and which way she faces); elbows, knees, shoulders and her chest bend toward
+  // your hand. Letting go leaves the pose (the photo studio keeps it). Two ways to get about, switched with X or A on a controller and
+  // remembered: joystick mode (left stick walks where you look, right stick turns in steps) and hands mode (squeeze in empty air and pull
+  // the room past you; tracked hands always work this way).
+  const xrh = xrHands(THREE, scene), xrA = new THREE.Vector3(), xrB = new THREE.Vector3(), xrQ3 = new THREE.Quaternion(), xrE2 = new THREE.Euler(0, 0, 0, 'YXZ');
+  let xrLabel = null;
+  function xrSay(text) { if (!xrLabel) { const c = document.createElement('canvas'); c.width = 512; c.height = 128; const t = new THREE.CanvasTexture(c); xrLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })); xrLabel.renderOrder = 999; xrLabel.scale.set(0.5, 0.125, 1); xrLabel.c = c; scene.add(xrLabel); }
+    const g = xrLabel.c.getContext('2d'); g.clearRect(0, 0, 512, 128); g.fillStyle = 'rgba(20,12,40,0.78)'; g.beginPath(); g.roundRect(8, 8, 496, 112, 40); g.fill(); g.fillStyle = '#c9f7ff'; g.font = '600 44px Fredoka, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 256, 66); xrLabel.material.map.needsUpdate = true; xrLabel.until = performance.now() + 2200; xrLabel.visible = true; }
+  function xrHead(xf, out) { const vp = xf.getViewerPose(renderer.xr.getReferenceSpace()); if (!vp) return null; const t = vp.transform; out.set(t.position.x, t.position.y, t.position.z).applyMatrix4(XR.rig.matrixWorld); xrQ3.set(t.orientation.x, t.orientation.y, t.orientation.z, t.orientation.w).premultiply(XR.rig.quaternion); return out; }
+  function xrHandsFrame(xf) {
+    const now = performance.now(), dt = Math.min(0.1, XR.lastT ? (now - XR.lastT) / 1000 : 0); XR.lastT = now;
+    const hs = xrh.update(xf, renderer.xr.getReferenceSpace(), XR.rig.matrixWorld, XR.session.inputSources), live = new Set();
+    for (const h of hs) { live.add(h.src);
+      // X or A switches between joystick and hands mode
+      const bx = h.buttons[4] || 0, was = XR.btn.get(h.src) || 0; XR.btn.set(h.src, bx); if (bx > 0.5 && was <= 0.5 && h.kind === 'controller') { XR.mode = XR.mode === 'stick' ? 'hands' : 'stick'; try { localStorage.setItem('brenai.xrMode', XR.mode); } catch {} xrSay(XR.mode === 'stick' ? 'Joystick mode' : 'Hands mode'); }
+      // joysticks: the left one walks where you look, the right one turns in steps of 30 degrees about where you stand
+      if (XR.mode === 'stick' && h.kind === 'controller' && h.axes.length >= 4 && dt > 0) { const ax = h.axes[2] || 0, ay = h.axes[3] || 0;
+        if (h.side === 'left' && Math.hypot(ax, ay) > 0.15 && xrHead(xf, xrA)) { xrE2.setFromQuaternion(xrQ3, 'YXZ'); const y = xrE2.y, sp = 1.6 * dt, fx = -Math.sin(y), fz = -Math.cos(y), rx = Math.cos(y), rz = -Math.sin(y); XR.off.x += (fx * -ay + rx * ax) * sp; XR.off.z += (fz * -ay + rz * ax) * sp; }   /* stick forward (negative y) walks the way you face */
+        if (h.side === 'right') { const armed = XR.turnArmed !== false; if (Math.abs(ax) > 0.7 && armed && xrHead(xf, xrA)) { XR.turnArmed = false; const step = ax > 0 ? -Math.PI / 6 : Math.PI / 6; xrB.copy(xrA).sub(XR.rig.position); const c = Math.cos(step), sn = Math.sin(step), nx = xrB.x * c + xrB.z * sn, nz = -xrB.x * sn + xrB.z * c; XR.yaw += step; XR.off.x += xrB.x - nx; XR.off.z += xrB.z - nz; } else if (Math.abs(ax) < 0.3) XR.turnArmed = true; } }
+      // taking hold, holding, letting go
+      const sq = Math.max(h.squeeze, h.pinch); let g = XR.held.get(h.src);
+      if (!g && sq > 0.6) { let best = null; vrm.scene.updateMatrixWorld(true); for (const n of PH_BONES) { const b = B(n); if (!b) continue; b.getWorldPosition(xrA); const d = xrA.distanceTo(h.at); if (d < (n === 'hips' || n === 'chest' || n === 'spine' ? 0.16 : 0.12) && (!best || d < best.d)) best = { n, d }; }
+        if (best) { const b = B(best.n); b.getWorldPosition(xrA); g = { n: best.n, ofs: xrA.clone().sub(h.at), q0: h.q.clone(), bq0: b.getWorldQuaternion(new THREE.Quaternion()), ry0: vrm.scene.rotation.y }; if (!ph.on) window.dispatchEvent(new Event('wizra-xr-pose')); }
+        else if (XR.mode === 'hands' || h.kind === 'hand') g = { room: true, last: XR.rig.worldToLocal(h.at.clone()) };
+        if (g) XR.held.set(h.src, g); }
+      else if (g && sq < 0.35) { XR.held.delete(h.src); g = null; }
+      if (!g) continue;
+      if (g.room) { const loc = XR.rig.worldToLocal(h.at.clone()), dl = loc.clone().sub(g.last); g.last.copy(loc); dl.y = 0; dl.applyQuaternion(XR.rig.quaternion); XR.off.sub(dl); continue; }   /* pull the room past you */
+      const dq = h.q.clone().multiply(g.q0.clone().invert()), tgt = h.at.clone().add(g.ofs.clone().applyQuaternion(dq)), b = B(g.n); if (!b) continue;
+      const setWorldQ = (bone, q) => { bone.parent.getWorldQuaternion(xrQ); bone.quaternion.copy(xrQ.invert()).multiply(q); bone.updateWorldMatrix(false, true); };
+      const end = /Hand$|Foot$/.test(g.n) ? g.n : '';
+      if (end) { API.photoReach(end, 0, 0, 0, tgt); setWorldQ(b, dq.clone().multiply(g.bq0)); phTouched(); }
+      else if (g.n === 'head' || g.n === 'neck') { setWorldQ(b, dq.clone().multiply(g.bq0)); phTouched(); }
+      else if (g.n === 'hips') { b.getWorldPosition(xrA); const dl = tgt.clone().sub(xrA); vrm.scene.position.add(dl); ph.off.x += dl.x; ph.off.y += dl.y; ph.off.z += dl.z; xrE2.setFromQuaternion(dq, 'YXZ'); const want = g.ry0 + xrE2.y, dy = want - vrm.scene.rotation.y; vrm.scene.rotation.y += dy; ph.off.ry += dy; phTouched(); }
+      else xrAim(g.n, tgt, false); }
+    for (const src of [...XR.held.keys()]) if (!live.has(src)) XR.held.delete(src);
+    if (xrLabel && xrLabel.visible) { if (now > xrLabel.until) xrLabel.visible = false; else if (xrHead(xf, xrA)) { xrB.set(0, -0.1, -0.9).applyQuaternion(xrQ3); xrLabel.position.copy(xrA).add(xrB); } } }
+  function renderView() { if (XR.on) { const par = camera.parent; XR.p.copy(camera.position); XR.q.copy(camera.quaternion); XR.e.setFromQuaternion(XR.q, 'YXZ'); XR.e.x = XR.e.z = 0; XR.e.y += XR.yaw;
       XR.rig.position.copy(XR.p).add(XR.off); XR.rig.quaternion.setFromEuler(XR.e); XR.rig.updateMatrixWorld(true); XR.rig.add(camera); renderer.render(scene, camera); if (XR.st && !XR.st.px && XR.st.frames >= 90 && XR.st.views) { try { const gl = renderer.getContext(), px = new Uint8Array(4); XR.st.px = XR.st.views.map(v => { if (!v.vp) return null; const pts = [[0.5, 0.5], [0.25, 0.25], [0.75, 0.75]]; return pts.map(([fx, fy]) => { gl.readPixels(Math.round(v.vp[0] + v.vp[2] * fx), Math.round(v.vp[1] + v.vp[3] * fy), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [...px]; }); }); XR.st.fb = !!gl.getParameter(gl.FRAMEBUFFER_BINDING); XR.st.err = gl.getError(); } catch (e) { XR.st.px = 'err ' + e.message; } }   /* what colour a few pixels of each eye came out (for a headset that shows black) */
       XR.rig.remove(camera); if (par) par.add(camera); camera.position.copy(XR.p); camera.quaternion.copy(XR.q); camera.updateMatrixWorld(); return; }
     if (!sbs.mode) { renderer.render(scene, camera); return; }

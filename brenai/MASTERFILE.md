@@ -104,6 +104,7 @@ Added since the reset on 2026-11-21, all live:
 - Skills for agents: `brenai/skills/*/SKILL.md` (seven). Rule: when a skill or this file changes, tell the Brenebase session and make sure Brenebase has the new version (see `AGENTS.md`).
 
 Built 2026-11-27 on the working branch, NOT live (waits for Andrew's word to push):
+- Quest 3 headset view (28 Nov): controllers and tracked hands show as glowing hands (`public/xrhands.js`) instead of rays. Put a hand on any part of her and squeeze (grip, trigger or pinch) to hold it, the way VaM's hands do: her hand, foot or head follows your hand's position and turn; her hips carry her (position and facing); elbows, knees, shoulders and chest bend toward your hand. Joystick mode (left stick walks where you look, right stick turns 30 degrees) or hands mode (squeeze in empty air and pull the room); X or A switches, remembered in `brenai.xrMode`. Rays stay only for gaze and screen pointers (the neckband). Not tried in a headset yet: tested with fake inputs (hand shapes rendered, pinch and grip read) and the page loads clean.
 - Mesh cloth for skirts (`public/meshcloth.js`, see its section under Appendix B). Tested headless on the L0 School outfit only. Not seen on a real phone or on other outfits yet; the phone time per frame is not measured (the headless runner draws about 3 frames a second).
 
 Not verified with the real PC model (it is not reachable from the cloud build session):
