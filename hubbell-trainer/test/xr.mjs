@@ -105,7 +105,10 @@ const r5 = await page.evaluate(async () => {
   const nrm = new THREE.Vector3(0, 0, 1).transformDirection(T.panel.matrixWorld), at = T.panel.localToWorld(local.clone());
   const c = d.controllers.right, q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(at.clone().add(nrm), at, new THREE.Vector3(0, 1, 0)));
   c.quaternion.set(q.x, q.y, q.z, q.w);
-  for (const back of [.12, .09, .07, .055, .045, .03]) { const p = T.rig.worldToLocal(at.clone().add(nrm.clone().multiplyScalar(back))); c.position.set(p.x, p.y, p.z); await wait(120); }
+  { const p0 = T.rig.worldToLocal(at.clone().add(nrm.clone().multiplyScalar(.3))); c.position.set(p0.x, p0.y, p0.z); await wait(250); }
+  const RH = T.HANDS.find(H => H.info && H.info.side === 'right'), off = RH.tipW.clone().sub(RH.c.getWorldPosition(new THREE.Vector3()));   /* fingertip relative to the controller */
+  out.tipOffset = +off.length().toFixed(3);
+  for (const back of [.1, .07, .05, .03, .015, 0, -.015]) { const p = T.rig.worldToLocal(at.clone().add(nrm.clone().multiplyScalar(back)).sub(off)); c.position.set(p.x, p.y, p.z); await wait(140); }
   out.pokeStarted = T.S.mod && T.S.mod.id; out.phase = T.S.phase;
   /* wrist: raise the left hand in view, press Menu twice with the pointer */
   T.wrist.updateMatrixWorld(true); const l = d.controllers.left;
@@ -114,15 +117,21 @@ const r5 = await page.evaluate(async () => {
   return out;
 });
 console.log('board, poke, wrist', JSON.stringify(r5));
+await page.exposeFunction('page_shot', () => page.screenshot({ path: 'xr5.png' }));
 const r6 = await page.evaluate(async () => {
   const T = window.TR, d = window.__dev, THREE = T.THREE, wait = ms => new Promise(r => setTimeout(r, ms)), V = () => new THREE.Vector3();
   const out = {}; T.menu(); await wait(200);
   d.controllers.right.position.set(.2, 1.3, -.35); d.controllers.right.quaternion.set(0, 0, 0, 1); d.controllers.left.position.set(-.2, 1.3, -.35); d.controllers.left.quaternion.set(0, 0, 0, 1); await wait(400);
-  out.controllers = T.HANDS.map(H => ({ shown: H.palm.visible && H.finger.visible, palmAtGrip: +H.palm.getWorldPosition(V()).distanceTo(H.grip.getWorldPosition(V())).toFixed(3), tipAtPointer: +H.tip.getWorldPosition(V()).distanceTo(H.c.localToWorld(new THREE.Vector3(0, 0, -.05))).toFixed(3), fingerLen: +H.finger.scale.y.toFixed(3) }));
-  await new Promise(r => requestAnimationFrame(r));
+  const gripW = side => { const src = [...T.renderer.xr.getSession().inputSources].find(q => q.handedness === side); return src; };
+  out.controllers = T.HANDS.map(H => ({ live: H.live, kind: H.kind, side: H.info && H.info.side, tipFromPointer: +H.tipW.distanceTo(H.c.getWorldPosition(V())).toFixed(3), wristToTip: H.info ? +H.info.wrist.distanceTo(H.info.tip).toFixed(3) : null }));
+  d.controllers.right.updateButtonValue('trigger', 1); await wait(300);
+  out.triggerCurlsIndex = +T.HANDS.find(H => H.info && H.info.side === 'right').info.wrist.distanceTo(T.HANDS.find(H => H.info && H.info.side === 'right').info.tip).toFixed(3);
+  d.controllers.right.updateButtonValue('trigger', 0); await wait(200);
+  let parts = 0; T.camera.parent.parent.traverse(o => { if (o.isMesh && o.material && o.material.type === 'ShaderMaterial' && o.visible && o.parent.visible) parts++; }); out.rimPieces = parts;
+  await page_shot();
   try {
     d.primaryInputMode = 'hand'; await wait(900);
-    out.handMode = T.HANDS.map(H => ({ tracked: H.tracked, joints: Object.keys(H.xrHand.joints || {}).length, mittenHidden: !H.palm.visible, tipIsJoint: H.tracked ? +H.tipW.distanceTo(H.xrHand.joints['index-finger-tip'].getWorldPosition(V())).toFixed(3) : null }));
+    out.handMode = T.HANDS.map(H => ({ live: H.live, kind: H.kind, wristToTip: H.info ? +H.info.wrist.distanceTo(H.info.tip).toFixed(3) : null }));
   } catch (e) { out.handMode = 'emulator: ' + e.message; }
   return out;
 });

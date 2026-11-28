@@ -83,13 +83,14 @@ Checked in the emulated Quest 3: board at 0.62 m and 29 degrees, a poke on the f
 
 ## Hands, touch and a live preview (2026-11-28)
 - **VR hands.** Your hands show as see-through yellow outlines where your real hands are, and interaction comes from them.
-  - Controllers: the palm sits on the grip pose (your palm) and the index finger runs to the pointer tip, so what you see pointing is what presses and points.
-  - Hand tracking (no controllers): every tracked joint of your own hand is outlined, poke uses your real index fingertip, pinch is the trigger. There is no walking without sticks, so controllers stay the main way.
+  - Same hand design as Brenai (its `brenai/public/xrhands.js`, inlined): a smooth see-through hand with a glowing pale-cyan edge, gold while squeezing or pinching. No bones, no joint dots, no laser line. One change here: the edge is alpha-blended instead of additive so it shows over this app's white board.
+  - Controllers: an open hand on the grip; the index finger curls with the trigger, the rest with the grip. Poke uses the drawn index fingertip. Far things: point and pull the trigger, the ring shows what you are on.
+  - Hand tracking (no controllers): your real joints drive the same hand shape, poke uses your real index fingertip, pinch is the trigger. There is no walking without sticks, so controllers stay the main way.
   - The pointer starts 12 cm behind the hand, so something the hand is in or on is picked first. The grip button grabs as well as the trigger.
 - **Touch (phone, tablet).** Drag to look, tap a thing to use it (taps work on device keys in the 3D view), a round pad walks and drives, yellow buttons for forks, tilt and horn. On a narrow screen the panel moves to the top and the top bar shows icons only.
 - Own dialogs instead of browser confirm boxes, and storage that cannot throw, so the page works inside a hosted preview frame.
 - `test/phone.mjs` (touch), `test/demo.mjs` (records the demo video), `test/xr.mjs` (now also checks the hands in controller and hand-tracking mode).
-- Checked in the emulator only: palm on the grip pose, fingertip on the pointer, 25 joints outlined in hand mode. **Not checked in a headset.**
+- Checked in the emulator only: a hand on each controller, the index curls with the trigger, poke with the drawn fingertip starts a module, tracked-hand mode draws both hands. **Not checked in a headset.**
 
 ## Placeholders to confirm
 - Box sizes #2-#6 and the product dimensions in Pack step 4.
