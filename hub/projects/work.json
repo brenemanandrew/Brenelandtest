@@ -1,0 +1,183 @@
+{
+ "id": "work",
+ "name": "Arden work tools (dashboards and kiosk)",
+ "area": "work",
+ "private": true,
+ "keywords": [
+  "arden",
+  "hubbell",
+  "kiosk",
+  "overtime",
+  "ardenot",
+  "arden hub",
+  "arden-hub",
+  "dashboard",
+  "dashboards",
+  "staging lane",
+  "lane health",
+  "arden pack",
+  "pack board",
+  "packer",
+  "pickers",
+  "idea board",
+  "roster",
+  "cross training",
+  "draw",
+  "sign-ups",
+  "shift card",
+  "sap",
+  "cubiscan",
+  "training app",
+  "standard work"
+ ],
+ "what": "Andrew's tools for the Hubbell Arden distribution center: Arden Hub (one PIN-gated app for the floor: Shift, Pick, Pack, Stage, Ship, People, Improve, System), the Weekend Overtime kiosk (ardenot), Staging Lane Health and Arden Pack (run as modules inside the hub), the CI idea board, and the dashboard PC kit that feeds them from SAP exports.",
+ "where": [
+  "Arden Hub: repo brenemanandrew/Arden-hub (PUBLIC), live https://arden-hub.fly.dev, deploys on push to main after tests",
+  "Overtime kiosk: repo brenemanandrew/ardenot (private), live https://ardenot.fly.dev",
+  "CI idea board: https://hubbellideaboard.fly.dev (own app, auto-stops, wakes on first hit)",
+  "Staging Lane Health source: F:\\Projects\\Staging Lane Health on the main PC; kits under Apps\\Staging Lane Health on Drive",
+  "Arden Pack source: F:\\Projects\\Arden Pack",
+  "Agent memory notes: Hubbell\\claude-memory on Google Drive"
+ ],
+ "stack": [
+  "Node standard library only, no dependencies (npm into a Drive folder corrupts node_modules)",
+  "One Fly machine each (--ha=false), data as files on one volume",
+  "SAP host PC pushes exports (WHTask.XLSX, Orders.XLSX, HU STAGING.XLSX, SAP Deliveries.TXT, SAP PGI.TXT)",
+  "Dashboard PC runs the roster sender and copier printer every 2 minutes"
+ ],
+ "tools": [
+  {
+   "name": "Arden Hub",
+   "what": "Shift home with Pick, Pack, Stage, Ship cards; People and Packers over time; Improve; System health board with uptime, p50/p95, stale detection",
+   "use_when": "Any floor dashboard question or new view: add it here as a section or module, not as a new site"
+  },
+  {
+   "name": "Staging Lane Health (module /stage)",
+   "what": "Lane board, TV and phone views, pickers, packer performance (/stage/packers)",
+   "use_when": "Lanes, pick performance, packer lines per hour"
+  },
+  {
+   "name": "Arden Pack (module /pack)",
+   "what": "Pack board: units and lines off the benches, pace, bench by hour",
+   "use_when": "Pack process relaunch measurement"
+  },
+  {
+   "name": "Weekend Overtime kiosk (ardenot)",
+   "what": "Sign-ups, draw with tickets and pick penalties, roster from the Cross Training Spreadsheet, posting sheets printed via the dashboard PC",
+   "use_when": "Overtime selection, sign-ups, roster"
+  },
+  {
+   "name": "Dashboard PC kit (ardenot/dashboard-pc)",
+   "what": "Sends the roster when it changes, prints posting sheets to the copier from inside the network",
+   "use_when": "Anything that must reach inside the Hubbell network"
+  },
+  {
+   "name": "System board (lib/checker.js, dashboards.json)",
+   "what": "Checks every dashboard once a minute: down, stale, slow, up",
+   "use_when": "Adding monitoring for a new dashboard: add an entry to dashboards.json"
+  }
+ ],
+ "settings": [
+  {
+   "name": "Arden Hub secrets (names only)",
+   "value": "HUB_STAGE_KEY, HUB_PACK_KEY, HUB_PASSPHRASE_HASH, HUB_SESSION_SECRET, FLY_API_TOKEN (repo)",
+   "note": "without HUB_STAGE_KEY / HUB_PACK_KEY the numbers never arrive"
+  },
+  {
+   "name": "Arden Hub local run",
+   "value": "HUB_DEV=1 HUB_DEMO=1 node server.js",
+   "note": "demo uses sample exports; never set HUB_DEV on Fly"
+  },
+  {
+   "name": "Module ports",
+   "value": "stage 8481, pack 8482",
+   "note": "HUB_STAGE_PORT, HUB_PACK_PORT"
+  },
+  {
+   "name": "Module builds",
+   "value": "stage e91b177 (2026-11-06), pack ac3544a",
+   "note": "modules/UPSTREAM.md; one local change in pack/server/main.js (PACK_HOST)"
+  },
+  {
+   "name": "Kiosk secrets (names only)",
+   "value": "OT_PASSPHRASE_HASH, OT_SESSION_SECRET, OT_DATA_KEY",
+   "note": "refuses to start without all three; OT_DATA_KEY must never change"
+  },
+  {
+   "name": "Kiosk draw rules (latest)",
+   "value": "tickets cap at 4, reset monthly; 4 tickets picked first in pool; pick penalty 10/20/30/40% for 1-4 picks in a row; tickets spent on first pick of the weekend",
+   "note": "from commit history, newest 4ff3852"
+  },
+  {
+   "name": "Sign-in pattern",
+   "value": "one passphrase per device, 180-day signed cookie, 5 wrong per address = 15 min wait",
+   "note": "Referrer-Policy must be same-origin"
+  }
+ ],
+ "working": [
+  "Arden Hub with Stage and Pack modules, Shift, Ship, People, Packers over time, Improve, System board",
+  "Kiosk sign-ups, lead edit and remove (logged), draw rules above, roster sync, sheet printing",
+  "Health checks with stale detection and TV mode"
+ ],
+ "broken": [
+  "Arden Hub's PUBLIC README states the default PIN. Set HUB_PASSPHRASE_HASH and consider making the repo private",
+  "Pack cloud copy was never pushed to (status no folder, 0 rows) as of the LESSONS note; cutover of the SAP host PC to arden-hub may not be done",
+  "Ship value cards wait until the ECC delivery pull is switched on (pull.deliveries.enabled false)",
+  "Kiosk: tablet ran an old build once; a version indicator on the tablet is wanted",
+  "Kiosk: Spanish selection text is wanted"
+ ],
+ "open": [
+  "Cut the SAP host PC over to arden-hub (/stage and /pack addresses), then remove the old cloud copy cards from dashboards.json",
+  "Pack relaunch: measure lines per packer with the pack board",
+  "Retire the hand-written pallet weight label once Cubiscan is in (done criterion)",
+  "The Power Automate Training App should share the OT kiosk roster source",
+  "Staging Lane Dashboard: supervisor walkthroughs promised, not confirmed"
+ ],
+ "rules": [
+  "Servers go on Fly or a PC-side script; never a Google Apps Script 'Anyone' web app (got an account suspended)",
+  "One Fly machine per app",
+  "Never recompute a number a module already shows",
+  "Push kit on the SAP PC must not change shape",
+  "Check the live build before touching a module",
+  "Pass Fly secrets as arguments, not piped (BOM on PowerShell)",
+  "Work data stays private: no names of coworkers, no kiosk data to outside models",
+  "Never use em dashes"
+ ],
+ "avoid_redoing": [
+  "Do not build a new dashboard site: add a section or module to Arden Hub",
+  "Sign-in, lockouts and cookie scheme already solved in ardenot and arden-hub lib/auth.js",
+  "Proxy header bug (hop-by-hop) already solved in lib/modules.js"
+ ],
+ "sources": [
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Arden-hub",
+   "path": "README.md"
+  },
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Arden-hub",
+   "path": "docs/LESSONS.md"
+  },
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Arden-hub",
+   "path": "modules/UPSTREAM.md"
+  },
+  {
+   "kind": "github-commits",
+   "repo": "brenemanandrew/ardenot",
+   "count": 10
+  },
+  {
+   "kind": "pc-file",
+   "path": "G:\\My Drive\\Hubbell\\claude-memory\\arden-initiatives-2026-11.md",
+   "note": "check the path on the PC"
+  }
+ ],
+ "repo": "brenemanandrew/Arden-hub",
+ "repos": {
+  "hub": "brenemanandrew/Arden-hub",
+  "kiosk": "brenemanandrew/ardenot"
+ }
+}

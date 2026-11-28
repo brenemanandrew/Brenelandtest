@@ -1,0 +1,61 @@
+{
+ "id": "sui",
+ "name": "SUI (World of Warcraft addon)",
+ "area": "hobby",
+ "private": false,
+ "needs_info": false,
+ "repo": "",
+ "keywords": [
+  "sui",
+  "wow addon",
+  "world of warcraft",
+  "warcraft",
+  "addon",
+  "lua",
+  ".toc"
+ ],
+ "what": "Andrew's World of Warcraft addon, kept in the WoW AddOns folder on his PC. Its .toc file (title, notes, version, game version) is read by the PC worker; tell Brenebase more about what it does as it grows.",
+ "where": [
+  "PC: C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\SUI (default retail path; set SUI_DIR on the PC if it differs)",
+  "No repo yet"
+ ],
+ "stack": [
+  "WoW addons are Lua plus XML with a .toc file"
+ ],
+ "tools": [
+  {
+   "name": "WoW AddOns folder",
+   "what": "where the addon runs from; /reload in game to load changes",
+   "use_when": "testing any change"
+  }
+ ],
+ "settings": [],
+ "working": [],
+ "broken": [],
+ "open": [
+  "Confirm the AddOns path (retail, classic or another drive)",
+  "Say what SUI does so agents get context",
+  "Consider a git repo for it, so Claude Code sessions can work on it and leave update files"
+ ],
+ "rules": [
+  "Never use em dashes"
+ ],
+ "avoid_redoing": [],
+ "sources": [
+  {
+   "kind": "pc-file",
+   "path": "C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\SUI\\SUI.toc",
+   "note": "addon title, notes, version"
+  },
+  {
+   "kind": "pc-file",
+   "path": "C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\SUI\\README.md",
+   "note": "optional"
+  },
+  {
+   "kind": "pc-file",
+   "path": "C:\\Program Files (x86)\\World of Warcraft\\_retail_\\Interface\\AddOns\\SUI\\CHANGELOG.md",
+   "note": "optional"
+  }
+ ]
+}

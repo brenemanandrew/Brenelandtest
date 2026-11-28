@@ -14,6 +14,7 @@ Andrew's modular character creator for his Three.js game Breneland. This repo is
 - `site/` - the deployed static app. `index.html` plus `hair/`, `models/`, `cloth/` data files (base64 GLB in small JS files, loaded on demand).
 - `Dockerfile`, `nginx.conf`, `fly.toml`, `.github/workflows/fly-deploy.yml` - Fly deploy on push to `main`. Both runs so far FAILED at `flyctl deploy`. Likely missing repo secret `FLY_API_TOKEN` or an app-name mismatch. Unresolved.
 - `brenai/` - separate app: Wizra, a chat persona for brenai.fly.dev running on the PC model via a bridge like the townsfolk (Node, own Dockerfile/fly.toml, deploy workflow `brenai-deploy.yml`). See `brenai/README.md`. Not part of Breneland.
+- `vam/` - Brene for Virt-a-Mate: a VaM plugin (draggable themed panels, Wizra chat, VITURE head tracking, side-by-side 3D, hand grabbing) and a relay on the PC. See `vam/README.md`. Not part of Breneland.
 - `pipeline/` - everything that builds `site/`:
   - `poser/index.html` - the builder source (one file, Three.js r181 from CDN). `<!--MODELS-->` is filled by the build.
   - `scripts/build.py` - builds `poser/index_embedded.html` and the data files, and a test copy in `/home/claude/ptest`.
@@ -49,3 +50,11 @@ Inputs already exist for all 28 pieces (`out/wear/*.glb`), so nothing has to be 
 - Buzz cut has small pits at the back. Jeans cuffs on her skinny jeans are ragged.
 - Outfit tiles for the "None" rows, face and eye shapes from his head model (`in26/head.glb`, not in repo), and the 12 shop accessories are not started.
 - He asked for a numbered sheet of all Breneland plant and tree assets plus Meshy cel-shade instructions. Instructions were given in chat. The sheet is not made. The tree code is on his Google Drive (`world-trees.js`).
+
+## Brenebase updates (required)
+After any change to this project, write `.brenebase/updates/<YYYY-MM-DD>-<short-name>.md` and commit it with the work, on the same branch. Brenebase (brenebase.fly.dev) reads these routinely to keep its project notes current.
+- Front matter: `project:` (breneland, brenai, work, brenerig, brenebase or valinfor), `by:`, `date:`, `branch:`, `title:`.
+- Then bullets under `## Done`, `## Tested`, `## Not tested`, `## Broken`, `## Open`, `## Settings changed`.
+- Never put passwords, PINs, tokens or their values in it. Name a secret, never its value.
+- No repo to commit to (a claude.ai chat, or Breneland-Next on the PC)? Save the same file in the Google Drive folder `Brenebase/updates` instead.
+- Template: `hub/UPDATE-TEMPLATE.md` in brenemanandrew/Brenelandtest.

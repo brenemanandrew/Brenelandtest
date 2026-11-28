@@ -1,0 +1,13 @@
+{
+ "id": "brenebase", "name": "Brenebase (this hub)", "area": "hobby", "private": false, "repo": "brenemanandrew/Brenelandtest",
+ "keywords": ["brenebase", "the hub", "router", "split job", "pc agent", "tailscale", "project cards", "update files", "copilot"],
+ "what": "Andrew's main entry point outside the Claude app: routes thoughts to tools and modes, splits jobs (code to Claude Code, art and story elsewhere) and merges them, keeps project cards that update themselves, collects update files from Claude sessions, and starts the PC models remotely over Tailscale.",
+ "where": ["Repo brenemanandrew/Brenelandtest, folder hub/ (branch claude/multi-agent-work-router-w9jzlg until merged)", "Planned address https://brenebase.fly.dev (fly.toml app brenebase), not deployed"],
+ "stack": ["Node 22, one dependency (@anthropic-ai/sdk)", "PC worker and PC agent (Node) on Andrew's PC", "Tailscale userspace networking on Fly"],
+ "tools": [{"name": "Send", "what": "Route it or Split it", "use_when": "every new thought"}, {"name": "PC tab", "what": "load the model, start bridges and worker", "use_when": "the PC side is off"}, {"name": "Projects tab", "what": "cards, notes from each project's files, update files", "use_when": "checking what exists before building"}],
+ "settings": [{"name": "Required secrets (names only)", "value": "HUB_PASSWORD, HUB_WORKER_TOKEN", "note": "everything else is optional and turns one part on"}, {"name": "Optional", "value": "ANTHROPIC_API_KEY, MESHY_API_KEY, GITHUB_TOKEN, TS_AUTHKEY, PC_TAILNET_HOST, COPILOT_TOKEN, HUB_WORK_LOCAL, HUB_UPDATE_DIRS", "note": "see server.mjs header"}],
+ "working": ["Routing with 3D and motion rules", "Split and merge with manifest", "Project cards with live notes", "Update files from repos, PC folders, direct posts and its own jobs", "PC agent by Tailscale or polling, jumpstart", "Copilot with fit check"],
+ "broken": [], "open": ["Deploy to brenebase.fly.dev", "Fold the mocap page and clip converter in for both rigs", "Valinfor card needs Andrew's info"],
+ "rules": ["Never use em dashes", "Deploys and Meshy spends always wait for Andrew's OK", "Work context never goes to Claude"],
+ "avoid_redoing": [], "sources": [{"kind": "github", "repo": "brenemanandrew/Brenelandtest", "path": "hub/README.md"}]
+}

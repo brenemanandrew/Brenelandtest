@@ -1,0 +1,158 @@
+{
+ "id": "brenai",
+ "name": "Brenai (Wizra)",
+ "area": "hobby",
+ "private": false,
+ "keywords": [
+  "brenai",
+  "wizra",
+  "companion game",
+  "her dorm",
+  "vrm",
+  "studio",
+  "mocap",
+  "kokoro",
+  "bionic",
+  "picture pack",
+  "outfit",
+  "romance level"
+ ],
+ "what": "Companion life-sim at brenai.fly.dev. The player talks with Wizra (22, goth, D&D, college student) who has a 3D VRM body, voice, dorm, schedule, moods, memory and a relationship that grows through romance levels. Her words come from the PC model through a bridge; the game supplies everything around them.",
+ "where": [
+  "Repo brenemanandrew/Brenelandtest, folder brenai/",
+  "Live: https://brenai.fly.dev (deploys on push to main touching brenai/, workflow brenai-deploy.yml)",
+  "Data: Fly volume brenai_data at /data (3 GB): per-player saves, shared.json, avatar.vrm, anims.json, outfits/, pack/, inbox/"
+ ],
+ "stack": [
+  "Node, one server file (server.mjs), no build step, no framework",
+  "Plain browser modules, three.js and three-vrm vendored in public/vendor",
+  "PC model MN-Violet-Lotus-12B in Bionic on an RTX 5060 Ti 16 GB, reached by bridge/wizra-bridge.mjs",
+  "Kokoro voice on the PC (kokoro-js, 28 voices), browser voices as fallback",
+  "Claude claude-opus-5-5 only as a backup when the PC is offline and a key is set",
+  "MediaPipe pose, face and hand trackers on the mocap page"
+ ],
+ "tools": [
+  {
+   "name": "Wizra bridge (bridge/wizra-bridge.mjs, start-wizra.ps1)",
+   "what": "Connects the PC model and voice out to the server",
+   "use_when": "Anything that needs her words or voice; the hub worker talks to the same Bionic server"
+  },
+  {
+   "name": "Studio (public/dev.html)",
+   "what": "Layout editor, scripted events, room maps, character and rules, outfits",
+   "use_when": "Changing her character, rules, rooms, events or layout WITHOUT code"
+  },
+  {
+   "name": "Mocap page (public/mocap.html, mocap.js)",
+   "what": "Camera, video and photo motion capture to her clip format, face, fingers, tongue",
+   "use_when": "A motion only Andrew can act out"
+  },
+  {
+   "name": "Clip converter (tools/clipconv.mjs)",
+   "what": "Mixamo FBX (without skin) to her clip JSON",
+   "use_when": "Stock motions for her VRM"
+  },
+  {
+   "name": "Picture pack (tools/picpack)",
+   "what": "Renders about a hundred ready pictures she can send",
+   "use_when": "More or different pictures"
+  },
+  {
+   "name": "tools/check.sh",
+   "what": "Parses every script",
+   "use_when": "Before every commit, chained with &&"
+  }
+ ],
+ "settings": [
+  {
+   "name": "CONTEXT_TOKENS",
+   "value": "32768",
+   "note": "PC model context; WIZRA_CONTEXT on the PC must match"
+  },
+  {
+   "name": "Bionic server",
+   "value": "port 1234",
+   "note": "temperature slider 0.3 to 1.2; WIZRA_MIN_P 0.05, WIZRA_REPEAT_PENALTY 1.08"
+  },
+  {
+   "name": "Secrets (names only)",
+   "value": "BRENAI_BRAIN_TOKEN, APP_PASSWORD, ANTHROPIC_API_KEY (optional), FLY_API_TOKEN (repo)",
+   "note": "never write values into files"
+  },
+  {
+   "name": "Other env",
+   "value": "REPLY_TOKENS, USER_NAME, MODEL, EFFORT, COMPACT_AT, LEARN_EVERY, SESSION_SECRET",
+   "note": "test switches: AWAY_SPEED, AWAY_TEST_LIE, CALL_TEST_RING, PIC_TEST, VISIT_TEST, WANDER_TEST"
+  },
+  {
+   "name": "VISIT_AT",
+   "value": "90 rapport",
+   "note": "unlocks visits"
+  },
+  {
+   "name": "Romance level costs",
+   "value": "lvl1 100, lvl2 500, lvl3 700, cap 1000",
+   "note": "editable in Studio, Game rules"
+  }
+ ],
+ "working": [
+  "Chat, voice and talk-to-text",
+  "3D body, rooms, errands and routine",
+  "Coming and going, cover stories, plans",
+  "Video calls, her calling you",
+  "Pictures by level, picture pack",
+  "Outfits by level and moment (55 models)",
+  "Studio: layout, events, maps, character and rules",
+  "Mocap: camera, video, picture, face, fingers, tongue",
+  "Movie night, D&D stories with voices, weather, web push",
+  "Players with PINs, PIN recovery"
+ ],
+ "broken": [
+  "PC model sometimes stops answering while the bridge stays connected (status dot amber); fix is reloading the model and its server on the PC",
+  "Movie night: the player on the couch is a stand-in; her lounging pose and walking to switch on the TV are not built",
+  "Self-collision (bodyfix.js) is written but off behind window.WIZRA_FIX, never checked visually",
+  "Mocap on a real camera is largely untested; jitter, finger and tongue tuned on made-up data",
+  "Room clipping in windows and furniture reported, not looked at",
+  "Weather shows only grey or bright sky, no rain or snow",
+  "Her week does not yet decide when she is really out"
+ ],
+ "open": [
+  "Mixamo batch: 79 clips chosen, still need converting with clipconv and posting to /api/anims (fetch the current set and merge)",
+  "Gifts and decor land on fixed spots; player cannot choose",
+  "Mocap and clip converter only output for VRM; a Breneland (66-bone Mixamo) output would make them shared tools"
+ ],
+ "rules": [
+  "Read brenai/AGENTS.md, CODING.md and HANDOFF.md first",
+  "Run tools/check.sh before every commit, chain with &&",
+  "Never put a // comment after code on a line that continues",
+  "Small exact edits, never reformat files",
+  "Her model, outfits, motion clips and picture pack never go into git",
+  "Do not read the owner's chat or her notes about him",
+  "Pushing to main deploys live: only when Andrew asks",
+  "A sexual animation request was declined and removed; do not rebuild it. Camera never looks from below; chest, hips and thighs off limits in the touch minigame",
+  "Never use em dashes"
+ ],
+ "avoid_redoing": [
+  "Studio already covers character, rules, events, maps, layout and outfits: do not ask for code for those",
+  "Two players at once is parked on purpose",
+  "Sound is all Web Audio in sound.js, no audio files"
+ ],
+ "sources": [
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Brenelandtest",
+   "path": "brenai/HANDOFF.md"
+  },
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Brenelandtest",
+   "path": "brenai/WISHLIST.md"
+  },
+  {
+   "kind": "github",
+   "repo": "brenemanandrew/Brenelandtest",
+   "path": "brenai/README.md"
+  }
+ ],
+ "repo": "brenemanandrew/Brenelandtest"
+}

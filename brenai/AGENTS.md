@@ -15,6 +15,13 @@ The rules that matter most, repeated here so they are never missed:
 - One change at a time. After each, say what you changed, what you tested, and what you could not test.
 - Pushing to `main` deploys the live game within a minute and restarts its server. Standing word from the owner (2026-11-28): push Brenai changes to `main` without asking each time, once `tools/check.sh` passes and the change has been tested; then say what went live. This covers Brenai only, never the main Breneland game.
 
+## Brenebase updates (required)
+After any change to this project, write `.brenebase/updates/<YYYY-MM-DD>-<short-name>.md` and commit it with the work, on the same branch. Brenebase (brenebase.fly.dev) reads these routinely to keep its project notes current.
+- Front matter: `project:` (breneland, brenai, work, brenerig, brenebase or valinfor), `by:`, `date:`, `branch:`, `title:`.
+- Then bullets under `## Done`, `## Tested`, `## Not tested`, `## Broken`, `## Open`, `## Settings changed`.
+- Never put passwords, PINs, tokens or their values in it. Name a secret, never its value.
+- No repo to commit to (a claude.ai chat, or Breneland-Next on the PC)? Save the same file in the Google Drive folder `Brenebase/updates` instead.
+- Template: `hub/UPDATE-TEMPLATE.md` in brenemanandrew/Brenelandtest.
 Also in this folder:
 - `MASTERFILE.md`: everything in one file (rules, architecture, data, every route, features, current state, open work). Section 10 is the current state. Keep it current when you ship something.
 - `skills/*/SKILL.md`: seven skills: making a change, headless testing, writing her character, her 3D body, reporting to the owner, assets, and building a server-run activity. Read the one that fits the job before starting.

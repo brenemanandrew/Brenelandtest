@@ -1,0 +1,491 @@
+// Brene for Virt-a-Mate: big, clear panels you can drag around, the Phone (texts and calls with the cast), and VITURE glasses support.
+// Load Brene.cslist as a Session plugin (Main menu > Session Plugin Presets) so it stays across scenes, or on any atom in a scene.
+// Layout, theme and size are saved to Saves/PluginData/Brene/layout.json with "Save layout" (and on every change in edit mode).
+//
+// VaM calls that are not certain to exist in every VaM version (undo, the save and load dialogs, the main menu) go through
+// SendMessage, which does nothing if the method is missing instead of stopping the whole plugin from loading.
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using SimpleJSON;
+using MVR.FileManagementSecure;
+
+namespace Brene
+{
+    public partial class BreneMain : MVRScript
+    {
+        const string DIR = "Saves/PluginData/Brene", FILE = "Saves/PluginData/Brene/layout.json";
+
+        class Act { public string id, label; public Action run; public Func<bool> on; public Button btn; }
+        readonly Dictionary<string, Act> acts = new Dictionary<string, Act>();
+
+        GameObject canvasGo, radialGo; Canvas canvas; CanvasScaler scaler, radialScaler;
+        Panel pScene, pPeople, pGlasses, pChat, pLayout, pDock;
+        Text status, chatLog; InputField chatIn; ScrollRect chatScroll; RectTransform peopleList;
+        Link link; Viture vit; Character chr; Radial radial;
+        JSONStorableStringChooser menuKey; bool chatBusy; float nextStatus, nextPeople, saveAt = -1;
+
+        JSONStorableString relayUrl; JSONStorableBool showUi, headOn, stereoOn, fullOn, handsOn, swapEyes, flipYaw, flipPitch, flipRoll;
+        bool frozen;
+        JSONStorableFloat uiSize, ipd, posScale, menuFit, pokeTip; float fovBase = -1, fovWrote = -1;
+
+        public override void Init()
+        {
+            try
+            {
+                link = new Link(); vit = new Viture(link);
+                relayUrl = new JSONStorableString("Relay address", "http://127.0.0.1:8767", (string s) => link.Url = s.TrimEnd('/'));
+                RegisterString(relayUrl); CreateTextField(relayUrl).height = 60; link.Url = relayUrl.val;
+                showUi = Bool("Show Brene panels", true, v => { if (canvasGo != null) canvasGo.SetActive(v); });
+                uiSize = new JSONStorableFloat("Panel size", 1.25f, (float v) => { if (scaler != null) scaler.scaleFactor = v; if (radialScaler != null) radialScaler.scaleFactor = v; if (coach != null) coach.Scale(v); }, 0.6f, 3f);
+                RegisterFloat(uiSize); CreateSlider(uiSize);
+                menuKey = new JSONStorableStringChooser("Menu key", new List<string> { "BackQuote", "Tab", "Q", "F1", "Mouse4" }, "BackQuote", "Radial menu key (hold)");
+                RegisterStringChooser(menuKey); CreatePopup(menuKey);
+                // VaM's own menu can run off the top of a short screen: a wider camera view makes it smaller so it fits
+                menuFit = new JSONStorableFloat("Fit VaM menu (wider view)", 0f, (float v) => { }, 0f, 45f); RegisterFloat(menuFit); CreateSlider(menuFit);
+                headOn = Bool("Head tracking (glasses)", true, v => vit.Head = v);
+                handsOn = Bool("Hand control", true, v => vit.HandsOn = v);
+                stereoOn = Bool("3D side by side", false, v => vit.Stereo = v);
+                fullOn = Bool("3D Full (32:9 screen)", false, v => vit.Full = v);
+                swapEyes = Bool("Swap eyes", false, v => vit.SwapEyes = v);
+                flipYaw = Bool("Flip left/right", false, v => vit.FlipYaw = v);
+                flipPitch = Bool("Flip up/down", false, v => vit.FlipPitch = v);
+                flipRoll = Bool("Flip tilt", false, v => vit.FlipRoll = v);
+                ipd = new JSONStorableFloat("Eye spacing (m)", 0.064f, (float v) => vit.Ipd = v, 0.04f, 0.08f); RegisterFloat(ipd); CreateSlider(ipd, true);
+                posScale = new JSONStorableFloat("6DOF movement scale", 1f, (float v) => vit.PosScale = v, 0f, 3f); RegisterFloat(posScale); CreateSlider(posScale, true);
+                CreateButton("Re-centre head", true).button.onClick.AddListener(() => vit.Recenter());
+                CreateButton("Reset panel layout", true).button.onClick.AddListener(ResetLayout);
+                // in the headset: how far ahead of the controller the fingertip that presses buttons is (controllers differ)
+                pokeTip = new JSONStorableFloat("Poke tip distance (m)", 0.07f, (float v) => { }, 0.02f, 0.15f); RegisterFloat(pokeTip); CreateSlider(pokeTip, true);
+
+                InitWizra(); InitReactions(); InitMR();
+                Actions();
+                BuildCanvas();
+                LoadLayout();
+                if (!tourOff) welcomeAt = Time.realtimeSinceStartup + 2.5f;   // the Welcome tour at every start, unless ticked off on its card
+                link.OnCmd = RunCmd; link.Report = SceneReport; twiceCheckAt = Time.realtimeSinceStartup + 3f;
+                StartCoroutine(link.Poll(() => true));   // always: the library page needs the scene's people and sends commands
+            }
+            catch (Exception e) { Report("Brene could not start: " + e); }
+            // a line in VaM's output_log.txt so a start can be checked from the log alone
+            try
+            {
+                var d = pDock != null ? pDock.Root : null;
+                UnityEngine.Debug.Log("Brene started: panels " + Panel.All.Count + ", dock " + (d == null ? "missing" : (d.gameObject.activeInHierarchy ? "shown" : "hidden") + " at " + d.anchoredPosition + " size " + d.sizeDelta) + ", panel size " + uiSize.val + ", screen " + Screen.width + "x" + Screen.height + ", canvas " + (canvasGo != null && canvasGo.activeSelf ? "on" : "off"));
+            }
+            catch (Exception e) { Report("Brene start note failed: " + e.Message); }
+        }
+        // errors go to VaM's error window and to output_log.txt (VaM's window can run off a short screen)
+        static void Report(string s) { SuperController.LogError(s); UnityEngine.Debug.LogError(s); }
+
+        JSONStorableBool Bool(string name, bool def, Action<bool> set)
+        {
+            var b = new JSONStorableBool(name, def, (bool v) => { set(v); Refresh(); }); RegisterBool(b); CreateToggle(b, name.StartsWith("Flip") || name.StartsWith("Swap") || name.StartsWith("3D"));
+            set(def); return b;
+        }
+
+        // ---- the actions a button can run ----
+        void Actions()
+        {
+            var sc = SuperController.singleton;
+            Add("play", "Play mode", () => sc.gameMode = sc.gameMode == SuperController.GameMode.Play ? SuperController.GameMode.Edit : SuperController.GameMode.Play, () => sc.gameMode == SuperController.GameMode.Play);
+            Add("freeze", "Freeze", () => { frozen = !frozen; Send("SetFreezeAnimation", frozen); }, () => frozen);   // asked by name; Brene keeps its own on/off
+            Add("undo", "Undo", () => Send("Undo"), null);
+            Add("redo", "Redo", () => Send("Redo"), null);
+            Add("save", "Save scene", () => Send("SaveSceneDialog"), null);
+            Add("load", "Open scene", () => Send("LoadSceneDialog"), null);
+            Add("menu", "VaM menu", () => Send("ToggleMainHUD"), null);
+            Add("head", "Head track", () => headOn.val = !headOn.val, () => headOn.val);
+            Add("stereo", "3D", () => stereoOn.val = !stereoOn.val, () => stereoOn.val);
+            Add("full", "3D Full", () => fullOn.val = !fullOn.val, () => fullOn.val);
+            Add("center", "Re-centre", () => vit.Recenter(), null);
+            Add("hands", "Hands", () => handsOn.val = !handsOn.val, () => handsOn.val);
+            Add("edit", "Edit layout", () => SetEdit(!BreneEdit.On), () => BreneEdit.On);
+            Add("theme", "Theme", NextTheme, null);
+            Add("bigger", "Bigger", () => uiSize.val = Mathf.Min(3f, uiSize.val + 0.15f), null);
+            Add("smaller", "Smaller", () => uiSize.val = Mathf.Max(0.6f, uiSize.val - 0.15f), null);
+            Add("savelayout", "Save layout", SaveLayout, null);
+            Add("panels", "Show all", ShowAll, null);
+            Add("tools", "Tools", ToggleTools, () => AnyTool());
+            Add("chat", "Phone", () => { if (pChat.Root.gameObject.activeSelf) pChat.Root.gameObject.SetActive(false); else OpenPhone(); }, () => pChat != null && pChat.Root.gameObject.activeSelf);
+            Add("fitless", "VaM menu smaller", () => menuFit.val = Mathf.Min(45f, menuFit.val + 8f), null);
+            Add("fitmore", "VaM menu bigger", () => menuFit.val = Mathf.Max(0f, menuFit.val - 8f), null);
+            Add("radial", "Menu", () => radial.OpenAtCentre(), null);
+            Add("character", "Character", () => chr.Open(null), null);
+        }
+        void Add(string id, string label, Action run, Func<bool> on) { var inner = run; run = () => { if (canvasGo != null && !canvasGo.activeSelf) { showUi.val = true; canvasGo.SetActive(true); } inner(); }; acts[id] = new Act { id = id, label = label, run = run, on = on }; }
+        static void Send(string method) { SuperController.singleton.gameObject.SendMessage(method, SendMessageOptions.DontRequireReceiver); }
+        static void Send(string method, object arg) { SuperController.singleton.gameObject.SendMessage(method, arg, SendMessageOptions.DontRequireReceiver); }
+
+        // ---- building the panels ----
+        void BuildCanvas()
+        {
+            canvasGo = new GameObject("Brene UI");
+            canvas = canvasGo.AddComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 30;
+            scaler = canvasGo.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; scaler.scaleFactor = uiSize.val;
+            canvasGo.AddComponent<GraphicRaycaster>();
+            BreneEdit.Canvas = canvas; BreneEdit.Changed = () => { if (BreneEdit.On) saveAt = Time.realtimeSinceStartup + 1f; };
+            BreneEdit.Save = () => { saveAt = Time.realtimeSinceStartup + 1f; KeepOnScreen(); };
+            var root = canvasGo.transform;
+
+            pScene = new Panel(root, "scene", "Scene", new Vector2(20, -20), new Vector2(340, 250), true);
+            pGlasses = new Panel(root, "glasses", "Glasses", new Vector2(20, -290), new Vector2(340, 250), true);
+            pLayout = new Panel(root, "layout", "Layout", new Vector2(380, -360), new Vector2(340, 250), true);
+            pPeople = new Panel(root, "people", "People", new Vector2(380, -20), new Vector2(240, 320), false);
+            pChat = new Panel(root, "chat", "Phone", new Vector2(-1, -20), new Vector2(460, 620), false);   // id kept: older layouts keep its place
+            pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(BreneEdit.On);
+
+            foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
+            foreach (var id in new[] { "mr", "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
+            foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels", "fitless", "fitmore" }) MakeButton(id, pLayout);
+            MakeButton("radial", pDock); MakeButton("tools", pDock); MakeButton("chat", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
+            chr = new Character(this, link, ApplyPreset); chr.Build(root);
+            BuildGuides(root);
+            // the radial menu has its own canvas so it still opens when the panels are hidden
+            if (radialGo == null)
+            {
+                radialGo = new GameObject("Brene menu");
+                var rc = radialGo.AddComponent<Canvas>(); rc.renderMode = RenderMode.ScreenSpaceOverlay; rc.sortingOrder = 40;
+                radialScaler = radialGo.AddComponent<CanvasScaler>(); radialScaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; radialScaler.scaleFactor = uiSize.val;
+                radialGo.AddComponent<GraphicRaycaster>();
+                radial = new Radial(radialGo.transform, MenuItems);
+                radial.BeforeRun = () => { if (canvasGo != null && !canvasGo.activeSelf) { showUi.val = true; canvasGo.SetActive(true); } };
+            }
+
+            // people: one button per person in the scene, tap to select
+            peopleList = Scroll(pPeople.Body).content;
+            var v = peopleList.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 6; v.childForceExpandHeight = false; v.childControlHeight = true; v.childControlWidth = true;
+
+            // the Phone: contacts, texts and calls with Wizra, Zoe, Belinda and Margo (BrenePhone.cs)
+            BuildPhone();
+
+            // status line along the bottom of the dock
+            var st = Ui.Rect("Status", pDock.Root); Ui.Bottom(st, 30, 0);
+            status = Ui.Label(st, "", 16, Role.Dim, TextAnchor.MiddleLeft);
+            Ui.Fill((RectTransform)pDock.Body, 10, 54, 10, 34); pDock.FootPad = 44;
+
+            // calm start: only the dock. Tools, Wizra and the flows open from the dock or the radial menu
+            pDock.Kind = "dock"; pChat.Kind = "chat";
+            foreach (var p in new[] { chr.Panel, sceneFlow.Panel, glassFlow.Panel, pStory, pLaptop, pHelp }) p.Kind = "window";
+            foreach (var p in new[] { pChoice, pickFlow.Panel, pVamMenu }) p.Kind = "dialog";
+            foreach (var p in Panel.All) if (p.Kind != "dock") p.Root.gameObject.SetActive(false);
+            // the dock in a sensible order
+            int at = 0; foreach (var id in new[] { "radial", "tools", "chat", "character", "sceneflow", "glassflow", "story", "help", "edit" }) { Act a; if (acts.TryGetValue(id, out a) && a.btn != null) { a.btn.transform.SetParent(pDock.Body, false); a.btn.transform.SetSiblingIndex(at++); } }
+            foreach (var p in Panel.All) p.Fit();
+            pGlasses.Root.anchoredPosition = new Vector2(20, pScene.Root.anchoredPosition.y - pScene.Root.sizeDelta.y - 16);
+            PlaceRight(pChat, 20); PlaceBottomRight(pDock);
+            foreach (var p in Panel.All) { p.Fit(); p.ShowEdit(BreneEdit.On); }   // ShowEdit again: CanHide is set after some panels are made
+            ShowLog();   // a rebuild (Reset layout) keeps the talk so far
+            Refresh();
+        }
+
+        void PlaceRight(Panel p, float top) { p.Root.anchoredPosition = new Vector2(Screen.width / uiSize.val - p.Root.sizeDelta.x - 20, -top); }
+        void PlaceBottomRight(Panel p) { p.Root.anchoredPosition = new Vector2(Screen.width / uiSize.val - p.Root.sizeDelta.x - 20, -(Screen.height / uiSize.val - p.Root.sizeDelta.y - 20)); }
+
+        void MakeButton(string id, Panel p)
+        {
+            Act a; if (!acts.TryGetValue(id, out a)) return;
+            if (a.btn != null) { a.btn.transform.SetParent(p.Body, false); return; }
+            a.btn = Ui.Button(p.Body, a.label, () => { try { a.run(); } catch (Exception e) { SuperController.LogError("Brene " + a.id + ": " + e.Message); } Refresh(); });
+            a.btn.gameObject.AddComponent<DragButton>().actionId = id;
+            Ui.WithIcon(a.btn, BreneIcons.ForAct(id));
+        }
+
+        // the panels' own lists stop dead at their ends (no bounce)
+        static ScrollRect Scroll(RectTransform area) { var sr = Ui.Scroll(area); sr.movementType = ScrollRect.MovementType.Clamped; return sr; }
+
+        InputField Input(RectTransform rt, string hint)
+        {
+            Ui.Box(rt, Role.Field);
+            var f = rt.gameObject.AddComponent<InputField>();
+            var ph = Ui.Label(rt, hint, 21, Role.Dim, TextAnchor.MiddleLeft); ph.fontStyle = FontStyle.Italic;
+            var tx = Ui.Label(rt, "", 21, Role.Text, TextAnchor.MiddleLeft); tx.supportRichText = false; tx.raycastTarget = true;
+            f.textComponent = tx; f.placeholder = ph; f.lineType = InputField.LineType.SingleLine;
+            f.onEndEdit.AddListener(s => { if (UnityEngine.Input.GetKey(KeyCode.Return) || UnityEngine.Input.GetKey(KeyCode.KeypadEnter)) SendChat(); });
+            return f;
+        }
+
+        // ---- the Phone's Send: to whoever is on the screen (on the call screen, the caller) ----
+        void SendChat()
+        {
+            var text = chatIn.text.Trim(); if (text == "" || chatBusy) return;
+            chatIn.text = "";
+            SayTo(phScreen == "call" && callWho != "" ? callWho : talkTo, text, null);
+            chatIn.ActivateInputField();
+        }
+        static string Esc(string s) { return (s ?? "").Replace("<", "&lt;").Replace(">", "&gt;"); }
+
+        // ---- the library page's commands ----
+        string RunCmd(JSONNode c)
+        {
+            var kind = c["kind"].Value; var path = c["path"].Value;
+            if (kind == "rescan") { Send("RescanPackages"); return null; }
+            if (kind == "scene") { if (path == "") return "no scene"; Send("Load", path); return null; }
+            if (PRESETS.ContainsKey(kind)) return ApplyPreset(kind, path, c["person"].Value);
+            return "Unknown command " + kind;
+        }
+        static readonly Dictionary<string, string> PRESETS = new Dictionary<string, string> {
+            { "look", "AppearancePresets" }, { "pose", "PosePresets" }, { "skin", "SkinPresets" }, { "hair", "HairPresets" }, { "clothing", "ClothingPresets" } };
+        // a saved preset onto a person: the named person, else the selected one, else the first in the scene
+        string ApplyPreset(string kind, string path, string who)
+        {
+            Atom a = null;
+            if (!string.IsNullOrEmpty(who)) a = SuperController.singleton.GetAtomByUid(who);
+            if (a == null) { var sel = SuperController.singleton.GetSelectedAtom(); if (sel != null && sel.type == "Person") a = sel; }
+            if (a == null) foreach (var x in SuperController.singleton.GetAtoms()) if (x != null && x.type == "Person") { a = x; break; }
+            if (a == null) return "There is no person in this scene";
+            string id; if (!PRESETS.TryGetValue(kind, out id)) return "Unknown kind " + kind;
+            var st = a.GetStorableByID(id);
+            if (st == null) return a.uid + " has no " + id;
+            var url = st.GetUrlJSONParam("presetBrowsePath");
+            if (url == null) return "This VaM version names the preset path differently";
+            url.val = path; st.CallAction("LoadPreset");
+            return null;
+        }
+
+        // ---- the radial menu: the same things as the panels, grouped, two flicks deep at most ----
+        List<RItem> MenuItems()
+        {
+            Func<string, RItem> act = id => { Act a = acts[id]; return new RItem(a.label == "Play mode" && SuperController.singleton.gameMode != SuperController.GameMode.Play ? "Edit mode" : a.label, () => { a.run(); Refresh(); }) { On = a.on }; };
+            Func<string, RItem> sec = s => new RItem(s, () => chr.Open(s));
+            var items = new List<RItem> {
+                new RItem("Character", new List<RItem> { new RItem("Start", () => chr.Open("Who")), sec("Body"), sec("Face"), sec("Skin"), sec("Hair"), sec("Clothes"), sec("Pose"), new RItem("Save", () => chr.Open("Finish")) }),
+                new RItem("Scene", new List<RItem> { act("play"), act("freeze"), act("undo"), act("redo"), act("save"), act("load") }),
+                act("play"),
+                new RItem("Glasses", new List<RItem> { act("mr"), act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
+                new RItem("Wizra", () => OpenTexts("wizra")),   // the Phone, on Wizra's texts
+                new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore"), act("movemenu"), new RItem("Reset layout", ResetLayout) }),
+                act("menu"),
+                new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Phone", OpenPhone), new RItem("Talk to next", () => { NextWho(); OpenTexts(talkTo); }) }),
+            };
+            if (vr) items.Add(new RItem("Bring board here", PlaceBoard));
+            return items;
+        }
+        KeyCode MenuKey()
+        {
+            switch (menuKey.val) { case "Tab": return KeyCode.Tab; case "Q": return KeyCode.Q; case "F1": return KeyCode.F1; case "Mouse4": return KeyCode.Mouse3; default: return KeyCode.BackQuote; }
+        }
+
+        JSONClass SceneReport()
+        {
+            var j = new JSONClass(); var arr = new JSONArray();
+            foreach (var a in SuperController.singleton.GetAtoms()) if (a != null && a.type == "Person") arr.Add(a.uid);
+            j["people"] = arr;
+            var sel = SuperController.singleton.GetSelectedAtom(); j["selected"] = sel != null ? sel.uid : "";
+            return j;
+        }
+
+        // ---- people ----
+        void RefreshPeople()
+        {
+            if (peopleList == null) return;
+            var names = new List<Atom>();
+            foreach (var a in SuperController.singleton.GetAtoms()) if (a != null && a.type == "Person") names.Add(a);
+            if (names.Count == peopleList.childCount) { bool same = true; for (int i = 0; i < names.Count; i++) if (peopleList.GetChild(i).name != "Button " + names[i].uid) same = false; if (same) return; }
+            for (int i = peopleList.childCount - 1; i >= 0; i--) Destroy(peopleList.GetChild(i).gameObject);
+            foreach (var a in names)
+            {
+                var atom = a;
+                var b = Ui.Button(peopleList, atom.uid, () => { if (atom != null && atom.mainController != null) SuperController.singleton.SelectController(atom.mainController); });
+                var le = b.gameObject.AddComponent<LayoutElement>(); le.minHeight = 52; le.preferredHeight = 52;
+            }
+            if (names.Count == 0) { var t = Ui.Label(peopleList, "No people in this scene", 18, Role.Dim, TextAnchor.MiddleLeft); t.gameObject.AddComponent<LayoutElement>().minHeight = 40; }
+        }
+
+        // ---- editor ----
+        void SetEdit(bool on)
+        {
+            BreneEdit.On = on; foreach (var p in Panel.All) p.ShowEdit(on);
+            if (!on) SaveLayout();
+            Refresh();
+        }
+        // Show all brings back the quick-button panels only (flows and pop-ups open when they are needed)
+        void ShowAll() { showUi.val = true; if (canvasGo != null) canvasGo.SetActive(true); pDock.Root.gameObject.SetActive(true); foreach (var p in Panel.All) if (p.Kind == "tool") p.Root.gameObject.SetActive(true); BreneEdit.Changed(); Refresh(); }
+        bool AnyTool() { foreach (var p in Panel.All) if (p.Kind == "tool" && p.Visible) return true; return false; }
+        void ToggleTools() { bool on = !AnyTool(); foreach (var p in Panel.All) if (p.Kind == "tool") { if (on) { p.Root.gameObject.SetActive(true); p.Root.SetAsLastSibling(); } else p.Close(); } BreneEdit.Changed(); Refresh(); }
+        void NextTheme()
+        {
+            int i = Array.IndexOf(Theme.Names, Theme.Name); Theme.Name = Theme.Names[(i + 1) % Theme.Names.Length];
+            Theme.ApplyAll(canvasGo.transform); Refresh(); BreneEdit.Changed();
+        }
+
+        void Refresh()
+        {
+            foreach (var a in new List<Act>(acts.Values)) if (a.btn != null && a.on != null) { try { Ui.SetOn(a.btn, a.on()); } catch (Exception) { } }
+            Act play; if (acts.TryGetValue("play", out play) && play.btn != null) { try { Ui.SetText(play.btn, SuperController.singleton.gameMode == SuperController.GameMode.Play ? "Play mode" : "Edit mode"); } catch (Exception) { } }
+        }
+
+        // ---- layout file ----
+        void SaveLayout()
+        {
+            try
+            {
+                var j = new JSONClass(); j["v"].AsInt = 2; j["theme"] = Theme.Name; j["menuX"].AsFloat = menuMove.x; j["menuY"].AsFloat = menuMove.y; j["menuZ"].AsFloat = menuMove.z; j["menuSize"].AsFloat = menuSize; j["tourOff"].AsBool = tourOff; j["size"].AsFloat = uiSize.val;
+                var ps = new JSONClass();
+                foreach (var p in Panel.All)
+                {
+                    var o = new JSONClass();
+                    o["x"].AsFloat = p.Root.anchoredPosition.x; o["y"].AsFloat = p.Root.anchoredPosition.y;
+                    o["w"].AsFloat = p.Root.sizeDelta.x; o["h"].AsFloat = p.Root.sizeDelta.y;
+                    o["hidden"].AsBool = !p.Root.gameObject.activeSelf;
+                    o["shrunk"].AsBool = p.Shrunk; o["cx"].AsFloat = p.Chip.anchoredPosition.x; o["cy"].AsFloat = p.Chip.anchoredPosition.y;
+                    if (p.Droppable)
+                    {
+                        var arr = new JSONArray();
+                        for (int i = 0; i < p.Body.childCount; i++) { var d = p.Body.GetChild(i).GetComponent<DragButton>(); if (d != null) arr.Add(d.actionId); }
+                        o["buttons"] = arr;
+                    }
+                    ps[p.Id] = o;
+                }
+                j["panels"] = ps;
+                FileManagerSecure.CreateDirectory(DIR);
+                SuperController.singleton.SaveJSON(j, FILE);
+            }
+            catch (Exception e) { Report("Brene: could not save the layout: " + e.Message); }
+        }
+
+        void LoadLayout()
+        {
+            if (!FileManagerSecure.FileExists(FILE)) return;
+            try
+            {
+                var j = SuperController.singleton.LoadJSON(FILE);
+                if (j == null) return;
+                if (j["theme"] != null && Array.IndexOf(Theme.Names, j["theme"].Value) >= 0) { Theme.Name = j["theme"].Value; Theme.ApplyAll(canvasGo.transform); }
+                if (j["size"] != null) uiSize.val = Mathf.Clamp(j["size"].AsFloat, 0.6f, 3f);
+                tourOff = j["tourOff"].AsBool;   // (the old "tutorialSeen" is no longer read: Welcome opens at every start until ticked off)
+                if (j["menuSize"] != null) { menuMove = new Vector3(j["menuX"].AsFloat, j["menuY"].AsFloat, j["menuZ"].AsFloat); menuSize = Mathf.Clamp(j["menuSize"].AsFloat, 0.4f, 2.5f); }
+                var ps = j["panels"];
+                foreach (var p in Panel.All)
+                {
+                    var o = ps[p.Id]; if (o == null || o["x"] == null) continue;
+                    p.Root.anchoredPosition = new Vector2(o["x"].AsFloat, o["y"].AsFloat);
+                    p.Root.sizeDelta = new Vector2(Mathf.Max(180, o["w"].AsFloat), Mathf.Max(110, o["h"].AsFloat));
+                    if (j["v"].AsInt >= 2 && (p.Kind == "tool" || p.Kind == "chat")) p.Root.gameObject.SetActive(!o["hidden"].AsBool);   // older layouts: the calm defaults instead
+                    // shrunk to a chip: the dock, tool panels and the Phone come back as chips (windows open only when asked: the calm start)
+                    if (o["shrunk"].AsBool && (p.Kind == "tool" || p.Kind == "chat" || p.Kind == "dock")) p.ShrinkAt(new Vector2(o["cx"].AsFloat, o["cy"].AsFloat));
+                }
+                // buttons: put each where it was saved, in order (an action not in the file stays where it was built)
+                foreach (var p in Panel.All)
+                {
+                    var o = ps[p.Id]; if (o == null || !p.Droppable) continue;
+                    var arr = o["buttons"].AsArray; if (arr == null) continue;
+                    for (int i = 0; i < arr.Count; i++) { Act a; if (acts.TryGetValue(arr[i].Value, out a) && a.btn != null) { a.btn.transform.SetParent(p.Body, false); a.btn.transform.SetAsLastSibling(); } }
+                }
+                foreach (var p in Panel.All) p.Fit();
+                Act edit; if (acts.TryGetValue("edit", out edit) && edit.btn != null && !edit.btn.gameObject.activeInHierarchy) edit.btn.transform.SetParent(pDock.Body, false);   // never lose the way back into the editor
+                if (!pDock.Shrunk) pDock.Root.gameObject.SetActive(true);
+                KeepOnScreen();
+            }
+            catch (Exception e) { Report("Brene: could not read the layout: " + e.Message); }
+        }
+
+        // panels left outside the window (a smaller window, a bigger panel size, an older layout) come back inside it.
+        // Run after a layout is read, and again whenever the window or the panel size changes.
+        void KeepOnScreen()
+        {
+            if (canvasGo == null || uiSize == null) return;
+            var size = BoardSize(); float W = size.x, H = size.y;   // the screen, or the board in the headset
+            foreach (var p in new List<Panel>(Panel.All))
+            {
+                if (p.Root == null) continue;
+                // a chip is small: wholly inside
+                if (p.Chip != null) { var c = p.Chip.anchoredPosition; p.Chip.anchoredPosition = new Vector2(Mathf.Clamp(c.x, 0, Mathf.Max(0, W - 64)), -Mathf.Clamp(-c.y, 0, Mathf.Max(0, H - 64))); }
+                var a = p.Root.anchoredPosition; var z = p.Root.sizeDelta;
+                // the dock is the way back to everything, so it has to be wholly inside; the others only need a part you can grab
+                bool lost = p == pDock ? (a.x < 0 || a.x > W - z.x || -a.y > H - z.y || a.y > 0) : (a.x < -z.x + 60 || a.x > W - 60 || -a.y > H - 40 || a.y > 0);
+                if (lost) p.Root.anchoredPosition = new Vector2(Mathf.Clamp(a.x, 0, Mathf.Max(0, W - z.x)), -Mathf.Clamp(-a.y, 0, Mathf.Max(0, H - z.y)));
+            }
+        }
+
+        void ResetLayout()
+        {
+            if (vr) LeaveVR();   // rebuilt on the monitor; TickVR moves it back onto the board within a second
+            if (FileManagerSecure.FileExists(FILE)) FileManagerSecure.DeleteFile(FILE);
+            Theme.Name = "Night"; uiSize.val = 1.25f;
+            Panel.All.Clear(); foreach (var a in new List<Act>(acts.Values)) a.btn = null; if (radial != null) radial.Close();
+            if (canvasGo != null) Destroy(canvasGo);
+            BuildCanvas(); canvasGo.SetActive(showUi.val);
+            saveAt = -1; SaveLayout();   // the fresh layout is written at once, so "Don't show this at start" and the VaM menu's place are not lost with the old file
+        }
+
+        // ---- every frame ----
+        // A slip in one frame is reported a few times, not sixty times a second (which would bury VaM's error window and slow it down)
+        int frameErrors; float seenW, seenH, seenSize, twiceCheckAt = -1; bool twice;
+        void FrameError(string where, Exception e) { if (frameErrors++ < 3) Report("Brene " + where + ": " + e); }
+        void Update()
+        {
+            try { Tick(); } catch (Exception e) { FrameError("update", e); }
+        }
+        // typing in any text box (Brene's or VaM's): the menu key is a letter then, not the menu
+        static bool Typing()
+        {
+            var es = EventSystem.current; if (es == null) return false;
+            var go = es.currentSelectedGameObject; if (go == null) return false;
+            var f = go.GetComponent<InputField>(); return f != null && f.isFocused;
+        }
+        void Tick()
+        {
+            if (link == null || vit == null) return;   // Brene could not start (already reported)
+            if (radial != null) radial.Tick(Typing() ? KeyCode.None : MenuKey());
+            TickGuides();
+            TickVR();
+            if (saveAt > 0 && Time.realtimeSinceStartup > saveAt) { saveAt = -1; SaveLayout(); }
+            if (Time.realtimeSinceStartup > nextPeople) { nextPeople = Time.realtimeSinceStartup + 2f; RefreshPeople(); Refresh(); ForgetGoneBodies(); }
+            // the window or the panel size changed: nothing may be left outside it
+            if (uiSize != null && (Screen.width != seenW || Screen.height != seenH || uiSize.val != seenSize)) { seenW = Screen.width; seenH = Screen.height; seenSize = uiSize.val; KeepOnScreen(); }
+            // two copies of Brene at once (a session plugin and one in the scene) fight over the camera and the menu key: say so
+            if (twiceCheckAt > 0 && Time.realtimeSinceStartup > twiceCheckAt)
+            {
+                twiceCheckAt = -1; int copies = 0;
+                foreach (var c in UnityEngine.Object.FindObjectsOfType<Canvas>()) if (c != null && c.name == "Brene menu") copies++;
+                twice = copies > 1; if (twice) Report("Brene is loaded twice (as a session plugin and in this scene?). Remove one copy: two fight over the camera and the menu key.");
+            }
+            if (status != null && Time.realtimeSinceStartup > nextStatus)
+            {
+                nextStatus = Time.realtimeSinceStartup + 0.5f;
+                string s;
+                if (!link.Connected) s = "Relay: not running (start-brene.bat)";
+                else s = "Glasses: " + (link.Glasses ? (link.HasPos ? "6DOF" : "3DOF") : "none") + "   Hands: " + link.Hands.Count + (vit.HandNote != "" ? "   " + vit.HandNote : "");
+                if (twice) s = "Brene is loaded twice: remove one copy";
+                if (BreneEdit.On) s = "Editing: drag titles to move, corners to resize, buttons between panels";
+                status.text = s;
+            }
+        }
+        // the wider view for "Fit VaM menu": VaM's own field of view is the base; ours is added on top each frame
+        void FitMenu()
+        {
+            if (vr) return; var cam = Vam.MonitorCam(); if (cam == null) return;
+            if (Mathf.Abs(cam.fieldOfView - fovWrote) > 0.01f) fovBase = cam.fieldOfView;   // VaM (or its preferences) set it: that is the base
+            if (menuFit.val <= 0.01f) { if (fovWrote >= 0) { cam.fieldOfView = fovBase; fovWrote = -1; } return; }
+            cam.fieldOfView = Mathf.Clamp(fovBase + menuFit.val, 10f, 120f); fovWrote = cam.fieldOfView;
+        }
+        void LateUpdate()
+        {
+            if (menuFit == null) return;   // Brene could not start
+            try { FitMenu(); TickVamMenu(); TickMR(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } } catch (Exception e) { FrameError("late update", e); }
+        }
+
+        // leaving (plugin removed or reloaded, scene closed): everything Brene changed in VaM is put back, each part on its own so
+        // one that fails cannot leave the panels or the camera behind
+        void OnDestroy()
+        {
+            try { if (vit != null) vit.Shutdown(); } catch (Exception e) { Report("Brene closing (camera): " + e.Message); }
+            try { if (vr) LeaveVR(); } catch (Exception e) { Report("Brene closing (headset): " + e.Message); }
+            try { RestoreVamMenu(); } catch (Exception) { }
+            try { MrStop(); } catch (Exception) { }   // the sky and the scenery come back
+            // the wider view of "Fit VaM menu": back to VaM's own, or the next start would widen an already widened view
+            try { if (fovWrote >= 0) { var cam = Vam.MonitorCam(); if (cam != null && Mathf.Abs(cam.fieldOfView - fovWrote) < 0.01f) cam.fieldOfView = fovBase; fovWrote = -1; } } catch (Exception) { }
+            try { if (radial != null) radial.Close(); } catch (Exception) { }
+            if (canvasGo != null) Destroy(canvasGo);
+            if (radialGo != null) Destroy(radialGo);
+            try { if (coach != null) coach.Destroy(); } catch (Exception) { }
+            try { DropWizra(); } catch (Exception) { }
+            try { DropHands(); } catch (Exception) { }
+            Panel.All.Clear(); BreneEdit.On = false; BreneEdit.Changed = () => { }; BreneEdit.Save = () => { }; BreneHover.Strong = false;
+        }
+    }
+}

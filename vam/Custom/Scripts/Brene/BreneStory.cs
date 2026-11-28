@@ -1,0 +1,210 @@
+// Brene for Virt-a-Mate: Little Shepersville, the VaM side. Brenai's server is every character's mind and keeps the story
+// (day, time, turning points, writing deadlines); VaM is the town and the bodies. Everything goes through the relay's /story/*.
+//   Story panel    the day, time and place; the town's places, each tied to a VaM scene (Go loads it, Set picks its scene).
+//   Turning point  when Brenai has a question waiting (2 to 4 answers), a card opens in the middle (on the board in VR).
+//   Margo's call   on the Phone (BrenePhone.cs): her call faces, changing with what she does in her replies; her voice like a phone call.
+//   The laptop     the cabin laptop for writing: title, text, word count, Save (kept on the PC and sent to Brenai), Tell Margo.
+// Part of BreneMain.
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.Networking;
+using SimpleJSON;
+
+namespace Brene
+{
+    public partial class BreneMain
+    {
+        static readonly string[] PLACES = { "Rental cabin", "Peak Pizza", "Casa Belinda", "Main Street", "Library", "Wizra's flat", "Lodge", "Trail", "Lake" };
+        Panel pStory, pChoice, pLaptop; Flow pickFlow; string storyPlace = "", pickFor = "", shownChoice = "";
+        Text storyLine, choiceText, laptopCount, laptopNote; RectTransform storyPlaces, choiceAnswers;
+        InputField laptopTitle, laptopText; JSONNode storyState, margoInfo; float nextStory; bool storyBusy; int faceAsk;
+        readonly Dictionary<string, Texture2D> pics = new Dictionary<string, Texture2D>();
+
+        void BuildStory(Transform root)
+        {
+            Add("story", "Story", () => Show(pStory), null);
+            Add("laptop", "Laptop", OpenLaptop, null);
+            Add("margo", "Call Margo", CallMargo, null);
+            MakeButton("story", pDock);
+
+            // the story panel: where and when, and the places
+            pStory = new Panel(root, "story", "Little Shepersville", new Vector2(700, -40), new Vector2(560, 640), false);
+            var v = pStory.Body.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 8; v.childControlHeight = true; v.childControlWidth = true; v.childForceExpandHeight = false;
+            var sl = Ui.Rect("Line", pStory.Body); sl.gameObject.AddComponent<LayoutElement>().minHeight = 64;
+            storyLine = Ui.Label(sl, "", 20, Role.Text, TextAnchor.MiddleLeft); storyLine.supportRichText = true;
+            var tools = Flow.Grid(pStory.Body, new Vector2(170, 52));
+            Ui.Button(tools, "Laptop", OpenLaptop); Ui.Button(tools, "Call Margo", CallMargo); Ui.Button(tools, "Talk to...", () => { NextWho(); OpenTexts(talkTo); });
+            Flow.Say(pStory.Body, "Places: Go takes you there (loads its scene). Set picks which VaM scene is that place.");
+            storyPlaces = Ui.Rect("Places", pStory.Body); var pv = storyPlaces.gameObject.AddComponent<VerticalLayoutGroup>(); pv.spacing = 4; pv.childControlHeight = true; pv.childControlWidth = true; pv.childForceExpandHeight = false;
+            pStory.Root.gameObject.SetActive(false);
+
+            // the scene picker for a place (one step of the flow panel)
+            pickFlow = new Flow(root, "pickscene", "Pick a scene", new Vector2(420, -60));
+            pickFlow.Steps.Add(new FlowStep("Scene", "Tap the scene for this place.", c => FlowTiles(pickFlow.Note, c, "scene", (path, name) =>
+            {
+                StartCoroutine(Json("POST", "/story/places", Obj("place", pickFor, "scene", path), (j, e) => { pickFlow.Note(e ?? (pickFor + " is now " + name)); RefreshPlaces(); }));
+            })));
+            pickFlow.Build();
+
+            // a turning point: the question and its answers, in the middle
+            pChoice = new Panel(root, "choice", "A choice", new Vector2(0, 0), new Vector2(620, 420), false); pChoice.CanHide = false;
+            var cv = pChoice.Body.gameObject.AddComponent<VerticalLayoutGroup>(); cv.spacing = 10; cv.childControlHeight = true; cv.childControlWidth = true; cv.childForceExpandHeight = false;
+            var ct = Ui.Rect("Q", pChoice.Body); ct.gameObject.AddComponent<LayoutElement>().minHeight = 110;
+            choiceText = Ui.Label(ct, "", 26, Role.Text, TextAnchor.MiddleCenter); choiceText.fontStyle = FontStyle.Bold;
+            choiceAnswers = Ui.Rect("Answers", pChoice.Body); var av = choiceAnswers.gameObject.AddComponent<VerticalLayoutGroup>(); av.spacing = 8; av.childControlHeight = true; av.childControlWidth = true; av.childForceExpandHeight = false;
+            pChoice.Root.gameObject.SetActive(false);
+
+            // the cabin laptop
+            pLaptop = new Panel(root, "laptop", "Cabin laptop", new Vector2(380, -40), new Vector2(760, 640), false);
+            var tr = Ui.Rect("Title", pLaptop.Body); Ui.Top(tr, 46, 0);
+            laptopTitle = Field(tr, "Chapter title", 22, false);
+            var tx = Ui.Rect("Text", pLaptop.Body); Ui.Fill(tx, 0, 54, 0, 96);
+            laptopText = Field(tx, "Write here...", 20, true);
+            laptopText.onValueChanged.AddListener(s => Count());
+            var nr = Ui.Rect("Note", pLaptop.Body); Ui.Bottom(nr, 30, 60);
+            laptopCount = Ui.Label(nr, "0 words", 17, Role.Dim, TextAnchor.MiddleLeft);
+            var lb = Ui.Rect("Buttons", pLaptop.Body); Ui.Bottom(lb, 54, 0);
+            var lg = lb.gameObject.AddComponent<GridLayoutGroup>(); lg.cellSize = new Vector2(240, 54); lg.spacing = new Vector2(8, 0);
+            Ui.SetOn(Ui.Button(lb, "Save", SaveWriting), true); Ui.Button(lb, "Tell Margo", TellMargo); Ui.Button(lb, "Close", () => pLaptop.Root.gameObject.SetActive(false));
+            laptopNote = laptopCount;
+            pLaptop.Root.gameObject.SetActive(false);
+            RefreshPlaces();
+        }
+
+        InputField Field(RectTransform rt, string hint, int size, bool multi)
+        {
+            Ui.Box(rt, Role.Field); var f = rt.gameObject.AddComponent<InputField>();
+            var ph = Ui.Label(rt, hint, size, Role.Dim, multi ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft); ph.fontStyle = FontStyle.Italic;
+            var t = Ui.Label(rt, "", size, Role.Text, multi ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft); t.supportRichText = false; t.raycastTarget = true;
+            if (multi) { ((RectTransform)t.transform).offsetMin = new Vector2(10, 8); ((RectTransform)t.transform).offsetMax = new Vector2(-10, -8); ((RectTransform)ph.transform).offsetMax = new Vector2(-10, -8); }
+            f.textComponent = t; f.placeholder = ph; f.lineType = multi ? InputField.LineType.MultiLineNewline : InputField.LineType.SingleLine;
+            return f;
+        }
+        void Show(Panel p) { p.Root.gameObject.SetActive(true); p.Root.SetAsLastSibling(); }
+
+        // ---- talking to the relay ----
+        static JSONClass Obj(params string[] kv) { var j = new JSONClass(); for (int i = 0; i + 1 < kv.Length; i += 2) j[kv[i]] = kv[i + 1]; return j; }
+        // a story question to the relay (the shared request in BreneLink, 15 seconds at most); done(answer, error)
+        IEnumerator Json(string method, string path, JSONNode body, Action<JSONNode, string> done) { return link.Json(method, path, body, 15, done); }
+        // a story picture, kept once fetched (a handful of call faces); done is only run when there is a picture
+        void Picture(string rel, Action<Texture2D> done)
+        {
+            Texture2D t; if (pics.TryGetValue(rel, out t) && t != null) { done(t); return; }
+            StartCoroutine(link.Picture("/story/media?p=" + UnityWebRequest.EscapeURL(rel), (Texture2D tex) => { if (tex == null) return; pics[rel] = tex; done(tex); }));
+        }
+
+        // ---- every couple of seconds: the story's state, and a turning point if one is waiting ----
+        void TickStory()
+        {
+            if (pStory == null || storyBusy || !link.Connected || Time.realtimeSinceStartup < nextStory) return;
+            nextStory = Time.realtimeSinceStartup + 2f; storyBusy = true;
+            StartCoroutine(Json("GET", "/story/state", null, (j, e) =>
+            {
+                storyBusy = false; if (j == null) return; storyState = j;
+                PhoneEvents(j, true);   // a call coming in, unread texts
+                storyPlace = j["place"].Value;
+                var line = j["live"].AsBool
+                    ? "<b>Day " + j["day"].Value + "</b>, " + j["time"].Value + (storyPlace != "" ? "   at <b>" + storyPlace + "</b>" : "")
+                    : "<color=#ffb070>" + (j["note"].Value != "" ? j["note"].Value : "The story is not running yet") + "</color>" + (storyPlace != "" ? "\nYou are at <b>" + storyPlace + "</b>" : "");
+                storyLine.text = line;
+                var pend = j["pending"];
+                if (pend != null && pend["id"] != null && pend["id"].Value != "" && pend["id"].Value != shownChoice) ShowChoice(pend);
+            }));
+        }
+
+        void ShowChoice(JSONNode pend)
+        {
+            shownChoice = pend["id"].Value; choiceText.text = pend["question"].Value;
+            for (int i = choiceAnswers.childCount - 1; i >= 0; i--) Destroy(choiceAnswers.GetChild(i).gameObject);
+            var ans = pend["answers"].AsArray; if (ans == null) return;
+            for (int i = 0; i < ans.Count && i < 4; i++)
+            {
+                int k = i; string label = ans[i].Value;
+                Flow.Wide(choiceAnswers, label, () =>
+                {
+                    var body = new JSONClass(); body["id"] = shownChoice; body["answer"].AsInt = k;
+                    StartCoroutine(Json("POST", "/story/choose", body, (j, e) => { PhoneEvents(j, false); if (e != null) Line("<color=#ff8a8a>" + Esc(e) + "</color>"); else { Line("<i>You chose: " + Esc(label) + "</i>"); pChoice.Root.gameObject.SetActive(false); } }));
+                }, k == 0);
+            }
+            // in the middle of the screen (or the board), above everything
+            var size = vr ? BoardSize() : new Vector2(Screen.width / uiSize.val, Screen.height / uiSize.val);
+            pChoice.Root.anchoredPosition = new Vector2((size.x - pChoice.Root.sizeDelta.x) / 2, -(size.y - pChoice.Root.sizeDelta.y) / 2);
+            Show(pChoice);
+        }
+
+        // ---- places ----
+        void RefreshPlaces()
+        {
+            if (storyPlaces == null) return;
+            StartCoroutine(Json("GET", "/story/places", null, (j, e) =>
+            {
+                for (int i = storyPlaces.childCount - 1; i >= 0; i--) Destroy(storyPlaces.GetChild(i).gameObject);
+                var map = j != null ? j["places"] : null;
+                foreach (var pl in PLACES)
+                {
+                    var place = pl; bool set = map != null && map[place] != null && map[place].Value != "";
+                    var row = Flow.Grid(storyPlaces, new Vector2(170, 48));
+                    Ui.Label(Ui.Rect("Name", row), place, 19, set ? Role.Text : Role.Dim, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
+                    Ui.SetOn(Ui.Button(row, set ? "Go" : "Go (no scene)", () => GoTo(place)), set);
+                    Ui.Button(row, set ? "Change scene" : "Set scene", () => { pickFor = place; pickFlow.Steps[0].Hint = "Tap the VaM scene that is " + place + "."; pickFlow.Open(0); });
+                }
+            }));
+        }
+        void GoTo(string place)
+        {
+            StartCoroutine(Json("POST", "/story/goto", Obj("place", place), (j, e) =>
+            {
+                if (e != null) { Line("<color=#ff8a8a>" + Esc(e) + "</color>"); return; }
+                storyPlace = place; if (j["note"] != null && j["note"].Value != "") Line("<i>" + Esc(j["note"].Value) + "</i>"); else Line("<i>Going to " + place + "...</i>");
+            }));
+        }
+
+        // ---- Margo's call (on the Phone) ----
+        void CallMargo() { CallContact("margo"); }
+        void MargoHeard(string reply)
+        {
+            if (callWho != "margo") return;
+            var f = Feeling(reply);
+            Face(f == "smile" ? "smiling" : f == "frown" ? "stern" : f == "surprise" ? "delighted" : "listening", "");
+        }
+        // a call face by mood (warm, listening, smiling, delighted, skeptical, stern, evening, weekend)
+        void Face(string mood, string caption)
+        {
+            if (margoInfo == null || callFace == null) return; var calls = margoInfo["call"].AsArray; if (calls == null) return;
+            string file = null; for (int i = 0; i < calls.Count; i++) if (calls[i]["mood"].Value == mood) file = calls[i]["file"].Value;
+            if (file == null && calls.Count > 0) file = calls[0]["file"].Value;
+            if (file == null) return;
+            callCaption.text = caption != "" ? caption : "Margo · " + mood;
+            int ask = ++faceAsk;   // a slower, older face must not land on top of a newer one
+            Picture("margo/" + file, (Texture2D t) => { if (ask == faceAsk && callFace != null && callWho == "margo") { Pics.Show(callFace, t, false); callInitial.text = ""; } });
+        }
+
+        // ---- the laptop ----
+        void OpenLaptop()
+        {
+            Show(pLaptop);
+            StartCoroutine(Json("GET", "/story/writing", null, (j, e) =>
+            {
+                if (j == null) { laptopNote.text = e; return; }
+                if (laptopText.text == "" && j["text"].Value != "") { laptopTitle.text = j["title"].Value; laptopText.text = j["text"].Value; }
+                Count();
+            }));
+        }
+        int Words() { int n = 0; bool inWord = false; foreach (var ch in laptopText.text) { bool w = !char.IsWhiteSpace(ch); if (w && !inWord) n++; inWord = w; } return n; }
+        void Count() { if (laptopCount != null) laptopCount.text = Words() + " words"; }
+        void SaveWriting()
+        {
+            var body = Obj("title", laptopTitle.text == "" ? "Untitled" : laptopTitle.text, "text", laptopText.text);
+            StartCoroutine(Json("POST", "/story/writing", body, (j, e) => laptopNote.text = e ?? (j["words"].Value + " words saved" + (j["sentToBrenai"].AsBool ? ", sent to Brenai" : " on this PC"))));
+        }
+        void TellMargo()
+        {
+            SaveWriting();
+            var title = laptopTitle.text == "" ? "my pages" : "\"" + laptopTitle.text + "\"";
+            CallMargo(); SayTo("margo", "*sends her " + title + ", " + Words() + " words*", null);
+        }
+    }
+}

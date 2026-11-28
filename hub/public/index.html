@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brenebase</title>
+<meta name="theme-color" content="#14161c">
+<style>
+:root{--bg:#14161c;--card:#1e222b;--line:#2d3340;--text:#e8eaf0;--dim:#9aa3b5;--acc:#6aa8ff;--ok:#4cc38a;--warn:#e5b54a;--bad:#e5645a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,sans-serif}
+header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:5}
+#lights .dot{margin-left:6px}.dot.mid{background:var(--warn)}
+header b{font-size:18px}.dot{width:9px;height:9px;border-radius:50%;background:var(--bad);display:inline-block}.dot.on{background:var(--ok)}
+nav{margin-left:auto;display:flex;gap:6px}nav button{background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:5px 10px}nav button.on{color:var(--text);border-color:var(--acc)}
+main{max-width:720px;margin:0 auto;padding:14px}
+textarea{width:100%;min-height:96px;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;resize:vertical}
+button.go{background:var(--acc);color:#081020;border:0;border-radius:10px;padding:10px 16px;font-weight:600}
+button.sm{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+select{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+.dim{color:var(--dim);font-size:14px}.tag{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--dim)}
+.st-waiting{color:var(--warn)}.st-done{color:var(--ok)}.st-failed{color:var(--bad)}.st-queued,.st-running{color:var(--acc)}.st-held,.st-cancelled{color:var(--dim)}.st-waiting-answer,.st-reviewing{color:var(--warn)}
+pre{white-space:pre-wrap;word-break:break-word;background:#0f1116;border-radius:8px;padding:10px;font-size:13px;max-height:340px;overflow:auto}
+h3{margin:18px 0 6px}.mode{margin:4px 0 4px 10px}
+#login{display:none}
+</style></head><body>
+<header><b>Brenebase</b><span class="dim" id="lights"><span id="adot" class="dot"></span> PC <span id="mdot" class="dot"></span> Model <span id="wdot" class="dot"></span> Worker</span>
+<nav><button data-tab="send" class="on">Send</button><button data-tab="jobs">Jobs</button><button data-tab="projects">Projects</button><button data-tab="pc">PC</button><button data-tab="tools">Tools</button></nav></header>
+<main>
+<div id="login" class="card"><p>Password</p><div class="row"><input id="pw" type="password" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="go" id="loginBtn">Go</button></div></div>
+
+<section id="send">
+  <textarea id="thought" placeholder="Dump the thought here. The hub picks where it goes."></textarea>
+  <div class="row"><button class="go" id="routeBtn">Route it</button><button class="go" id="splitBtn" style="background:#b48cff">Split it</button><span class="dim">Wrap private parts in [[local]] ... [[/local]]</span></div>
+  <div id="pick" class="card" style="display:none">
+    <div id="why" class="dim"></div>
+    <div class="row"><select id="tool"></select><select id="mode"></select><select id="area"></select><select id="proj"></select></div>
+    <div id="hints"></div>
+    <div id="vetBox"></div>
+    <div class="row"><select id="autonomy"></select><span id="autoDoes" class="dim" style="flex:1;min-width:160px"></span></div>
+    <div id="does" class="dim"></div>
+    <div id="extra"></div>
+    <div class="row"><button class="go" id="sendBtn">Send</button><span id="q" class="dim"></span></div>
+  </div>
+  <div id="splitBox" class="card" style="display:none">
+    <b>Code part</b> <span class="dim">(goes to Claude Code, one rule per line)</span>
+    <textarea id="sp_mech"></textarea>
+    <b>Art part</b> <span class="dim">(Meshy, Blender or you. Never sent to Claude)</span>
+    <textarea id="sp_art" style="min-height:60px"></textarea>
+    <b>Story part</b> <span class="dim">(your PC model. Never sent to Claude)</span>
+    <textarea id="sp_story" style="min-height:60px"></textarea>
+    <b>Slots</b> <span class="dim">(what the code loads; Claude sees only the id, path and format)</span>
+    <div id="sp_slots"></div>
+    <div class="row"><select id="sp_addType"></select><button class="sm" id="sp_add">Add slot</button></div>
+    <div id="sp_leaks"></div>
+    <details open><summary><b>Exactly what Claude Code gets</b></summary><pre id="sp_brief"></pre></details>
+    <div class="row"><input id="sp_repo" placeholder="Repo (owner/name)" value="brenemanandrew/Brenelandtest" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="go" id="sp_send">Send the parts</button></div>
+  </div>
+  <div id="last"></div>
+</section>
+<section id="jobs" style="display:none"><div id="jobList"></div></section>
+<section id="projects" style="display:none"><div class="row"><button class="sm" id="syncBtn">Update notes now</button><span id="syncMsg" class="dim"></span></div><div id="projList"></div></section>
+<section id="pc" style="display:none"><div id="pcBox"></div></section>
+<section id="tools" style="display:none"><div id="catalogue"></div></section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let CAT = null;
+const api = async (p, b) => { const r = await fetch(p, b ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) } : {}); if (r.status === 401) { $('login').style.display = 'block'; throw new Error('login'); } return r.json(); };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => { document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b)); for (const s of ['send', 'jobs', 'projects', 'pc', 'tools']) $(s).style.display = s === b.dataset.tab ? '' : 'none'; if (b.dataset.tab === 'jobs') jobs(); if (b.dataset.tab === 'projects') projects(); if (b.dataset.tab === 'pc') pc(); });
+$('loginBtn').onclick = async () => { await api('/api/login', { password: $('pw').value }).catch(() => {}); $('login').style.display = 'none'; boot(); };
+
+function fillModes(sel) { const t = CAT.tools.find(t => t.id === $('tool').value); $('mode').innerHTML = Object.entries(t.modes).map(([k, m]) => `<option value="${k}">${esc(m.label)}</option>`).join(''); if (sel && t.modes[sel]) $('mode').value = sel; showDoes(); }
+function showDoes() {
+  const t = CAT.tools.find(t => t.id === $('tool').value), m = t.modes[$('mode').value];
+  $('does').textContent = m.does;
+  const need = { 'make3d:generate': ['image_url', 'Picture link (optional)'], 'make3d:retexture': ['model_url', 'Model link'], 'make3d:rig': ['model_url', 'Model link'], 'make3d:process': ['in', 'Model file on the PC'], 'coder:build': ['repo', 'Repo (owner/name)'], 'coder:fix': ['repo', 'Repo (owner/name)'], 'coder:brief': ['repo', 'Repo (owner/name)'] }[`${t.id}:${$('mode').value}`];
+  $('extra').innerHTML = need ? `<div class="row"><input id="x_${need[0]}" placeholder="${esc(need[1])}" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"></div>` : '';
+}
+$('tool').onchange = () => fillModes(); $('mode').onchange = showDoes;
+
+let routed = null;
+$('routeBtn').onclick = async () => {
+  const text = $('thought').value.trim(); if (!text) return;
+  $('routeBtn').disabled = true;
+  try {
+    routed = await api('/api/route', { text });
+    $('pick').style.display = '';
+    $('why').textContent = (routed.why || '') + (routed.by ? `  (by ${routed.by}, ${Math.round((routed.confidence || 0) * 100)}%)` : '');
+    $('tool').value = routed.pick ? routed.pick.tool : 'planner'; fillModes(routed.pick && routed.pick.mode);
+    $('area').value = routed.area || 'hobby';
+    $('q').textContent = routed.question || '';
+    $('proj').value = routed.project ? routed.project.id : '';
+    const tg = routed.tags || {}, v = routed.vet || { parts: [] };
+    const tagLine = tg.found && tg.found.length ? `<div class="row" style="margin:6px 0">${tg.found.map(t => `<span class="tag">${esc(t)}</span>`).join('')}<span class="dim">${routed.project ? esc(routed.project.name) : ''}${tg.focus ? ', ' + esc(tg.focus) : ''}${tg.projects && tg.projects.length > 1 ? ' (tags name more than one project; the first is used)' : ''}</span></div>` : '';
+    const needs = routed.project && routed.project.needsInfo ? `<p class="st-waiting">${esc(routed.project.name)} has no details yet. Tell Brenebase about it on the Projects tab so agents get context.</p>` : '';
+    $('vetBox').innerHTML = tagLine + needs + (v.suggest === 'parts' ? `<div class="card" style="border-color:var(--acc)"><b>This has ${v.parts.length} parts.</b> Each goes to its own tool and through its own checks.${v.parts.map(p => `<div class="mode"><span class="tag">${esc(p.label)}</span> ${esc(p.text)}</div>`).join('')}<div class="row"><button class="go" id="partsBtn">Send as parts</button><span class="dim">or Send below to keep it as one job</span></div></div>` : v.suggest === 'split' ? `<div class="card" style="border-color:#b48cff"><b>This is a build with art or story in it.</b> Use <b>Split it</b> so Claude only gets the code part and the rest is merged later.</div>` : '');
+    if ($('partsBtn')) $('partsBtn').onclick = async () => { const j = await api('/api/jobs/parts', { text: $('thought').value, parts: v.parts, project: $('proj').value, area: $('area').value, autonomy: $('autonomy').value, repo: tg.repo }); $('last').innerHTML = jobCard(j); $('pick').style.display = 'none'; $('thought').value = ''; jobs(); };
+    $('hints').innerHTML = routed.hints && routed.hints.length ? `<div class="dim" style="margin-top:6px">Already known in ${esc(routed.project.name)}:</div>` + routed.hints.map(h => `<div class="mode"><span class="tag">${esc(h.kind)}</span> ${esc(h.text)}</div>`).join('') : '';
+  } finally { $('routeBtn').disabled = false; }
+};
+$('sendBtn').onclick = async () => {
+  const args = {}; let repo;
+  document.querySelectorAll('#extra input').forEach(i => { const k = i.id.slice(2); if (!i.value) return; if (k === 'repo') repo = i.value; else args[k] = i.value; });
+  const j = await api('/api/jobs', { text: $('thought').value, tool: $('tool').value, mode: $('mode').value, area: $('area').value, autonomy: $('autonomy').value, args, repo: repo || (routed && routed.tags && routed.tags.repo), project: $('proj').value, target: routed && routed.target });
+  $('last').innerHTML = jobCard(j); $('pick').style.display = 'none'; $('thought').value = '';
+};
+
+function jobCard(j) {
+  const r = j.result || {};
+  const btns = (j.status === 'waiting' ? `<button class="sm" onclick="act('${j.id}','approve')">${j.backend === 'split' ? 'OK, merge it' : 'OK, run it'}</button> ` : '') + (['waiting', 'queued', 'running'].includes(j.status) ? `<button class="sm" onclick="act('${j.id}','cancel')">Cancel</button> ` : '') + (j.backend === 'meshy' && j.status === 'running' ? `<button class="sm" onclick="act('${j.id}','refresh')">Check Meshy</button>` : '');
+  return `<div class="card"><div class="row" style="margin:0"><b>${esc(j.label)}</b>${j.area ? `<span class="tag">${esc(j.area)}</span>` : ''}<span class="tag">${esc(j.runsOn)}</span><span class="st-${j.status}">${j.status}</span></div>
+  <div class="dim">${esc((j.text || '').slice(0, 160))}</div>
+  ${j.error ? `<p class="st-failed">${esc(j.error)}</p>` : ''}
+  ${r.link ? `<p><a href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open</a></p>` : ''}
+  ${r.thumb ? `<img src="${esc(r.thumb)}" style="max-width:100%;border-radius:8px">` : ''}
+  ${r.branch ? `<p class="dim">Branch: ${esc(r.branch)}</p>` : ''}
+  ${r.review ? `<div class="card" style="margin:8px 0;border-color:${r.review.verdict === 'ok' ? 'var(--ok)' : r.review.verdict === 'fixed' ? 'var(--warn)' : 'var(--bad)'}"><b>Claude Opus check: ${esc({ ok: 'no changes needed', fixed: 'corrected', unreliable: 'too wrong to use', unchecked: 'not checked' }[r.review.verdict] || r.review.verdict)}</b><div class="dim">${esc(r.review.note || '')}</div>${(r.review.corrections || []).map(c => `<div class="mode"><span class="st-failed">was:</span> ${esc(c.was)}<br><span class="st-done">now:</span> ${esc(c.now)}<br><span class="dim">why: ${esc(c.why)}</span></div>`).join('')}${r.original && r.original !== r.text ? `<details><summary class="dim">Copilot's original answer</summary><pre>${esc(r.original)}</pre></details>` : ''}</div>` : ''}
+  ${r.relay ? `<p class="dim">Copy this into Copilot, then paste its answer below.</p><div class="row"><button class="sm" onclick="navigator.clipboard.writeText(document.getElementById('rp_${j.id}').textContent)">Copy</button><a class="sm" href="${esc(r.link)}" target="_blank" style="color:var(--acc)">Open Copilot</a></div><pre id="rp_${j.id}">${esc(r.text)}</pre><textarea id="ra_${j.id}" placeholder="Paste Copilot's answer here" style="min-height:70px"></textarea><div class="row"><button class="sm" onclick="pasteBack('${j.id}')">Save answer</button></div>` : r.text ? `<pre>${esc(r.text)}</pre>` : ''}
+  ${j.slots ? `<div class="dim" style="margin:6px 0">Stage: ${esc(j.stage)}</div>` + j.slots.map(x => `<div class="row" style="margin:3px 0"><span class="${x.fill ? 'st-done' : 'st-waiting'}">${x.fill ? 'filled' : 'empty'}</span><b>${esc(x.id)}</b><span class="dim">${x.fill ? 'from ' + esc(x.fill.from || x.fill.source) : ''}</span><button class="sm" onclick="fill('${j.id}','${x.id}')">${x.fill ? 'Replace' : 'Fill'}</button></div>`).join('') : ''}
+  ${j.project ? `<span class="tag">${esc(j.project)}</span>` : ''}
+  ${j.parent ? `<div class="dim">Part of split ${esc(j.parent)}</div>` : ''}
+  ${j.status === 'queued' && j.prompt ? `<details><summary class="dim">What goes to Claude Code</summary><pre>${esc(j.prompt)}</pre></details>` : ''}
+  <div class="row">${btns}</div></div>`;
+}
+/* ---- split ---- */
+let SP = null;
+const lines = id => $(id).value.split('\n').map(x => x.trim()).filter(Boolean);
+async function spRefresh(add) {
+  if (SP) { SP.mechanics = lines('sp_mech'); SP.art = lines('sp_art'); SP.story = lines('sp_story'); }
+  const d = await api('/api/split/plan', SP ? { plan: SP, repo: $('sp_repo').value, add } : { text: $('thought').value, repo: $('sp_repo').value });
+  SP = d.plan;
+  $('sp_mech').value = SP.mechanics.join('\n'); $('sp_art').value = SP.art.join('\n'); $('sp_story').value = SP.story.join('\n');
+  $('sp_slots').innerHTML = SP.slots.map((x, i) => `<div class="row" style="margin:4px 0"><span class="tag">${x.side}</span><b>${esc(x.id)}</b><span class="dim">${esc(x.path)}</span><button class="sm" onclick="spDrop(${i})">Remove</button></div>`).join('') || '<p class="dim">No slots found. Add the ones the game needs.</p>';
+  $('sp_addType').innerHTML = d.types.map(t => `<option>${t}</option>`).join('');
+  $('sp_brief').textContent = d.brief.replace(/hub\/NEW/g, 'hub/<job id>');
+  $('sp_leaks').innerHTML = d.leaks.length ? `<p class="st-waiting">These words from your art or story also appear in the code part: <b>${d.leaks.map(esc).join(', ')}</b>. Reword the code part if they should stay private.</p>` : '<p class="st-done">Nothing from the art or story part is in what Claude gets.</p>';
+}
+window.spDrop = i => { SP.slots.splice(i, 1); spRefresh(); };
+$('splitBtn').onclick = async () => { if (!$('thought').value.trim()) return; SP = null; $('pick').style.display = 'none'; $('splitBox').style.display = ''; await spRefresh(); };
+$('sp_add').onclick = () => spRefresh($('sp_addType').value);
+let spT = 0; for (const id of ['sp_mech', 'sp_art', 'sp_story']) $(id).oninput = () => { clearTimeout(spT); spT = setTimeout(() => spRefresh(), 600); };
+$('sp_send').onclick = async () => {
+  SP.mechanics = lines('sp_mech'); SP.art = lines('sp_art'); SP.story = lines('sp_story');
+  const j = await api('/api/split/run', { text: $('thought').value, plan: SP, repo: $('sp_repo').value });
+  if (j.error) return alert(j.error);
+  $('splitBox').style.display = 'none'; $('thought').value = ''; $('last').innerHTML = jobCard(j);
+};
+window.fill = async (id, slot) => { const v = prompt(`Link, PC file path, or JSON for ${slot}`); if (v == null) return; const source = /^https?:/.test(v) ? 'url' : /^[\[{]/.test(v.trim()) ? 'text' : 'pcpath'; await api(`/api/jobs/${id}/fill`, { slot, source, value: v }); jobs(); };
+
+/* ---- projects ---- */
+const ago = t => { const m = Math.round((Date.now() - t) / 60000); return m < 60 ? m + ' min ago' : m < 2880 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' days ago'; };
+async function projects() {
+  const d = await api('/api/projects');
+  const list = (title, arr, help, id) => arr && arr.length ? `<details><summary><b>${title}</b> <span class="dim">(${arr.length})</span></summary>${arr.map(x => { const t = typeof x === 'string' ? x : x.name ? `<b>${esc(x.name)}</b>${x.value ? ' = ' + esc(x.value) : ''} <span class="dim">${esc(x.what || x.note || '')}${x.use_when ? '. Use when: ' + esc(x.use_when) : ''}</span>` : esc(x.text); return `<div class="mode">${typeof x === 'string' ? esc(t) : t}${help ? ` <button class="sm" onclick="help('${id}', this)" data-item="${esc(typeof x === 'string' ? x : x.text || x.name)}">Get help</button>` : ''}</div>`; }).join('')}</details>` : '';
+  const live = d.projects.filter(c => !c.archived), arch = d.projects.filter(c => c.archived);
+  $('projList').innerHTML = (arch.length ? `<details class="card"><summary><b>Archived</b> <span class="dim">(${arch.length})</span></summary>${arch.map(c => `<div class="mode"><b>${esc(c.name)}</b> <span class="dim">${esc(c.what)}</span></div>`).join('')}</details>` : '') + live.map(c => {
+    const src = Object.values(c.live.sources || {});
+    const liveItems = src.flatMap(x => (x.items || []).map(i => `${i.section}: ${i.text}`));
+    return `<div class="card"><div class="row" style="margin:0"><b>${esc(c.name)}</b><span class="tag">${esc(c.area)}</span>${c.private ? '<span class="tag">stays on PC</span>' : ''}${c.needs_info ? '<span class="st-waiting">needs your info</span>' : ''}</div>
+      <div class="dim">${esc(c.what)}</div>
+      ${list('Where', c.where)}${list('Tools', c.tools)}${list('Settings', c.settings)}${list('Works', c.working)}${list('Known problems', c.broken, true, c.id)}${list('Open', c.open, true, c.id)}${list('Rules for agents', c.rules)}${list('Do not redo', c.avoid_redoing)}
+      ${list('From its own notes (auto)', liveItems.slice(0, 60))}
+      ${c.live.changes && c.live.changes.length ? list('Recently added', c.live.changes.slice(0, 5).flatMap(x => x.added.map(a => `${ago(x.at)}, ${x.source}: ${a}`))) : ''}
+      <div class="dim" style="margin-top:6px">Sources: ${src.length ? src.map(x => `${esc(x.label)} ${x.error ? '<span class="st-failed">' + esc(x.error) + '</span>' : 'checked ' + ago(x.checked)}`).join('; ') : (c.sources || []).length ? 'not read yet' : 'none yet'}</div></div>`;
+  }).join('');
+}
+window.help = async (id, btn) => { btn.disabled = true; const j = await api(`/api/projects/${id}/help`, { item: btn.dataset.item }); btn.textContent = j.label ? `Sent: ${j.label}` : 'Failed'; };
+$('syncBtn').onclick = async () => { $('syncMsg').textContent = 'reading...'; const r = await api('/api/projects/sync', {}); $('syncMsg').textContent = `${r.report.filter(x => /new/.test(x) && !/ 0 new/.test(x)).length} sources changed, ${r.report.filter(x => /FAILED/.test(x)).length} failed, ${r.pcFiles} PC files asked for`; projects(); };
+
+/* ---- PC: the agent on Andrew's PC, reached over Tailscale or by its polling ---- */
+async function pc(quiet) {
+  const d = await api('/api/pc'); const st = d.status;
+  const loaded = st && st.model && st.model.loaded.length;
+  $('adot').className = 'dot' + (d.reach === 'tailscale' ? ' on' : d.reach === 'polling' ? ' on' : '');
+  $('mdot').className = 'dot' + (loaded ? ' on' : st && st.model && st.model.server ? ' mid' : '');
+  $('wdot').className = 'dot' + (d.worker.online ? ' on' : '');
+  if (quiet) return;
+  const btn = (a, label) => `<button class="sm" onclick="pcDo('${a}', this)">${label}</button>`;
+  const helpers = st ? Object.entries(st.helpers).map(([k, h]) => `<div class="row" style="margin:4px 0"><span class="${h.running ? 'st-done' : 'st-waiting'}">${h.running ? 'running' : h.setUp ? 'stopped' : 'not set up'}</span><b>${esc(h.label)}</b>${h.setUp ? (h.running ? btn('stop:' + k, 'Stop') : btn('start:' + k, 'Start')) + btn('logs:' + k, 'Log') : ''}</div>`).join('') : '';
+  $('pcBox').innerHTML = `<div class="card"><div class="row" style="margin:0"><b>${st ? esc(st.pc) : 'Your PC'}</b><span class="tag">${d.reach === 'tailscale' ? 'Tailscale, direct' : d.reach === 'polling' ? 'reached by polling' : 'offline'}</span>${d.reach !== 'tailscale' && !d.tailscaleSetUp ? '<span class="tag">Tailscale not set up on Brenebase</span>' : ''}</div>
+    ${st ? `<p class="dim">Checked ${d.statusAge != null ? d.statusAge + ' s ago' : 'just now'}. Up ${Math.round(st.uptimeMin / 60)} h.</p>` : '<p class="dim">No word from the PC agent. Is the PC on and awake, and the agent installed?</p>'}
+    <div class="row">${btn('start-all', 'Start everything')}${btn('stop-all', 'Stop everything')}${btn('status', 'Refresh')}</div></div>
+    ${st ? `<div class="card"><div class="row" style="margin:0"><span class="${loaded ? 'st-done' : 'st-waiting'}">${loaded ? 'loaded' : st.model.server ? 'server up, no model' : 'off'}</span><b>Model</b><span class="dim">${esc(st.model.name)}, ${st.model.context} context</span>${loaded ? btn('model-stop', 'Unload') : btn('model-start', 'Load')}</div>${loaded ? `<div class="dim">${st.model.loaded.map(esc).join(', ')}</div>` : ''}${st.model.lmsFound ? '' : '<p class="st-failed">lms not found on the PC (set LMS)</p>'}</div><div class="card">${helpers}</div>` : ''}
+    <div class="card"><div class="row" style="margin:0"><span class="${d.worker.online ? 'st-done' : 'st-waiting'}">${d.worker.online ? 'online' : 'offline'}</span><b>Worker</b><span class="dim">${esc((d.worker.can || []).join(', '))}</span></div></div>
+    <pre id="pcOut" style="display:none"></pre>
+    <details class="card"><summary><b>Set up the PC (once)</b></summary><p class="dim">In PowerShell on the PC:</p><pre>irm ${location.origin}/pc/install-agent.ps1 | iex</pre><p class="dim">For the direct path, install Tailscale on the PC and put a Tailscale auth key in Brenebase's TS_AUTHKEY secret, and the PC's tailnet name in PC_TAILNET_HOST. Without Tailscale the agent still works by checking in every few seconds.</p></details>`;
+}
+window.pcDo = async (a, b) => { b.disabled = true; b.textContent = '...'; const r = await api('/api/pc/do', { action: a }); $('pcOut').style.display = ''; $('pcOut').textContent = `${a} (${r.via || ''}): ${r.ok ? 'ok' : 'not done'}\n${r.note || ''}`; await pc(); };
+setInterval(() => pc(true).catch(() => {}), 15000);
+
+window.pasteBack = async id => { const v = $('ra_' + id).value.trim(); if (!v) return; await api(`/api/jobs/${id}/answer`, { text: v }); jobs(); };
+window.act = async (id, what) => { const j = await api(`/api/jobs/${id}/${what}`, {}); jobs(); if ($('last').innerHTML.includes(id)) $('last').innerHTML = jobCard(j); };
+async function jobs() { const d = await api('/api/jobs'); $('jobList').innerHTML = d.jobs.map(jobCard).join('') || '<p class="dim">No jobs yet.</p>'; }
+
+async function boot() {
+  CAT = await api('/api/catalogue');
+  pc(true).catch(() => {});
+  $('tool').innerHTML = CAT.tools.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  const PJS = (await api('/api/projects')).projects.filter(c => !c.archived); $('proj').innerHTML = '<option value="">No project</option>' + PJS.map(c => `<option value="${c.id}">${esc(c.name.split(' (')[0])}</option>`).join('');
+  $('area').innerHTML = Object.entries(CAT.areas).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
+  $('autonomy').innerHTML = Object.entries(CAT.autonomy).map(([k, v]) => `<option value="${k}"${k === 'draft' ? ' selected' : ''}>${k}</option>`).join('');
+  const ad = () => $('autoDoes').textContent = CAT.autonomy[$('autonomy').value]; $('autonomy').onchange = ad; ad();
+  fillModes();
+  const ST = await api('/api/settings'), R = ST.copilotRecord;
+  const copilotBox = `<div class="card"><b>Copilot check by Claude Opus</b><div class="row"><select id="revSel">${['complex', 'all', 'off'].map(v => `<option value="${v}"${ST.copilotReview === v ? ' selected' : ''}>${{ complex: 'Check complex answers', all: 'Check every answer', off: 'Off (trust Copilot)' }[v]}</option>`).join('')}</select></div><div class="dim">Track record: ${R.reviewed} checked, ${R.ok} needed no changes, ${R.fixed} corrected (${R.corrections} corrections), ${R.unreliable} too wrong to use${R.reviewed ? `. Clean rate ${Math.round(100 * R.ok / R.reviewed)}%.` : '.'}</div></div>`;
+  const TGS = (await api('/api/tags')).tags;
+  const tagBox = `<div class="card"><b>Tags</b> <span class="dim">Start a request with one (SUI: ..., Hubbell Kaizen: ...). The whole statement is still checked.</span><div id="tagList">${TGS.map((t, i) => `<div class="row" style="margin:3px 0"><b>${esc(t.tag)}</b><span class="dim">${esc(t.note || [t.project, t.focus, t.tool && t.tool + (t.mode ? ':' + t.mode : '')].filter(Boolean).join(', '))}</span><button class="sm" onclick="tagDel(${i})">Remove</button></div>`).join('')}</div><div class="row"><input id="tg_tag" placeholder="Tag" style="width:90px;padding:7px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><select id="tg_proj"><option value="">project</option>${PJS.map(c => `<option value="${c.id}">${esc(c.id)}</option>`).join('')}</select><select id="tg_tool"><option value="">tool</option>${CAT.tools.map(t => `<option value="${t.id}">${esc(t.id)}</option>`).join('')}</select><input id="tg_note" placeholder="what it means" style="flex:1;min-width:120px;padding:7px;border-radius:8px;border:1px solid var(--line);background:#0f1116;color:var(--text)"><button class="sm" id="tagAdd">Add</button></div></div>`;
+  window.TGS = TGS;
+  $('catalogue').innerHTML = copilotBox + tagBox + `<p class="dim">Cloud model: ${CAT.claude ? 'on' : 'off'}. Meshy: ${CAT.meshy ? 'on' : 'off'}. PC worker: ${CAT.worker.online ? 'online (' + CAT.worker.can.join(', ') + ')' : 'offline'}.</p>` + CAT.tools.map(t => `<h3>${esc(t.name)} <span class="tag">${t.type}</span> <span class="tag">${t.runsOn}</span></h3><div class="dim">${esc(t.what)}</div>${Object.values(t.modes).map(m => `<div class="mode"><b>${esc(m.label)}</b> <span class="dim">${esc(m.does)}</span></div>`).join('')}${t.built.length ? `<div class="dim" style="margin-top:4px">Wraps: ${t.built.map(esc).join('; ')}</div>` : ''}`).join('');
+}
+window.tagDel = async i => { const t = window.TGS.slice(); t.splice(i, 1); await api('/api/tags', { tags: t }); boot(); };
+boot().then(() => { if ($('tagAdd')) $('tagAdd').onclick = async () => { const tag = $('tg_tag').value.trim(); if (!tag) return; const t = window.TGS.concat([{ tag, project: $('tg_proj').value || undefined, tool: $('tg_tool').value || undefined, note: $('tg_note').value || undefined }]); await api('/api/tags', { tags: t }); boot(); }; const r = $('revSel'); if (r) r.onchange = () => api('/api/settings', { copilotReview: r.value }); }).catch(() => {});
+setInterval(() => { if ($('jobs').style.display !== 'none') jobs().catch(() => {}); }, 5000);
+</script></body></html>

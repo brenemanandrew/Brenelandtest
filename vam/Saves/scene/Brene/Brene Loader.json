@@ -1,0 +1,22 @@
+{
+   "playerHeightAdjust" : "0",
+   "atoms" : [
+      {
+         "id" : "CoreControl",
+         "on" : "true",
+         "type" : "CoreControl",
+         "position" : { "x" : "0", "y" : "0", "z" : "0" },
+         "rotation" : { "x" : "0", "y" : "0", "z" : "0" },
+         "containerPosition" : { "x" : "0", "y" : "0", "z" : "0" },
+         "containerRotation" : { "x" : "0", "y" : "0", "z" : "0" },
+         "storables" : [
+            {
+               "id" : "PluginManager",
+               "plugins" : {
+                  "plugin#0" : "Custom/Scripts/Brene/Brene.cslist"
+               }
+            }
+         ]
+      }
+   ]
+}
