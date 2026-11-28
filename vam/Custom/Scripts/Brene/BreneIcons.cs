@@ -198,4 +198,84 @@ namespace Brene
         public void Hide() { if (go != null && go.activeSelf) go.SetActive(false); }
         public void Destroy() { if (go != null) UnityEngine.Object.Destroy(go); }
     }
+    // A hand in the headset, drawn the way the owner asked: just the outline of a hand. A smooth see-through hand with a glowing
+    // edge (no bones, no joint dots, no laser dots), turned with the controller. VaM plugins cannot bring their own shaders, so
+    // the glowing edge is painted into a picture once (from distance-to-edge maths over a palm, four fingers and a thumb) and
+    // shown on a small world-space panel lying in the hand's plane; the colour tints it (pale cyan, warm gold when pressing).
+    public class BreneHand
+    {
+        const int W = 160, H = 320;                    // the picture: a right hand seen from the back, fingers up, 10 by 20 cm
+        const float TIPX = 42, TIPY = 302;             // the index fingertip in the picture: it sits on the poke point
+        readonly GameObject go; readonly Image img; readonly bool left;
+        static Sprite sprite;
+
+        public BreneHand(string name, bool left)
+        {
+            this.left = left;
+            go = new GameObject(name);
+            var c = go.AddComponent<Canvas>(); c.renderMode = RenderMode.WorldSpace; c.sortingOrder = 50;
+            var rt = (RectTransform)go.transform; rt.sizeDelta = new Vector2(W, H); rt.pivot = new Vector2(TIPX / W, TIPY / H);
+            var r = Ui.Rect("Hand", rt); Ui.Fill(r, 0, 0, 0, 0);
+            img = r.gameObject.AddComponent<Image>(); img.sprite = Sprite_(); img.raycastTarget = false;
+            go.SetActive(false);
+        }
+
+        // tip = the poke point (index fingertip); rot = the controller's rotation (forward = where it points, up = its top)
+        public void Place(Vector3 tip, Quaternion rot, Color c)
+        {
+            if (go == null) return;
+            if (!go.activeSelf) go.SetActive(true);
+            var t = go.transform;
+            t.rotation = Quaternion.LookRotation(rot * Vector3.up, rot * Vector3.forward);   // lying in the hand's plane, fingers forward
+            t.localScale = new Vector3(left ? -1f : 1f, 1f, 1f) * (0.20f / H);             // a left hand is the right one mirrored
+            t.position = tip;
+            img.color = c;
+        }
+        public void Hide() { if (go != null && go.activeSelf) go.SetActive(false); }
+        public void Destroy() { if (go != null) UnityEngine.Object.Destroy(go); }
+
+        // ---- the picture ----
+        static float Seg(float px, float py, float ax, float ay, float bx, float by, float r)
+        {
+            float dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy; float k = l > 0 ? Mathf.Clamp01(((px - ax) * dx + (py - ay) * dy) / l) : 0;
+            float qx = ax + dx * k - px, qy = ay + dy * k - py; return Mathf.Sqrt(qx * qx + qy * qy) - r;
+        }
+        static float Box(float px, float py, float x0, float y0, float x1, float y1, float r)
+        {
+            float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, hx = (x1 - x0) / 2 - r, hy = (y1 - y0) / 2 - r;
+            float qx = Mathf.Abs(px - cx) - hx, qy = Mathf.Abs(py - cy) - hy;
+            float ox = Mathf.Max(qx, 0), oy = Mathf.Max(qy, 0);
+            return Mathf.Sqrt(ox * ox + oy * oy) + Mathf.Min(Mathf.Max(qx, qy), 0) - r;
+        }
+        // distance to the hand's edge in pixels: below zero inside
+        static float Dist(float x, float y)
+        {
+            float d = Box(x, y, 28, 22, 124, 178, 26);                         // palm, wrist to knuckles
+            d = Mathf.Min(d, Seg(x, y, 42, 168, 42, 290, 12));                  // index
+            d = Mathf.Min(d, Seg(x, y, 70, 172, 70, 300, 12.5f));               // middle
+            d = Mathf.Min(d, Seg(x, y, 97, 168, 97, 286, 12));                  // ring
+            d = Mathf.Min(d, Seg(x, y, 121, 160, 124, 250, 11));                // little finger
+            d = Mathf.Min(d, Seg(x, y, 40, 70, 12, 150, 13));                   // thumb, whole, out to the side
+            return d;
+        }
+        static Sprite Sprite_()
+        {
+            if (sprite != null) return sprite;
+            var tex = new Texture2D(W, H, TextureFormat.RGBA32, false); tex.wrapMode = TextureWrapMode.Clamp;
+            var px = new Color32[W * H];
+            for (int y = 0; y < H; y++) for (int x = 0; x < W; x++)
+            {
+                float d = Dist(x + 0.5f, y + 0.5f);
+                // a bright rim on the edge, a soft glow just outside it, and a faint see-through fill inside
+                float rim = Mathf.Exp(-(d * d) / (2f * 1.6f * 1.6f));
+                float halo = d > 0 ? 0.45f * Mathf.Exp(-d / 3.5f) : 0f;
+                float fill = d < 0 ? 0.10f : 0f;
+                float a = Mathf.Clamp01(Mathf.Max(rim, Mathf.Max(halo, fill)));
+                px[y * W + x] = new Color32(255, 255, 255, (byte)(255 * a));
+            }
+            tex.SetPixels32(px); tex.Apply();
+            sprite = Sprite.Create(tex, new Rect(0, 0, W, H), new Vector2(0.5f, 0.5f), 100, 0, SpriteMeshType.FullRect, new Vector4(0, 0, 0, 0));
+            return sprite;
+        }
+    }
 }

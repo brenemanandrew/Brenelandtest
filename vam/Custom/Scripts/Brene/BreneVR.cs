@@ -177,7 +177,7 @@ namespace Brene
         }
 
         // ---- glowing hands, poking and the both-hands gesture ----
-        readonly BreneGlow[] palmGlow = new BreneGlow[2], tipGlow = new BreneGlow[2], fingerGlow = new BreneGlow[4];
+        readonly BreneHand[] handOutline = new BreneHand[2];
         readonly float[] pokeAt = new float[2]; readonly bool[] pokeArmed = { true, true }; readonly Button[] pokeHover = new Button[2];
         readonly int[] pokeState = new int[2];   // 0 away, 1 near a button, 2 touching
         float gestStart = -1; bool gestArmed = true;
@@ -192,25 +192,23 @@ namespace Brene
             Vector3 tL = pL + rL * new Vector3(0, -0.015f, tip), tR = pR + rR * new Vector3(0, -0.015f, tip);
             if (okL) Poke(0, tL); else pokeState[0] = 0;
             if (okR) Poke(1, tR); else pokeState[1] = 0;
-            DrawHand(0, okL, pL, tL, h.position); DrawHand(1, okR, pR, tR, h.position);
+            DrawHand(0, okL, tL, rL); DrawHand(1, okR, tR, rR);
             Gesture(okL && okR, pL, pR, h);
         }
 
-        void DrawHand(int i, bool ok, Vector3 palm, Vector3 tip, Vector3 eye)
+        // the owner's hand design: just the outline of a hand, pale cyan, warm gold while pressing a button (no dots)
+        void DrawHand(int i, bool ok, Vector3 tip, Quaternion rot)
         {
-            if (palmGlow[i] == null) { palmGlow[i] = new BreneGlow("Brene hand " + i, true); tipGlow[i] = new BreneGlow("Brene fingertip " + i, false); fingerGlow[i * 2] = new BreneGlow("Brene finger " + i, false); fingerGlow[i * 2 + 1] = new BreneGlow("Brene finger " + i, false); }
-            if (!ok) { palmGlow[i].Hide(); tipGlow[i].Hide(); fingerGlow[i * 2].Hide(); fingerGlow[i * 2 + 1].Hide(); return; }
-            var hand = new Color(0.35f, 0.9f, 1f);
-            var tipC = pokeState[i] == 2 ? new Color(0.35f, 1f, 0.5f) : pokeState[i] == 1 ? Theme.Get(Role.Accent) : new Color(0.7f, 0.97f, 1f);
-            palmGlow[i].Place(palm, eye, 0.09f, hand);
-            fingerGlow[i * 2].Place(palm + (tip - palm) * 0.36f, eye, 0.022f, hand);
-            fingerGlow[i * 2 + 1].Place(palm + (tip - palm) * 0.68f, eye, 0.022f, hand);
-            tipGlow[i].Place(tip, eye, pokeState[i] == 2 ? 0.045f : 0.035f, tipC);
+            if (handOutline[i] == null) handOutline[i] = new BreneHand("Brene hand " + i, i == 0);
+            if (!ok) { handOutline[i].Hide(); return; }
+            var c = pokeState[i] == 2 ? new Color(1f, 0.886f, 0.627f, 0.95f)       // #ffe2a0, pressing
+                  : pokeState[i] == 1 ? new Color(0.80f, 0.97f, 1f, 0.95f)          // near a button: a touch brighter
+                  : new Color(0.722f, 0.957f, 1f, 0.85f);                           // #b8f4ff
+            handOutline[i].Place(tip, rot, c);
         }
         void DropHands()
         {
-            for (int i = 0; i < 2; i++) { if (palmGlow[i] != null) palmGlow[i].Destroy(); if (tipGlow[i] != null) tipGlow[i].Destroy(); palmGlow[i] = null; tipGlow[i] = null; }
-            for (int i = 0; i < 4; i++) { if (fingerGlow[i] != null) fingerGlow[i].Destroy(); fingerGlow[i] = null; }
+            for (int i = 0; i < 2; i++) { if (handOutline[i] != null) handOutline[i].Destroy(); handOutline[i] = null; }
             for (int i = 0; i < 2; i++) { if (pokeHover[i] != null) Hover(pokeHover[i], false); pokeHover[i] = null; pokeState[i] = 0; pokeArmed[i] = true; }
         }
 
