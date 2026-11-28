@@ -13,7 +13,7 @@ The rules that matter most, repeated here so they are never missed:
 - Her model, outfit models, motion clips and picture pack never go into git.
 - Do not read the owner's chat text or her notes about him.
 - One change at a time. After each, say what you changed, what you tested, and what you could not test.
-- Pushing to `main` deploys the live game within a minute and restarts its server. Do not push unless the owner has asked you to.
+- Pushing to `main` deploys the live game within a minute and restarts its server. Standing word from the owner (2026-11-28): push Brenai changes to `main` without asking each time, once `tools/check.sh` passes and the change has been tested; then say what went live. This covers Brenai only, never the main Breneland game.
 
 Also in this folder:
 - `MASTERFILE.md`: everything in one file (rules, architecture, data, every route, features, current state, open work). Section 10 is the current state. Keep it current when you ship something.
