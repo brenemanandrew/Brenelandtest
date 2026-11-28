@@ -105,6 +105,14 @@ Not from the plan (assumed): where the THORs park, the exact spot of the inducti
 
 `test/map.mjs` renders the top view. All module tests, the VR emulator checks and the phone checks pass on the new floor.
 
+## A busy, solid floor (2026-11-28)
+- **Solid.** You can no longer pass through things: racks, benches, conveyors, stations, tote stacks, the chargers (fixed), and the THORs, the forklift, loose pallets, people and the other trucks (moving). In a headset the check is made where your head is. You can always step away from something you are touching. The forklift is stopped by people and equipment too, and hitting either is a safety call (a person fails the run).
+- **Busy.** Eight people and trucks work fixed routes that stay clear of the module work: a pedestrian on the walkway who crosses the main aisle at the crosswalk, a picker at the south flow racks, a VA worker, a dock worker, a packer at PK03, a picker on a THOR in the next Pallet Land aisle, and two forklifts that drive into a storage aisle and back out. They wait for you instead of walking into you. Totes ride the overhead line to pack and cartons leave on the outfeed.
+- **Crosswalk rule (forklift module):** passing a pedestrian in the crosswalk at speed is a safety call. The pedestrian does not step out in front of a truck that is already close and moving.
+- **Sound** is generated in the page (no files): building hum, conveyor rattle, scanner beeps, tape, a pallet set down, a distant horn, and an electric truck with its backup beeper, placed in 3D. It starts after the first click, tap or trigger.
+- Menu: "Busy floor (people, trucks, sound)" turns all of it off or on.
+- `test/phys.mjs` checks: walking is stopped by a THOR, a rack and a person; open floor is not blocked; the people move; the sound graph starts; the crosswalk call and the pedestrian's wait. **Not checked:** how it sounds (no audio here), and frame rate on the Quest with the extra figures (313 draw calls in that test view, up from about 214).
+
 ## Placeholders to confirm
 - Box sizes #2-#6 and the product dimensions in Pack step 4.
 - Forklift capacity plate (5000 lb @ 24 in), truck type (sit-down counterbalance). Arden's reach trucks are not modeled.

@@ -407,7 +407,7 @@ for (let i = 0; i < 7; i++) box(1.3, .004, .25, M(i % 2 ? C.conc : C.white), 8.0
 { const post = box(.08, 2.2, .08, M(C.gray), -15.5, 0, 3.6); const s = label('STOP\nSOUND HORN', .7, .7, { bg: '#c0392b', fg: '#fff' }); place(s, -15.5, 2.4, 3.65, 0); const s2 = s.clone(); place(s2, -15.5, 2.4, 3.55, Math.PI); }
 floorPaint(ZONE.charger, C.yellow); floorPaint([ZONE.charger[0] + .12, ZONE.charger[1] - .12, ZONE.charger[2] + .12, ZONE.charger[3] - .12], C.conc, .004);
 place(label('PIT CHARGING', 1.6, .45, { bg: '#FDDB33' }), 28, 2.6, 2.9, 0); box(.08, 2.4, .08, M(C.gray), 28, 0, 2.8);
-for (const z of [3.9, 5.5, 7.1]) box(.4, 1.4, .6, M(0x333333), 29.6, 0, z);   /* chargers on the east wall */
+for (const z of [3.9, 5.5, 7.1]) box(.4, 1.4, .6, M(0x333333), 29.6, 0, z); solid(29.4, 30, 3.5, 7.5);   /* chargers on the east wall */
 floorPaint(ZONE.hospital, 0xc0392b); floorPaint([ZONE.hospital[0] + .12, ZONE.hospital[1] - .12, ZONE.hospital[2] + .12, ZONE.hospital[3] - .12], C.conc, .004);
 place(label('NON CONF\nPICK HOSPITAL', 1.6, .8, { bg: '#c0392b', fg: '#fff' }), -6.8, 2.2, 3.5); box(.08, 2, .08, M(C.gray), -6.8, 0, 3.4);
 const hospitalPad = box(2.6, .02, 2.8, HIDDEN, -6.8, .01, 5.1);
@@ -503,6 +503,7 @@ pickFace('P106-A', 'HBL2621', 4);
     totes.push(t); movable(t);
   }
   OBJ.indTotes = totes;
+  solid(ix - 1.25, ix + 1.25, iz - .55, iz + .55); solid(-8.8, -8.2, -14.6, -14.1); solid(-5.1, -3.8, -13.5, -13.1); solid(-5.2, -4.0, -12.3, -11.3);   /* rack, computer stand, tote stacks, pallet */
   const shelf = box(2.4, .05, 1, HIDDEN, ix, .86, iz); reg(shelf, 'ind_rack', 'Induction flow rack');
   /* induction computer, scanner, tote stacks, flow rack pallet, turnover log */
   box(.08, 1.15, .08, M(0x333333), -8.5, 0, -14.35); box(.5, .04, .35, M(0x333333), -8.5, 1.0, -14.3);
@@ -534,7 +535,7 @@ function makeThor(id, battery) {
 const thor1 = makeThor('thor1', 12); thor1.position.set(-11.6, 0, -11.2); scene.add(thor1);
 const thor2 = makeThor('thor2', 91); thor2.position.set(-10.2, 0, -11.2); scene.add(thor2);
 movable(thor1); movable(thor2);
-{ const card = box(.25, .04, .18, M(0xffffff), 0, 0, 0); card.position.set(-6.0, .9, 6.2); box(.8, .9, .5, M(0x666666), -6.0, 0, 6.2); reg(card, 'disc_card', 'Discrepancy cards'); place(label('DISCREPANCY\nCARDS', .5, .2), -6.0, 1.15, 6.46); }
+{ const card = box(.25, .04, .18, M(0xffffff), 0, 0, 0); card.position.set(-6.0, .9, 6.2); box(.8, .9, .5, M(0x666666), -6.0, 0, 6.2); reg(card, 'disc_card', 'Discrepancy cards'); solid(-6.4, -5.6, 5.95, 6.45); place(label('DISCREPANCY\nCARDS', .5, .2), -6.0, 1.15, 6.46); }
 
 /* ---------- flow rack zone D (decor and waste hunt) ---------- */
 for (let i = 0; i < 3; i++) {
@@ -553,7 +554,7 @@ for (const [x, col, code, red] of [[-1.2, C.blue, 'T-20006'], [-.5, C.blue, 'T-2
   const t = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, t); t.position.set(x, .7, -11.3); scene.add(t);
   const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); t.add(b); movable(t); if (red) OBJ.fr_red = t;
 }
-{ const base = box(.35, .95, .3, M(0x444444), -2.2, 0, -9.7); reg(base, 'mc_cradle', 'Handheld charging cradle'); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), -2.2, .7, -9.54);
+{ const base = box(.35, .95, .3, M(0x444444), -2.2, 0, -9.7); reg(base, 'mc_cradle', 'Handheld charging cradle'); solid(-2.4, -2.0, -9.9, -9.5); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), -2.2, .7, -9.54);
   const mc = new THREE.Group(); box(.1, .17, .025, M(0x1a1a1a), 0, -.085, -.0125, mc);
   const d = makeDevice('mc', 'rf', .09, .135, 'Handheld (mobile computer)', 88); d.mesh.position.z = .002; mc.add(d.mesh);
   mc.position.set(-2.2, 1.05, -9.7); mc.rotation.x = -.6; scene.add(mc); movable(mc); d.group = mc; }
@@ -580,7 +581,7 @@ const PK = {};
   const sd = canvasTex(256, 96); const sdm = new THREE.Mesh(new THREE.PlaneGeometry(.16, .06), new THREE.MeshBasicMaterial({ map: sd.tex })); sdm.position.set(0, .04, .23); sdm.rotation.x = -.6; scale.add(sdm);
   reg(scale, 'pk_scale', 'Scale'); PK.scaleDisp = sd; PK.scale = scale;
   /* infeed tote rollers */
-  box(.9, .85, .6, M(0x555555), bx - 1.75, 0, bz); for (let k = 0; k < 6; k++) box(.05, .03, .55, M(0x999999), bx - 2.1 + k * .14, .85, bz);
+  box(.9, .85, .6, M(0x555555), bx - 1.75, 0, bz); solid(bx - 2.2, bx - 1.3, bz - .3, bz + .3); for (let k = 0; k < 6; k++) box(.05, .03, .55, M(0x999999), bx - 2.1 + k * .14, .85, bz);
   const tote = new THREE.Group(); box(.55, .3, .38, M(C.blue), 0, 0, 0, tote); tote.position.set(bx - 1.75, .88, bz); scene.add(tote);
   const tbc = barcode('HU8000451', .2, .1, 'HU 8000451'); tbc.position.set(0, .16, .195); tote.add(tbc); PK.tote = tote; movable(tote);
   const tote2 = new THREE.Group(); box(.55, .3, .38, M(C.blue), 0, 0, 0, tote2); tote2.position.set(bx - 1.75, .88, bz - .1); scene.add(tote2);
@@ -612,6 +613,7 @@ const TK = {};
   floorPaint([ax - 2.5, ax + 2.5, az - 1.5, az + 1.5], C.yellow); floorPaint([ax - 2.4, ax + 2.4, az - 1.4, az + 1.4], C.conc, .004);
   place(label('PK10 TRUCK PACK', 1.6, .4, { bg: '#FDDB33' }), ax, 2.6, az - 1.6); box(.06, 2.5, .06, M(C.gray), ax, 0, az - 1.65);
   const pal = makePallet(0); pal.position.set(ax, 0, az); scene.add(pal); reg(pal, 'tk_pallet', 'Empty pallet'); TK.pallet = pal;
+  solid(ax - .6, ax + .6, az - .5, az + .5); solid(ax - 1.2, ax - .6, az - 1.45, az - 1.05); solid(ax + 1.85, ax + 2.35, az + .9, az + 1.3); solid(ax - 2.1, ax - 1.5, az + .6, az + 1.0);
   box(.08, 1.15, .08, M(0x333333), ax - .9, 0, az - 1.25); box(.5, .04, .35, M(0x333333), ax - .9, 1.0, az - 1.2);
   const sd = makeDevice('pk10', 'gui', .62, .39, 'PK10 station screen (EWM)'); sd.mesh.position.set(ax - .9, 1.45, az - 1.32); scene.add(sd.mesh); box(.66, .43, .03, M(0x111111), ax - .9, 1.235, az - 1.35);
   gunProp(ax - .75, 1.07, az - 1.12, 'tk_gun', 'PK10 scanner');
@@ -1014,13 +1016,14 @@ function menu() {
     { icon: 'truck', label: 'Ship: truck pack, stage, dock', fn: () => startModule('ship') },
     { icon: 'search', label: 'Gemba waste hunt (TIMWOODS)', fn: startHunt },
     { icon: 'guide', label: 'Guide arrows: ' + (S.guide ? 'on' : 'off'), fn: () => { S.guide = !S.guide; LS.setItem(LS_GUIDE, S.guide ? '1' : '0'); menu(); } },
+    { icon: 'person', label: 'Busy floor (people, trucks, sound): ' + (AMB.on ? 'on' : 'off'), fn: () => { setBusy(!AMB.on); menu(); } },
     { icon: 'tour', label: 'Show the tour', fn: () => tour(0) }] });
   placePanelVR('soft');
 }
 /* welcome tour: opens at every start until "Don't show this at start" is ticked */
 const LS_TOUR = 'arden.trainer.tourOff';
 const TOUR = [
-  { t: 'Welcome', pc: 'This is the Arden DC floor: Pallet Land, the flow rack, induction, pack stations, truck pack, staging and a dock door.\n\nSeven modules. Each one follows the current standard work step by step and tells you why.' },
+  { t: 'Welcome', pc: 'This is the Arden DC floor: Pallet Land, the flow rack, induction, pack stations, truck pack, staging and a dock door.\n\nSeven modules. Each one follows the current standard work step by step and tells you why.\n\nThe floor is busy: people and trucks are working around you, and things are solid. Walk around them.' },
   { t: 'Look and move', spot: 'body>canvas', pc: 'Click the view to look around with the mouse. W A S D walks.\nPoint the crosshair at something and click (or press E) to use it. The ring turns green when it is in reach.\nTab or Esc frees the mouse.',
     touch: 'Drag on the view to look around. The round pad at the bottom right walks.\nTap something to use it.\nYou can tap the keys on a device, or on the copy of its screen in the panel.',
     vr: 'Your hands show as glowing outlines where your real hands are. Left stick walks. Right stick turns.\nReach out and touch a button on this board, a device or your wrist with your index fingertip to press it. No trigger needed.\nFor things further away, point your finger at them and pull the trigger or squeeze the grip. The ring turns green when it is in reach.' },
@@ -1079,7 +1082,7 @@ MODS.pit = {
     choice('Mounting', 'How do you get on and off?', ['Face the truck, three points of contact, use the step and grab handle', 'Jump up from the side', 'Step up on the forks', 'Whatever is fastest'], 0, 'Most PIT injuries off the job site are slips getting on and off.', { fb: ['', 'Jumping is how ankles go.', 'Never stand on the forks.', 'Three points of contact, every time.'], onDone() { mountTruck(); } }),
     choice('Seated', 'First thing once you are seated?', ['Fasten the seatbelt', 'Raise the forks so you are ready', 'Drive off, the belt slows you down', 'Sound the horn'], 0, 'In a tip-over the belt keeps you inside the overhead guard. Jumping out is what kills.', { critical: true, fb: ['', 'Forks stay low.', 'Belt first. Always.', 'Belt first.'] }),
     info('Controls', 'PC: W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.\nQuest: left stick drives and steers, right stick up/down lifts, right stick left/right tilts, A is the horn.\n\nTravel with the forks 4 to 6 in off the floor. The panel bottom shows speed and fork height.', 'Forks low and tilted back keep the load stable and the forks out of people\'s legs.'),
-    drive('Drive to the pallet', 'Drive to the receiving drop (purple square) at the inbound dock: out of the chargers, west along the main aisle. Forks low. Stay out of the green walkway.', () => F.pos.distanceTo(recvPallet.position) < 4.2, 'Pedestrians own the walkway. A PIT never enters it.', { target: 'recv' }),
+    drive('Drive to the pallet', 'Drive to the receiving drop (purple square) at the inbound dock: out of the chargers, west along the main aisle. Forks low. Stay out of the green walkway, and stop for anyone in the crosswalk.', () => F.pos.distanceTo(recvPallet.position) < 4.2, 'Pedestrians own the walkway. A PIT never enters it.', { target: 'recv' }),
     drive('Pick up the pallet', 'Square up to the pallet. Forks flat at floor height, drive straight in until the pallet touches the carriage, lift a few inches, tilt back.', () => F.load === recvPallet && F.h > .12, 'Forks all the way in spreads the load on the forks. Tilt back cradles it.', { target: 'recv' }),
     drive('Go to Pallet Land', 'Take the pallet to the Pallet Land aisle: along the main aisle, then north between the racks. Stop at the striped intersection and sound the horn before you enter.', () => F.load === recvPallet && inRect(F.pos.x, F.pos.z, ZONE.aisle), 'Rack ends are blind corners. The horn tells people you are coming.', { target: 'aisleStop' }),
     drive('Put it away in P104-B', `Put the pallet on level B (beam at 1.6 m) of bay P104, on the west side of the aisle. Stop square to the rack, raise the load above the beam, ease in, lower it onto the beam, then back straight out.`, () => SLOTS[SLOT_T].filled === recvPallet && !F.load, 'Raise only when stopped and square. Lower onto the beam before you back out, or you drag the pallet off the rack.', { target: 'slot' }),
@@ -1259,7 +1262,7 @@ huntSpot('w_waiting', -6.6, 2.0, -13.3, ['Waiting'], 'A picker standing at an em
 huntSpot('w_banding', -10.2, 1.6, -6.2, ['Over-processing'], 'Every pallet in this lane is banded. Only UK, long product and 24-50 in cabinets need bands.', () => { for (let i = 0; i < 2; i++) { const p = makePallet(2, { wrap: true }); p.position.set(-11 + i * 1.6, 0, -6.2); HP.add(p); for (const x of [-.3, .3]) box(.03, .02, 1.02, M(0x111111), -11 + i * 1.6 + x, .75, -6.2); } });
 huntSpot('w_damaged', 6.4, 1.3, 4.3, ['Defects'], 'A crushed carton riding the outfeed conveyor. It will be refused or claimed.', () => { const c = carton(.4, .2, .35, 0x9b7a50); c.position.set(6.4, .8, 4.3); c.rotation.z = .3; HP.add(c); });
 huntSpot('w_prebuilt', 3.1, 2.4, 6.9, ['Overproduction'], 'A tower of cartons built hours ahead of any order. They take space and get crushed.', () => { for (let i = 0; i < 7; i++) box(.5, .3, .4, M(C.cardboard), 3.1, i * .3, 6.9); });
-huntSpot('w_double', 8.05, 1.2, -1, ['Transport'], 'A pallet dropped in the walkway to be moved again later: moved twice, and blocking people.', () => { const p = makePallet(1); p.position.set(8.05, 0, -1); HP.add(p); });
+huntSpot('w_double', 8.05, 1.2, -1, ['Transport'], 'A pallet dropped in the walkway to be moved again later: moved twice, and blocking people.', () => { const p = makePallet(1); p.position.set(8.25, 0, -1); HP.add(p); });
 huntSpot('w_retype', -10, 2.0, 4.6, ['Over-processing', 'Skills (unused talent)'], 'The lead is re-typing hand-written carton weights into EWM. The weight should carry from the scale (Rec. 1).', () => { person(-10, 5.4, Math.PI, 0xff8c00); });
 function huntMarkers(on) { HP.visible = on; HUNT.forEach(h => { h.m.visible = on && !S.found[h.id]; }); }
 function startHunt() {
@@ -1286,6 +1289,152 @@ function huntDone() {
   const recs = JSON.parse(LS.getItem(LS_REC) || '[]'); recs.push({ name: trainee(), module: 'Gemba waste hunt', date: stamp(), secs, mistakes: S.mistakes.length, safety: 0, score, pass: n === HUNT.length ? 'PASS' : 'RETRY', notes: `found ${n}/${HUNT.length}` }); LS.setItem(LS_REC, JSON.stringify(recs));
   setPanel({ title: 'Waste hunt done', sub: `${n} of ${HUNT.length} found`, text: `Score ${score}. Pick the waste you see most on your own shift for the idea list.`, btns: [{ label: 'Kaizen card', fn: kaizenCard, hot: true }, { label: 'Menu', fn: menu }] });
 }
+
+/* ============================================================
+   A BUSY FLOOR: things are solid, people and trucks move, and the building sounds like a shift in progress.
+   - Solid: racks, benches, conveyors and stations (static solids), and the THORs, the forklift, loose pallets, people and
+     the other trucks (dynamic circles below). You can always step away from something you are already touching.
+   - People and trucks follow fixed routes away from the module work, and wait for you instead of walking into you.
+   - One pedestrian uses the walkway and the crosswalk over the main aisle: a forklift must stop for them.
+   - Sound is generated here (no files): a low building hum, conveyor rattle, scanner beeps, tape, a pallet set down,
+     a distant horn, and an electric truck with its backup beeper. It starts after the first click, tap or trigger.
+   ============================================================ */
+const AMB = { on: false, npcs: [], movers: [], t: 0, next: 2 };
+const CROSS = [7.2, 8.9, 8.8, 12.3];   /* the crosswalk over the main aisle */
+function dynCircles(who) {
+  const out = [], P = new THREE.Vector3();
+  for (const t of [thor1, thor2]) if (t !== S.riding) { t.updateWorldMatrix(true, false); for (const [lz, r] of [[-.25, .6], [-1.4, .6]]) { t.localToWorld(P.set(0, 0, lz)); out.push({ x: P.x, z: P.z, r, kind: 'equipment' }); } }
+  if (who === 'walk') {
+    if (!F.onboard) for (const [lz, r] of [[-.2, .85], [.95, .55]]) { truck.localToWorld(P.set(0, 0, lz)); out.push({ x: P.x, z: P.z, r, kind: 'equipment' }); }
+    for (const pal of PALLETS) if (pal.parent === scene && pal.position.y < .2) out.push({ x: pal.position.x, z: pal.position.z, r: .65, kind: 'equipment' });
+  }
+  if (AMB.on) for (const n of AMB.npcs) out.push({ x: n.o.position.x, z: n.o.position.z, r: n.r, kind: n.kind === 'person' ? 'person' : 'equipment' });
+  return out;
+}
+/* is (x,z) inside something that moves? Moving away from what you already touch is always allowed (cx, cz = where you are now) */
+function hitsDyn(x, z, r, who, cx, cz) {
+  for (const c of dynCircles(who)) { const d = Math.hypot(x - c.x, z - c.z); if (d < r + c.r && (cx === undefined || d < Math.hypot(cx - c.x, cz - c.z) - 1e-6)) return c; }
+  return null;
+}
+function npcFork() {   /* a second forklift with a load: scenery that drives in and backs out of an aisle; forks point to local +z */
+  const g = new THREE.Group();
+  box(1.1, .55, 1.7, M(0xf2a900), 0, .25, -.15, g); box(1.1, .55, .45, M(0x1b1b1b), 0, .25, -1.15, g); box(.55, .6, .5, M(0x1b1b1b), 0, .95, -.4, g);
+  for (const [x, z] of [[-.5, .45], [.5, .45], [-.5, -.75], [.5, -.75]]) box(.06, 1.35, .06, M(0x1b1b1b), x, .8, z, g);
+  box(1.06, .06, 1.26, M(0x1b1b1b), 0, 2.12, -.15, g); for (const x of [-.36, .36]) box(.09, 2.3, .12, M(0x444444), x, .03, .72, g);
+  for (const x of [-.3, .3]) box(.11, .05, 1.1, M(0x2a2a2a), x, .14, 1.35, g);
+  for (const [x, z] of [[-.6, .55], [.6, .55], [-.55, -.95], [.55, -.95]]) box(.2, .5, .5, M(0x1b1b1b), x, 0, z, g);
+  box(1.2, .13, 1.0, M(C.pallet), 0, .19, 1.4, g); box(1.1, .7, .95, M(C.cardboard), 0, .32, 1.4, g);
+  box(.32, .6, .2, M(0x2b3a55), 0, 1.0, -.35, g); box(.4, .5, .3, M(0xc6ff2e), 0, 1.3, -.35, g); box(.24, .24, .24, M(0xd9a982), 0, 1.82, -.35, g);   /* the driver */
+  bake(g);
+  const strobe = new THREE.Mesh(new THREE.SphereGeometry(.07, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff9a1f })); strobe.position.set(0, 2.25, -.7); g.add(strobe); g.userData.strobe = strobe;
+  scene.add(g); return g;
+}
+function npcThor() {   /* a picker riding a THOR, forks to local +z */
+  const g = new THREE.Group();
+  box(.8, .08, .6, M(0x333333), 0, .05, -.05, g); box(.8, .9, .5, M(C.yellow), 0, .05, .55, g);
+  for (const x of [-.3, .3]) box(.16, .06, 1.25, M(0x555555), x, .03, 1.45, g);
+  box(1.2, .13, 1.0, M(C.pallet), 0, .09, 1.45, g); box(1.0, .5, .9, M(C.cardboard), 0, .22, 1.45, g); box(.55, .3, .38, M(0x6b4a2b), .2, .72, 1.3, g);
+  box(.32, .7, .2, M(0x2b3a55), 0, .13, -.05, g); box(.42, .6, .28, M(0xc6ff2e), 0, .83, -.05, g); box(.24, .24, .24, M(0xd9a982), 0, 1.45, -.05, g);
+  bake(g); scene.add(g); return g;
+}
+function addNpc(kind, o, path, speed, opt = {}) { const [x, z] = path[0]; o.position.set(x, 0, z); const n = { kind, o, path, speed, i: 1 % path.length, dir: 1, wait: 0, moving: false, r: kind === 'person' ? .35 : 1.0, ...opt }; AMB.npcs.push(n); return n; }
+/* the people and trucks, on routes that stay clear of where the modules send you */
+addNpc('person', person(8.05, -12, 0), [[7.75, -12, 4], [7.75, 8.4, 0], [7.75, 12.25, 5]], 1.25, { ping: true, cross: true });                  /* walkway and crosswalk */
+addNpc('person', person(-3, -3.25, 0, 0xff8c00), [[-3, -3.25, 3], [1, -3.25, 4], [5, -3.25, 3]], 1.0, { ping: true });                          /* picker at the south flow racks */
+addNpc('person', person(11.3, -10.5, 0), [[11.3, -10.5, 6], [11.3, -6.5, 5], [11.3, -3, 4]], .9, { ping: true });                               /* VA */
+addNpc('person', person(-9, 14.5, 0), [[-9, 14.5, 4], [-6.5, 14.5, 2], [-6.5, 16.6, 5], [-9, 16.6, 3]], 1.1);                                   /* outbound dock */
+addNpc('person', person(1.3, 6.25, 0), [[1.3, 6.25, 99]], 0, { idle: true });                                                                    /* packer at PK03 */
+addNpc('thor', npcThor(), [[-23.3, -13.6, 5], [-23.3, -7, 6], [-23.3, -.8, 4]], 1.7, { ping: true });                                           /* a picker in the next Pallet Land aisle */
+const NPC_FORK = addNpc('fork', npcFork(), [[20.1, 13.4, 2.5], [20.1, 16.6, 4]], 1.3, { ping: true, shuttle: true });                           /* drives into an east storage aisle and backs out */
+addNpc('fork', npcFork(), [[18.3, -1, 3], [18.3, -13.5, 5]], 1.5, { ping: true, shuttle: true });                                               /* Slow Moving */
+/* totes riding the overhead line to pack, cartons leaving pack */
+for (let i = 0; i < 6; i++) { const m = box(.5, .28, .36, M(i % 3 ? C.blue : 0x6b4a2b), 6.3, 2.6, 0); AMB.movers.push({ m, axis: 'z', a: -11.2, b: 4.1, v: .45, s: i / 6 }); }
+for (let i = 0; i < 3; i++) { const m = box(.36, .22, .3, M(C.cardboard), 0, .79, 4.3); AMB.movers.push({ m, axis: 'x', a: -.1, b: 2.2, v: .3, s: i / 3 }); }
+for (const mv of AMB.movers) mv.m.userData.iidOwner = 'amb';   /* keeps them out of the merge at the end; they are not in the pick list */
+function playerXZ() { if (F.onboard) return [F.pos.x, F.pos.z, 2.3]; const p = camera.getWorldPosition(new THREE.Vector3()); return [p.x, p.z, 1.0]; }
+function updateAmbience(dt) {
+  AMB.t += dt;
+  const [px, pz, pr] = playerXZ();
+  for (const n of AMB.npcs) {
+    n.moving = false;
+    if (n.idle) { n.o.rotation.y = Math.sin(AMB.t * .7) * .25; continue; }
+    if (n.wait > 0) { n.wait -= dt; continue; }
+    const [tx, tz, pause = 0] = n.path[n.i], dx = tx - n.o.position.x, dz = tz - n.o.position.z, d = Math.hypot(dx, dz);
+    if (d < .04) {
+      n.wait = pause;
+      if (n.ping) { if (n.i + n.dir < 0 || n.i + n.dir >= n.path.length) n.dir = -n.dir; n.i += n.dir; } else n.i = (n.i + 1) % n.path.length;
+      continue;
+    }
+    const ux = dx / d, uz = dz / d, ex = px - n.o.position.x, ez = pz - n.o.position.z, ed = Math.hypot(ex, ez);
+    if (ed < n.r + pr && ex * ux + ez * uz > 0) continue;                                    /* you are in the way: wait */
+    const step = Math.min(d, n.speed * dt), nx = n.o.position.x + ux * step, nz = n.o.position.z + uz * step;
+    if (n.cross && !inRect(n.o.position.x, n.o.position.z, CROSS) && inRect(nx, nz, CROSS) && F.onboard && Math.abs(F.v) > .3 && Math.abs(F.pos.x - nx) < 8 && F.pos.z > 7.5 && F.pos.z < 13.5) continue;   /* does not step out in front of a moving truck */
+    n.o.position.x = nx; n.o.position.z = nz; n.moving = true;
+    const back = n.shuttle && n.i === 0;                                                       /* a shuttle truck backs out to its first point */
+    n.rev = back; n.o.rotation.y = Math.atan2(back ? -ux : ux, back ? -uz : uz);
+    if (n.kind === 'person') n.o.position.y = Math.abs(Math.sin(AMB.t * 8 + n.speed)) * .03;
+  }
+  for (const n of AMB.npcs) if (n.o.userData.strobe) n.o.userData.strobe.visible = Math.floor(AMB.t * 3) % 2 === 0;
+  for (const mv of AMB.movers) { const k = ((AMB.t * mv.v / Math.abs(mv.b - mv.a)) + mv.s) % 1; mv.m.position[mv.axis] = mv.a + (mv.b - mv.a) * k; }
+  /* the crosswalk rule */
+  for (const n of AMB.npcs) if (n.cross) {   /* counted once per crossing */
+    const inX = inRect(n.o.position.x, n.o.position.z, CROSS); if (!inX) n.flagged = false;
+    if (inX && !n.flagged && F.onboard && Math.abs(F.v) > .7 && Math.abs(F.pos.x - n.o.position.x) < 4.5 && Math.abs(F.pos.z - n.o.position.z) < 3.5) { n.flagged = true; F.lastV.ped = 0; violation('Did not stop for a pedestrian in the crosswalk. People on foot have the right of way.', 'ped'); }
+  }
+  sndUpdate(dt);
+}
+function setBusy(on) {
+  AMB.on = on; LS.setItem('arden.trainer.busy', on ? '1' : '0');
+  for (const n of AMB.npcs) n.o.visible = on; for (const mv of AMB.movers) mv.m.visible = on;
+  if (SND.master) SND.master.gain.value = on ? .9 : 0; if (on) sndStart();
+}
+/* ---------- the sound of the building ---------- */
+const SND = { master: null, fork: null, beepG: null, forkPan: null, started: false };
+function sndPanner(x, y, z) { const p = AC.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = 2.5; p.rolloffFactor = 1.3; p.maxDistance = 60; p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; p.connect(SND.master); return p; }
+function sndStart() {
+  if (!AMB.on) return;
+  try {
+    AC = AC || new AudioContext(); if (AC.state === 'suspended') AC.resume();
+    if (SND.started) return; SND.started = true;
+    SND.master = AC.createGain(); SND.master.gain.value = .9; SND.master.connect(AC.destination);
+    const buf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const noise = () => { const s = AC.createBufferSource(); s.buffer = buf; s.loop = true; s.start(); return s; };
+    SND.noise = noise;
+    const chain = (src, type, f, q, gain, dest) => { const fl = AC.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; const g = AC.createGain(); g.gain.value = gain; src.connect(fl); fl.connect(g); g.connect(dest); return g; };
+    chain(noise(), 'lowpass', 150, .7, .16, SND.master);                 /* building hum and air handlers */
+    chain(noise(), 'bandpass', 1900, .5, .012, SND.master);              /* air */
+    for (const [x, z] of [[1.2, -2.1], [1.2, -11.3], [3.5, 4.3]]) {      /* conveyor rattle */
+      const g = chain(noise(), 'bandpass', 620, 1.6, .2, sndPanner(x, .8, z)), lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 7 + x; lg.gain.value = .12; lfo.connect(lg); lg.connect(g.gain); lfo.start();
+    }
+    SND.forkPan = sndPanner(20, 1, 15);                                   /* the electric truck: motor whine and backup beeper */
+    const whine = AC.createOscillator(); whine.type = 'sawtooth'; whine.frequency.value = 92; SND.fork = chain(whine, 'lowpass', 420, .7, 0, SND.forkPan); whine.start();
+    const bp = AC.createOscillator(); bp.type = 'square'; bp.frequency.value = 1180; SND.beepG = AC.createGain(); SND.beepG.gain.value = 0; bp.connect(SND.beepG); SND.beepG.connect(SND.forkPan); bp.start();
+  } catch (e) { }
+}
+function sfx(kind, x, z) {
+  if (!SND.started || !AMB.on) return;
+  try {
+    const t = AC.currentTime, pan = sndPanner(x, 1.2, z), g = AC.createGain(); g.connect(pan);
+    if (kind === 'scan') { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.value = 2300 + Math.random() * 400; g.gain.setValueAtTime(.25, t); g.gain.setValueAtTime(0, t + .07); o.connect(g); o.start(t); o.stop(t + .08); }
+    else if (kind === 'tape') { const s = SND.noise(), f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1800; g.gain.setValueAtTime(.3, t); g.gain.linearRampToValueAtTime(0, t + .35); s.connect(f); f.connect(g); s.stop(t + .4); }
+    else if (kind === 'thud') { const o = AC.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(40, t + .25); g.gain.setValueAtTime(.9, t); g.gain.exponentialRampToValueAtTime(.001, t + .35); o.connect(g); o.start(t); o.stop(t + .4); }
+    else if (kind === 'horn') { for (const f of [392, 494]) { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.connect(g); o.start(t); o.stop(t + .45); } g.gain.setValueAtTime(.35, t); g.gain.setValueAtTime(0, t + .45); }
+    setTimeout(() => { try { pan.disconnect(); } catch (e) { } }, 900);
+  } catch (e) { }
+}
+const SFX_SPOTS = { scan: [[1.3, 5.4], [-2.6, 6], [1, -3], [-23.3, -6], [-8.5, -14], [11.3, -8], [-9, 15]], tape: [[1.3, 5.4], [11.3, -8]], thud: [[-23.3, -8], [20.1, 16], [18.3, -12], [-23, 14]], horn: [[20.1, 13], [18.3, -1], [-23.3, 1]] };
+function sndUpdate(dt) {
+  if (!SND.started) return;
+  const L = AC.listener, p = camera.getWorldPosition(new THREE.Vector3()), f = camera.getWorldDirection(new THREE.Vector3());
+  if (L.positionX) { L.positionX.value = p.x; L.positionY.value = p.y; L.positionZ.value = p.z; L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+  else { L.setPosition(p.x, p.y, p.z); L.setOrientation(f.x, f.y, f.z, 0, 1, 0); }
+  const n = NPC_FORK; SND.forkPan.positionX.value = n.o.position.x; SND.forkPan.positionZ.value = n.o.position.z;
+  SND.fork.gain.value = n.moving ? .22 : 0; SND.beepG.gain.value = n.moving && n.rev && Math.floor(AMB.t * 2) % 2 === 0 ? .12 : 0;
+  AMB.next -= dt;
+  if (AMB.next <= 0) { AMB.next = .8 + Math.random() * 2.6; const r = Math.random(), kind = r < .62 ? 'scan' : r < .8 ? 'tape' : r < .94 ? 'thud' : 'horn', s = SFX_SPOTS[kind][Math.floor(Math.random() * SFX_SPOTS[kind].length)]; sfx(kind, s[0], s[1]); }
+}
+document.addEventListener('visibilitychange', () => { try { if (AC) document.hidden ? AC.suspend() : AC.resume(); } catch (e) { } });
+for (const ev of ['pointerdown', 'keydown', 'touchstart']) addEventListener(ev, sndStart, { passive: true });
 
 /* ============================================================
    PLAYER: walking, mounting, driving
@@ -1385,7 +1534,14 @@ function walk(dt) {
   const len = Math.hypot(fx, fz); if (len > 1) { fx /= len; fz /= len; }
   if (S.riding) sp = 2.0;
   const nx = rig.position.x + fx * sp * dt, nz = rig.position.z + fz * sp * dt;
-  const blocked = (x, z) => { if (hitsSolid(x, z, S.riding ? .45 : .3, 'walk')) return true; if (!S.riding) return false; const ty = yaw + (S.rideOff || 0); return hitsSolid(x - Math.sin(ty) * 1.45, z - Math.cos(ty) * 1.45, .5, 'walk'); };
+  const xrOn = renderer.xr.isPresenting && !S.riding, [hox, hoz] = xrOn ? rotXZ(camera.position.x, camera.position.z, rig.rotation.y) : [0, 0];   /* in a headset, collide where your head is, not the room centre */
+  const blocked = (x0, z0) => {
+    const x = x0 + hox, z = z0 + hoz, cx = rig.position.x + hox, cz = rig.position.z + hoz, r = S.riding ? .45 : .3;
+    if (hitsSolid(x, z, r, 'walk') || hitsDyn(x, z, r, 'walk', cx, cz)) return true;
+    if (!S.riding) return false;
+    const ty = yaw + (S.rideOff || 0), tx = Math.sin(ty) * 1.45, tz = Math.cos(ty) * 1.45;   /* the pallet on the THOR's forks */
+    return hitsSolid(x - tx, z - tz, .5, 'walk') || !!hitsDyn(x - tx, z - tz, .5, 'walk', cx - tx, cz - tz);
+  };
   if (!blocked(nx, rig.position.z)) rig.position.x = nx;
   if (!blocked(rig.position.x, nz)) rig.position.z = nz;
   rig.rotation.y = yaw;
@@ -1423,6 +1579,11 @@ function driveTruck(dt) {
   F.pos.x = ax - Math.sin(F.heading) * .55; F.pos.z = az - Math.cos(F.heading) * .55;
   if (hitsSolid(F.pos.x, F.pos.z, .85, 'truck')) {
     if (Math.abs(F.v) > .6) violation('Struck the rack or a wall. Slow down near racks.', 'struck');
+    F.pos.x = old.x; F.pos.z = old.z; F.heading = old.h; F.v = 0;
+  }
+  const hit = hitsDyn(F.pos.x, F.pos.z, .85, 'truck', old.x, old.z);
+  if (hit) {
+    if (Math.abs(F.v) > .3) violation(hit.kind === 'person' ? 'Struck a pedestrian. Always stop for people on foot.' : 'Struck equipment. Slow down and leave room.', 'struckdyn');
     F.pos.x = old.x; F.pos.z = old.z; F.heading = old.h; F.v = 0;
   }
   const prevH = F.h;
@@ -1498,7 +1659,7 @@ const ctrls = [0, 1].map(i => {
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xfddb33 }));
   line.scale.z = 3; c.add(line); c.userData.line = line;
   c.addEventListener('squeeze', () => selectFrom(i));   /* the grip button grabs too */
-  c.addEventListener('select', () => selectFrom(i));
+  c.addEventListener('select', () => { sndStart(); selectFrom(i); });
   c.addEventListener('connected', e => { c.userData.hand = e.data && e.data.handedness; });
   const grip = renderer.xr.getControllerGrip(i); grip.add(new XRControllerModelFactory().createControllerModel(grip)); rig.add(grip);
   return c;
@@ -1743,6 +1904,7 @@ function tick(dt) {
   if (renderer.xr.isPresenting) { updateHands(); updateWrist(); updatePoke(); }
   document.body.classList.toggle('driving', F.onboard);
   if (F.onboard) { driveTruck(dt); seatRig(); } else walk(dt);
+  if (AMB.on) updateAmbience(dt);
   updateHover(); updateGuide(t);
   const st = cur();
   if (S.phase === 'run' && st && st.type === 'drive' && st.check()) { good(); st.onDone && st.onDone(); next(); }
@@ -1807,13 +1969,14 @@ for (const [id, ic] of [['menuBtn', 'menu'], ['recBtn', 'records'], ['nameBtn', 
 $('#helpBtn').firstChild.style.marginRight = '0';
 bake(scene); bake(HP);
 const TESTING = /[?&]test/.test(location.search);
+setBusy(LS.getItem('arden.trainer.busy') !== '0' && (!TESTING || /[?&]amb/.test(location.search)));
 placePlayer(0, 10.4, 0);
 showWho(); hudVis(); if (!TESTING && LS.getItem(LS_TOUR) !== '1') { menu(); tour(0); } else menu();
 if (!trainee() && !TESTING) askName();
 
 /* test hook for the headless checks */
 window.TR = { S, MODS, F, OBJ, SLOTS, PALLETS, recvPallet, startModule, answer, pressKey, onInteract, next, menu, tick, cur, startHunt, huntHit, HUNT, ZONE,
-  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo, tour, TOUR, panel, wrist, setChip, placePanelVR, hitsSolid, scene, HANDS, TOUCH, selectFrom, castFrom, HITS, placePlayer, getYaw: () => yaw, setLook(y, p) { yaw = y; pitch = p; } };
+  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo, tour, TOUR, panel, wrist, setChip, placePanelVR, hitsSolid, hitsDyn, AMB, CROSS, setBusy, SND, thor1, thor2, scene, HANDS, TOUCH, selectFrom, castFrom, HITS, placePlayer, getYaw: () => yaw, setLook(y, p) { yaw = y; pitch = p; } };
 </script>
 </body>
 </html>
