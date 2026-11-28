@@ -35,7 +35,7 @@ namespace UnityEngine
     }
     public class Transform : Component, IEnumerable
     {
-        public Vector3 position, localPosition, localScale, forward, up, right; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
+        public Vector3 position, localPosition, localScale, forward, up, right; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Vector3 TransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
         public void SetParent(Transform p, bool keep) { } public void SetParent(Transform p) { } public Transform GetChild(int i) { return null; }
         public void SetAsLastSibling() { } public Transform Find(string n) { return null; } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
         public IEnumerator GetEnumerator() { yield break; }
@@ -73,7 +73,7 @@ namespace UnityEngine
     public class Renderer : Component { public Material material; }
     public class Collider : Component { }
     public class Rigidbody : Component { }
-    public class Camera : Behaviour { public static Camera main; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
+    public class Camera : Behaviour { public static Camera main; public static Camera[] allCameras; public bool stereoEnabled; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
         public Ray ScreenPointToRay(Vector3 p) { return new Ray(); } public Vector3 WorldToScreenPoint(Vector3 p) { return p; } }
     public class Canvas : Behaviour { public bool isRootCanvas; public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
     public class CanvasGroup : Behaviour { public bool blocksRaycasts; public float alpha; }

@@ -11,6 +11,8 @@ title: Brene for VaM - Phone, tour at every start, icons and shrink-to-icon, VR 
 - Welcome tour opens at every start with a "Don't show this at start" tick box.
 - Icons drawn in code (BreneIcons.cs) on dock buttons and title bars; every panel (not dialogs) shrinks to a draggable round chip; saved with the layout.
 - VR (controllers over Steam Link, per Andrew): board at arm's length facing him with 4 cm buttons, hover highlight, fingertip poke (slider "Poke tip distance"), glowing hands at the controllers, both-hands gesture opens the radial, Bring board here in the radial, bigger wrist dock.
+- Fix after Andrew's report that the wrist phone sits far from his wrist: controller positions now go through the headset camera's own rig (its parent transform is VaM's tracking space, with player height and world scale) instead of VaM's camera target. Fixes the wrist dock, glowing hands, poke and touch reactions together.
+
 ## Tested
 - compile.sh ok; relay 26, story 39, library 38 passed.
 ## Not tested

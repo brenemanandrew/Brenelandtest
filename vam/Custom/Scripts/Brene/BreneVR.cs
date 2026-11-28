@@ -88,21 +88,37 @@ namespace Brene
         }
         void ToScreen(Canvas c) { if (c == null) return; c.renderMode = RenderMode.ScreenSpaceOverlay; ((RectTransform)c.transform).localScale = Vector3.one; }
 
-        Camera Cam() { return Camera.main; }
+        // the headset's own camera: the main camera if it renders in stereo, else any stereo camera (VaM's VR eye camera)
+        Camera Cam()
+        {
+            var m = Camera.main; if (m != null && m.stereoEnabled) return m;
+            foreach (var c in Camera.allCameras) if (c != null && c.enabled && c.stereoEnabled) return c;
+            return m;
+        }
         Transform HeadT()
         {
+            if (vr) { var cam = Cam(); if (cam != null) return cam.transform; }   // in a headset: where the eyes really are
             var ct = Vam.CenterTarget(); if (ct != null) return ct;
-            var cam = Cam(); return cam != null ? cam.transform : null;
+            var c2 = Cam(); return c2 != null ? c2.transform : null;
         }
-        // a tracked controller (or the head) in the room: tracking space to world, from where the head is in both. False when untracked.
+        // a tracked controller (or the head) in the room. The headset camera sits inside VaM's player rig, whose transform IS the
+        // tracking space (with VaM's player height and world scale), so a tracked point is placed through the camera's parent.
+        // (The first version worked from VaM's camera target and ignored the rig's scale and offset: the wrist dock and the glowing
+        // hands landed away from the real controllers.) False when untracked.
         bool XrPose(XRNode node, out Vector3 pos, out Quaternion rot)
         {
             pos = Vector3.zero; rot = Quaternion.identity;
-            var h = HeadT(); if (h == null) return false;
             Vector3 local = InputTracking.GetLocalPosition(node), headLocal = InputTracking.GetLocalPosition(XRNode.Head);
             if (local.sqrMagnitude < 0.0000001f) return false;
-            var headRot = InputTracking.GetLocalRotation(XRNode.Head);
-            var rig = h.rotation * Quaternion.Inverse(headRot);
+            var cam = Cam(); var space = cam != null ? cam.transform.parent : null;
+            if (space != null)
+            {
+                pos = space.TransformPoint(cam.transform.localPosition + (local - headLocal));
+                rot = space.rotation * InputTracking.GetLocalRotation(node);
+                return true;
+            }
+            var h = HeadT(); if (h == null) return false;
+            var rig = h.rotation * Quaternion.Inverse(InputTracking.GetLocalRotation(XRNode.Head));
             pos = h.position + rig * (local - headLocal); rot = rig * InputTracking.GetLocalRotation(node);
             return true;
         }
