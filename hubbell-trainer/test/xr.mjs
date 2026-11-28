@@ -90,6 +90,30 @@ const r4 = await page.evaluate(async () => {
   return out;
 });
 console.log('VR offsets', JSON.stringify(r4));
+const r5 = await page.evaluate(async () => {
+  const T = window.TR, d = window.__dev, THREE = T.THREE, wait = ms => new Promise(r => setTimeout(r, ms));
+  const out = {};
+  d.position.set(0, 1.6, 0); d.quaternion.set(0, 0, 0, 1); T.S.riding = null; T.menu(); await wait(200); T.placePanelVR(true); await wait(200);
+  const head = T.camera.getWorldPosition(new THREE.Vector3()), pp = T.panel.getWorldPosition(new THREE.Vector3());
+  out.boardDist = +Math.hypot(pp.x - head.x, pp.z - head.z).toFixed(2);
+  const gaze = T.camera.getWorldDirection(new THREE.Vector3()), to = pp.clone().sub(head); to.y = 0; to.normalize();
+  out.boardAngleDeg = Math.round(Math.acos(to.dot(gaze)) * 57.3); out.boardWidth = +(0.8 * T.panel.getWorldScale(new THREE.Vector3()).x).toFixed(2);
+  /* poke: push the right controller tip through the first menu button from the front, no trigger */
+  T.panel.updateMatrixWorld(true);
+  const rows = Math.ceil(T.panelState().btns.length / 2);
+  const local = new THREE.Vector3(-.4 + (24 + 220) / 1024 * .8, .4 - (1024 - 70 - rows * 86 + 37) / 1024 * .8, 0);
+  const nrm = new THREE.Vector3(0, 0, 1).transformDirection(T.panel.matrixWorld), at = T.panel.localToWorld(local.clone());
+  const c = d.controllers.right, q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(at.clone().add(nrm), at, new THREE.Vector3(0, 1, 0)));
+  c.quaternion.set(q.x, q.y, q.z, q.w);
+  for (const back of [.12, .09, .07, .055, .045, .03]) { const p = T.rig.worldToLocal(at.clone().add(nrm.clone().multiplyScalar(back))); c.position.set(p.x, p.y, p.z); await wait(120); }
+  out.pokeStarted = T.S.mod && T.S.mod.id; out.phase = T.S.phase;
+  /* wrist: raise the left hand in view, press Menu twice with the pointer */
+  T.wrist.updateMatrixWorld(true); const l = d.controllers.left;
+  l.position.set(-.12, 1.38, -.38); l.quaternion.setFromEuler ? l.quaternion.setFromEuler(new THREE.Euler(.9, 0, 0)) : (() => { const e = new THREE.Quaternion().setFromEuler(new THREE.Euler(.9, 0, 0)); l.quaternion.set(e.x, e.y, e.z, e.w); })();
+  await wait(400); out.wristVisible = T.wrist.visible;
+  return out;
+});
+console.log('board, poke, wrist', JSON.stringify(r5)); await page.screenshot({ path: 'xr2.png' });
 await page.screenshot({ path: 'xr.png' });
 console.log('ERRORS', JSON.stringify(errs.slice(0, 8)));
 await browser.close();

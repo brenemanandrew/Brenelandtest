@@ -18,6 +18,23 @@ for (const [name, url] of [['old', 'http://localhost:8098/index.html?test'], ['n
       return JSON.stringify(out);
     }));
     await p.waitForTimeout(500); await p.screenshot({ path: 'n1-step.png' });
+    console.log('tour/chip:', await p.evaluate(() => {
+      const T = window.TR, out = {}; localStorage.removeItem('arden.trainer.tourOff');
+      T.menu(); T.tour(0); out.t0 = [T.panelState().title, T.panelState().btns.map(b => b.label)];
+      T.panelState().btns[0].fn(); T.panelState().btns[0].fn(); out.t2 = T.panelState().title; out.spot = document.querySelector('.spot') && document.querySelector('.spot').id;
+      T.panelState().btns.find(b => /Don't show/.test(b.label)).fn(); out.tick = [localStorage.getItem('arden.trainer.tourOff'), T.panelState().btns.find(b => /Don't show/.test(b.label)).icon];
+      T.panelState().btns.find(b => /Don't show/.test(b.label)).fn(); out.untick = localStorage.getItem('arden.trainer.tourOff');
+      T.panelState().btns.find(b => /Skip/.test(b.label)).fn(); out.after = [T.S.phase, document.querySelectorAll('.spot').length];
+      document.querySelector('#hMin').click(); out.chip = [getComputedStyle(document.querySelector('#chip')).display, getComputedStyle(document.querySelector('#hud')).display];
+      T.startModule('induct'); out.chipText = document.querySelector('#chip').textContent;
+      return JSON.stringify(out);
+    }));
+    await p.waitForTimeout(300); await p.screenshot({ path: 'n3-chip.png' });
+    await p.mouse.move(43, 757); await p.mouse.down(); await p.mouse.move(400, 300, { steps: 4 }); await p.mouse.up();
+    console.log('chip dragged to', await p.evaluate(() => { const c = document.querySelector('#chip'); return c.offsetLeft + ',' + c.offsetTop + ' saved ' + localStorage.getItem('arden.trainer.chip'); }));
+    await p.mouse.click(400, 300); console.log('chip click ->', await p.evaluate(() => getComputedStyle(document.querySelector('#hud')).display + ' / chip ' + getComputedStyle(document.querySelector('#chip')).display));
+    await p.evaluate(() => { const T = window.TR; T.menu(); T.tour(2); }); await p.waitForTimeout(300); await p.screenshot({ path: 'n4-tour.png' });
+    await p.evaluate(() => window.TR.menu()); await p.waitForTimeout(300); await p.screenshot({ path: 'n0-menu.png' });
     // name modal must swallow game keys
     await p.evaluate(() => { window.TR.menu(); document.querySelector('#nameBtn').click(); });
     await p.keyboard.type('Dee 3 e'); await p.waitForTimeout(200);

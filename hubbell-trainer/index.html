@@ -49,13 +49,23 @@ body>canvas{position:fixed;left:0;top:0;width:100vw;height:100vh;display:block}
 #hProg{height:5px;background:#e6e6e6;border-radius:3px;margin:2px 0 8px;overflow:hidden}#hProg i{display:block;height:100%;width:0;background:var(--y);transition:width .25s}
 #top #vrBtn{background:var(--y);color:#000;border-color:var(--y);font-weight:700}
 #top button[hidden]{display:none}
+#top button canvas,#hBtns button canvas{vertical-align:-4px;margin-right:5px}
+#hMin{position:absolute;right:8px;top:8px;width:30px;height:26px;border:1px solid #999;border-radius:4px;background:#fff;cursor:pointer;font-size:0}
+#hMin:hover{background:var(--y)}
+#hud{position:fixed}
+#chip{position:fixed;left:12px;bottom:12px;width:62px;height:62px;border-radius:50%;background:var(--y);border:3px solid #000;box-shadow:0 3px 12px rgba(0,0,0,.4);z-index:4;display:none;align-items:center;justify-content:center;flex-direction:column;font-weight:700;font-size:15px;cursor:grab;user-select:none;touch-action:none}
+#chip.pulse{animation:chipPulse .5s 3}
+@keyframes chipPulse{50%{transform:scale(1.18)}}
+.spot{outline:4px solid var(--y);outline-offset:3px;animation:spot 1s infinite}
+@keyframes spot{50%{outline-color:#fff}}
 @media (max-width:700px){#help{display:none}#top .sub{display:none}}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.181.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.181.0/examples/jsm/"}}</script>
 </head>
 <body>
-<div id="top"><b>ARDEN DC TRAINER</b><span class="sub">PIT · Pick · Pack · Ship · Kaizen</span><span class="sp"></span><span id="who" class="sub"></span><button id="vrBtn" hidden>Enter VR</button><button id="menuBtn">Menu</button><button id="recBtn">Records</button><button id="nameBtn">Trainee</button><button id="helpBtn" title="Controls">?</button></div>
-<div id="hud"><div id="hTitle">Loading the warehouse...</div><div id="hSub"></div><div id="hProg"><i></i></div><div id="hText"></div><div id="hRF"></div><div id="hDev"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
+<div id="top"><b>ARDEN DC TRAINER</b><span class="sub">PIT · Pick · Pack · Ship · Kaizen</span><span class="sp"></span><span id="who" class="sub"></span><button id="vrBtn" hidden>Enter VR</button><button id="menuBtn">Menu</button><button id="recBtn">Records</button><button id="nameBtn">Trainee</button><button id="helpBtn" title="Controls list"></button></div>
+<div id="chip" title="Show the panel"></div>
+<div id="hud"><button id="hMin" title="Shrink the panel to a chip">-</button><div id="hTitle">Loading the warehouse...</div><div id="hSub"></div><div id="hProg"><i></i></div><div id="hText"></div><div id="hRF"></div><div id="hDev"></div><div id="hWhy"></div><div id="hBtns"></div><div id="hFoot"></div></div>
 <div id="cross"></div><div id="look"></div><div id="toast"></div>
 <div id="help"><b>PC:</b> click the view to look around, WASD to walk, click or E to use what the crosshair is on, 1-9 for the panel buttons, Tab or Esc to free the mouse.<br><b>Forklift:</b> W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.<br><b>Quest 3:</b> Enter VR. Trigger uses things and presses panel buttons. Left stick walks, right stick turns. X brings the panel back. In the forklift: left stick drives and steers, right stick lifts and tilts, A is the horn.</div>
 <div id="modal" class="hidden"><div id="mbox"></div></div>
@@ -127,6 +137,20 @@ function canvasTex(w, h, draw) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   return { tex: t, c, g, redraw(fn) { fn(g, w, h); t.needsUpdate = true; } };
 }
+/* icons drawn in code (24 x 24 paths), used on the VR board, the wrist dock and the page buttons */
+const ICONS = {
+  forklift: 'M3 16V8h5l3 4v4M14 5v13h7M4 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M9 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+  induct: 'M3 5h18v11H3zM9 20h6M12 16v4', thor: 'M8 3h8v8H8zM10 6h4M12 11v5M5 20h14M7 20v-4h10v4',
+  handheld: 'M8 2h8v20H8zM10 5h4v6h-4zM10 14h1M13 14h1M10 17h1M13 17h1', box: 'M3 8l9-5 9 5v9l-9 5-9-5zM3 8l9 5 9-5M12 13v9',
+  truck: 'M2 7h11v9H2zM13 10h5l3 3v3h-8M5 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0M15 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0',
+  search: 'M4 10a6 6 0 1 0 12 0a6 6 0 1 0-12 0M15 15l6 6', guide: 'M12 3v14M6 11l6 6 6-6M5 21h14', tour: 'M5 21V4M5 4h12l-3 4 3 4H5',
+  menu: 'M3 11l9-8 9 8M5 10v10h14V10', records: 'M8 6h12M8 12h12M8 18h12M4 6h.5M4 12h.5M4 18h.5', person: 'M8 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0M4 21c0-5 16-5 16 0',
+  help: 'M9 9a3 3 0 1 1 4 3c-1 .7-1 1.5-1 2.5M12 18.5v.5', vr: 'M2 8h20v9h-6l-2-3h-4l-2 3H2z', next: 'M9 5l7 7-7 7', back: 'M15 5l-7 7 7 7', skip: 'M6 6l12 12M18 6L6 18',
+  boxoff: 'M4 4h16v16H4z', boxon: 'M4 4h16v16H4zM7 12l4 4 7-8', again: 'M20 12a8 8 0 1 1-3-6M20 3v5h-5', ok: 'M5 12l5 5 9-10', min: 'M5 12h14',
+  idea: 'M9 17h6M10 21h4M12 3a6 6 0 0 0-4 10c1 1 1 2 1 4h6c0-2 0-3 1-4a6 6 0 0 0-4-10', board: 'M4 4h16v12H4zM12 16v5M8 21h8', hide: 'M3 12c3-6 15-6 18 0c-3 6-15 6-18 0M4 4l16 16'
+};
+function drawIcon(g, name, x, y, size, color = '#000') { if (!ICONS[name]) return; g.save(); g.translate(x, y); g.scale(size / 24, size / 24); g.strokeStyle = color; g.lineWidth = 2.2; g.lineCap = g.lineJoin = 'round'; g.stroke(new Path2D(ICONS[name])); g.restore(); }
+function iconEl(name, px = 18, color = '#000') { const c = document.createElement('canvas'); c.width = c.height = px * 2; c.style.width = c.style.height = px + 'px'; drawIcon(c.getContext('2d'), name, 0, 0, px * 2, color); return c; }
 function hash(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function drawBars(g, code, x, y, w, h) {
   let r = hash(code); g.fillStyle = '#000'; let px = x;
@@ -702,8 +726,8 @@ let P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '' };
 let panelRects = [];
 let toastMsg = null;
 let hoverBtn = -1, leaveArm = 0;
-function progress() { return S.mod && S.mod.steps.length && S.phase === 'run' ? S.i / S.mod.steps.length : S.phase === 'done' ? 1 : S.phase === 'hunt' ? Object.keys(S.found).length / HUNT.length : 0; }
-function setPanel(p) { P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; hoverBtn = -1; drawPanel(); drawHud(); mirrorDev(); }
+function progress() { if (S.phase === 'tour') return (S.tourI + 1) / TOUR.length; return S.mod && S.mod.steps.length && S.phase === 'run' ? S.i / S.mod.steps.length : S.phase === 'done' ? 1 : S.phase === 'hunt' ? Object.keys(S.found).length / HUNT.length : 0; }
+function setPanel(p) { P = { title: '', sub: '', text: '', why: '', rf: null, btns: [], foot: '', ...p }; hoverBtn = -1; drawPanel(); drawHud(); mirrorDev(); drawWrist(); }
 function drawPanel() {
   panelCT.redraw((g, w, h) => {
     g.clearRect(0, 0, w, h);
@@ -726,8 +750,9 @@ function drawPanel() {
     P.btns.forEach((b, i) => {
       const cx = 24 + (i % cols) * (bw + 24), cy = by + Math.floor(i / cols) * (bh + 12);
       g.fillStyle = i === hoverBtn ? '#ffe96b' : b.hot ? '#FDDB33' : '#fff'; g.fillRect(cx, cy, bw, bh); g.strokeStyle = '#000'; g.lineWidth = i === hoverBtn ? 8 : 4; g.strokeRect(cx, cy, bw, bh);
-      g.fillStyle = '#000'; const lines = wrapText(g, b.label, bw - 30).slice(0, 2);
-      lines.forEach((l, k) => g.fillText(l, cx + 16, cy + (lines.length === 1 ? 48 : 32 + k * 32)));
+      const io = b.icon ? 56 : 0; if (b.icon) drawIcon(g, b.icon, cx + 12, cy + 15, 44);
+      g.fillStyle = '#000'; const lines = wrapText(g, b.label, bw - 30 - io).slice(0, 2);
+      lines.forEach((l, k) => g.fillText(l, cx + 16 + io, cy + (lines.length === 1 ? 48 : 32 + k * 32)));
       panelRects.push({ x: cx, y: cy, w: bw, h: bh, i });
     });
     if (toastMsg) { g.fillStyle = toastMsg.kind === 'bad' ? '#C00000' : toastMsg.kind === 'good' ? '#2E7D32' : '#000'; g.fillRect(0, h - 64, w, 64); g.fillStyle = '#fff'; g.font = 'bold 30px Calibri, Arial'; g.fillText(toastMsg.text.slice(0, 60), 20, h - 22); }
@@ -740,7 +765,8 @@ function drawHud() {
   const rf = $('#hRF'); rf.style.display = P.rf ? 'block' : 'none'; rf.textContent = P.rf ? P.rf.join('\n') : '';
   const wy = $('#hWhy'); wy.style.display = P.why ? 'block' : 'none'; wy.textContent = P.why ? 'Why: ' + P.why : '';
   const bb = $('#hBtns'); bb.innerHTML = '';
-  P.btns.forEach((b, i) => { const e = document.createElement('button'); if (b.hot) e.className = 'hot'; e.innerHTML = `<span class="n">${i + 1}</span> ${esc(b.label)}`; e.onclick = () => b.fn(); bb.appendChild(e); });
+  P.btns.forEach((b, i) => { const e = document.createElement('button'); if (b.hot) e.className = 'hot'; e.innerHTML = `<span class="n">${i + 1}</span> `; if (b.icon) e.appendChild(iconEl(b.icon)); e.appendChild(document.createTextNode(b.label)); e.onclick = () => b.fn(); bb.appendChild(e); });
+  $('#chip').textContent = S.mod && S.phase === 'run' && S.mod.steps.length ? `${S.i + 1}/${S.mod.steps.length}` : ''; if (!$('#chip').textContent) $('#chip').appendChild(iconEl('board', 30));
   $('#hFoot').textContent = P.foot;
   $('#hProg').style.display = progress() ? '' : 'none'; $('#hProg i').style.width = Math.round(progress() * 100) + '%';
 }
@@ -795,7 +821,8 @@ function enterStep() {
   if (st.type === 'rf') devSet(st.dev, typeof st.scr === 'function' ? st.scr() : st.scr);
   st.enter && st.enter();
   showStep();
-  if (renderer.xr.isPresenting) placePanelVR(true);
+  if (chipSt.on && !renderer.xr.isPresenting) { toast(`Step ${S.i + 1}: ${st.title}`, 'info', 2.5); const c = $('#chip'); c.classList.remove('pulse'); void c.offsetWidth; c.classList.add('pulse'); }
+  placePanelVR('soft');
 }
 function next() { const st = cur(); st && st.after && st.after(); S.i++; enterStep(); }
 function showStep() {
@@ -853,7 +880,7 @@ function onInteract(iid, hand, hit) {
     const bad = F.defect === iid;
     S.sub = { title: it.name, sub: 'Pre-shift inspection', text: 'You look: ' + (bad ? it.bad : it.ok), btns: [
       { label: 'OK', fn: () => inspAnswer(it, false) }, { label: 'Defect: report it', fn: () => inspAnswer(it, true) }], foot: footText() };
-    setPanel(S.sub); if (renderer.xr.isPresenting) placePanelVR(true);
+    setPanel(S.sub); placePanelVR('soft');
   }
 }
 function inspAnswer(it, saidBad) {
@@ -885,8 +912,8 @@ function finish() {
   const recs = JSON.parse(localStorage.getItem(LS_REC) || '[]'); recs.push(rec); localStorage.setItem(LS_REC, JSON.stringify(recs));
   S.phase = 'done'; S.lastRec = rec;
   const top = [...S.viol.map(v => 'SAFETY #' + v.step + ': ' + v.msg), ...S.mistakes.map(x => '#' + x.step + ': ' + x.msg)].slice(0, 5);
-  setPanel({ title: `${m.name}: ${pass ? 'PASS' : 'RETRY'}`, sub: `${trainee()} · ${Math.floor(secs / 60)} min ${secs % 60} s`, text: `Score ${score} of 100. Mistakes ${S.mistakes.length}, safety ${S.viol.length}.` + (top.length ? '\n\n' + top.join('\n') : '\n\nClean run.') + (m.target ? '\n\nFloor target: ' + m.target : ''), btns: [{ label: 'Kaizen card: what slowed you down?', fn: kaizenCard, hot: true }, { label: 'Run it again', fn: () => startModule(m.id) }, { label: 'Menu', fn: menu }] });
-  if (renderer.xr.isPresenting) placePanelVR(true);
+  setPanel({ title: `${m.name}: ${pass ? 'PASS' : 'RETRY'}`, sub: `${trainee()} · ${Math.floor(secs / 60)} min ${secs % 60} s`, text: `Score ${score} of 100. Mistakes ${S.mistakes.length}, safety ${S.viol.length}.` + (top.length ? '\n\n' + top.join('\n') : '\n\nClean run.') + (m.target ? '\n\nFloor target: ' + m.target : ''), btns: [{ icon: 'idea', label: 'Kaizen card: what slowed you down?', fn: kaizenCard, hot: true }, { icon: 'again', label: 'Run it again', fn: () => startModule(m.id) }, { icon: 'menu', label: 'Menu', fn: menu }] });
+  placePanelVR('soft');
 }
 const TIMWOODS = ['Transport', 'Inventory', 'Motion', 'Waiting', 'Overproduction', 'Over-processing', 'Defects', 'Skills (unused talent)'];
 function kaizenCard() {
@@ -903,17 +930,45 @@ function saveIdea(waste, note) {
   toast('Saved to the idea list.', 'good'); menu();
 }
 function menu() {
-  S.phase = 'menu'; S.mod = null; S.held = null; S.sub = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
+  S.phase = 'menu'; S.mod = null; S.held = null; S.sub = null; clearSpot(); unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('menu'); huntMarkers(false);
   setPanel({ title: 'Arden DC Trainer', sub: trainee() ? 'Trainee: ' + trainee() : 'Set your name with Trainee', text: 'Pick a module. Every step follows the current standard work, and each one tells you why.', btns: [
-    { label: 'Forklift (PIT): inspect, drive, put away', fn: () => startModule('pit') },
-    { label: 'Induction: EWM computer + scanner', fn: () => startModule('induct') },
-    { label: 'Pick: Pallet Land on the THOR', fn: () => startModule('pick') },
-    { label: 'Pick: Flow Rack with a handheld', fn: () => startModule('flow') },
-    { label: 'Pack: parcel at the pack station', fn: () => startModule('pack') },
-    { label: 'Ship: truck pack, stage, dock', fn: () => startModule('ship') },
-    { label: 'Gemba waste hunt (TIMWOODS)', fn: startHunt },
-    { label: 'Guide arrows: ' + (S.guide ? 'on' : 'off'), fn: () => { S.guide = !S.guide; localStorage.setItem(LS_GUIDE, S.guide ? '1' : '0'); menu(); } }] });
-  if (renderer.xr.isPresenting) placePanelVR(true);
+    { icon: 'forklift', label: 'Forklift (PIT): inspect, drive, put away', fn: () => startModule('pit') },
+    { icon: 'induct', label: 'Induction: EWM computer + scanner', fn: () => startModule('induct') },
+    { icon: 'thor', label: 'Pick: Pallet Land on the THOR', fn: () => startModule('pick') },
+    { icon: 'handheld', label: 'Pick: Flow Rack with a handheld', fn: () => startModule('flow') },
+    { icon: 'box', label: 'Pack: parcel at the pack station', fn: () => startModule('pack') },
+    { icon: 'truck', label: 'Ship: truck pack, stage, dock', fn: () => startModule('ship') },
+    { icon: 'search', label: 'Gemba waste hunt (TIMWOODS)', fn: startHunt },
+    { icon: 'guide', label: 'Guide arrows: ' + (S.guide ? 'on' : 'off'), fn: () => { S.guide = !S.guide; localStorage.setItem(LS_GUIDE, S.guide ? '1' : '0'); menu(); } },
+    { icon: 'tour', label: 'Show the tour', fn: () => tour(0) }] });
+  placePanelVR('soft');
+}
+/* welcome tour: opens at every start until "Don't show this at start" is ticked */
+const LS_TOUR = 'arden.trainer.tourOff';
+const TOUR = [
+  { t: 'Welcome', pc: 'This is the Arden DC floor: Pallet Land, the flow rack, induction, pack stations, truck pack, staging and a dock door.\n\nSeven modules. Each one follows the current standard work step by step and tells you why.' },
+  { t: 'Look and move', spot: 'body>canvas', pc: 'Click the view to look around with the mouse. W A S D walks.\nPoint the crosshair at something and click (or press E) to use it. The ring turns green when it is in reach.\nTab or Esc frees the mouse.',
+    vr: 'Left stick walks. Right stick turns.\nPoint at something and pull the trigger to use it. The ring turns green when it is in reach.\nYou can also press any button on this board, a device or your wrist with the glowing tip of a controller. No trigger needed.' },
+  { t: 'This panel', spot: '#hud', pc: 'The panel shows the step you are on, what to do and why. The bar under the title is your progress.\nThe small button in its corner shrinks it to a round chip you can drag anywhere. Click the chip to bring the panel back.',
+    vr: 'This board shows the step you are on, what to do and why.\nLook at your left wrist: Board here brings it to arm\'s length, Hide board puts it away, Menu leaves the module. The X button also brings the board to you.' },
+  { t: 'The devices', pc: 'Most steps are done on a device, like on the floor: the THOR terminal, the handheld, or a station screen.\nPress their keys, and scan barcodes with the scanner in your hand. A wrong scan or key shows the error on the device and counts as a mistake.\nA copy of the screen sits in this panel, and the keyboard works too.',
+    vr: 'Most steps are done on a device, like on the floor: the THOR terminal, the handheld, or a station screen.\nPress their keys with the pointer or a fingertip, and scan barcodes with the scanner in your right hand. A wrong scan or key shows the error on the device and counts as a mistake.' },
+  { t: 'The forklift', pc: 'W and S drive, A and D steer. R and F raise and lower the forks, T and G tilt back and forward, H is the horn.\nSpeed and fork height show at the bottom of the panel.', vr: 'Left stick drives and steers. Right stick up and down lifts, left and right tilts. A is the horn.\nSpeed and fork height show at the bottom of the board, which rides with the truck.' },
+  { t: 'Records and kaizen', spot: '#recBtn', pc: 'Each run is scored and saved on this device. Records (top bar) shows them and exports them.\nAfter a module, the kaizen card asks what slowed you down. That goes to the idea list.\n\nThe list of controls is under the ? button.', vr: 'Each run is scored and saved on this device. Records, on the page outside VR, shows them and exports them.\nAfter a module, the kaizen card asks what slowed you down. That goes to the idea list.' }
+];
+function clearSpot() { document.querySelectorAll('.spot').forEach(e => e.classList.remove('spot')); }
+function tour(i = 0) {
+  if (S.phase === 'run' || S.phase === 'hunt') return;
+  if (i === 0 && S.phase !== 'tour') setChip(false);
+  S.phase = 'tour'; S.mod = null; S.tourI = i;
+  const c = TOUR[i], xr = renderer.xr.isPresenting, off = localStorage.getItem(LS_TOUR) === '1', last = i === TOUR.length - 1;
+  clearSpot(); if (c.spot && !xr) $(c.spot).classList.add('spot');
+  setPanel({ title: c.t, sub: `Tour · ${i + 1} of ${TOUR.length}`, text: xr ? c.vr || c.pc : c.pc, btns: [
+    last ? { icon: 'ok', label: 'Start', hot: true, fn: menu } : { icon: 'next', label: 'Next', hot: true, fn: () => tour(i + 1) },
+    ...(i ? [{ icon: 'back', label: 'Back', fn: () => tour(i - 1) }] : []),
+    { icon: off ? 'boxon' : 'boxoff', label: "Don't show this at start", fn: () => { localStorage.setItem(LS_TOUR, off ? '0' : '1'); tour(i); } },
+    ...(last ? [] : [{ icon: 'skip', label: 'Skip the tour', fn: menu }])] });
+  placePanelVR('soft');
 }
 function setupScene(id) {
   inspHotspots(false); setDefect(null);
@@ -1146,7 +1201,7 @@ function huntHit(iid) {
     if (h.answer.includes(w)) { S.found[iid] = 1; h.m.visible = false; good('Yes: ' + h.answer.join(' / ')); if (Object.keys(S.found).length >= HUNT.length) huntDone(); else huntPanel(); }
     else mistake(`Not ${w}. Look again.`);
   } })) };
-  setPanel(S.sub); if (renderer.xr.isPresenting) placePanelVR(true);
+  setPanel(S.sub); placePanelVR('soft');
 }
 function huntDone() {
   huntMarkers(false); const n = Object.keys(S.found).length; S.sub = null;
@@ -1183,7 +1238,7 @@ function attachTool() {
   const o = S.tool === 'mc' ? DEV.mc.group : S.tool === 'gun' ? TOOL.gun : null; if (!o) return;
   const xr = renderer.xr.isPresenting, h = xr ? rightCtrl() : camera;
   if (o.parent !== h) h.add(o);
-  if (S.tool === 'mc') { if (xr) { o.position.set(0, .04, .07); o.rotation.set(-.9, 0, 0); } else { o.position.set(.19, -.15, -.34); o.rotation.set(-.1, -.3, 0); } }
+  if (S.tool === 'mc') { if (xr) { o.position.set(0, .06, .09); o.rotation.set(-.9, 0, 0); o.scale.setScalar(1.5); } else { o.position.set(.19, -.15, -.34); o.rotation.set(-.1, -.3, 0); o.scale.setScalar(1); } }   /* 1.5x in VR so the keys are pokeable */
   else { if (xr) { o.position.set(0, -.02, -.03); o.rotation.set(0, 0, 0); o.scale.setScalar(1); } else { o.position.set(.24, -.22, -.5); o.rotation.set(.1, .35, 0); o.scale.setScalar(.6); } }
 }
 function ride(t) { S.riding = t; S.rideOff = headYaw(); yaw = t.rotation.y - S.rideOff; rig.position.y = 0; headTo(t.position.x, t.position.z, yaw); rig.updateMatrixWorld(true); rig.attach(t); }
@@ -1344,6 +1399,7 @@ const ctrls = [0, 1].map(i => {
   const c = renderer.xr.getController(i); rig.add(c);
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xfddb33 }));
   line.scale.z = 3; c.add(line); c.userData.line = line;
+  const tipGlow = new THREE.Mesh(new THREE.SphereGeometry(.008, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff27a })); tipGlow.position.z = -.05; c.add(tipGlow);
   c.addEventListener('select', () => selectFrom(i));
   c.addEventListener('connected', e => { c.userData.hand = e.data && e.data.handedness; });
   const grip = renderer.xr.getControllerGrip(i); grip.add(new XRControllerModelFactory().createControllerModel(grip)); rig.add(grip);
@@ -1366,6 +1422,7 @@ function panelRectAt(uv) { const px = uv.x * PW, py = (1 - uv.y) * PH; return pa
 function selectFrom(src) {
   const h = HITS[src] || castFrom(src); if (!h) return;
   if (h.panel) { const r = panelRectAt(h.uv); if (r) pressPanelButton(r.i); return; }
+  if (h.iid === 'wrist') return wristPress(h.uv);
   const far = S.phase === 'hunt' ? 14 : REACH;
   if (h.dist > far) return toast('Move closer.', 'info', 1);
   const hand = src === 'desk' ? camera : ctrls[src];
@@ -1405,20 +1462,83 @@ function updateGuide(t) {
   arrow.visible = true; arrow.position.set(p.x, p.y + .45 + Math.sin(t * 4) * .08, p.z);
 }
 /* VR panel placement */
-function placePanelVR(force) {
+const BOARD = { dist: .62, side: .5, drop: .1, scale: .75 };   /* 0.6 m board at arm's length, 29 degrees left of where you look; buttons are 4.3 cm tall */
+function placePanelVR(mode) {   /* true = bring it here now; 'soft' = new content, move only if it is out of reach or out of view; false = every frame */
   if (!renderer.xr.isPresenting) { panel.visible = false; return; }
-  panel.visible = true;
+  panel.visible = !S.boardOff;
   if (F.onboard) {
     if (panel.parent !== truck) truck.add(panel);
     panel.position.set(-.55, 1.65, .55); panel.rotation.set(0, Math.PI + .5, 0); panel.scale.setScalar(.75); return;
   }
-  if (panel.parent !== scene) { scene.attach(panel); panel.scale.setScalar(1); }
+  const par = S.riding ? rig : scene;   /* on a THOR the board rides along */
+  if (panel.parent !== par) par.attach(panel);
+  panel.scale.setScalar(BOARD.scale);
   const head = camera.getWorldPosition(new THREE.Vector3()), dir = camera.getWorldDirection(new THREE.Vector3()); dir.y = 0; dir.normalize();
-  const want = head.clone().add(dir.multiplyScalar(1.0)); want.y = head.y - .15;
-  if (force || panel.position.distanceTo(want) > 2.2) { panel.position.copy(want); panel.lookAt(head.x, panel.position.y, head.z); }
+  const to = panel.getWorldPosition(new THREE.Vector3()).sub(head), d = to.length(); to.y = 0; to.normalize();
+  const lost = mode === 'soft' ? (d > 1.3 || to.dot(dir) < .2) : d > 2.2;
+  if (mode === true || lost) {
+    dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), BOARD.side);
+    const w = head.clone().add(dir.multiplyScalar(BOARD.dist)); w.y = head.y - BOARD.drop;
+    panel.position.copy(par.worldToLocal(w.clone())); panel.lookAt(head);
+  }
 }
-renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); $('#hud').style.display = 'none'; $('#help').style.display = 'none'; $('#vrBtn').textContent = 'Exit VR'; mirrorDev(); setTimeout(() => placePanelVR(true), 300); });
-renderer.xr.addEventListener('sessionend', () => { panel.visible = false; $('#hud').style.display = ''; $('#help').style.display = ''; $('#vrBtn').textContent = 'Enter VR'; camera.position.set(0, F.onboard ? 1.0 : EYE, 0); camera.rotation.set(0, 0, 0); if (F.seat) F.seat = { x: 0, z: 0, yaw: 0 }; S.rideOff = 0; mirrorDev(); });
+/* wrist dock on the left controller: shows when you look at it */
+const wristCT = canvasTex(512, 320);
+const wrist = new THREE.Mesh(new THREE.PlaneGeometry(.176, .11), new THREE.MeshBasicMaterial({ map: wristCT.tex }));
+wrist.position.set(0, .07, .06); wrist.rotation.x = -1.0; wrist.visible = false; reg(wrist, 'wrist', 'Wrist buttons');
+let wristRects = [];
+function drawWrist() {
+  wristCT.redraw((g, w, h) => {
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h); g.fillStyle = '#FDDB33'; g.font = 'bold 30px Calibri, Arial';
+    const st = cur(); g.fillText((S.phase === 'run' && st ? `${S.i + 1}/${S.mod.steps.length}  ${st.title}` : P.title).slice(0, 30), 14, 40);
+    g.fillStyle = '#5a5a5a'; g.fillRect(0, 56, w, 8); g.fillStyle = '#FDDB33'; g.fillRect(0, 56, w * progress(), 8);
+    wristRects = [];
+    [['board', 'Board here', 'here'], [S.boardOff ? 'board' : 'hide', S.boardOff ? 'Show board' : 'Hide board', 'toggle'], ['menu', now() < leaveArm ? 'Leave?' : 'Menu', 'menu']].forEach(([ic, lab, k], i) => {
+      const x = 12 + i * 166, y = 80, bw = 156, bh = 226;   /* 5.4 x 7.8 cm */
+      g.fillStyle = k === 'menu' && now() < leaveArm ? '#C00000' : '#FDDB33'; g.fillRect(x, y, bw, bh);
+      drawIcon(g, ic, x + 38, y + 30, 80); g.fillStyle = '#000'; g.font = 'bold 28px Calibri, Arial'; g.textAlign = 'center'; g.fillText(lab, x + bw / 2, y + 180); g.textAlign = 'left';
+      wristRects.push({ x, y, w: bw, h: bh, k });
+    });
+  });
+}
+function wristPress(uv) {
+  const px = uv.x * 512, py = (1 - uv.y) * 320, r = wristRects.find(q => px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h); if (!r) return;
+  beep(800, .05); buzz(.3, 25);
+  if (r.k === 'here') { S.boardOff = false; placePanelVR(true); }
+  else if (r.k === 'toggle') { S.boardOff = !S.boardOff; placePanelVR(S.boardOff ? false : true); }
+  else if (S.phase === 'run' || S.phase === 'hunt') { if (now() < leaveArm) { leaveArm = 0; leaveModule(); } else { leaveArm = now() + 3; setTimeout(drawWrist, 3100); } }
+  else menu();
+  drawWrist();
+}
+function updateWrist() {
+  const c = ctrls.find(q => q.userData.hand === 'left') || ctrls[0];
+  if (wrist.parent !== c) c.add(wrist);
+  const head = camera.getWorldPosition(new THREE.Vector3()), wp = wrist.getWorldPosition(new THREE.Vector3()), to = wp.clone().sub(head), d = to.length();
+  const n = new THREE.Vector3(0, 0, 1).transformDirection(wrist.matrixWorld);
+  wrist.visible = renderer.xr.isPresenting && d < .75 && to.normalize().dot(camera.getWorldDirection(new THREE.Vector3())) > .6 && n.dot(to) < -.15;
+}
+/* fingertip poke: touch a button on the board, the wrist or a device with the glowing tip of a controller */
+const POKE = { tip: .05, st: new Map() };
+function updatePoke() {
+  const surf = []; if (isVisible(panel)) surf.push([panel, 'panel']); if (isVisible(wrist)) surf.push([wrist, 'wrist']);
+  for (const d of Object.values(DEV)) if (isVisible(d.mesh)) surf.push([d.mesh, d.id]);
+  ctrls.forEach((c, ci) => {
+    const tip = c.localToWorld(new THREE.Vector3(0, 0, -POKE.tip));
+    for (const [m, id] of surf) {
+      if (m.parent === c || (m.parent && m.parent.parent === c)) continue;   /* not the thing this hand is holding */
+      const l = m.worldToLocal(tip.clone()), gp = m.geometry.parameters, key = ci + id, st = POKE.st.get(key) || { z: 99, down: false }; POKE.st.set(key, st);
+      const inside = Math.abs(l.x) < gp.width / 2 && Math.abs(l.y) < gp.height / 2;
+      if (!st.down && inside && st.z > .008 && st.z < .12 && l.z <= .008 && l.z > -.06) {   /* came through the face from the front */
+        st.down = true; buzz(.35, 25); const uv = { x: l.x / gp.width + .5, y: l.y / gp.height + .5 };
+        if (id === 'panel') { const r = panelRectAt(uv); if (r) pressPanelButton(r.i); } else if (id === 'wrist') wristPress(uv); else if (id !== 'mc' || S.tool === 'mc') devPress(id, uv);
+      }
+      if (st.down && (!inside || l.z > .03)) st.down = false;
+      st.z = inside ? l.z : 99;
+    }
+  });
+}
+renderer.xr.addEventListener('sessionstart', () => { camera.position.set(0, 0, 0); camera.rotation.set(0, 0, 0); hudVis(true); clearSpot(); $('#help').style.display = 'none'; $('#vrBtn').lastChild.textContent = 'Exit VR'; if (S.phase === 'tour') tour(S.tourI); mirrorDev(); setTimeout(() => placePanelVR(true), 300); });
+renderer.xr.addEventListener('sessionend', () => { panel.visible = false; wrist.visible = false; hudVis(false); $('#help').style.display = ''; $('#vrBtn').lastChild.textContent = 'Enter VR'; if (S.phase === 'tour') tour(S.tourI); camera.position.set(0, F.onboard ? 1.0 : EYE, 0); camera.rotation.set(0, 0, 0); if (F.seat) F.seat = { x: 0, z: 0, yaw: 0 }; S.rideOff = 0; mirrorDev(); });
 if (navigator.xr) navigator.xr.isSessionSupported('immersive-vr').then(ok => { $('#vrBtn').hidden = !ok; }).catch(() => { });
 $('#vrBtn').onclick = async () => {
   const cur = renderer.xr.getSession(); if (cur) return cur.end();
@@ -1434,6 +1554,7 @@ function tick(dt) {
   readXR();
   if (renderer.xr.isPresenting) { const x = !!(XRIN.left && XRIN.left.buttons[4] && XRIN.left.buttons[4].pressed); if (x && !xBtnPrev) placePanelVR(true); xBtnPrev = x; placePanelVR(false); }
   if (S.tool) attachTool();
+  if (renderer.xr.isPresenting) { updateWrist(); updatePoke(); }
   if (F.onboard) { driveTruck(dt); seatRig(); } else walk(dt);
   updateHover(); updateGuide(t);
   const st = cur();
@@ -1477,15 +1598,33 @@ $('#hDev').addEventListener('click', e => {
 $('#recBtn').onclick = showRecords; $('#nameBtn').onclick = askName; $('#menuBtn').onclick = () => { if ((S.phase === 'run' || S.phase === 'hunt') && !confirm('Leave this module? This run will not be recorded.')) return; leaveModule(); };
 const LS_HELP = 'arden.trainer.help';
 function setHelp(on) { $('#help').classList.toggle('off', !on); localStorage.setItem(LS_HELP, on ? '1' : '0'); }
-setHelp(localStorage.getItem(LS_HELP) !== '0'); $('#helpBtn').onclick = () => setHelp($('#help').classList.contains('off'));
+setHelp(localStorage.getItem(LS_HELP) === '1');   /* off unless asked for: the tour covers it */ $('#helpBtn').onclick = () => setHelp($('#help').classList.contains('off'));
 $('#modal').addEventListener('mousedown', e => { if (e.target.id === 'modal' && trainee()) closeModal(); });
+/* the panel shrinks to a round chip you can drag; place and state are remembered */
+const LS_CHIP = 'arden.trainer.chip';
+let chipSt = {}; try { chipSt = JSON.parse(localStorage.getItem(LS_CHIP) || '{}'); } catch (e) { }
+function hudVis(xr = renderer.xr.isPresenting) { $('#hud').style.display = xr || chipSt.on ? 'none' : ''; $('#chip').style.display = !xr && chipSt.on ? 'flex' : 'none'; placeChip(); }
+function placeChip() {   /* a chip saved off screen comes back */
+  const c = $('#chip'); if (chipSt.x == null) { c.style.left = '12px'; c.style.top = ''; c.style.bottom = '12px'; return; }
+  c.style.bottom = ''; c.style.left = Math.max(4, Math.min(innerWidth - 66, chipSt.x)) + 'px'; c.style.top = Math.max(50, Math.min(innerHeight - 66, chipSt.y)) + 'px';
+}
+function setChip(on) { chipSt.on = on; localStorage.setItem(LS_CHIP, JSON.stringify(chipSt)); hudVis(); }
+$('#hMin').appendChild(iconEl('min', 16)); $('#hMin').onclick = () => setChip(true);
+{ const c = $('#chip'); let drag = null;
+  c.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, l: c.offsetLeft, t: c.offsetTop, moved: false }; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true; if (drag.moved) { chipSt.x = drag.l + dx; chipSt.y = drag.t + dy; placeChip(); } });
+  c.addEventListener('pointerup', () => { if (!drag) return; const m = drag.moved; drag = null; if (m) localStorage.setItem(LS_CHIP, JSON.stringify(chipSt)); else setChip(false); }); }
+addEventListener('resize', placeChip);
+for (const [id, ic] of [['menuBtn', 'menu'], ['recBtn', 'records'], ['nameBtn', 'person'], ['vrBtn', 'vr'], ['helpBtn', 'help']]) $('#' + id).prepend(iconEl(ic, 16, id === 'vrBtn' ? '#000' : '#fff'));
+$('#helpBtn').firstChild.style.marginRight = '0';
 bake(scene); bake(HP);
-showWho(); menu();
-if (!trainee() && !/[?&]test/.test(location.search)) askName();
+const TESTING = /[?&]test/.test(location.search);
+showWho(); hudVis(); if (!TESTING && localStorage.getItem(LS_TOUR) !== '1') { menu(); tour(0); } else menu();
+if (!trainee() && !TESTING) askName();
 
 /* test hook for the headless checks */
 window.TR = { S, MODS, F, OBJ, SLOTS, PALLETS, recvPallet, startModule, answer, pressKey, onInteract, next, menu, tick, cur, startHunt, huntHit, HUNT, ZONE,
-  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo };
+  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo, tour, TOUR, panel, wrist, setChip, placePanelVR };
 </script>
 </body>
 </html>

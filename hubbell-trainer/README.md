@@ -67,6 +67,20 @@ Faster: static geometry is merged per material. The menu view went from 570 draw
 
 `test/checks.mjs` covers the new behaviour (F8 accepts typed values, spare ENT, dialog swallows game keys) and prints the draw calls.
 
+## Feedback pass from the Brene for VaM session (2026-11-28)
+Andrew's feedback to that session on its own tool, taken from its update notes (`.brenebase/updates/2026-11-27-vam-*.md`, `2026-11-28-vam-phone-tour-icons-vr.md` on `claude/multi-agent-work-router-w9jzlg`), applied here. Standing rule kept: nothing removed, only how it is presented.
+- **Too busy -> calm screen.** The controls box is off unless asked for (? button). The instruction panel shrinks to a round chip (corner button) that shows the step number, can be dragged anywhere, is remembered, and comes back on screen if it was saved off it. A new step while shrunk shows a short note and pulses the chip.
+- **Tour at every start** with a "Don't show this at start" tick. Six cards, PC and VR wording, highlights the thing it is talking about on PC. "Show the tour" is on the menu.
+- **Icons drawn in code** on the menu, results, tour and top bar buttons, on the VR board and on the wrist dock.
+- **VR, controllers first:**
+  - The board comes to arm's length (0.62 m), 29 degrees left of where you look so it does not cover the work, facing you, 0.6 m wide with 4.3 cm buttons. It only moves by itself when it is out of reach or out of view. On a THOR it rides along.
+  - Wrist dock on the left controller, shown when you look at it: step and progress, Board here, Hide board, Menu (press twice inside a module). Buttons are 5.4 x 7.8 cm.
+  - Fingertip poke: press any button on the board, the wrist or a device by pushing the glowing tip of a controller through it from the front. No trigger. The handheld is 1.5x in VR so its keys can be poked.
+  - Hover highlight and haptics were already in.
+- Hand tracking is left out, as on that tool (controllers first).
+
+Checked in the emulated Quest 3: board at 0.62 m and 29 degrees, a poke on the first menu button started the module, the wrist dock shows when the left hand is raised. **Not checked in a headset:** the wrist dock's angle on the real controller, poke feel, and whether 29 degrees left is the right place for the board.
+
 ## Placeholders to confirm
 - Box sizes #2-#6 and the product dimensions in Pack step 4.
 - Forklift capacity plate (5000 lb @ 24 in), truck type (sit-down counterbalance). Arden's reach trucks are not modeled.
