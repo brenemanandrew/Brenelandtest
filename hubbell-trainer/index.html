@@ -374,9 +374,10 @@ function laser(from, to) { const a = from.getWorldPosition(new THREE.Vector3());
 
 /* ============================================================
    THE WAREHOUSE (meters; x east, z south). Laid out from the Arden floor plan (Facility Outlook deck, Jan 2026) plus
-   Andrew's notes of 2026-11-28, at about 1:3 scale: cantilever (long product) on the west wall, Pallet Land with north-south
-   aisles, a middle strip with induction at its north end, staging lanes, then the Lead Hub and Non Conf at its south end,
-   Unit / Carton Pick (flow racks, conveyor) in the centre, Truck Pack and Parcel Pack south of it, the walkway, VA and Slow
+   Andrew's notes of 2026-11-28, at about 1:3 scale: long product (cantilever) on the west wall and in row PB, Pallet Land with north-south
+   aisles, the old long product strip as staging (induction against the north wall at its north-east corner, lanes, then the Lead Hub
+   and Non Conf at its south end), Unit / Carton Pick (flow racks north and south, static rack in the middle, conveyor) in the centre,
+   open floor on the north wall where the pushback racks were, Truck Pack and Parcel Pack south of it, the walkway, VA and Slow
    Moving to the north-east, East Warehouse Storage and the chargers to the east, a main aisle, then docks and offices on the south wall.
    ============================================================ */
 const C = { brown: 0xa77b4f, cardboard: 0xc49a6c, rackBlue: 0x1f4fa8, beam: 0xf07c00, pallet: 0xb48a58, conc: 0xb9bcbd, yellow: 0xfddb33, green: 0x2e9d3a, red: 0xc0392b, blue: 0x2a6fd6, orange: 0xf28c28, black: 0x111111, white: 0xffffff, gray: 0x777777 };
@@ -488,7 +489,7 @@ pickFace('P106-A', 'HBL2621', 4);
 
 /* ---------- induction flow rack and THORs ---------- */
 {
-  const ix = -8.2, iz = -14.6;
+  const ix = -6.6, iz = -14.6;
   box(2.4, .05, 1, M(0x888888), ix, .8, iz); box(2.4, .05, 1, M(0x888888), ix, 1.5, iz);
   for (const x of [-1.2, 1.2]) for (const z of [-.5, .5]) box(.06, 1.8, .06, M(C.gray), ix + x, 0, iz + z);
   place(label('INDUCTION\nFLOW RACK', 1.1, .5, { bg: '#FDDB33' }), ix, 2.1, iz + .5);
@@ -504,17 +505,17 @@ pickFace('P106-A', 'HBL2621', 4);
   OBJ.indTotes = totes;
   const shelf = box(2.4, .05, 1, HIDDEN, ix, .86, iz); reg(shelf, 'ind_rack', 'Induction flow rack');
   /* induction computer, scanner, tote stacks, flow rack pallet, turnover log */
-  box(.08, 1.15, .08, M(0x333333), -10.1, 0, -14.35); box(.5, .04, .35, M(0x333333), -10.1, 1.0, -14.3);
-  const d = makeDevice('ind', 'gui', .62, .39, 'Induction computer (EWM)'); d.mesh.position.set(-10.1, 1.45, -14.42); scene.add(d.mesh); box(.66, .43, .03, M(0x111111), -10.1, 1.235, -14.45);
-  gunProp(-10.25, 1.07, -14.2, 'ind_gun', 'Induction scanner');
-  const log = new THREE.Group(); box(.22, .02, .3, M(0x8b5a2b), 0, 0, 0, log); box(.2, .005, .26, M(0xffffff), 0, .02, 0, log); log.position.set(-9.92, 1.04, -14.25); scene.add(log); reg(log, 'ind_log', 'Turnover log');
-  for (const [x, col, code, id] of [[-6.4, 0x6b4a2b, 'T-10240', 'ind_brown'], [-5.7, C.blue, 'T-10250', 'ind_blue']]) {
+  box(.08, 1.15, .08, M(0x333333), -8.5, 0, -14.35); box(.5, .04, .35, M(0x333333), -8.5, 1.0, -14.3);
+  const d = makeDevice('ind', 'gui', .62, .39, 'Induction computer (EWM)'); d.mesh.position.set(-8.5, 1.45, -14.42); scene.add(d.mesh); box(.66, .43, .03, M(0x111111), -8.5, 1.235, -14.45);
+  gunProp(-8.65, 1.07, -14.2, 'ind_gun', 'Induction scanner');
+  const log = new THREE.Group(); box(.22, .02, .3, M(0x8b5a2b), 0, 0, 0, log); box(.2, .005, .26, M(0xffffff), 0, .02, 0, log); log.position.set(-8.32, 1.04, -14.25); scene.add(log); reg(log, 'ind_log', 'Turnover log');
+  for (const [x, col, code, id] of [[-4.8, 0x6b4a2b, 'T-10240', 'ind_brown'], [-4.1, C.blue, 'T-10250', 'ind_blue']]) {
     for (let k = 0; k < 3; k++) box(.55, .3, .38, M(col), x, k * .31, -13.3);
     const top = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, top); top.position.set(x, .93, -13.3); scene.add(top);
     const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); top.add(b); movable(top); OBJ[id] = top;
   }
-  const frp = makePallet(0); frp.position.set(-6.2, 0, -11.8); scene.add(frp); reg(frp, 'ind_frpallet', 'Flow rack induction pallet');
-  place(label('FLOW RACK\nINDUCTION', .7, .35, { bg: '#FDDB33' }), -6.2, 1.3, -12.35);
+  const frp = makePallet(0); frp.position.set(-4.6, 0, -11.8); scene.add(frp); reg(frp, 'ind_frpallet', 'Flow rack induction pallet');
+  place(label('FLOW RACK\nINDUCTION', .7, .35, { bg: '#FDDB33' }), -4.6, 1.3, -12.35);
 }
 function makeThor(id, battery) {
   /* rider pallet truck with a THOR vehicle-mount terminal; the operator stands at the origin facing -z */
@@ -538,24 +539,24 @@ movable(thor1); movable(thor2);
 /* ---------- flow rack zone D (decor and waste hunt) ---------- */
 for (let i = 0; i < 3; i++) {
   const x0 = -3.6 + i * 3;
-  const fr = new THREE.Group(); fr.position.set(x0 + 1.4, 0, -14.4); scene.add(fr);
+  const fr = new THREE.Group(); fr.position.set(x0 + 1.4, 0, -12.8); scene.add(fr);
   for (let l = 0; l < 4; l++) { const s = box(2.8, .04, 1, M(0x999999), 0, .5 + l * .45, 0, fr); s.rotation.x = .12; for (let k = 0; k < 5; k++) box(.45, .3, .5, M(C.cardboard), -1.1 + k * .55, .56 + l * .45, .2, fr); }
   bake(fr);
-  place(label('D' + (1 + i) + '00', .5, .25, { bg: '#FDDB33' }), x0 + 1.4, 2.6, -13.85);
+  place(label('D' + (1 + i) + '00', .5, .25, { bg: '#FDDB33' }), x0 + 1.4, 2.6, -12.25);
 }
-solid(-3.6, 5.4, -15, -13.8);
-const frConv = box(10.2, .7, .6, M(0x555555), 1.2, 0, -12.9); solid(-3.9, 6.3, -13.2, -12.6);   /* pick conveyor */
+solid(-3.6, 5.4, -13.4, -12.2);
+const frConv = box(10.2, .7, .6, M(0x555555), 1.2, 0, -11.3); solid(-3.9, 6.3, -11.6, -11.0);   /* pick conveyor */
 reg(frConv, 'fr_conv', 'Pick conveyor');
-for (let l = 1; l <= 2; l++) for (let k = 0; k < 5; k++) { const code = `D30${k + 1}-0${l + 1}`; const b = barcode(code, .2, .08, code); b.position.set(3.8 - 1.1 + k * .55, .47 + l * .45, -13.86); scene.add(b); }
-{ const b = barcode('HBL7740', .16, .08, 'HBL7740'); b.position.set(3.8 - 1.1 + 2 * .55, .47 + .45 + .12, -13.86); scene.add(b); }
+for (let l = 1; l <= 2; l++) for (let k = 0; k < 5; k++) { const code = `D30${k + 1}-0${l + 1}`; const b = barcode(code, .2, .08, code); b.position.set(3.8 - 1.1 + k * .55, .47 + l * .45, -12.26); scene.add(b); }
+{ const b = barcode('HBL7740', .16, .08, 'HBL7740'); b.position.set(3.8 - 1.1 + 2 * .55, .47 + .45 + .12, -12.26); scene.add(b); }
 for (const [x, col, code, red] of [[-1.2, C.blue, 'T-20006'], [-.5, C.blue, 'T-20007'], [.2, C.red, 'T-20009', 1], [.9, C.blue, 'T-20008']]) {
-  const t = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, t); t.position.set(x, .7, -12.9); scene.add(t);
+  const t = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, t); t.position.set(x, .7, -11.3); scene.add(t);
   const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); t.add(b); movable(t); if (red) OBJ.fr_red = t;
 }
-{ const base = box(.35, .95, .3, M(0x444444), -2.2, 0, -11.3); reg(base, 'mc_cradle', 'Handheld charging cradle'); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), -2.2, .7, -11.14);
+{ const base = box(.35, .95, .3, M(0x444444), -2.2, 0, -9.7); reg(base, 'mc_cradle', 'Handheld charging cradle'); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), -2.2, .7, -9.54);
   const mc = new THREE.Group(); box(.1, .17, .025, M(0x1a1a1a), 0, -.085, -.0125, mc);
   const d = makeDevice('mc', 'rf', .09, .135, 'Handheld (mobile computer)', 88); d.mesh.position.z = .002; mc.add(d.mesh);
-  mc.position.set(-2.2, 1.05, -11.3); mc.rotation.x = -.6; scene.add(mc); movable(mc); d.group = mc; }
+  mc.position.set(-2.2, 1.05, -9.7); mc.rotation.x = -.6; scene.add(mc); movable(mc); d.group = mc; }
 
 /* ---------- pack stations ---------- */
 function packBench(x, z, name) {
@@ -665,16 +666,29 @@ function decorShelf(x0, x1, zc, seed) {   /* an east-west carton shelf row */
   for (let l = 0; l < 4; l++) { box(len, .04, 1, M(0x999999), xc, .3 + l * .45, zc); for (let k = 0; k < Math.floor(len / .6); k++) if (hash(seed + l + ':' + k) % 5) box(.45, .28, .8, M(C.cardboard), x0 + .35 + k * .6, .34 + l * .45, zc); }
   solid(x0, x1, zc - .5, zc + .5);
 }
-/* Pallet Land: more aisles west and east of the working aisle, and the south block past the cross aisle */
-decorRack(-25.9, RZ0, 0.9, true, 'w1'); decorRack(-21.25, RZ0, 0.9, false, 'w2'); decorRack(-14.15, RZ0, 0.9, false, 'e1');
-decorRack(-25.9, 3.4, 8.8, true, 's1'); decorRack(-20.7, 3.4, 8.8, true, 's2'); decorRack(-14.7, 3.4, 8.8, true, 's3');
+function cantRow(xc, z0, z1, seed) {   /* a free-standing cantilever row for long product, arms to the west */
+  for (let z = z0; z <= z1 + .01; z += (z1 - z0) / Math.max(1, Math.round((z1 - z0) / 2.1))) { box(.15, 4, .15, M(C.rackBlue), xc + .4, 0, z); for (const y of [.9, 1.9, 2.9]) box(.9, .08, .1, M(C.beam), xc, y, z); }
+  for (const y of [.98, 1.98, 2.98]) for (let z = z0; z < z1 - 3; z += 6.2) box(.3 + (hash(seed + y + z) % 3) * .15, .22, Math.min(5.6, z1 - z - .4), M(hash(seed + 'c' + y + z) % 2 ? 0x9aa3a8 : 0x6f7b80), xc, y, z + Math.min(5.6, z1 - z - .4) / 2 + .2);
+  solid(xc - .5, xc + .5, z0, z1);
+}
+/* Pallet Land: row PB (first row from the west) is long product now; more aisles west and east of the working aisle; the south block */
+cantRow(-26.45, RZ0, 0.9, 'pb'); decorRack(-25.35, RZ0, 0.9, false, 'w1'); decorRack(-21.25, RZ0, 0.9, false, 'w2'); decorRack(-14.15, RZ0, 0.9, false, 'e1');
+cantRow(-26.45, 3.4, 8.8, 'pb2'); decorRack(-25.35, 3.4, 8.8, false, 's1'); decorRack(-20.7, 3.4, 8.8, true, 's2'); decorRack(-14.7, 3.4, 8.8, true, 's3');
 /* cantilever (long product) on the west wall */
 for (let z = -15; z <= 8.1; z += 2.1) { box(.15, 4, .15, M(C.rackBlue), -29.7, 0, z); for (const y of [.9, 1.9, 2.9]) box(.9, .08, .1, M(C.beam), -29.3, y, z); }
 for (const y of [.98, 1.98, 2.98]) for (const z0 of [-14.6, -8.2, -1.8, 4.2]) box(.3 + (hash('lp' + y + z0) % 3) * .15, .22, 5.6 - (hash('lq' + y + z0) % 3) * .8, M(hash('lr' + y + z0) % 2 ? 0x9aa3a8 : 0x6f7b80), -29.3, y, z0 + 2.6);
-solid(-30, -28.85, -15.5, 8.6); place(label('LONG PRODUCT\nCANTILEVER', 1.4, .6, { bg: '#FDDB33' }), -28.8, 4.4, -3, Math.PI / 2);
+solid(-30, -28.85, -15.5, 8.6); place(label('LONG PRODUCT\nCANTILEVER', 1.4, .6, { bg: '#FDDB33' }), -28.8, 4.4, -3, Math.PI / 2); place(label('PB\nLONG PRODUCT', 1.2, .6, { bg: '#FDDB33' }), -26.45, 4.4, 0.95, 0);
 /* Unit / Carton Pick: more shelf rows south of the flow racks, and the conveyor that runs down the east side to pack */
-for (const [i, z] of [-8.6, -5.6, -2.6, 0.4].entries()) decorShelf(-3.4, 5.2, z, 'u' + i);
-box(.6, .2, 17, M(0x555555), 6.3, 2.4, -4.3); for (const z of [-12.6, -8.5, -4.3, 0, 4]) for (const dx of [-.25, .25]) box(.06, 2.4, .06, M(C.gray), 6.3 + dx, 0, z);
+decorShelf(-3.4, 5.2, -7.0, 'u0'); decorShelf(-3.4, 5.2, -4.6, 'u1');   /* static rack in the middle */
+place(label('STATIC RACK', 1.2, .35, { bg: '#FDDB33' }), -3.45, 2.4, -5.8, -Math.PI / 2);
+for (let i = 0; i < 3; i++) {   /* the south flow racks, facing their own conveyor */
+  const fr = new THREE.Group(); fr.position.set(-2.2 + i * 3, 0, -.6); fr.rotation.y = Math.PI; scene.add(fr);
+  for (let l = 0; l < 4; l++) { const sh = box(2.8, .04, 1, M(0x999999), 0, .5 + l * .45, 0, fr); sh.rotation.x = .12; for (let k = 0; k < 5; k++) box(.45, .3, .5, M(C.cardboard), -1.1 + k * .55, .56 + l * .45, .2, fr); }
+  bake(fr); place(label('D' + (6 + i) + '00', .5, .25, { bg: '#FDDB33' }), -2.2 + i * 3, 2.6, -1.15, Math.PI);
+}
+solid(-3.6, 5.4, -1.2, 0); box(10.2, .7, .6, M(0x555555), 1.2, 0, -2.1); solid(-3.9, 6.3, -2.4, -1.8);
+place(label('FLOW RACK', 1.2, .35, { bg: '#FDDB33' }), -3.95, 2.4, -11.9, -Math.PI / 2); place(label('FLOW RACK', 1.2, .35, { bg: '#FDDB33' }), -3.95, 2.4, -1.4, -Math.PI / 2);
+box(.6, .2, 15.5, M(0x555555), 6.3, 2.4, -3.55); for (const z of [-11, -7, -3.5, 0, 4]) for (const dx of [-.25, .25]) box(.06, 2.4, .06, M(C.gray), 6.3 + dx, 0, z);
 place(label('UNIT / CARTON PICK', 2.2, .4, { bg: '#FDDB33' }), .9, 3.3, 2.1, 0); box(.08, 3.5, .08, M(C.gray), .9, 0, 2.0);
 /* north-east: VA area and Slow Moving; east: maintenance, East Warehouse Storage, chargers */
 for (const [x, z] of [[10.2, -12.5], [12.4, -12.5], [10.2, -8.5], [12.4, -8.5], [10.2, -4.5]]) { box(1.6, .9, .8, M(0x8d6e4f), x, 0, z); solid(x - .8, x + .8, z - .4, z + .4); }
@@ -1094,7 +1108,7 @@ MODS.pick = {
     rf('thor2', '2. Check your zone', 'Compare the zone on the screen with the sign at the end of the rack: P100. Wrong zone? F7.', { head: '415 Resource', lines: ['Res:  THOR2', 'Zone: D300', '', 'F4 = start', 'F7 = change zone'] }, { key: 'F7', keyFb: { F4: 'D300 is flow rack. The sign says P100: F7 first.', ENT: 'Check the zone first: F7.' }, why: 'The zone decides which tasks the system gives you.' }),
     rf('thor2', '2. Change the zone', 'Type P100, press ENT.', { head: 'Change zone', fields: [{ label: 'Zone', via: 'type', expect: 'P100', err: 'Type the zone on the sign: P100.' }] }, { why: 'Wrong zone means wasted travel and misrouted picks.' }),
     choice('3. Totes', 'Order 4400101 is LTL. How many totes do you take?', ['1 tote', 'Up to 4 totes', 'As many as fit', 'None'], 0, '1 tote for LTL, up to 4 for parcel.'),
-    rf('thor2', '3. Scan your tote', 'Ride to the induction flow rack, at the north end of the staging strip. Scan the first tote, T-10230, then press F4.', { head: 'Totes 4400101', lines: ['Wave LTL', 'Totes: 1'], fields: [{ label: 'Tote', expect: 'T-10230', wrong: { 'T-10231': 'Take the first tote in line: T-10230.', 'T-10232': 'Take the first tote in line: T-10230.', 'T-10233': 'Take the first tote in line: T-10230.' } }] }, { key: 'F4', why: 'The tote ties the order to you.' }),
+    rf('thor2', '3. Scan your tote', 'Ride to the induction flow rack, against the north wall at the north-east corner of the staging strip. Scan the first tote, T-10230, then press F4.', { head: 'Totes 4400101', lines: ['Wave LTL', 'Totes: 1'], fields: [{ label: 'Tote', expect: 'T-10230', wrong: { 'T-10231': 'Take the first tote in line: T-10230.', 'T-10232': 'Take the first tote in line: T-10230.', 'T-10233': 'Take the first tote in line: T-10230.' } }] }, { key: 'F4', why: 'The tote ties the order to you.' }),
     carry('3. Tote on the THOR', 'Put the tote on the pallet on your THOR.', ['ind_tote0', 'bc:T-10230'], 'thor2_pallet', 'The tote rides with you to every location.', { dropOn: () => [OBJ.thor2_pallet, V3(.3, .13, .25)] }),
     choice('3. Cones', 'What is in each tote?', ['1 green, 1 orange and 1 blue cone', '3 green cones', 'No cones', '1 red cone'], 0, 'Without the cones you cannot mark the order later.'),
     rf('thor2', '4. Go to the location', 'Ride into the Pallet Land aisle (west of staging) to the SRCBIN on the screen. The racks on your left as you ride north are row P10x. Scan the location label.', { head: 'Task 1 of 2', lines: ['SRCBIN P104-01-A', 'Prod   HBL5262', 'Qty    6 EA'], fields: [{ label: 'Loc', expect: 'P104-01-A', err: 'Wrong location. The RF says P104-01-A.' }] }, { why: 'Scanning the location proves you are at the right bin before you touch product.' }),
@@ -1116,7 +1130,7 @@ MODS.pick = {
 
 /* ---------- 3. Pick: Flow Rack with a handheld ---------- */
 MODS.flow = {
-  id: 'flow', name: 'Pick: Flow Rack (handheld)', start: { x: -1.4, z: -10.4, yaw: 0 }, target: 'lines per hour. Hot orders first.',
+  id: 'flow', name: 'Pick: Flow Rack (handheld)', start: { x: -1.4, z: -8.9, yaw: 0 }, target: 'lines per hour. Hot orders first.',
   steps: [
     info('Flow Rack Pick', 'Core process, Draft 1.0. Your tool is the handheld: one device that scans, shows the RF screens and has the keys. Zone D###: D100, D200, D300, D400, D600, D700.', 'Totes ride the conveyor with you; the handheld goes everywhere you go.'),
     act('1. Get your handheld', 'Take a handheld from the charging cradle.', ['mc_cradle', 'dev:mc'], 'A scanner that dies mid-pick leaves totes half-picked on the line.', { onHit() { equip('mc'); } }),
@@ -1141,7 +1155,7 @@ MODS.flow = {
 
 /* ---------- 4. Induction ---------- */
 MODS.induct = {
-  id: 'induct', name: 'Induction', start: { x: -9.0, z: -11.2, yaw: .3 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
+  id: 'induct', name: 'Induction', start: { x: -7.4, z: -11.3, yaw: .33 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
   steps: [
     info('Induction', 'Core process, Draft 1.0. Tools: computer (SAP EWM), scanner. Induction is where an order gets its totes. Nothing gets picked until it is inducted.', 'Induction steers the work for every picker behind you.'),
     getGun('ind_gun', 'scanner at the induction computer'),
@@ -1152,9 +1166,9 @@ MODS.induct = {
     choice('2. Supervisor', 'Your supervisor asks you to do 4400125 next instead.', ['Do that one', 'Finish the queue your way first', 'Ignore it, oldest first is the rule', 'Ask another inducter to do it'], 0, 'Don\'t set your own priorities for an area. A supervisor-directed order goes next.'),
     rf('ind', '3. Induct the LTL order', 'Order 4400101, LTL wave, color BROWN. Scan 1 tote in the wave color (the tote stacks are to your right).', { head: 'Induct 4400101', lines: ['Wave LTL  color BROWN', 'Totes needed: 1'], fields: [{ label: 'Tote', expect: 'T-10240', wrong: { 'T-10250': 'Blue is static / flow rack. Match the wave: brown.' } }], pad: false }, { why: 'The tote color tells pack and the dock how the order ships.' }),
     choice('3. Cones', 'Before the tote goes on the rack:', ['1 green, 1 orange and 1 blue cone in it', 'Nothing, the picker adds cones', 'Only a green cone', 'Write the order number on it'], 0, 'Pallet Land pickers take their totes from this rack, ready to go.'),
-    act('3. Place it', 'Put the tote on the induction flow rack.', 'ind_rack', 'Pallet Land pickers take their totes from this rack, so it has to be stocked and in order.', { onHit() { OBJ.ind_brown.position.set(-8.2 + .9, 1.55, -14.5); } }),
+    act('3. Place it', 'Put the tote on the induction flow rack.', 'ind_rack', 'Pallet Land pickers take their totes from this rack, so it has to be stocked and in order.', { onHit() { OBJ.ind_brown.position.set(-6.6 + .9, 1.55, -14.5); } }),
     rf('ind', '4. Induct a flow rack order', 'Order 4400125, FLOW wave, color BLUE. Scan a tote in the wave color.', { head: 'Induct 4400125', lines: ['Wave FLOW  color BLUE', 'Totes needed: 1'], fields: [{ label: 'Tote', expect: 'T-10250', wrong: { 'T-10240': 'Brown is Pallet Land. This wave is blue.' } }], pad: false }),
-    act('4. Place it', 'Put it on the flow rack induction pallet.', 'ind_frpallet', 'Match the tote color to the wave every time.', { onHit() { OBJ.ind_blue.position.set(-6.2, .13, -11.8); } }),
+    act('4. Place it', 'Put it on the flow rack induction pallet.', 'ind_frpallet', 'Match the tote color to the wave every time.', { onHit() { OBJ.ind_blue.position.set(-4.6, .13, -11.8); } }),
     choice('5. Completed totes', 'How many completed totes do you move at a time?', ['Up to 10: zone-complete to the conveyor, order-complete to D100', 'All of them at once', 'One at a time', 'Leave them for the pickers'], 0, 'Too few and pickers wait; too many and the line jams.'),
     choice('6. Stock', 'How do you keep empty pallets ready?', ['3 stacks about 10 high, plus a row of singles in front', 'One big stack', 'Whatever is left', 'Pickers get their own'], 0, 'A picker who has to hunt for a pallet or cones isn\'t picking.'),
     choice('7. Release work', 'How do you decide which work to release?', ['Check with the supervisors where the demand is', 'Run down the queue', 'Whatever is easiest', 'Biggest orders first'], 0, 'Releasing by need keeps every area busy and nothing waiting.'),
@@ -1241,7 +1255,7 @@ function huntSpot(id, x, y, z, answer, what, propFn) {
 huntSpot('w_stickers', 1.3, 1.4, 5.4, ['Over-processing'], 'A carton covered in old colored stickers. Most of them were removed in Kaizen 03.', () => { const c = carton(.4, .3, .3); c.position.set(1.6, .9, 5.4); HP.add(c); for (let i = 0; i < 6; i++) { const s = box(.08, .005, .06, M([C.red, C.yellow, C.green, 0xff66cc, C.blue, C.orange][i]), 1.45 + (i % 3) * .1, 1.2, 5.35 + Math.floor(i / 3) * .08); } });
 huntSpot('w_boxstock', 9.4, 1.6, 7.2, ['Motion'], 'Box stock for PK03 kept here, across the walkway from the bench. Every carton is a walk.', () => { for (let i = 0; i < 3; i++) box(.6, .5, .5, M(C.cardboard), 9.4, i * .5, 7.6); });
 huntSpot('w_pallets', -11.3, 2.6, -8.6, ['Inventory'], 'Empty pallets stacked far past the 3 stacks of about 10 the Induction SW calls for.', () => { for (let s = 0; s < 6; s++) for (let i = 0; i < 16; i++) box(1.2, .14, 1, M(C.pallet), -12.6 + (s % 3) * 1.3, i * .145, -9.2 + Math.floor(s / 3) * 1.1); });
-huntSpot('w_waiting', -8.2, 2.0, -13.3, ['Waiting'], 'A picker standing at an empty induction rack. No totes inducted, nothing to pick.', () => { person(-8.2, -13.3, 0); });
+huntSpot('w_waiting', -6.6, 2.0, -13.3, ['Waiting'], 'A picker standing at an empty induction rack. No totes inducted, nothing to pick.', () => { person(-6.6, -13.3, 0); });
 huntSpot('w_banding', -10.2, 1.6, -6.2, ['Over-processing'], 'Every pallet in this lane is banded. Only UK, long product and 24-50 in cabinets need bands.', () => { for (let i = 0; i < 2; i++) { const p = makePallet(2, { wrap: true }); p.position.set(-11 + i * 1.6, 0, -6.2); HP.add(p); for (const x of [-.3, .3]) box(.03, .02, 1.02, M(0x111111), -11 + i * 1.6 + x, .75, -6.2); } });
 huntSpot('w_damaged', 6.4, 1.3, 4.3, ['Defects'], 'A crushed carton riding the outfeed conveyor. It will be refused or claimed.', () => { const c = carton(.4, .2, .35, 0x9b7a50); c.position.set(6.4, .8, 4.3); c.rotation.z = .3; HP.add(c); });
 huntSpot('w_prebuilt', 3.1, 2.4, 6.9, ['Overproduction'], 'A tower of cartons built hours ahead of any order. They take space and get crushed.', () => { for (let i = 0; i < 7; i++) box(.5, .3, .4, M(C.cardboard), 3.1, i * .3, 6.9); });

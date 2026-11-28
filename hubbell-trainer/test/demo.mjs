@@ -25,7 +25,7 @@ await ev(() => window.glide(-11.6, -9.6, 0, -.45, 1200)); await ev(() => window.
 await ev(() => window.use('thor2')); await w(600); await ev(() => window.glide(-10.2, -11.2, 0, -.5, 800)); await w(800); await ev(() => window.use('thor2_gun')); await w(1500);
 await keys('thor2', ['4', '1', '5', 'ENT']); await w(1200); await keys('thor2', ['F7']); await w(900); await keys('thor2', ['P', '1', '0', '0', 'ENT']); await w(1000);
 await ev(() => window.ok()); await w(900);
-await ev(() => window.glide(-8.4, -12.4, 0, -.25, 2200)); await w(500);
+await ev(() => window.glide(-6.8, -12.4, 0, -.25, 2200)); await w(500);
 await ev(() => window.scan('T-10232')); await w(2600);                       /* wrong tote: the device says so */
 await ev(() => window.scan('T-10230')); await w(1200); await keys('thor2', ['F4']); await w(900);
 await ev(() => { window.use('ind_tote0'); }); await w(900); await ev(() => window.use('thor2_pallet')); await w(900); await ev(() => window.ok()); await w(900);
