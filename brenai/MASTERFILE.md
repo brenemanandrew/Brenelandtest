@@ -103,7 +103,10 @@ Added since the reset on 2026-11-21, all live:
 - Wide sleeves hang under gravity (bone cloth strips made at load, like coat tails).
 - Skills for agents: `brenai/skills/*/SKILL.md` (seven). Rule: when a skill or this file changes, tell the Brenebase session and make sure Brenebase has the new version (see `AGENTS.md`).
 
-Built 2026-11-27 on the working branch, NOT live (waits for Andrew's word to push):
+Built 2026-11-28 on the working branch, NOT live (waits for Andrew's word to push):
+- Headset touch and wrist menu (`avatar-vrm.js`, after the hands code). Touch (`xrTouch`, run after her pose is final, before `vrm.update`): your hands are solid to her head, chest, arms, hands and shins; a push turns the bone about its joint just enough to clear the hand (limits per part), and it springs back with a small wobble. The turn is taken off again each frame, so a held pose never drifts. Wrist menu (`xmFrame`): a band on the left wrist; touch it with the other fingertip, or press Y or B, and a ring opens: move mode, Poses, Faces, Hold still or Let her move, Face her, Mic, Touch on or off, Leave headset. Poke to choose. Tested with fake hands (head 0.6 rad at a deep push, back to exactly 0; menu steps and pages) and rendered; not tried in a headset.
+
+Live since 2026-11-28 (pushed at Andrew's word):
 - Quest 3 headset view (28 Nov): controllers and tracked hands show as glowing hands (`public/xrhands.js`) instead of rays. Put a hand on any part of her and squeeze (grip, trigger or pinch) to hold it, the way VaM's hands do: her hand, foot or head follows your hand's position and turn; her hips carry her (position and facing); elbows, knees, shoulders and chest bend toward your hand. Joystick mode (left stick walks where you look, right stick turns 30 degrees) or hands mode (squeeze in empty air and pull the room); X or A switches, remembered in `brenai.xrMode`. Rays stay only for gaze and screen pointers (the neckband). Not tried in a headset yet: tested with fake inputs (hand shapes rendered, pinch and grip read) and the page loads clean.
 - Mesh cloth for skirts (`public/meshcloth.js`, see its section under Appendix B). Tested headless on the L0 School outfit only. Not seen on a real phone or on other outfits yet; the phone time per frame is not measured (the headless runner draws about 3 frames a second).
 

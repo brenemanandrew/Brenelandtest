@@ -4,7 +4,7 @@
 // are squeezed. Each frame update() also says where each hand can grab from (between thumb and index tip, or the palm of a held
 // controller), how it is turned, and how hard it is squeezing.
 //   const hands = xrHands(THREE, scene)
-//   hands.update(frame, refSpace, rigMatrix, inputSources)  ->  [{ src, side, kind: 'hand' | 'controller', at, q, pinch, squeeze, buttons, axes }]
+//   hands.update(frame, refSpace, rigMatrix, inputSources)  ->  [{ src, side, kind: 'hand' | 'controller', at, q, pinch, squeeze, buttons, axes, tip, wrist }]
 //   hands.hide()
 export function xrHands(THREE, scene) {
   const FINGERS = ['thumb', 'index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'];
@@ -46,12 +46,12 @@ export function xrHands(THREE, scene) {
         for (const f of FINGERS) { const pts = [W.clone()]; for (const part of f === 'thumb' ? PARTS.thumb : PARTS.other) { const j = src.hand.get(f + '-' + part), jp = j && xf.getJointPose(j, ref); if (jp) pts.push(V().setFromMatrixPosition(M.fromArray(jp.transform.matrix).premultiply(rigM))); } chains.push(pts); tips[f] = pts[pts.length - 1]; }
         const pinchD = tips.thumb && tips['index-finger'] ? tips.thumb.distanceTo(tips['index-finger']) : 1, pinch = Math.max(0, Math.min(1, (0.045 - pinchD) / 0.03));
         const at = tips.thumb && tips['index-finger'] ? tips.thumb.clone().add(tips['index-finger']).multiplyScalar(0.5) : W.clone();
-        lay(g, chains, 0.0055, pinch > 0.5); out.push({ src, side, kind: 'hand', at, q: wq, pinch, squeeze: pinch, buttons, axes, tip: tips['index-finger'] || at });
+        lay(g, chains, 0.0055, pinch > 0.5); out.push({ src, side, kind: 'hand', at, q: wq, pinch, squeeze: pinch, buttons, axes, tip: tips['index-finger'] || at, wrist: W.clone() });
       } else if (src.gripSpace) {   /* a controller: the hand drawn on it */
         const pose = xf.getPose(src.gripSpace, ref); if (!pose) { g.visible = false; continue; } M.fromArray(pose.transform.matrix).premultiply(rigM);
         const trig = buttons[0] || 0, grip = buttons[1] || 0, chains = controllerHand(side, trig, grip).map(pts => pts.map(p => p.applyMatrix4(M)));
         const at = V().set(0, 0.005, -0.02).applyMatrix4(M), q = new THREE.Quaternion().setFromRotationMatrix(M);
-        lay(g, chains, 0.0065, Math.max(trig, grip) > 0.5); out.push({ src, side, kind: 'controller', at, q, pinch: trig, squeeze: grip, buttons, axes, tip: chains[1][chains[1].length - 1] });
+        lay(g, chains, 0.0065, Math.max(trig, grip) > 0.5); out.push({ src, side, kind: 'controller', at, q, pinch: trig, squeeze: grip, buttons, axes, tip: chains[1][chains[1].length - 1], wrist: V().set(0, -0.005, 0.085).applyMatrix4(M) });
       } else g.visible = false; }
     for (const [src, g] of drawn) if (!live.has(src)) { g.visible = false; scene.remove(g); drawn.delete(src); }
     return out; }
