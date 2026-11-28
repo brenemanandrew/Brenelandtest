@@ -2,7 +2,7 @@
 // (day, time, turning points, writing deadlines); VaM is the town and the bodies. Everything goes through the relay's /story/*.
 //   Story panel    the day, time and place; the town's places, each tied to a VaM scene (Go loads it, Set picks its scene).
 //   Turning point  when Brenai has a question waiting (2 to 4 answers), a card opens in the middle (on the board in VR).
-//   Margo's call   her call faces on a screen, changing with what she does in her replies; her voice like a phone call.
+//   Margo's call   on the Phone (BrenePhone.cs): her call faces, changing with what she does in her replies; her voice like a phone call.
 //   The laptop     the cabin laptop for writing: title, text, word count, Save (kept on the PC and sent to Brenai), Tell Margo.
 // Part of BreneMain.
 using System;
@@ -18,8 +18,8 @@ namespace Brene
     public partial class BreneMain
     {
         static readonly string[] PLACES = { "Rental cabin", "Peak Pizza", "Casa Belinda", "Main Street", "Library", "Wizra's flat", "Lodge", "Trail", "Lake" };
-        Panel pStory, pChoice, pCall, pLaptop; Flow pickFlow; string storyPlace = "", pickFor = "", shownChoice = "";
-        Text storyLine, choiceText, callCaption, laptopCount, laptopNote; RectTransform storyPlaces, choiceAnswers; RawImage callFace;
+        Panel pStory, pChoice, pLaptop; Flow pickFlow; string storyPlace = "", pickFor = "", shownChoice = "";
+        Text storyLine, choiceText, laptopCount, laptopNote; RectTransform storyPlaces, choiceAnswers;
         InputField laptopTitle, laptopText; JSONNode storyState, margoInfo; float nextStory; bool storyBusy; int faceAsk;
         readonly Dictionary<string, Texture2D> pics = new Dictionary<string, Texture2D>();
 
@@ -36,7 +36,7 @@ namespace Brene
             var sl = Ui.Rect("Line", pStory.Body); sl.gameObject.AddComponent<LayoutElement>().minHeight = 64;
             storyLine = Ui.Label(sl, "", 20, Role.Text, TextAnchor.MiddleLeft); storyLine.supportRichText = true;
             var tools = Flow.Grid(pStory.Body, new Vector2(170, 52));
-            Ui.Button(tools, "Laptop", OpenLaptop); Ui.Button(tools, "Call Margo", CallMargo); Ui.Button(tools, "Talk to...", () => { Show(pChat); NextWho(); });
+            Ui.Button(tools, "Laptop", OpenLaptop); Ui.Button(tools, "Call Margo", CallMargo); Ui.Button(tools, "Talk to...", () => { NextWho(); OpenTexts(talkTo); });
             Flow.Say(pStory.Body, "Places: Go takes you there (loads its scene). Set picks which VaM scene is that place.");
             storyPlaces = Ui.Rect("Places", pStory.Body); var pv = storyPlaces.gameObject.AddComponent<VerticalLayoutGroup>(); pv.spacing = 4; pv.childControlHeight = true; pv.childControlWidth = true; pv.childForceExpandHeight = false;
             pStory.Root.gameObject.SetActive(false);
@@ -56,16 +56,6 @@ namespace Brene
             choiceText = Ui.Label(ct, "", 26, Role.Text, TextAnchor.MiddleCenter); choiceText.fontStyle = FontStyle.Bold;
             choiceAnswers = Ui.Rect("Answers", pChoice.Body); var av = choiceAnswers.gameObject.AddComponent<VerticalLayoutGroup>(); av.spacing = 8; av.childControlHeight = true; av.childControlWidth = true; av.childForceExpandHeight = false;
             pChoice.Root.gameObject.SetActive(false);
-
-            // Margo's video call
-            pCall = new Panel(root, "call", "Margo (video call)", new Vector2(700, -40), new Vector2(420, 560), false);
-            var fr = Ui.Rect("Face", pCall.Body); Ui.Fill(fr, 0, 0, 0, 120); Ui.Box(fr, Role.Field);
-            var fi = Ui.Rect("Img", fr); Ui.Fill(fi, 6, 6, 6, 6); callFace = fi.gameObject.AddComponent<RawImage>(); callFace.color = new Color(1, 1, 1, 0.1f);
-            var cc = Ui.Rect("Caption", pCall.Body); Ui.Bottom(cc, 56, 60);
-            callCaption = Ui.Label(cc, "", 18, Role.Dim, TextAnchor.MiddleCenter);
-            var hb = Ui.Rect("Hang up", pCall.Body); Ui.Bottom(hb, 52, 0);
-            Ui.Stretch(Ui.Button(hb, "Hang up", () => { pCall.Root.gameObject.SetActive(false); TalkTo("wizra"); }));
-            pCall.Root.gameObject.SetActive(false);
 
             // the cabin laptop
             pLaptop = new Panel(root, "laptop", "Cabin laptop", new Vector2(380, -40), new Vector2(760, 640), false);
@@ -114,6 +104,7 @@ namespace Brene
             StartCoroutine(Json("GET", "/story/state", null, (j, e) =>
             {
                 storyBusy = false; if (j == null) return; storyState = j;
+                PhoneEvents(j, true);   // a call coming in, unread texts
                 storyPlace = j["place"].Value;
                 var line = j["live"].AsBool
                     ? "<b>Day " + j["day"].Value + "</b>, " + j["time"].Value + (storyPlace != "" ? "   at <b>" + storyPlace + "</b>" : "")
@@ -135,7 +126,7 @@ namespace Brene
                 Flow.Wide(choiceAnswers, label, () =>
                 {
                     var body = new JSONClass(); body["id"] = shownChoice; body["answer"].AsInt = k;
-                    StartCoroutine(Json("POST", "/story/choose", body, (j, e) => { if (e != null) Line("<color=#ff8a8a>" + Esc(e) + "</color>"); else { Line("<i>You chose: " + Esc(label) + "</i>"); pChoice.Root.gameObject.SetActive(false); } }));
+                    StartCoroutine(Json("POST", "/story/choose", body, (j, e) => { PhoneEvents(j, false); if (e != null) Line("<color=#ff8a8a>" + Esc(e) + "</color>"); else { Line("<i>You chose: " + Esc(label) + "</i>"); pChoice.Root.gameObject.SetActive(false); } }));
                 }, k == 0);
             }
             // in the middle of the screen (or the board), above everything
@@ -171,29 +162,24 @@ namespace Brene
             }));
         }
 
-        // ---- Margo's call ----
-        void CallMargo()
-        {
-            Show(pCall); Show(pChat); TalkTo("margo"); callCaption.text = "Connecting...";
-            if (margoInfo == null) StartCoroutine(Json("GET", "/story/margo", null, (j, e) => { margoInfo = j; if (e != null) callCaption.text = e; else Face("warm", ""); }));
-            else Face("warm", "");
-        }
+        // ---- Margo's call (on the Phone) ----
+        void CallMargo() { CallContact("margo"); }
         void MargoHeard(string reply)
         {
-            if (!pCall.Root.gameObject.activeSelf) return;
+            if (callWho != "margo") return;
             var f = Feeling(reply);
             Face(f == "smile" ? "smiling" : f == "frown" ? "stern" : f == "surprise" ? "delighted" : "listening", "");
         }
         // a call face by mood (warm, listening, smiling, delighted, skeptical, stern, evening, weekend)
         void Face(string mood, string caption)
         {
-            if (margoInfo == null) return; var calls = margoInfo["call"].AsArray; if (calls == null) return;
+            if (margoInfo == null || callFace == null) return; var calls = margoInfo["call"].AsArray; if (calls == null) return;
             string file = null; for (int i = 0; i < calls.Count; i++) if (calls[i]["mood"].Value == mood) file = calls[i]["file"].Value;
             if (file == null && calls.Count > 0) file = calls[0]["file"].Value;
             if (file == null) return;
             callCaption.text = caption != "" ? caption : "Margo · " + mood;
             int ask = ++faceAsk;   // a slower, older face must not land on top of a newer one
-            Picture("margo/" + file, (Texture2D t) => { if (ask == faceAsk && callFace != null) Pics.Show(callFace, t, false); });
+            Picture("margo/" + file, (Texture2D t) => { if (ask == faceAsk && callFace != null && callWho == "margo") { Pics.Show(callFace, t, false); callInitial.text = ""; } });
         }
 
         // ---- the laptop ----

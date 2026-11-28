@@ -2,7 +2,9 @@
 // Everything here is plain Unity UI (uGUI) drawn on one screen-space overlay canvas, so it does not depend on VaM's own menus.
 //   Theme      colours, a rounded sprite made in code, the font
 //   Skin       marks an Image or Text with its role so a theme change can recolour it
-//   Panel      a movable window: title bar (drag to move), body, resize corner and hide button (edit mode)
+//   Panel      a movable window: title bar (icon, drag to move, - shrinks it to a round chip), body, resize corner and hide
+//              button (edit mode)
+//   BreneHover a strong highlight on the button under the pointer or a fingertip (in the headset)
 //   DragMove / DragResize / DragButton   the drag handlers; DragButton moves a button to another panel or another place in edit mode
 // Kept to C# 5 features (no string interpolation, no ?.) because VaM compiles plugins itself.
 using System;
@@ -108,6 +110,7 @@ namespace Brene
             var b = rt.gameObject.AddComponent<Button>(); b.targetGraphic = img;
             var cb = b.colors; cb.highlightedColor = new Color(1.15f, 1.15f, 1.15f, 1f); cb.pressedColor = new Color(0.8f, 0.8f, 0.8f, 1f); b.colors = cb;
             Label(rt, text, 22, Role.Text, TextAnchor.MiddleCenter);
+            rt.gameObject.AddComponent<BreneHover>();
             if (onClick != null) b.onClick.AddListener(() => onClick());
             return b;
         }
@@ -168,6 +171,23 @@ namespace Brene
         {
             var t = b.GetComponentInChildren<Text>(); if (t != null) t.text = text;
         }
+        // one of BreneIcons' pictures, tinted by the theme (role)
+        public static Image Glyph(RectTransform rt, string icon, int role)
+        {
+            var img = rt.gameObject.AddComponent<Image>(); img.sprite = BreneIcons.Get(icon); img.raycastTarget = false;
+            rt.gameObject.AddComponent<Skin>().role = role; img.color = Theme.Get(role); return img;
+        }
+        // a button with its icon on the left and its label beside it
+        public static void WithIcon(Button b, string icon)
+        {
+            if (b == null || icon == null || b.transform.Find("Icon") != null) return;
+            var rt = Rect("Icon", b.transform); rt.anchorMin = rt.anchorMax = new Vector2(0, 0.5f); rt.pivot = new Vector2(0, 0.5f);
+            rt.sizeDelta = new Vector2(30, 30); rt.anchoredPosition = new Vector2(9, 0);
+            Glyph(rt, icon, Role.Text);
+            var t = b.GetComponentInChildren<Text>(); if (t == null) return;
+            t.rectTransform.offsetMin = new Vector2(44, 0); t.rectTransform.offsetMax = new Vector2(-4, 0);
+            t.alignment = TextAnchor.MiddleLeft; t.fontSize = 19;
+        }
     }
 
     // ---- the editor's state ----
@@ -175,6 +195,7 @@ namespace Brene
     {
         public static bool On;
         public static Action Changed = () => { };
+        public static Action Save = () => { };   // saved even outside edit mode (a panel shrunk to its chip, a chip moved)
         public static Canvas Canvas;
         public static float Scale { get { return Canvas != null ? Canvas.scaleFactor : 1f; } }
     }
@@ -182,8 +203,9 @@ namespace Brene
     public class Panel
     {
         public string Id, Title;
-        public RectTransform Root, Body, Bar;
-        public GameObject Resize, Hide;
+        public RectTransform Root, Body, Bar, Chip;   // Chip: the round icon the panel shrinks to
+        public GameObject Resize, Hide, ShrinkBtn;
+        public string Icon; public bool Shrunk;
         public bool Droppable;   // other buttons can be dropped into it (button panels)
         public bool CanHide = true;
         // tool = a quick-button panel (shown together by Tools / Show all); window = a big flow or page, one open at a time;
@@ -203,8 +225,26 @@ namespace Brene
             Bar = Ui.Rect("Bar", Root); Bar.anchorMin = new Vector2(0, 1); Bar.anchorMax = new Vector2(1, 1); Bar.pivot = new Vector2(0.5f, 1);
             Bar.sizeDelta = new Vector2(0, 46); Bar.anchoredPosition = Vector2.zero;
             Ui.Box(Bar, Role.Title);
-            Ui.Label(Bar, title, 22, Role.Text, TextAnchor.MiddleLeft).fontStyle = FontStyle.Bold;
+            Icon = BreneIcons.ForPanel(id);
+            var ic = Ui.Rect("Icon", Bar); ic.anchorMin = ic.anchorMax = new Vector2(0, 0.5f); ic.pivot = new Vector2(0, 0.5f); ic.sizeDelta = new Vector2(30, 30); ic.anchoredPosition = new Vector2(10, 0);
+            Ui.Glyph(ic, Icon, Role.Text);
+            var tl = Ui.Label(Bar, title, 22, Role.Text, TextAnchor.MiddleLeft); tl.fontStyle = FontStyle.Bold;
+            tl.rectTransform.offsetMin = new Vector2(48, 0); tl.rectTransform.offsetMax = new Vector2(-96, 0);
             Bar.gameObject.AddComponent<DragMove>().target = Root;
+
+            // - shrinks the panel to a round chip where it stands; tap the chip to open it again (any kind but a pop-up dialog)
+            var srt = Ui.Rect("Shrink", Bar); srt.anchorMin = srt.anchorMax = new Vector2(1, 0.5f); srt.pivot = new Vector2(1, 0.5f);
+            srt.sizeDelta = new Vector2(38, 34); srt.anchoredPosition = new Vector2(-6, 0);
+            var sbt = Ui.Button(srt, "-", Shrink); Ui.Stretch(sbt); var st = sbt.GetComponentInChildren<Text>(); st.fontSize = 30; st.fontStyle = FontStyle.Bold;
+            ShrinkBtn = srt.gameObject;
+            Chip = Ui.Rect("Chip " + id, canvas); Chip.anchorMin = Chip.anchorMax = new Vector2(0, 1); Chip.pivot = new Vector2(0, 1); Chip.sizeDelta = new Vector2(64, 64);
+            var cbg = Ui.Box(Chip, Role.Title); cbg.sprite = BreneIcons.Get("disc"); cbg.type = Image.Type.Simple;
+            var crt = Ui.Rect("Ring", Chip); Ui.Fill(crt, 0, 0, 0, 0); Ui.Glyph(crt, "halo", Role.Accent);
+            var cic = Ui.Rect("Icon", Chip); cic.anchorMin = cic.anchorMax = new Vector2(0.5f, 0.5f); cic.sizeDelta = new Vector2(34, 34); Ui.Glyph(cic, Icon, Role.Text);
+            var cb = Chip.gameObject.AddComponent<Button>(); cb.targetGraphic = cbg; cb.onClick.AddListener(() => Expand());
+            Chip.gameObject.AddComponent<BreneHover>();
+            var cdm = Chip.gameObject.AddComponent<DragMove>(); cdm.target = Chip; cdm.always = true;
+            Chip.gameObject.SetActive(false);
 
             var hrt = Ui.Rect("Hide", Bar); hrt.anchorMin = hrt.anchorMax = new Vector2(1, 0.5f); hrt.pivot = new Vector2(1, 0.5f);
             hrt.sizeDelta = new Vector2(38, 34); hrt.anchoredPosition = new Vector2(-6, 0);
@@ -230,7 +270,30 @@ namespace Brene
             ShowEdit(BreneEdit.On);
         }
 
-        public void ShowEdit(bool on) { Resize.SetActive(on); Hide.SetActive(on && CanHide); }
+        public void ShowEdit(bool on)
+        {
+            Resize.SetActive(on); Hide.SetActive(on && CanHide);
+            ShrinkBtn.SetActive(Kind != "dialog");
+            ((RectTransform)ShrinkBtn.transform).anchoredPosition = new Vector2(on && CanHide ? -50 : -6, 0);
+        }
+
+        // ---- shrink to a chip, and back ----
+        public void Shrink() { if (Kind == "dialog") return; ShrinkAt(Root.anchoredPosition); BreneEdit.Save(); }
+        public void ShrinkAt(Vector2 at)
+        {
+            Shrunk = true; Chip.anchoredPosition = at; Chip.gameObject.SetActive(true); Chip.SetAsLastSibling();
+            Root.gameObject.SetActive(false);
+        }
+        // opens where the chip is now
+        public void Expand()
+        {
+            Root.anchoredPosition = Chip.anchoredPosition; Shrunk = false; Chip.gameObject.SetActive(false);
+            Root.gameObject.SetActive(true); Root.SetAsLastSibling(); BreneEdit.Save();
+        }
+        // open, or as a chip
+        public bool Visible { get { return Root.gameObject.activeSelf || Shrunk; } }
+        // put away, chip and all
+        public void Close() { Shrunk = false; Chip.gameObject.SetActive(false); Root.gameObject.SetActive(false); }
 
         // fit the grid's cells to the panel's width so buttons grow with the panel
         public float FootPad = 10;   // room under the buttons (the dock keeps its status line there)
@@ -251,10 +314,12 @@ namespace Brene
     public class PanelTag : MonoBehaviour
     {
         public Panel panel;
-        // one window at a time: opening one puts the others away
+        // one window at a time: opening one puts the others away. A shrunk panel opened by anything (a button, a tutorial) drops its chip.
         void OnEnable()
         {
-            if (panel == null || panel.Kind != "window") return;
+            if (panel == null) return;
+            if (panel.Shrunk) { panel.Shrunk = false; if (panel.Chip != null) panel.Chip.gameObject.SetActive(false); }
+            if (panel.Kind != "window") return;
             foreach (var p in new List<Panel>(Panel.All)) if (p != panel && p.Kind == "window" && p.Root != null && p.Root.gameObject.activeSelf) p.Root.gameObject.SetActive(false);
         }
     }
@@ -262,10 +327,10 @@ namespace Brene
 
     public class DragMove : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
-        public RectTransform target;
+        public RectTransform target; public bool always;   // always: saved outside edit mode too (chips)
         public void OnBeginDrag(PointerEventData e) { target.SetAsLastSibling(); }
         public void OnDrag(PointerEventData e) { target.anchoredPosition += e.delta / BreneEdit.Scale; }
-        public void OnEndDrag(PointerEventData e) { BreneEdit.Changed(); }
+        public void OnEndDrag(PointerEventData e) { if (always) BreneEdit.Save(); else BreneEdit.Changed(); }
     }
 
     public class DragResize : MonoBehaviour, IDragHandler, IEndDragHandler
@@ -318,6 +383,25 @@ namespace Brene
             if (dropIndex >= 0) transform.SetSiblingIndex(dropIndex); else transform.SetAsLastSibling();
             Panel.FitAll();   // both panels resize to their new number of buttons
             BreneEdit.Changed();
+        }
+    }
+
+    // in the headset the button under VaM's pointer or a fingertip lights up in the accent colour and grows a little, much
+    // stronger than the usual faint tint (which is hard to see on a board in the room). On a monitor it does nothing.
+    public class BreneHover : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
+    {
+        public static bool Strong;
+        bool laser, poke, lit;
+        public void OnPointerEnter(PointerEventData e) { laser = true; Show(); }
+        public void OnPointerExit(PointerEventData e) { laser = false; Show(); }
+        public void Poke(bool on) { if (poke == on) return; poke = on; Show(); }
+        void OnDisable() { laser = false; poke = false; Show(); }
+        void Show()
+        {
+            bool on = Strong && (laser || poke); if (on == lit) return; lit = on;
+            var img = GetComponent<Image>(); if (img == null) return;
+            if (on) { img.color = Theme.Get(Role.Accent); transform.localScale = Vector3.one * 1.06f; }
+            else { var sk = GetComponent<Skin>(); if (sk != null) sk.Apply(); transform.localScale = Vector3.one; }
         }
     }
 }

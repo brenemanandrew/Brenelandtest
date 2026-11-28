@@ -1,7 +1,7 @@
 // Brene for Virt-a-Mate: the cast in the scene (Wizra, Zoe, Belinda, Margo). Brenai is each one's mind; any VaM person can be
 // each one's body.
-//   Talking to   the Wizra panel talks to one of them at a time ("Talking to: Zoe"); the message goes with where you are and
-//                who is in the scene (/story/say on the relay, which falls back to Wizra's normal chat until Brenai's story
+//   Talking to   the Phone's texts talk to one of them at a time; the message goes with where you are, who is in the scene,
+//                and "call" or "text" (/story/say on the relay, which falls back to Wizra's normal chat until Brenai's story
 //                routes exist).
 //   Voice        each one's own Brenai voice, played from her head. Several can talk at once.
 //   Lip sync     her mouth opens with the loudness of her voice.
@@ -27,7 +27,7 @@ namespace Brene
         readonly Dictionary<string, Voice> voices = new Dictionary<string, Voice>();
         readonly float[] voiceBuf = new float[256];
         JSONStorableBool voiceOn; JSONStorableString wizraBody, castBodies; string talkTo = "wizra"; int chatWaiting;
-        Button bodyBtn, voiceBtn, whoBtn;
+        Button bodyBtn, voiceBtn, whoBtn, textCallBtn;
         public int WizraReplies;   // counts replies from anyone (the tutorial waits on it)
         static readonly string[] MOUTH = { "Mouth", "Mouth Open", "Mouth Open Wide", "Lips Part", "Jaw Open" };
         static readonly Dictionary<string, string[]> EXPR = new Dictionary<string, string[]> {
@@ -66,27 +66,32 @@ namespace Brene
         // who of the cast has a body in this scene right now
         List<string> Present() { var l = new List<string>(); foreach (var w in CAST) if (BodyOf(w) != null) l.Add(w); return l; }
 
-        // the bar along the top of the chat panel: talking to whom, her body, voice on or off
-        void BuildWizraBar()
+        // the bar along the top of the Phone's texts: back to contacts, whom (tap for the next), call her, her body, voice on or off
+        void BuildWizraBar(RectTransform parent)
         {
-            var bar = Ui.Rect("WizraBar", pChat.Body); Ui.Top(bar, 48, 0);
-            var a = Ui.Rect("Who", bar); Ui.Span(a, 0, 0.33f);
+            var r1 = Ui.Rect("WizraBar", parent); Ui.Top(r1, 48, 0);
+            var k = Ui.Rect("Back", r1); Ui.Span(k, 0, 0.22f); Ui.Stretch(Ui.Button(k, "< Back", () => PhoneShow("contacts")));
+            var a = Ui.Rect("Who", r1); Ui.Span(a, 0.24f, 0.66f);
             whoBtn = Ui.Button(a, "", NextWho); Ui.Stretch(whoBtn); Ui.SetOn(whoBtn, true);
-            var b = Ui.Rect("Body", bar); Ui.Span(b, 0.35f, 0.78f);
+            var cl = Ui.Rect("Call", r1); Ui.Span(cl, 0.68f, 1);
+            textCallBtn = Ui.Button(cl, "Call", () => CallContact(talkTo)); Ui.Stretch(textCallBtn); Ui.WithIcon(textCallBtn, "phone");
+            var r2 = Ui.Rect("BodyBar", parent); Ui.Top(r2, 44, 52);
+            var b = Ui.Rect("Body", r2); Ui.Span(b, 0, 0.66f);
             bodyBtn = Ui.Button(b, "", NextBody); Ui.Stretch(bodyBtn);
-            var c = Ui.Rect("Voice", bar); Ui.Span(c, 0.8f, 1);
+            var c = Ui.Rect("Voice", r2); Ui.Span(c, 0.68f, 1);
             voiceBtn = Ui.Button(c, voiceOn.val ? "Voice: on" : "Voice: off", () => voiceOn.val = !voiceOn.val); Ui.Stretch(voiceBtn); Ui.SetOn(voiceBtn, voiceOn.val);
-            voiceBtn.GetComponentInChildren<Text>().fontSize = 16; whoBtn.GetComponentInChildren<Text>().fontSize = 17; bodyBtn.GetComponentInChildren<Text>().fontSize = 17;
+            voiceBtn.GetComponentInChildren<Text>().fontSize = 17; bodyBtn.GetComponentInChildren<Text>().fontSize = 17;
             ShowBody();
         }
         void ShowBody()
         {
-            if (whoBtn != null) Ui.SetText(whoBtn, "To: " + Nice(talkTo));
+            if (whoBtn != null) Ui.SetText(whoBtn, Nice(talkTo) + "  >");
+            if (textCallBtn != null) Ui.SetText(textCallBtn, callWho == talkTo && talkTo != "" ? "On call" : "Call");
             if (bodyBtn == null) return; var a = BodyOf(talkTo);
             Ui.SetText(bodyBtn, a != null ? "Body: " + a.uid : "Pick her body"); Ui.SetOn(bodyBtn, a != null);
         }
-        public void TalkTo(string who) { if (Array.IndexOf(CAST, who) >= 0) { talkTo = who; ShowBody(); } }
-        void NextWho() { talkTo = CAST[(Array.IndexOf(CAST, talkTo) + 1) % CAST.Length]; ShowBody(); }
+        public void TalkTo(string who) { if (Array.IndexOf(CAST, who) >= 0) { talkTo = who; ShowBody(); ShowLog(); } }
+        void NextWho() { TalkTo(CAST[(Array.IndexOf(CAST, talkTo) + 1) % CAST.Length]); }
         void NextBody()
         {
             var people = Atoms("Person"); if (people.Count == 0) { SetBody(talkTo, ""); Line("<i>Add a person to the scene to give " + Nice(talkTo) + " a body.</i>"); return; }
@@ -99,14 +104,17 @@ namespace Brene
         void SayTo(string who, string text, Action<string> after)
         {
             // more than one can be on its way (Tell Margo while Wizra is still answering): each takes away its own "thinking" line
+            // on a call with her, it goes as part of the call ("call"); otherwise as a text
+            var mode = who == callWho ? "call" : "text";
             var thinking = "<i>" + Nice(who) + " is thinking...</i>";
-            chatWaiting++; chatBusy = true; Line("<b>You</b> to " + Nice(who) + ": " + Esc(text)); Line(thinking);
-            StartCoroutine(link.Say(who, text, storyPlace, Present(), voiceOn.val, (reply, err, voiceId) =>
+            chatWaiting++; chatBusy = true; LineTo(who, "<b>You:</b> " + Esc(text)); LineTo(who, thinking);
+            StartCoroutine(link.Say(who, text, storyPlace, Present(), voiceOn.val, mode, (reply, err, voiceId) =>
             {
                 if (chatWaiting > 0) chatWaiting--; chatBusy = chatWaiting > 0;
-                int at = chatLines.LastIndexOf(thinking); if (at >= 0) chatLines.RemoveAt(at);
-                if (err != null) { Line("<color=#ff8a8a>" + Esc(err) + "</color>"); return; }
-                Line("<b>" + Nice(who) + ":</b> " + Esc(reply));
+                var log = LogOf(who); int at = log.LastIndexOf(thinking); if (at >= 0) log.RemoveAt(at);
+                if (err != null) { LineTo(who, "<color=#ff8a8a>" + Esc(err) + "</color>"); return; }
+                LineTo(who, "<b>" + Nice(who) + ":</b> " + Esc(reply));
+                Unseen(who);
                 Heard(who, reply, voiceId);
                 if (after != null) after(reply);
             }));
@@ -137,12 +145,12 @@ namespace Brene
                 // no sound came: say why in the relay's own words when it gave any
                 string why = ""; try { var j = JSON.Parse(txt ?? ""); if (j != null && j["error"] != null) why = j["error"].Value; } catch (Exception) { }
                 if (why == "") why = code == 0 ? "Her voice could not be fetched: the relay stopped answering." : "Her voice came back in a sound format Brene can't read.";
-                Line("<color=#ffb070>" + Esc(why) + "</color>"); yield break;
+                LineTo(who, "<color=#ffb070>" + Esc(why) + "</color>"); yield break;
             }
-            if (wav == null) { Line("<color=#ffb070>Her voice is taking too long to make. Her words are above.</color>"); yield break; }
+            if (wav == null) { LineTo(who, "<color=#ffb070>Her voice is taking too long to make. Her words are above.</color>"); yield break; }
             // VaM leaves out Unity's audio download module, so the WAV arrives as plain bytes and is turned into a clip here
             var clip = WavClip(wav, "voice " + who);
-            if (clip == null) { Line("<color=#ffb070>Her voice came back in a sound format Brene can't read.</color>"); yield break; }
+            if (clip == null) { LineTo(who, "<color=#ffb070>Her voice came back in a sound format Brene can't read.</color>"); yield break; }
             var v = VoiceOf(who);
             // no body (Margo on a call): heard as a phone voice, not from a place in the room
             v.src.spatialBlend = body != null ? 1f : 0f;
@@ -264,6 +272,7 @@ namespace Brene
             voices.Clear();
             foreach (var t in new List<Texture2D>(pics.Values)) if (t != null) Destroy(t);
             pics.Clear();
+            DropRing();
         }
     }
 }

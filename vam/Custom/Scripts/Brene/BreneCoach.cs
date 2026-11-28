@@ -2,7 +2,7 @@
 // The screen dims except for a bright window around the thing being explained (the spotlight), with a card beside it:
 // what it is, what to do, step dots, Back / Next / Skip. A step can wait for you to actually do it ("Hold the ` key now"):
 // then Next is replaced by "Waiting for you..." and the tutorial moves on by itself once it has happened.
-// Tutorials are picked from the Tutorials list (radial menu > Help, or the dock's ? button). Welcome runs once on the first start.
+// Tutorials are picked from the Help panel (dock). Welcome opens at every start; its card has a "Don't show this at start" box.
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -19,12 +19,18 @@ namespace Brene
         public CoachStep(string title, string text) { Title = title; Text = text; }
     }
 
-    public class Lesson { public string Name, About; public List<CoachStep> Steps = new List<CoachStep>(); public Lesson(string n, string a) { Name = n; About = a; } }
+    public class Lesson
+    {
+        public string Name, About; public List<CoachStep> Steps = new List<CoachStep>();
+        // a tick box on the card (the Welcome tour's "Don't show this at start"); null = none
+        public string Option; public Func<bool> OptionGet; public Action<bool> OptionSet;
+        public Lesson(string n, string a) { Name = n; About = a; }
+    }
 
     public class Coach
     {
         readonly GameObject go; readonly RectTransform root; readonly Image[] dims = new Image[4]; RectTransform ring, card;
-        Text title, body, dots; Button back, next; Lesson lesson; int index; bool waiting; float doneAt = -1; float k = 1f;
+        Text title, body, dots; Button back, next, opt; Image optIcon; RectTransform bodyRt; Lesson lesson; int index; bool waiting; float doneAt = -1; float k = 1f;
         public bool Running { get { return lesson != null; } }
         public GameObject CanvasGo { get { return go; } }
         public Vector2 WorldSize;   // set in VR: the board's size in canvas units (zero on a monitor)
@@ -49,7 +55,7 @@ namespace Brene
             Ui.Box(card, Role.Panel); card.localScale = Vector3.one * k;
             var tr = Ui.Rect("Title", card); tr.anchorMin = new Vector2(0, 1); tr.anchorMax = new Vector2(1, 1); tr.pivot = new Vector2(0.5f, 1); tr.sizeDelta = new Vector2(-36, 50); tr.anchoredPosition = new Vector2(0, -12);
             title = Ui.Label(tr, "", 28, Role.Accent, TextAnchor.MiddleLeft); title.fontStyle = FontStyle.Bold;
-            var br = Ui.Rect("Body", card); Ui.Fill(br, 26, 66, 26, 86);
+            var br = Ui.Rect("Body", card); Ui.Fill(br, 26, 66, 26, 86); bodyRt = br;
             body = Ui.Label(br, "", 22, Role.Text, TextAnchor.UpperLeft); body.supportRichText = true;
             var dr = Ui.Rect("Dots", card); dr.anchorMin = new Vector2(0, 0); dr.anchorMax = new Vector2(0.4f, 0); dr.pivot = new Vector2(0, 0); dr.sizeDelta = new Vector2(0, 30); dr.anchoredPosition = new Vector2(14, 24);
             dots = Ui.Label(dr, "", 18, Role.Dim, TextAnchor.MiddleLeft);
@@ -57,6 +63,10 @@ namespace Brene
             Btn("Skip", new Vector2(-156, 18), 100, Stop);
             next = Btn("Next", new Vector2(-18, 18), 130, () => { if (!waiting) Show(index + 1); });
             Ui.SetOn(next, true);
+            // the tick box (only on lessons that have one)
+            var orr = Ui.Rect("Option", card); orr.anchorMin = orr.anchorMax = new Vector2(0, 0); orr.pivot = new Vector2(0, 0); orr.sizeDelta = new Vector2(420, 46); orr.anchoredPosition = new Vector2(18, 82);
+            opt = Ui.Button(orr, "", () => { if (lesson != null && lesson.OptionSet != null && lesson.OptionGet != null) { lesson.OptionSet(!lesson.OptionGet()); ShowOption(); } }); Ui.Stretch(opt);
+            Ui.WithIcon(opt, "box"); var oi = opt.transform.Find("Icon"); optIcon = oi != null ? oi.GetComponent<Image>() : null;
             go.SetActive(false);
         }
 
@@ -66,7 +76,17 @@ namespace Brene
             var b = Ui.Button(r, text, a); Ui.Stretch(b); return b;
         }
 
-        public void Start(Lesson l) { lesson = l; go.SetActive(true); Theme.ApplyAll(root); Show(0); }
+        public void Start(Lesson l) { lesson = l; go.SetActive(true); Theme.ApplyAll(root); ShowOption(); Show(0); }
+        void ShowOption()
+        {
+            bool has = lesson != null && lesson.Option != null && lesson.OptionGet != null;
+            opt.gameObject.SetActive(has);
+            card.sizeDelta = new Vector2(560, has ? 356 : 300); bodyRt.offsetMin = new Vector2(26, has ? 140 : 86);
+            if (!has) return;
+            bool on = false; try { on = lesson.OptionGet(); } catch (Exception) { }
+            Ui.SetText(opt, lesson.Option); Ui.SetOn(opt, on);
+            if (optIcon != null) optIcon.sprite = BreneIcons.Get(on ? "check" : "box");
+        }
         public void Stop() { var n = lesson != null ? lesson.Name : ""; lesson = null; go.SetActive(false); Finished(n); }
 
         void Show(int i)

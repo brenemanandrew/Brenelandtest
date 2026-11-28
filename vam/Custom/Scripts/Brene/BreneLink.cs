@@ -3,6 +3,7 @@
 // (from brenai.fly.dev or LM Studio), so this side only makes small local HTTP requests and never holds a password.
 //   GET  /state  -> {"pose":{"yaw","pitch","roll","pos":[x,y,z],"age"},"hands":[{"id","x","y","size","pinch","closed"}],"glasses":bool,"handsOn":bool}
 //   POST /chat   {"text"} -> {"text"} or {"error"}
+//   POST /story/say {who, text, place, present, voice, mode} -> {text, voice, events?, calling?}; POST /story/call {who, action}
 //   /state may carry "cmd" {"id","kind":"scene|look|pose|rescan","path","person"} from the library page; the plugin runs it and
 //   POST /vam    {"people":[uids],"selected","done":id,"error"} reports back (also once a second, so the page lists the people)
 using System;
@@ -142,12 +143,14 @@ namespace Brene
 
         // one line to a member of the cast (Little Shepersville): /story/say with where you are and who is there
         // done(reply, error, voiceId): voiceId is set when the relay is making her voice for this reply (GET /voice?id=)
-        public IEnumerator Say(string who, string text, string place, List<string> present, bool voice, Action<string, string, string> done)
+        // mode: "call" while on a call with her on the Phone, else "text"
+        public IEnumerator Say(string who, string text, string place, List<string> present, bool voice, string mode, Action<string, string, string> done)
         {
-            var body = new JSONClass(); body["who"] = who; body["text"] = text; body["place"] = place ?? ""; body["voice"].AsBool = voice;
+            var body = new JSONClass(); body["who"] = who; body["text"] = text; body["place"] = place ?? ""; body["voice"].AsBool = voice; body["mode"] = mode == "call" ? "call" : "text";
             var arr = new JSONArray(); foreach (var p in present) arr.Add(p); body["present"] = arr;
-            return Json("POST", "/story/say", body, 180, (JSONNode j, string e) => Reply(j, e, done));
+            return Json("POST", "/story/say", body, 180, (JSONNode j, string e) => { if (j != null && OnPhone != null) { try { OnPhone(j); } catch (Exception) { } } Reply(j, e, done); });
         }
+        public Action<JSONNode> OnPhone;   // a say answer can carry phone events (a call coming in); the plugin looks at them
         // one message to Wizra through her plain chat (the same answer shape as Say)
         public IEnumerator Chat(string text, bool voice, Action<string, string, string> done)
         {

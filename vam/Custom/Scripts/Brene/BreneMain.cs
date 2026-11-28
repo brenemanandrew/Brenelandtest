@@ -1,4 +1,4 @@
-// Brene for Virt-a-Mate: big, clear panels you can drag around, Wizra's chat, and VITURE glasses support.
+// Brene for Virt-a-Mate: big, clear panels you can drag around, the Phone (texts and calls with the cast), and VITURE glasses support.
 // Load Brene.cslist as a Session plugin (Main menu > Session Plugin Presets) so it stays across scenes, or on any atom in a scene.
 // Layout, theme and size are saved to Saves/PluginData/Brene/layout.json with "Save layout" (and on every change in edit mode).
 //
@@ -27,11 +27,10 @@ namespace Brene
         Text status, chatLog; InputField chatIn; ScrollRect chatScroll; RectTransform peopleList;
         Link link; Viture vit; Character chr; Radial radial;
         JSONStorableStringChooser menuKey; bool chatBusy; float nextStatus, nextPeople, saveAt = -1;
-        readonly List<string> chatLines = new List<string>();
 
         JSONStorableString relayUrl; JSONStorableBool showUi, headOn, stereoOn, fullOn, handsOn, swapEyes, flipYaw, flipPitch, flipRoll;
         bool frozen;
-        JSONStorableFloat uiSize, ipd, posScale, menuFit; float fovBase = -1, fovWrote = -1;
+        JSONStorableFloat uiSize, ipd, posScale, menuFit, pokeTip; float fovBase = -1, fovWrote = -1;
 
         public override void Init()
         {
@@ -59,11 +58,14 @@ namespace Brene
                 posScale = new JSONStorableFloat("6DOF movement scale", 1f, (float v) => vit.PosScale = v, 0f, 3f); RegisterFloat(posScale); CreateSlider(posScale, true);
                 CreateButton("Re-centre head", true).button.onClick.AddListener(() => vit.Recenter());
                 CreateButton("Reset panel layout", true).button.onClick.AddListener(ResetLayout);
+                // in the headset: how far ahead of the controller the fingertip that presses buttons is (controllers differ)
+                pokeTip = new JSONStorableFloat("Poke tip distance (m)", 0.07f, (float v) => { }, 0.02f, 0.15f); RegisterFloat(pokeTip); CreateSlider(pokeTip, true);
 
                 InitWizra(); InitReactions();
                 Actions();
                 BuildCanvas();
                 LoadLayout();
+                if (!tourOff) welcomeAt = Time.realtimeSinceStartup + 2.5f;   // the Welcome tour at every start, unless ticked off on its card
                 link.OnCmd = RunCmd; link.Report = SceneReport; twiceCheckAt = Time.realtimeSinceStartup + 3f;
                 StartCoroutine(link.Poll(() => true));   // always: the library page needs the scene's people and sends commands
             }
@@ -108,7 +110,7 @@ namespace Brene
             Add("savelayout", "Save layout", SaveLayout, null);
             Add("panels", "Show all", ShowAll, null);
             Add("tools", "Tools", ToggleTools, () => AnyTool());
-            Add("chat", "Wizra", () => { pChat.Root.gameObject.SetActive(!pChat.Root.gameObject.activeSelf); if (pChat.Root.gameObject.activeSelf) pChat.Root.SetAsLastSibling(); }, () => pChat != null && pChat.Root.gameObject.activeSelf);
+            Add("chat", "Phone", () => { if (pChat.Root.gameObject.activeSelf) pChat.Root.gameObject.SetActive(false); else OpenPhone(); }, () => pChat != null && pChat.Root.gameObject.activeSelf);
             Add("fitless", "VaM menu smaller", () => menuFit.val = Mathf.Min(45f, menuFit.val + 8f), null);
             Add("fitmore", "VaM menu bigger", () => menuFit.val = Mathf.Max(0f, menuFit.val - 8f), null);
             Add("radial", "Menu", () => radial.OpenAtCentre(), null);
@@ -126,13 +128,14 @@ namespace Brene
             scaler = canvasGo.AddComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; scaler.scaleFactor = uiSize.val;
             canvasGo.AddComponent<GraphicRaycaster>();
             BreneEdit.Canvas = canvas; BreneEdit.Changed = () => { if (BreneEdit.On) saveAt = Time.realtimeSinceStartup + 1f; };
+            BreneEdit.Save = () => { saveAt = Time.realtimeSinceStartup + 1f; KeepOnScreen(); };
             var root = canvasGo.transform;
 
             pScene = new Panel(root, "scene", "Scene", new Vector2(20, -20), new Vector2(340, 250), true);
             pGlasses = new Panel(root, "glasses", "Glasses", new Vector2(20, -290), new Vector2(340, 250), true);
             pLayout = new Panel(root, "layout", "Layout", new Vector2(380, -360), new Vector2(340, 250), true);
             pPeople = new Panel(root, "people", "People", new Vector2(380, -20), new Vector2(240, 320), false);
-            pChat = new Panel(root, "chat", "Wizra", new Vector2(-1, -20), new Vector2(460, 520), false);
+            pChat = new Panel(root, "chat", "Phone", new Vector2(-1, -20), new Vector2(460, 620), false);   // id kept: older layouts keep its place
             pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(BreneEdit.On);
 
             foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
@@ -156,20 +159,8 @@ namespace Brene
             peopleList = Scroll(pPeople.Body).content;
             var v = peopleList.gameObject.AddComponent<VerticalLayoutGroup>(); v.spacing = 6; v.childForceExpandHeight = false; v.childControlHeight = true; v.childControlWidth = true;
 
-            // Wizra: the log, a box to type in and Send
-            var logArea = Ui.Rect("Log", pChat.Body); Ui.Fill(logArea, 0, 56, 0, 62);   // 56 at the top: the who / body / voice bar
-            Ui.Box(logArea, Role.Field);
-            chatScroll = Scroll(logArea); var logContent = chatScroll.content;
-            var lv = logContent.gameObject.AddComponent<VerticalLayoutGroup>(); lv.childControlHeight = true; lv.childControlWidth = true; lv.padding = new RectOffset(10, 10, 8, 8);
-            chatLog = Ui.Label(logContent, "Say something to Wizra. Her words come from the PC model through the Brene relay.", 21, Role.Text, TextAnchor.UpperLeft);
-            chatLog.verticalOverflow = VerticalWrapMode.Overflow; chatLog.supportRichText = true;
-            chatLog.gameObject.AddComponent<LayoutElement>();
-            var inRt = Ui.Rect("Input", pChat.Body); inRt.anchorMin = new Vector2(0, 0); inRt.anchorMax = new Vector2(1, 0); inRt.pivot = new Vector2(0, 0);
-            inRt.offsetMin = new Vector2(0, 0); inRt.offsetMax = new Vector2(-110, 54);
-            chatIn = Input(inRt, "Type here, Enter to send");
-            var sendRt = Ui.Rect("Send", pChat.Body); sendRt.anchorMin = sendRt.anchorMax = new Vector2(1, 0); sendRt.pivot = new Vector2(1, 0); sendRt.sizeDelta = new Vector2(100, 54);
-            var sb = Ui.Button(sendRt, "Send", SendChat); Ui.Stretch(sb);
-            Ui.SetOn(sb, false);
+            // the Phone: contacts, texts and calls with Wizra, Zoe, Belinda and Margo (BrenePhone.cs)
+            BuildPhone();
 
             // status line along the bottom of the dock
             var st = Ui.Rect("Status", pDock.Root); Ui.Bottom(st, 30, 0);
@@ -179,7 +170,7 @@ namespace Brene
             // calm start: only the dock. Tools, Wizra and the flows open from the dock or the radial menu
             pDock.Kind = "dock"; pChat.Kind = "chat";
             foreach (var p in new[] { chr.Panel, sceneFlow.Panel, glassFlow.Panel, pStory, pLaptop, pHelp }) p.Kind = "window";
-            foreach (var p in new[] { pChoice, pickFlow.Panel, pCall, pVamMenu }) p.Kind = "dialog";
+            foreach (var p in new[] { pChoice, pickFlow.Panel, pVamMenu }) p.Kind = "dialog";
             foreach (var p in Panel.All) if (p.Kind != "dock") p.Root.gameObject.SetActive(false);
             // the dock in a sensible order
             int at = 0; foreach (var id in new[] { "radial", "tools", "chat", "character", "sceneflow", "glassflow", "story", "help", "edit" }) { Act a; if (acts.TryGetValue(id, out a) && a.btn != null) { a.btn.transform.SetParent(pDock.Body, false); a.btn.transform.SetSiblingIndex(at++); } }
@@ -187,7 +178,7 @@ namespace Brene
             pGlasses.Root.anchoredPosition = new Vector2(20, pScene.Root.anchoredPosition.y - pScene.Root.sizeDelta.y - 16);
             PlaceRight(pChat, 20); PlaceBottomRight(pDock);
             foreach (var p in Panel.All) { p.Fit(); p.ShowEdit(BreneEdit.On); }   // ShowEdit again: CanHide is set after some panels are made
-            if (chatLines.Count > 0) chatLog.text = string.Join("\n\n", chatLines.ToArray());   // a rebuild (Reset layout) keeps the talk so far
+            ShowLog();   // a rebuild (Reset layout) keeps the talk so far
             Refresh();
         }
 
@@ -200,6 +191,7 @@ namespace Brene
             if (a.btn != null) { a.btn.transform.SetParent(p.Body, false); return; }
             a.btn = Ui.Button(p.Body, a.label, () => { try { a.run(); } catch (Exception e) { SuperController.LogError("Brene " + a.id + ": " + e.Message); } Refresh(); });
             a.btn.gameObject.AddComponent<DragButton>().actionId = id;
+            Ui.WithIcon(a.btn, BreneIcons.ForAct(id));
         }
 
         // the panels' own lists stop dead at their ends (no bounce)
@@ -216,19 +208,13 @@ namespace Brene
             return f;
         }
 
-        // ---- Wizra ----
+        // ---- the Phone's Send: to whoever is on the screen (on the call screen, the caller) ----
         void SendChat()
         {
             var text = chatIn.text.Trim(); if (text == "" || chatBusy) return;
             chatIn.text = "";
-            SayTo(talkTo, text, null);
+            SayTo(phScreen == "call" && callWho != "" ? callWho : talkTo, text, null);
             chatIn.ActivateInputField();
-        }
-        void Line(string s)
-        {
-            chatLines.Add(s); while (chatLines.Count > 80) chatLines.RemoveAt(0);
-            chatLog.text = string.Join("\n\n", chatLines.ToArray());
-            Canvas.ForceUpdateCanvases(); chatScroll.verticalNormalizedPosition = 0;
         }
         static string Esc(string s) { return (s ?? "").Replace("<", "&lt;").Replace(">", "&gt;"); }
 
@@ -265,16 +251,18 @@ namespace Brene
         {
             Func<string, RItem> act = id => { Act a = acts[id]; return new RItem(a.label == "Play mode" && SuperController.singleton.gameMode != SuperController.GameMode.Play ? "Edit mode" : a.label, () => { a.run(); Refresh(); }) { On = a.on }; };
             Func<string, RItem> sec = s => new RItem(s, () => chr.Open(s));
-            return new List<RItem> {
+            var items = new List<RItem> {
                 new RItem("Character", new List<RItem> { new RItem("Start", () => chr.Open("Who")), sec("Body"), sec("Face"), sec("Skin"), sec("Hair"), sec("Clothes"), sec("Pose"), new RItem("Save", () => chr.Open("Finish")) }),
                 new RItem("Scene", new List<RItem> { act("play"), act("freeze"), act("undo"), act("redo"), act("save"), act("load") }),
                 act("play"),
                 new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
-                new RItem("Wizra", () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); chatIn.ActivateInputField(); }),
+                new RItem("Wizra", () => OpenTexts("wizra")),   // the Phone, on Wizra's texts
                 new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore"), act("movemenu"), new RItem("Reset layout", ResetLayout) }),
                 act("menu"),
-                new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Talk to next", () => { NextWho(); pChat.Root.gameObject.SetActive(true); }) }),
+                new RItem("Story", new List<RItem> { act("story"), act("laptop"), act("margo"), new RItem("Phone", OpenPhone), new RItem("Talk to next", () => { NextWho(); OpenTexts(talkTo); }) }),
             };
+            if (vr) items.Add(new RItem("Bring board here", PlaceBoard));
+            return items;
         }
         KeyCode MenuKey()
         {
@@ -316,8 +304,8 @@ namespace Brene
         }
         // Show all brings back the quick-button panels only (flows and pop-ups open when they are needed)
         void ShowAll() { showUi.val = true; if (canvasGo != null) canvasGo.SetActive(true); pDock.Root.gameObject.SetActive(true); foreach (var p in Panel.All) if (p.Kind == "tool") p.Root.gameObject.SetActive(true); BreneEdit.Changed(); Refresh(); }
-        bool AnyTool() { foreach (var p in Panel.All) if (p.Kind == "tool" && p.Root.gameObject.activeSelf) return true; return false; }
-        void ToggleTools() { bool on = !AnyTool(); foreach (var p in Panel.All) if (p.Kind == "tool") { p.Root.gameObject.SetActive(on); if (on) p.Root.SetAsLastSibling(); } BreneEdit.Changed(); Refresh(); }
+        bool AnyTool() { foreach (var p in Panel.All) if (p.Kind == "tool" && p.Visible) return true; return false; }
+        void ToggleTools() { bool on = !AnyTool(); foreach (var p in Panel.All) if (p.Kind == "tool") { if (on) { p.Root.gameObject.SetActive(true); p.Root.SetAsLastSibling(); } else p.Close(); } BreneEdit.Changed(); Refresh(); }
         void NextTheme()
         {
             int i = Array.IndexOf(Theme.Names, Theme.Name); Theme.Name = Theme.Names[(i + 1) % Theme.Names.Length];
@@ -335,7 +323,7 @@ namespace Brene
         {
             try
             {
-                var j = new JSONClass(); j["v"].AsInt = 2; j["theme"] = Theme.Name; j["menuX"].AsFloat = menuMove.x; j["menuY"].AsFloat = menuMove.y; j["menuZ"].AsFloat = menuMove.z; j["menuSize"].AsFloat = menuSize; j["tutorialSeen"].AsBool = tutorialSeen; j["size"].AsFloat = uiSize.val;
+                var j = new JSONClass(); j["v"].AsInt = 2; j["theme"] = Theme.Name; j["menuX"].AsFloat = menuMove.x; j["menuY"].AsFloat = menuMove.y; j["menuZ"].AsFloat = menuMove.z; j["menuSize"].AsFloat = menuSize; j["tourOff"].AsBool = tourOff; j["size"].AsFloat = uiSize.val;
                 var ps = new JSONClass();
                 foreach (var p in Panel.All)
                 {
@@ -343,6 +331,7 @@ namespace Brene
                     o["x"].AsFloat = p.Root.anchoredPosition.x; o["y"].AsFloat = p.Root.anchoredPosition.y;
                     o["w"].AsFloat = p.Root.sizeDelta.x; o["h"].AsFloat = p.Root.sizeDelta.y;
                     o["hidden"].AsBool = !p.Root.gameObject.activeSelf;
+                    o["shrunk"].AsBool = p.Shrunk; o["cx"].AsFloat = p.Chip.anchoredPosition.x; o["cy"].AsFloat = p.Chip.anchoredPosition.y;
                     if (p.Droppable)
                     {
                         var arr = new JSONArray();
@@ -367,7 +356,7 @@ namespace Brene
                 if (j == null) return;
                 if (j["theme"] != null && Array.IndexOf(Theme.Names, j["theme"].Value) >= 0) { Theme.Name = j["theme"].Value; Theme.ApplyAll(canvasGo.transform); }
                 if (j["size"] != null) uiSize.val = Mathf.Clamp(j["size"].AsFloat, 0.6f, 3f);
-                tutorialSeen = j["tutorialSeen"].AsBool;
+                tourOff = j["tourOff"].AsBool;   // (the old "tutorialSeen" is no longer read: Welcome opens at every start until ticked off)
                 if (j["menuSize"] != null) { menuMove = new Vector3(j["menuX"].AsFloat, j["menuY"].AsFloat, j["menuZ"].AsFloat); menuSize = Mathf.Clamp(j["menuSize"].AsFloat, 0.4f, 2.5f); }
                 var ps = j["panels"];
                 foreach (var p in Panel.All)
@@ -376,6 +365,8 @@ namespace Brene
                     p.Root.anchoredPosition = new Vector2(o["x"].AsFloat, o["y"].AsFloat);
                     p.Root.sizeDelta = new Vector2(Mathf.Max(180, o["w"].AsFloat), Mathf.Max(110, o["h"].AsFloat));
                     if (j["v"].AsInt >= 2 && (p.Kind == "tool" || p.Kind == "chat")) p.Root.gameObject.SetActive(!o["hidden"].AsBool);   // older layouts: the calm defaults instead
+                    // shrunk to a chip: the dock, tool panels and the Phone come back as chips (windows open only when asked: the calm start)
+                    if (o["shrunk"].AsBool && (p.Kind == "tool" || p.Kind == "chat" || p.Kind == "dock")) p.ShrinkAt(new Vector2(o["cx"].AsFloat, o["cy"].AsFloat));
                 }
                 // buttons: put each where it was saved, in order (an action not in the file stays where it was built)
                 foreach (var p in Panel.All)
@@ -386,7 +377,7 @@ namespace Brene
                 }
                 foreach (var p in Panel.All) p.Fit();
                 Act edit; if (acts.TryGetValue("edit", out edit) && edit.btn != null && !edit.btn.gameObject.activeInHierarchy) edit.btn.transform.SetParent(pDock.Body, false);   // never lose the way back into the editor
-                pDock.Root.gameObject.SetActive(true);
+                if (!pDock.Shrunk) pDock.Root.gameObject.SetActive(true);
                 KeepOnScreen();
             }
             catch (Exception e) { Report("Brene: could not read the layout: " + e.Message); }
@@ -396,11 +387,14 @@ namespace Brene
         // Run after a layout is read, and again whenever the window or the panel size changes.
         void KeepOnScreen()
         {
-            if (vr || canvasGo == null || uiSize == null) return;
-            float W = Screen.width / uiSize.val, H = Screen.height / uiSize.val;
+            if (canvasGo == null || uiSize == null) return;
+            var size = BoardSize(); float W = size.x, H = size.y;   // the screen, or the board in the headset
             foreach (var p in new List<Panel>(Panel.All))
             {
-                if (p.Root == null) continue; var a = p.Root.anchoredPosition; var z = p.Root.sizeDelta;
+                if (p.Root == null) continue;
+                // a chip is small: wholly inside
+                if (p.Chip != null) { var c = p.Chip.anchoredPosition; p.Chip.anchoredPosition = new Vector2(Mathf.Clamp(c.x, 0, Mathf.Max(0, W - 64)), -Mathf.Clamp(-c.y, 0, Mathf.Max(0, H - 64))); }
+                var a = p.Root.anchoredPosition; var z = p.Root.sizeDelta;
                 // the dock is the way back to everything, so it has to be wholly inside; the others only need a part you can grab
                 bool lost = p == pDock ? (a.x < 0 || a.x > W - z.x || -a.y > H - z.y || a.y > 0) : (a.x < -z.x + 60 || a.x > W - 60 || -a.y > H - 40 || a.y > 0);
                 if (lost) p.Root.anchoredPosition = new Vector2(Mathf.Clamp(a.x, 0, Mathf.Max(0, W - z.x)), -Mathf.Clamp(-a.y, 0, Mathf.Max(0, H - z.y)));
@@ -415,7 +409,7 @@ namespace Brene
             Panel.All.Clear(); foreach (var a in new List<Act>(acts.Values)) a.btn = null; if (radial != null) radial.Close();
             if (canvasGo != null) Destroy(canvasGo);
             BuildCanvas(); canvasGo.SetActive(showUi.val);
-            saveAt = -1; SaveLayout();   // the fresh layout is written at once, so "tutorial seen" and the VaM menu's place are not lost with the old file
+            saveAt = -1; SaveLayout();   // the fresh layout is written at once, so "Don't show this at start" and the VaM menu's place are not lost with the old file
         }
 
         // ---- every frame ----
@@ -489,7 +483,8 @@ namespace Brene
             if (radialGo != null) Destroy(radialGo);
             try { if (coach != null) coach.Destroy(); } catch (Exception) { }
             try { DropWizra(); } catch (Exception) { }
-            Panel.All.Clear(); BreneEdit.On = false; BreneEdit.Changed = () => { };
+            try { DropHands(); } catch (Exception) { }
+            Panel.All.Clear(); BreneEdit.On = false; BreneEdit.Changed = () => { }; BreneEdit.Save = () => { }; BreneHover.Strong = false;
         }
     }
 }

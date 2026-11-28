@@ -11,7 +11,7 @@ namespace Brene
     public partial class BreneMain
     {
         Flow sceneFlow, glassFlow; Coach coach; Panel pHelp; readonly List<Lesson> lessons = new List<Lesson>();
-        bool tutorialSeen; float welcomeAt = -1; int replyMark; string lightPick = "";
+        bool tourOff; float welcomeAt = -1; int replyMark; string lightPick = "";   // tourOff: "Don't show this at start" ticked on the Welcome card (saved in the layout file)
 
         void BuildGuides(Transform root)
         {
@@ -29,13 +29,12 @@ namespace Brene
 
             pHelp = new Panel(root, "help", "Help and tutorials", new Vector2(420, -120), new Vector2(520, 560), false);
             var vl = pHelp.Body.gameObject.AddComponent<VerticalLayoutGroup>(); vl.spacing = 8; vl.childControlHeight = true; vl.childControlWidth = true; vl.childForceExpandHeight = false;
-            BuildWizraBar();
             BuildStory(root);
             chr.MakeWizra = a => { MakeWizra(a); ShowBody(); };
             chr.MakeCast = (w, a) => { MakeCast(w, a); ShowBody(); };
             chr.BuildPersonality = BuildPersonality; chr.BuildReactions = BuildReactions;
             if (coach != null) coach.Destroy();
-            coach = new Coach(uiSize.val); coach.Finished = n => { if (n == "Welcome") { tutorialSeen = true; SaveLayout(); } };
+            coach = new Coach(uiSize.val);
             Lessons();
             foreach (var l in lessons)
             {
@@ -44,19 +43,19 @@ namespace Brene
                 b.GetComponentInChildren<Text>().fontSize = 19;
             }
             pHelp.Root.gameObject.SetActive(false);
-            if (!tutorialSeen) welcomeAt = Time.realtimeSinceStartup + 2.5f;
         }
 
         void OpenHelp() { pHelp.Root.gameObject.SetActive(true); pHelp.Root.SetAsLastSibling(); }
 
         void TickGuides()
         {
-            if (welcomeAt > 0 && Time.realtimeSinceStartup > welcomeAt) { welcomeAt = -1; if (!tutorialSeen && lessons.Count > 0 && !coach.Running) coach.Start(lessons[0]); }
+            if (welcomeAt > 0 && Time.realtimeSinceStartup > welcomeAt) { welcomeAt = -1; if (!tourOff && lessons.Count > 0 && !coach.Running) coach.Start(lessons[0]); }
             if (coach != null) coach.Tick();
             if (sceneFlow != null) sceneFlow.Tick();
             if (glassFlow != null) glassFlow.Tick();
             TickWizra();
             TickStory();
+            TickPhone();
             TickReactions();
         }
 
@@ -190,7 +189,7 @@ namespace Brene
             }));
             f.Steps.Add(new FlowStep("Hands", "Optional: control things with your hands.", c =>
             {
-                Flow.Say(c, "Open 127.0.0.1:8767/hands in Chrome or Edge on this PC and press Start camera. Hold a hand up: a ball follows it in VaM. Close your hand over a control point to hold it; open to let go.");
+                Flow.Say(c, "Open 127.0.0.1:8767/hands in Chrome or Edge on this PC and press Start camera. Hold a hand up: a glowing ring follows it in VaM. Close your hand over a control point to hold it; open to let go.");
                 Flow.Wide(c, handsOn.val ? "Hand control: on" : "Hand control: off (tap to turn on)", () => { handsOn.val = !handsOn.val; f.Redraw(); }, handsOn.val);
             }) { Check = () => !link.Connected ? "start the relay first" : link.Hands.Count > 0 ? null : "no hands seen yet (is the hands page running?)" });
         }
@@ -200,14 +199,16 @@ namespace Brene
         {
             lessons.Clear();
             var w = new Lesson("Welcome", "a 1 minute tour of Brene"); lessons.Add(w);
+            w.Option = "Don't show this at start"; w.OptionGet = () => tourOff; w.OptionSet = v => { tourOff = v; SaveLayout(); };
             w.Steps.Add(new CoachStep("Welcome to Brene", "Brene puts VaM's tools into big, clear panels and step-by-step flows. Nothing of VaM's is taken away: its own menus are still one tap away.\n\nThis tour takes about a minute. Skip any time."));
-            w.Steps.Add(new CoachStep("Your dock", "Everything starts here. Brene starts calm: just this dock. Tools shows the quick-button panels (scene, glasses, layout, people), Wizra opens her chat, and Character, Set up scene, Glasses setup, Story and Help each open one window at a time. The line at the bottom says what is connected.") { Target = () => pDock.Root, Enter = () => pDock.Root.gameObject.SetActive(true) });
+            w.Steps.Add(new CoachStep("Your dock", "Everything starts here. Brene starts calm: just this dock. Tools shows the quick-button panels (scene, glasses, layout, people), Phone has texts and calls with Wizra, Zoe, Belinda and Margo, and Character, Set up scene, Glasses setup, Story and Help each open one window at a time. The line at the bottom says what is connected. The - on any title bar shrinks a panel to a round icon; tap it to open it again.") { Target = () => pDock.Root, Enter = () => pDock.Root.gameObject.SetActive(true) });
             w.Steps.Add(new CoachStep("The radial menu", "Hold the <b>" + KeyName() + "</b> key, move the mouse toward a choice and let go. Two flicks reach anything.\n\n<b>Try it now:</b> hold the key.") { Done = () => radial.Open });
             w.Steps.Add(new CoachStep("Character", "Makes and changes a person in eleven steps: who, a starting look, body, face, skin, hair, clothes, pose, personality, reactions, save. The \"Build Wizra\" tutorial in Help walks you through making Wizra herself.") { Target = () => Btn("character") });
             w.Steps.Add(new CoachStep("Set up a scene", "A flow for the whole scene: open one, people, poses, lights, how you view it, play and save.") { Target = () => Btn("sceneflow") });
             w.Steps.Add(new CoachStep("Library", "Your scenes, looks and poses as picture tiles, and the VaM Hub with one-tap install. It's a web page, so it also works on your phone:\n\n<b>127.0.0.1:8767/library</b> on this PC (needs the relay running)."));
             w.Steps.Add(new CoachStep("Make it yours", "Edit layout lets you drag panels, resize them and move buttons between them. Theme changes the colours.") { Target = () => Btn("edit") });
-            w.Steps.Add(new CoachStep("Help is here", "Every tour is in Help, any time: Build Wizra, Scene, Glasses, In the headset, Library, Layout.") { Target = () => Btn("help") });
+            w.Steps.Add(new CoachStep("The Phone", "Contacts: Wizra, Zoe, Belinda and Margo. Text opens your texts with her, Call rings her. When one of them calls you, the phone rings: Answer or Decline.") { Target = () => Btn("chat") });
+            w.Steps.Add(new CoachStep("Help is here", "Every tour is in Help, any time: Build Wizra, Scene, Glasses, In the headset, Library, Layout.\n\nThis tour opens at every start. Tick the box below to stop that.") { Target = () => Btn("help") });
 
             // the character tutorial builds Wizra herself (her description is Brenai's own: persona.mjs)
             var ch = new Lesson("Build Wizra", "make Wizra from Brenai, step by step"); lessons.Add(ch);
@@ -223,7 +224,7 @@ namespace Brene
             ch.Steps.Add(new CoachStep("Her personality", "VaM has no personalities of its own: hers lives in Brenai. These bars are her temperament (warmth, sarcasm, playfulness...) and her mood right now. They shift as you spend time with her; her persona is edited in Brenai's robot panel.") { Enter = () => chr.Open("Personality"), Target = () => chr.Panel.Root });
             ch.Steps.Add(new CoachStep("Her reactions", "What she does when you touch her head, face, hair, shoulder, arm, hand, belly or knee: a face (tap to change it), and whether she's told, so she can answer it in words.\n\nTouch her with your hands in VR, or the webcam hands.\n\n<b>Try it:</b> press Test on Head.") { Enter = () => chr.Open("Reactions"), Target = () => chr.Panel.Root, Done = () => ReactionTests > 0 });
             ch.Steps.Add(new CoachStep("Make her Wizra", "Save the look as <b>Wizra</b>. (<b>Make her Wizra</b> is here too, if you skipped it.) From now on her voice comes from this body, her lips move when she talks, and her face follows what she does.") { Enter = () => { chr.SaveName = "Wizra"; chr.Open("Finish"); }, Target = () => chr.Panel.Root });
-            ch.Steps.Add(new CoachStep("Say hi", "Now talk to her in the Wizra panel. She remembers everything from Brenai.\n\n<b>Try it:</b> send her a message.") { Enter = () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); replyMark = WizraReplies; }, Target = () => pChat.Root, Done = () => WizraReplies > replyMark });
+            ch.Steps.Add(new CoachStep("Say hi", "Now text her on the Phone. She remembers everything from Brenai.\n\n<b>Try it:</b> send her a message.") { Enter = () => { OpenTexts("wizra"); replyMark = WizraReplies; }, Target = () => pChat.Root, Done = () => WizraReplies > replyMark });
 
             var sc = new Lesson("Set up a scene", "the scene flow"); lessons.Add(sc);
             sc.Steps.Add(new CoachStep("Scene flow", "Six steps from an empty room to a saved scene.") { Enter = () => sceneFlow.Open(0), Target = () => sceneFlow.Panel.Root });
@@ -238,9 +239,11 @@ namespace Brene
             gl.Steps.Add(new CoachStep("Work through it", "Press Next at each step. You can come back any time from the dock.") { Target = () => glassFlow.NextRt });
 
             var vrl = new Lesson("In the headset", "the board, the wrist dock, pointing"); lessons.Add(vrl);
-            vrl.Steps.Add(new CoachStep("Everything is on a board", "In a headset, Brene's panels sit on a board floating in front of you: the same panels, flows and menu as on the monitor. Point with VaM's laser and pull the trigger to press."));
-            vrl.Steps.Add(new CoachStep("Your wrist", "Raise your left hand and look at it: a dock appears on your wrist. Board shows or hides the board, Menu opens the ring, Wizra opens her chat, Bring board here moves the board in front of you.\n\n<b>Try it:</b> look at your left wrist.") { Done = () => !InVR || (wristGo != null && wristGo.activeSelf) });
-            vrl.Steps.Add(new CoachStep("Talking to Wizra", "Her voice comes from her body in the room. With no keyboard, use the quick lines under her chat (Hey, Tell me more...). A real keyboard still works for anything else.") { Target = () => pChat.Root, Enter = () => { pChat.Root.gameObject.SetActive(true); pChat.Root.SetAsLastSibling(); } });
+            vrl.Steps.Add(new CoachStep("Everything is on a board", "In a headset, Brene's panels sit on a board at arm's length, facing you: the same panels, flows and menu as on the monitor."));
+            vrl.Steps.Add(new CoachStep("Poke to press", "Your hands glow. The bright dot ahead of each hand is your fingertip: push it into a button to press it. Pull back before the next press. The button under it lights up.\n\nVaM's laser still works too. Fingertip too far or too near? Change \"Poke tip distance\" in the plugin's settings.") { Done = () => !InVR || PokeCount > 0 });
+            vrl.Steps.Add(new CoachStep("Your wrist", "Raise your left hand and look at it: a dock appears on your wrist. Board shows or hides the board, Menu opens the ring, Phone opens the phone, Bring board here moves the board in front of you.\n\n<b>Try it:</b> look at your left wrist.") { Done = () => !InVR || (wristGo != null && wristGo.activeSelf) });
+            vrl.Steps.Add(new CoachStep("The ring menu", "Hold both hands together in front of your chest for half a second: the ring menu opens on the board. Poke a choice. It also has Bring board here."));
+            vrl.Steps.Add(new CoachStep("The Phone", "Voices come from their bodies in the room, or like a phone call when on a call. With no keyboard, use the quick lines under the texts (Hey, Tell me more...). A real keyboard still works for anything else.") { Target = () => pChat.Root, Enter = () => OpenPhone() });
 
             var lib = new Lesson("Library", "scenes, looks and the Hub"); lessons.Add(lib);
             lib.Steps.Add(new CoachStep("The Library page", "Open <b>127.0.0.1:8767/library</b> in a browser on this PC, or on your phone if the relay was started with --lan (it prints the link).\n\nFirst time: paste your VaM folder."));
@@ -249,7 +252,7 @@ namespace Brene
 
             var lay = new Lesson("Layout", "move and restyle everything"); lessons.Add(lay);
             lay.Steps.Add(new CoachStep("Edit layout", "Turn on edit mode.\n\n<b>Try it:</b> press Edit layout.") { Target = () => Btn("edit"), Done = () => BreneEdit.On });
-            lay.Steps.Add(new CoachStep("Move and resize", "Drag a panel's title bar to move it. Drag the coloured corner to resize. x hides a panel.") { Target = () => pScene.Root, Enter = () => { if (!AnyTool()) ToggleTools(); } });
+            lay.Steps.Add(new CoachStep("Move and resize", "Drag a panel's title bar to move it. Drag the coloured corner to resize. x hides a panel. - shrinks it to a round icon you can drag; tap the icon to open it again.") { Target = () => pScene.Root, Enter = () => { if (!AnyTool()) ToggleTools(); } });
             lay.Steps.Add(new CoachStep("Move buttons", "Drag a button onto another panel, or between two buttons, to put it there.") { Target = () => pScene.Body, Enter = () => { if (!AnyTool()) ToggleTools(); } });
             lay.Steps.Add(new CoachStep("Done", "Press Edit layout again to finish. Your layout is saved.\n\n<b>Try it now.</b>") { Target = () => Btn("edit"), Done = () => !BreneEdit.On });
         }

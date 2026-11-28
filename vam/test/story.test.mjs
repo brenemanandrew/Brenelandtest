@@ -28,8 +28,9 @@ function brenai(withStory) {
     if (!withStory) return j(404, { error: 'not found' });
     if (req.url === '/api/story/personality?who=zoe') return j(200, { traits: { dryness: 90 }, mood: 'busy' });
     if (req.url === '/api/story/touch') { seen.stouch = (seen.stouch || []).concat(b); return j(200, { ok: true }); }
-    if (req.url === '/api/story/state') return j(200, { day: 3, time: 'evening', place: 'Peak Pizza', cast: { zoe: { mood: 'dry', where: 'Peak Pizza' } }, pending: { id: 'tp4', question: 'Stay for one more slice?', answers: ['Stay', 'Head home'] } });
-    if (req.url === '/api/story/say') { seen.say.push(b); return j(200, { text: `*shrugs* ${b.who} heard: ${b.text}` }); }
+    if (req.url === '/api/story/call') { seen.call = (seen.call || []).concat(b); return j(200, { ok: true, events: b.action === 'decline' ? [{ kind: 'call', who: 'zoe', reason: 'insists' }] : [] }); }
+    if (req.url === '/api/story/state') return j(200, { day: 3, time: 'evening', place: 'Peak Pizza', calling: 'margo', unread: { zoe: 2 }, cast: { zoe: { mood: 'dry', where: 'Peak Pizza' } }, pending: { id: 'tp4', question: 'Stay for one more slice?', answers: ['Stay', 'Head home'] } });
+    if (req.url === '/api/story/say') { seen.say.push(b); return j(200, { text: `*shrugs* ${b.who} heard: ${b.text}`, ...(/call me/.test(b.text) ? { events: [{ kind: 'call', who: 'belinda', reason: 'asked' }, 'junk'], calling: 'belinda' } : {}) }); }
     if (req.url === '/api/story/choose') { seen.choose.push(b); return j(200, { ok: true }); }
     if (req.url === '/api/story/writing') { seen.writing.push(b); return j(200, { ok: true }); }
     j(404, { error: 'not found' });
@@ -52,6 +53,18 @@ try {
   await sleep(300); ok(A.seen.tts[0] && A.seen.tts[0].cast === 'zoe' && A.seen.tts[0].text === 'heard: Hi'.replace('heard', 'zoe heard'), 'voice: her own voice (cast) and only spoken words: ' + JSON.stringify(A.seen.tts[0]));
   r = await post(18791, '/story/say', { who: 'wizra', text: 'Hey', voice: true }); await sleep(300);
   ok(r.text.includes('wizra heard') && !('cast' in A.seen.tts[1]), "say: Wizra through the story route keeps her usual voice (no cast)");
+  // the phone: call mode, incoming call events, answering and declining
+  ok(s.calling === 'margo' && s.unread.zoe === 2, 'phone: state passes calling and unread through');
+  r = await post(18791, '/story/say', { who: 'margo', text: 'Can you hear me?', mode: 'call' });
+  ok(r.mode === 'call' && A.seen.say.at(-1).mode === 'call', 'phone: a message on a call goes to Brenai with mode call');
+  r = await post(18791, '/story/say', { who: 'zoe', text: 'Hi again', mode: 'weird' });
+  ok(r.mode === 'text' && A.seen.say.at(-1).mode === 'text', 'phone: any other mode is sent as text');
+  r = await post(18791, '/story/say', { who: 'zoe', text: 'Ask Belinda to call me' });
+  ok(r.events && r.events.length === 1 && r.events[0].kind === 'call' && r.events[0].who === 'belinda' && r.calling === 'belinda', 'phone: a call event in a say answer reaches the plugin (junk dropped)');
+  r = await post(18791, '/story/call', { who: 'margo', action: 'answer' }); ok(r.ok && A.seen.call[0].who === 'margo' && A.seen.call[0].action === 'answer', 'phone: answering a call is reported to Brenai');
+  r = await post(18791, '/story/call', { who: 'zoe', action: 'decline' }); ok(r.ok && r.events[0].who === 'zoe' && A.seen.call[1].action === 'decline', 'phone: decline reported, events in the answer passed on');
+  r = await post(18791, '/story/call', { who: 'zoe', action: 'explode' }); ok(r.error && A.seen.call.length === 2, 'phone: an unknown call action is refused');
+  r = await post(18791, '/story/call', { who: 'nobody', action: 'end' }); ok(r.error, 'phone: an unknown caller is refused');
   r = await post(18791, '/story/choose', { id: 'tp4', answer: 0 }); ok(r.ok && A.seen.choose[0].id === 'tp4' && A.seen.choose[0].answer === 0, 'choose: the answer reaches Brenai');
   r = await post(18791, '/story/say', { who: 'zoe', text: '' }); ok(r.error, 'say: empty refused');
 
@@ -91,6 +104,7 @@ try {
   r = await post(18792, '/story/touch', { who: 'wizra', zone: 'hand' }); ok(!r.ok && /needs the story routes/.test(r.note), 'no story routes: other parts say plainly they cannot be told yet');
   await sleep(1700); const asked = B.seen.state; await get(18792, '/story/state'); await get(18792, '/story/state');
   ok(asked === 1 && B.seen.state === 1, 'no story routes: Brenai is not asked again every poll (' + B.seen.state + ' ask(s) after 3 polls)');
+  r = await post(18792, '/story/call', { who: 'margo', action: 'ignore' }); ok(r.ok === false && /no call route yet/.test(r.note), 'no story routes: a call report answers ok:false with a note');
   r = await post(18792, '/story/say', { who: 'belinda', text: 'hola' }); ok(r.error && /Belinda isn't connected yet/.test(r.error), 'no story routes: Belinda says she is not connected yet');
 } catch (e) { fail++; console.log('FAIL ' + (e.stack || e)); }
 finally { for (const p of procs) p.kill(); for (const s of servers) s.close(); fs.rmSync(T, { recursive: true, force: true }); }

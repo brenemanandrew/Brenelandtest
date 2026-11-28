@@ -4,8 +4,10 @@
 //
 // Relay routes for the VaM plugin (all local):
 //   GET  /story/state            {live, day, time, place, cast{}, pending{id, question, answers[]}, places{}, note}
-//   POST /story/say              {who, text, place, present[], voice} -> {text, voice, who} | {error}
-//   POST /story/choose           {id, answer} -> {ok} | {error}
+//   POST /story/say              {who, text, place, present[], voice, mode: 'text'|'call'} -> {text, voice, who, events?, calling?} | {error}
+//   POST /story/choose           {id, answer} -> {ok, events?} | {error}
+//   POST /story/call             {who, action: 'answer'|'decline'|'ignore'|'end'} -> {ok, events?} | {ok:false, note}  (the phone's calls)
+// The state, say and choose answers pass Brenai's phone fields through: events [{kind:'call', who, reason?}], calling: who, unread {who: n}.
 //   GET  /story/places           {places: {name: scene path}};  POST {place, scene} sets one
 //   POST /story/goto             {place} -> loads that place's scene in VaM (through the library's command queue)
 //   GET  /story/margo            margo.json (her selfies and call faces, JPG)
@@ -21,6 +23,9 @@ const withList = o => ({ ...o, traitList: Object.entries(o.traits || {}).map(([n
 export const CAST = ['wizra', 'zoe', 'belinda', 'margo'];
 // the parts she can be touched on: Brenai's own touch areas plus the head; chest, hips and thighs stay off limits there
 export const ZONES = ['head', 'face', 'hair', 'shoulder', 'arm', 'hand', 'belly', 'knee'];
+export const CALL_ACTIONS = ['answer', 'decline', 'ignore', 'end'];
+// the phone's fields in a Brenai answer, passed on to the plugin as they are (only the ones it reads)
+const phone = j => { const o = {}; if (j && Array.isArray(j.events)) o.events = j.events.filter(e => e && typeof e === 'object'); if (j && typeof j.calling === 'string' && j.calling) o.calling = j.calling; if (j && j.unread && typeof j.unread === 'object') o.unread = j.unread; return o; };
 export const PLACES = ['Rental cabin', 'Peak Pizza', 'Casa Belinda', 'Main Street', 'Library', "Wizra's flat", 'Lodge', 'Trail', 'Lake'];
 
 export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spokenOf }) {
@@ -42,6 +47,7 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
   const brenaiState = () => call('GET', '/api/story/state');
   const brenaiSay = b => call('POST', '/api/story/say', b);
   const brenaiChoose = b => call('POST', '/api/story/choose', b);
+  const brenaiCall = b => call('POST', '/api/story/call', b);   // provisional: the phone's answer, decline, ignore and hang up
 
   // the plugin asks for the state every 2 seconds. Brenai is asked at most every 1.5 s while it answers; after a failure the
   // relay waits before asking again (a wrong PIN must not be tried every 2 s, and missing story routes will not appear in a minute)
@@ -58,8 +64,9 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
       const b = await readBody(req), who = CAST.includes(b.who) ? b.who : 'wizra', text = String(b.text || '').trim().slice(0, 4000);
       if (!text) return send(res, 400, { error: 'Say something first' });
       const present = (Array.isArray(b.present) ? b.present : []).filter(x => CAST.includes(x)), place = String(b.place || s.place || '').slice(0, 60);
-      let reply;
-      try { reply = brenai.enabled ? (await brenaiSay({ who, text, place, present })).text : null; }
+      const mode = b.mode === 'call' ? 'call' : 'text';
+      let reply, extra = {};
+      try { const j = brenai.enabled ? await brenaiSay({ who, text, place, present, mode }) : null; reply = j ? j.text : null; if (j) extra = phone(j); }
       catch (e) { if (!e.notYet) return send(res, 200, { error: e.message }); reply = null; }
       if (reply == null) {   // the story routes are not there yet: Wizra still answers through her normal chat; the others wait
         if (who !== 'wizra') return send(res, 200, { error: `${who[0].toUpperCase() + who.slice(1)} isn't connected yet: Brenai's story routes aren't built. Wizra works now.` });
@@ -67,11 +74,18 @@ export function story({ dataDir, storyDir, lib, brenai, askWizra, makeVoice, spo
       }
       let voice = null; const spoken = spokenOf(reply);
       if (b.voice && brenai.enabled && spoken) voice = makeVoice(spoken, who === 'wizra' ? '' : who);
-      return send(res, 200, { text: reply, voice, who });
+      return send(res, 200, { text: reply, voice, who, mode, ...extra });
+    }
+    if (p === '/story/call' && req.method === 'POST') {
+      const b = await readBody(req), who = CAST.includes(b.who) ? b.who : null, action = CALL_ACTIONS.includes(b.action) ? b.action : null;
+      if (!who || !action) return send(res, 400, { error: 'who and action (answer, decline, ignore or end) are needed' });
+      if (!brenai.enabled) return send(res, 200, { ok: false, note: 'Not told: set BRENAI_PIN on this PC.' });
+      try { const j = await brenaiCall({ who, action }); last.at = 0; return send(res, 200, { ok: true, ...phone(j) }); }
+      catch (e) { return send(res, 200, { ok: false, note: e.notYet ? 'Brenai has no call route yet, so ' + who[0].toUpperCase() + who.slice(1) + " won't remember this call." : e.message }); }
     }
     if (p === '/story/choose' && req.method === 'POST') {
       const b = await readBody(req);
-      try { await brenaiChoose({ id: String(b.id || ''), answer: b.answer }); last.at = 0; return send(res, 200, { ok: true }); }
+      try { const j = await brenaiChoose({ id: String(b.id || ''), answer: b.answer }); last.at = 0; return send(res, 200, { ok: true, ...phone(j) }); }
       catch (e) { return send(res, 200, { error: e.message }); }
     }
     if (p === '/story/places') {

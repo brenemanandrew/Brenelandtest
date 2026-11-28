@@ -2,7 +2,7 @@
 //   Head    turns (and with 6DOF moves) VaM's desktop camera with your head, on top of the mouse camera.
 //   3D      draws the scene twice, side by side, for the glasses' 3D mode. Half = each eye squeezed into half a 16:9 picture
 //           (1920x1080 side by side); Full = each eye keeps its shape (the PC screen becomes 3840x1080).
-//   Hands   a marker for each tracked hand; close the hand (or pinch) over a control point of a person or object and it follows
+//   Hands   a glowing marker for each tracked hand (ring, soft glow, dot, facing the camera); close the hand (or pinch) over a control point of a person or object and it follows
 //           your hand until you open it. Moving the hand toward the camera or away carries it nearer or further.
 // The desktop camera is SuperController.singleton.MonitorCenterCamera. Head pose is applied as an offset that is taken back off
 // before VaM's own camera moves are read, so mouse orbit and head turning add up instead of fighting.
@@ -103,7 +103,7 @@ namespace Brene
         // ---- hands ----
         class Held { public FreeControllerV3 fc; public float depth, size0; public Vector3 offset; }
         readonly Dictionary<int, Held> held = new Dictionary<int, Held>();
-        readonly Dictionary<int, GameObject> markers = new Dictionary<int, GameObject>();
+        readonly Dictionary<int, BreneGlow> markers = new Dictionary<int, BreneGlow>();
         public string HandNote = "";
 
         public void Hands()
@@ -127,7 +127,7 @@ namespace Brene
                     Marker(h.id, at, grip, g != null, c);
                 }
             }
-            foreach (var id in new List<int>(markers.Keys)) if (!seen.Contains(id)) { UnityEngine.Object.Destroy(markers[id]); markers.Remove(id); held.Remove(id); }
+            foreach (var id in new List<int>(markers.Keys)) if (!seen.Contains(id)) { if (markers[id] != null) markers[id].Destroy(); markers.Remove(id); held.Remove(id); }
         }
 
         // the control point nearest the hand on screen (within 70 pixels), preferring the one nearest the camera
@@ -156,21 +156,15 @@ namespace Brene
 
         void Marker(int id, Vector3 at, bool grip, bool holding, Camera c)
         {
-            GameObject m;
-            if (!markers.TryGetValue(id, out m) || m == null)
-            {
-                m = GameObject.CreatePrimitive(PrimitiveType.Sphere); m.name = "Brene hand " + id;
-                var col = m.GetComponent<Collider>(); if (col != null) UnityEngine.Object.Destroy(col);
-                markers[id] = m;
-            }
-            m.transform.position = at;
-            m.transform.localScale = Vector3.one * (holding ? 0.035f : 0.025f) * Mathf.Max(0.3f, Vector3.Distance(c.transform.position, at) / 0.6f);
-            var rend = m.GetComponent<Renderer>();
-            if (rend != null) rend.material.color = holding ? new Color(0.3f, 0.9f, 0.5f) : grip ? new Color(1f, 0.7f, 0.2f) : new Color(0.6f, 0.5f, 1f);
+            BreneGlow m;
+            if (!markers.TryGetValue(id, out m) || m == null) { m = new BreneGlow("Brene hand " + id, true); markers[id] = m; }
+            // bigger than the old balls, and the same size on screen at any depth
+            float size = (holding ? 0.075f : 0.055f) * Mathf.Max(0.3f, Vector3.Distance(c.transform.position, at) / 0.6f);
+            m.Place(at, c.transform.position, size, holding ? new Color(0.35f, 1f, 0.5f) : grip ? new Color(1f, 0.75f, 0.25f) : new Color(0.35f, 0.9f, 1f));
         }
 
         // where the webcam hands are in the scene (for touch reactions)
-        public List<Vector3> HandPoints() { var l = new List<Vector3>(); foreach (var m in new List<GameObject>(markers.Values)) if (m != null) l.Add(m.transform.position); return l; }
+        public List<Vector3> HandPoints() { var l = new List<Vector3>(); foreach (var m in new List<BreneGlow>(markers.Values)) if (m != null && m.Shown) l.Add(m.Position); return l; }
 
         public void Shutdown()
         {
@@ -184,7 +178,7 @@ namespace Brene
                     c.transform.localPosition = wrotePos - baseRot * lastPos; c.transform.localRotation = baseRot;
                 }
             }
-            foreach (var m in new List<GameObject>(markers.Values)) if (m != null) UnityEngine.Object.Destroy(m);
+            foreach (var m in new List<BreneGlow>(markers.Values)) if (m != null) m.Destroy();
             markers.Clear(); held.Clear();
         }
     }

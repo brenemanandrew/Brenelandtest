@@ -144,12 +144,9 @@ namespace Brene
             var hands = new List<Vector3>();
             if (vr)
             {
-                var h = HeadT();
-                if (h != null)
-                {
-                    var rig = h.rotation * Quaternion.Inverse(InputTracking.GetLocalRotation(XRNode.Head)); var hl = InputTracking.GetLocalPosition(XRNode.Head);
-                    foreach (var n in new[] { XRNode.LeftHand, XRNode.RightHand }) hands.Add(h.position + rig * (InputTracking.GetLocalPosition(n) - hl));
-                }
+                Vector3 p; Quaternion r;
+                if (XrPose(XRNode.LeftHand, out p, out r)) hands.Add(p);
+                if (XrPose(XRNode.RightHand, out p, out r)) hands.Add(p);
             }
             else hands.AddRange(vit.HandPoints());
             if (hands.Count == 0) return;

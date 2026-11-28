@@ -10,7 +10,7 @@ namespace UnityEngine
 {
     public class Object { public string name; public static void Destroy(Object o) { } public static implicit operator bool(Object o) { return o != null; } public static T[] FindObjectsOfType<T>() where T : Object { return new T[0]; } }
     public class Component : Object { public Transform transform; public GameObject gameObject; public T GetComponent<T>() { return default(T); } public T GetComponentInParent<T>() { return default(T); } public T GetComponentInChildren<T>() { return default(T); } public T[] GetComponentsInChildren<T>(bool inactive) { return new T[0]; } public void SendMessage(string m, SendMessageOptions o) { } public void SendMessage(string m, object a, SendMessageOptions o) { } }
-    public class Behaviour : Component { public bool enabled; }
+    public class Behaviour : Component { public bool enabled; public bool isActiveAndEnabled { get { return enabled; } } }
     public class MonoBehaviour : Behaviour { public Coroutine StartCoroutine(IEnumerator e) { return null; } public Coroutine StartCoroutine(string m, object a) { return null; } }
     public class Coroutine { }
     public class YieldInstruction { }
@@ -21,7 +21,7 @@ namespace UnityEngine
     public enum TextureFormat { RGBA32 }
     public enum TextureWrapMode { Clamp }
     public enum SpriteMeshType { FullRect, Tight }
-    public enum TextAnchor { UpperLeft, MiddleLeft, MiddleCenter }
+    public enum TextAnchor { UpperLeft, UpperCenter, MiddleLeft, MiddleCenter }
     public enum FontStyle { Normal, Bold, Italic }
     public enum RenderMode { ScreenSpaceOverlay, WorldSpace }
     public class GameObject : Object
@@ -37,7 +37,7 @@ namespace UnityEngine
     {
         public Vector3 position, localPosition, localScale, forward, up, right; public Vector3 InverseTransformPoint(Vector3 p) { return p; } public Quaternion localRotation, rotation; public Transform parent; public int childCount;
         public void SetParent(Transform p, bool keep) { } public void SetParent(Transform p) { } public Transform GetChild(int i) { return null; }
-        public void SetAsLastSibling() { } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
+        public void SetAsLastSibling() { } public Transform Find(string n) { return null; } public int GetSiblingIndex() { return 0; } public void SetSiblingIndex(int i) { }
         public IEnumerator GetEnumerator() { yield break; }
     }
     public class RectTransform : Transform { public void GetWorldCorners(Vector3[] c) { } public Vector2 anchorMin, anchorMax, pivot, anchoredPosition, sizeDelta, offsetMin, offsetMax; public Rect rect; }
@@ -53,7 +53,7 @@ namespace UnityEngine
         public static bool operator ==(Quaternion a, Quaternion b) { return true; } public static bool operator !=(Quaternion a, Quaternion b) { return false; } public override bool Equals(object o) { return true; } public override int GetHashCode() { return 0; } }
     public struct Color { public static Color white; public float r, g, b, a; public Color(float r, float g, float b) { this.r = r; this.g = g; this.b = b; a = 1; } public Color(float r, float g, float b, float a) { this.r = r; this.g = g; this.b = b; this.a = a; } }
     public struct Color32 { public Color32(byte r, byte g, byte b, byte a) { } }
-    public struct Rect { public float x, y, width, height; public Vector2 size; public Rect(float x, float y, float w, float h) { this.x = x; this.y = y; width = w; height = h; size = new Vector2(w, h); } }
+    public struct Rect { public float x, y, width, height; public Vector2 size; public bool Contains(Vector2 p) { return false; } public Rect(float x, float y, float w, float h) { this.x = x; this.y = y; width = w; height = h; size = new Vector2(w, h); } }
     public class RectOffset { public RectOffset(int l, int r, int t, int b) { } }
     public struct Ray { public Vector3 origin, direction; }
     public static class Mathf { public const float PI = 3.14159f; public static float Abs(float v) { return v; } public static float Clamp(float v, float a, float b) { return v; } public static int Clamp(int v, int a, int b) { return v; } public static float Clamp01(float v) { return v; } public static float Sqrt(float v) { return v; } public static float Max(float a, float b) { return a; } public static int Max(int a, int b) { return a; } public static float Min(float a, float b) { return a; } public static int FloorToInt(float v) { return 0; } public static int RoundToInt(float v) { return 0; } public static float Floor(float v) { return v; } public static float Atan2(float y, float x) { return 0; } public static float Cos(float a) { return 0; } public static float Sin(float a) { return 0; } }
@@ -65,7 +65,7 @@ namespace UnityEngine
     public class Font : Object { }
     public enum AudioType { WAV }
     public class AudioClip : Object { public static AudioClip Create(string n, int len, int ch, int rate, bool stream) { return null; } public bool SetData(float[] d, int off) { return true; } }
-    public class AudioSource : Behaviour { public AudioClip clip; public bool isPlaying; public float spatialBlend, minDistance, volume; public void Play() { } public void Stop() { } public void GetOutputData(float[] d, int ch) { } }
+    public class AudioSource : Behaviour { public AudioClip clip; public bool isPlaying, loop; public float spatialBlend, minDistance, volume; public void Play() { } public void Stop() { } public void GetOutputData(float[] d, int ch) { } }
     public class Texture : Object { }
     public class Texture2D : Texture { public TextureWrapMode wrapMode; public Texture2D(int w, int h) { } public Texture2D(int w, int h, TextureFormat f, bool m) { } public bool LoadImage(byte[] b) { return true; } public void SetPixels32(Color32[] p) { } public void Apply() { } }
     public class Sprite : Object { public static Sprite Create(Texture2D t, Rect r, Vector2 p, float ppu, uint ex, SpriteMeshType m, Vector4 b) { return null; } }
@@ -78,7 +78,7 @@ namespace UnityEngine
     public class Canvas : Behaviour { public bool isRootCanvas; public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
     public class CanvasGroup : Behaviour { public bool blocksRaycasts; public float alpha; }
 }
-namespace UnityEngine.Events { public class UnityEvent { public void AddListener(Action a) { } } public class UnityEvent<T> { public void AddListener(Action<T> a) { } } }
+namespace UnityEngine.Events { public class UnityEvent { public void AddListener(Action a) { } public void Invoke() { } } public class UnityEvent<T> { public void AddListener(Action<T> a) { } } }
 namespace UnityEngine.EventSystems
 {
     public class PointerEventData { public UnityEngine.Vector2 delta; }
@@ -87,6 +87,8 @@ namespace UnityEngine.EventSystems
     public interface IBeginDragHandler { void OnBeginDrag(PointerEventData e); }
     public interface IDragHandler { void OnDrag(PointerEventData e); }
     public interface IEndDragHandler { void OnEndDrag(PointerEventData e); }
+    public interface IPointerEnterHandler { void OnPointerEnter(PointerEventData e); }
+    public interface IPointerExitHandler { void OnPointerExit(PointerEventData e); }
 }
 namespace UnityEngine.XR
 {
@@ -103,7 +105,7 @@ namespace UnityEngine.UI
     public class Image : Graphic { public enum Type { Simple, Sliced } public Sprite sprite; public Type type; public bool fillCenter; }
     public class Text : Graphic { public Font font; public int fontSize; public string text; public TextAnchor alignment; public HorizontalWrapMode horizontalOverflow; public VerticalWrapMode verticalOverflow; public FontStyle fontStyle; public bool supportRichText; }
     public struct ColorBlock { public Color highlightedColor, pressedColor; }
-    public class Selectable : Behaviour { public Graphic targetGraphic; public ColorBlock colors; }
+    public class Selectable : Behaviour { public Graphic targetGraphic; public ColorBlock colors; public bool interactable; }
     public class Button : Selectable { public class ButtonClickedEvent : UnityEngine.Events.UnityEvent { } public ButtonClickedEvent onClick; }
     public class InputField : Selectable { public enum LineType { SingleLine, MultiLineNewline } public string text; public Text textComponent; public Graphic placeholder; public LineType lineType; public UnityEngine.Events.UnityEvent<string> onEndEdit, onValueChanged; public void ActivateInputField() { } public bool isFocused { get { return false; } } }
     public class ScrollRect : Behaviour { public enum MovementType { Clamped } public RectTransform viewport, content; public bool horizontal; public float scrollSensitivity, verticalNormalizedPosition; public MovementType movementType; }
