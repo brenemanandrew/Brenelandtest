@@ -140,12 +140,13 @@ namespace Brene
         void ToggleBoard() { if (canvasGo == null) return; bool on = !canvasGo.activeSelf; canvasGo.SetActive(on); if (on) PlaceBoard(); }
 
         // ---- the wrist dock ----
+        Button wristMr;
         void BuildWrist()
         {
             wristGo = new GameObject("Brene wrist");
             wristCanvas = wristGo.AddComponent<Canvas>(); wristCanvas.renderMode = RenderMode.WorldSpace; wristCanvas.worldCamera = Cam();
             wristGo.AddComponent<GraphicRaycaster>();
-            var rt = (RectTransform)wristGo.transform; rt.sizeDelta = new Vector2(420, 300); rt.localScale = Vector3.one * 0.0006f;   // about 25 by 18 cm, buttons 5 cm tall
+            var rt = (RectTransform)wristGo.transform; rt.sizeDelta = new Vector2(420, 450); rt.localScale = Vector3.one * 0.0006f;   // about 25 by 27 cm (three rows), buttons 8 cm tall
             var bg = Ui.Rect("Bg", rt); Ui.Fill(bg, 0, 0, 0, 0); Ui.Box(bg, Role.Panel);
             var g = Ui.Rect("Grid", rt); Ui.Fill(g, 12, 12, 12, 12);
             var grid = g.gameObject.AddComponent<GridLayoutGroup>(); grid.cellSize = new Vector2(192, 132); grid.spacing = new Vector2(12, 12);
@@ -153,6 +154,7 @@ namespace Brene
             Ui.WithIcon(Ui.Button(g, "Menu", () => { if (!canvasGo.activeSelf) ToggleBoard(); radial.OpenAtCentre(); }), "ring");
             Ui.WithIcon(Ui.Button(g, "Phone", () => { if (!canvasGo.activeSelf) ToggleBoard(); OpenPhone(); }), "phone");
             Ui.Button(g, "Bring board here", PlaceBoard);
+            var mrb = Ui.Button(g, "See my room", () => { mrOn.val = !mrOn.val; }); Ui.WithIcon(mrb, "glasses"); wristMr = mrb;   // mixed reality on/off, one tap away for safety
             Theme.ApplyAll(rt);
             Send("AddCanvas", wristCanvas);
             wristGo.SetActive(false);

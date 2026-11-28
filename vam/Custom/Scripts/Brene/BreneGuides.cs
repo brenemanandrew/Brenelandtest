@@ -245,6 +245,8 @@ namespace Brene
             vrl.Steps.Add(new CoachStep("The ring menu", "Hold both hands together in front of your chest for half a second: the ring menu opens on the board. Poke a choice. It also has Bring board here."));
             vrl.Steps.Add(new CoachStep("The Phone", "Voices come from their bodies in the room, or like a phone call when on a call. With no keyboard, use the quick lines under the texts (Hey, Tell me more...). A real keyboard still works for anything else.") { Target = () => pChat.Root, Enter = () => OpenPhone() });
 
+            vrl.Steps.Add(new CoachStep("See your room", "For safety, the wrist dock has <b>See my room</b>: everything but the characters turns one solid colour (green by default). With passthrough and its colour key turned on in Virtual Desktop, that colour becomes your real room, so you can see where you are walking."));
+
             var lib = new Lesson("Library", "scenes, looks and the Hub"); lessons.Add(lib);
             lib.Steps.Add(new CoachStep("The Library page", "Open <b>127.0.0.1:8767/library</b> in a browser on this PC, or on your phone if the relay was started with --lan (it prints the link).\n\nFirst time: paste your VaM folder."));
             lib.Steps.Add(new CoachStep("Tabs", "Scenes, Looks (whole look, skin, hair, clothes), Poses, and Hub. Tap a picture, then Load or Apply: VaM does it straight away."));

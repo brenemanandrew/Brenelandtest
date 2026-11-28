@@ -75,6 +75,12 @@ Not part of Breneland. Works in VaM's desktop mode and in a VR headset (Quest, I
 - **Cabin laptop:** title, text, word count; Save keeps it on the PC (plus a dated copy) and sends it to Brenai; Tell Margo saves, calls her and tells her.
 - **Test:** `node vam/test/story.test.mjs`, 39 checks (including personality, touch and the Phone's call routes): a stand-in Brenai with and without the story routes.
 
+## Mixed reality (see your room)
+- **Why:** walking around a dark room you can't see is risky. With this on, the characters stand in your real room.
+- **How it works:** Brene draws everything that is not a character in one key colour (Green by default; Blue, Magenta or Black in the settings): every camera clears to that colour and scenery atoms (room and prop models, and anything named like a room, floor, wall or sky) are switched off. **Virtual Desktop** replaces that colour with the headset's passthrough (its passthrough with chroma key setting). Steam Link and Meta's Link can't do this for VaM.
+- **Where:** wrist dock "See my room", Glasses panel and radial > Glasses > Mixed reality, or the plugin setting. Off puts the sky and scenery back.
+- **Expect:** a thin fringe at edges; keep the key colour away from the characters' colours (green keeps black hair and dark clothes solid); no shadows on your real floor.
+
 ## In a VR headset
 - **Automatic:** when VaM runs in a headset, everything Brene shows moves onto a board at arm's length (about 55 cm), a little below eye height, facing you: the same panels, layout, flows, radial menu and tutorials. Buttons on it are 4 cm tall. Back on the monitor, it returns to the screen.
 - **Poking:** the main way to press. Brene draws glowing hands at your controllers (a ring, a dotted finger and a bright fingertip). Push the fingertip into a button to press it; pull back before the next press. The button under the fingertip (or VaM's laser) lights up in the accent colour. The fingertip sits "Poke tip distance" ahead of the controller (plugin settings, default 7 cm). VaM's laser pointers still work.

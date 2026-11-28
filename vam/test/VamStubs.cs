@@ -17,6 +17,7 @@ namespace UnityEngine
     public class WaitForSeconds : YieldInstruction { public WaitForSeconds(float s) { } }
     public enum SendMessageOptions { RequireReceiver, DontRequireReceiver }
     public enum PrimitiveType { Sphere, Cube }
+    public enum CameraClearFlags { Skybox, SolidColor, Depth, Nothing }
     public enum KeyCode { None, Return, KeypadEnter, BackQuote, Tab, Q, F1, Mouse3, Escape }
     public enum TextureFormat { RGBA32 }
     public enum TextureWrapMode { Clamp }
@@ -73,7 +74,7 @@ namespace UnityEngine
     public class Renderer : Component { public Material material; }
     public class Collider : Component { }
     public class Rigidbody : Component { }
-    public class Camera : Behaviour { public static Camera main; public static Camera[] allCameras; public bool stereoEnabled; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
+    public class Camera : Behaviour { public static Camera main; public CameraClearFlags clearFlags; public Color backgroundColor; public static Camera[] allCameras; public bool stereoEnabled; public float fieldOfView, nearClipPlane, farClipPlane, depth, aspect; public int cullingMask; public Rect rect; public void CopyFrom(Camera c) { } public void ResetAspect() { }
         public Ray ScreenPointToRay(Vector3 p) { return new Ray(); } public Vector3 WorldToScreenPoint(Vector3 p) { return p; } }
     public class Canvas : Behaviour { public bool isRootCanvas; public RenderMode renderMode; public int sortingOrder; public float scaleFactor; public Camera worldCamera; public static void ForceUpdateCanvases() { } }
     public class CanvasGroup : Behaviour { public bool blocksRaycasts; public float alpha; }

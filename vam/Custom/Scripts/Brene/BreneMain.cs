@@ -61,7 +61,7 @@ namespace Brene
                 // in the headset: how far ahead of the controller the fingertip that presses buttons is (controllers differ)
                 pokeTip = new JSONStorableFloat("Poke tip distance (m)", 0.07f, (float v) => { }, 0.02f, 0.15f); RegisterFloat(pokeTip); CreateSlider(pokeTip, true);
 
-                InitWizra(); InitReactions();
+                InitWizra(); InitReactions(); InitMR();
                 Actions();
                 BuildCanvas();
                 LoadLayout();
@@ -139,7 +139,7 @@ namespace Brene
             pDock = new Panel(root, "dock", "Brene", new Vector2(-1, -1), new Vector2(500, 110), true); pDock.CanHide = false; pDock.ShowEdit(BreneEdit.On);
 
             foreach (var id in new[] { "play", "freeze", "undo", "redo", "save", "load", "menu" }) MakeButton(id, pScene);
-            foreach (var id in new[] { "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
+            foreach (var id in new[] { "mr", "head", "stereo", "full", "center", "hands" }) MakeButton(id, pGlasses);
             foreach (var id in new[] { "theme", "bigger", "smaller", "savelayout", "panels", "fitless", "fitmore" }) MakeButton(id, pLayout);
             MakeButton("radial", pDock); MakeButton("tools", pDock); MakeButton("chat", pDock); MakeButton("character", pDock); MakeButton("edit", pDock);
             chr = new Character(this, link, ApplyPreset); chr.Build(root);
@@ -255,7 +255,7 @@ namespace Brene
                 new RItem("Character", new List<RItem> { new RItem("Start", () => chr.Open("Who")), sec("Body"), sec("Face"), sec("Skin"), sec("Hair"), sec("Clothes"), sec("Pose"), new RItem("Save", () => chr.Open("Finish")) }),
                 new RItem("Scene", new List<RItem> { act("play"), act("freeze"), act("undo"), act("redo"), act("save"), act("load") }),
                 act("play"),
-                new RItem("Glasses", new List<RItem> { act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
+                new RItem("Glasses", new List<RItem> { act("mr"), act("head"), act("stereo"), act("full"), act("center"), act("hands") }),
                 new RItem("Wizra", () => OpenTexts("wizra")),   // the Phone, on Wizra's texts
                 new RItem("Panels", new List<RItem> { new RItem(showUi.val ? "Hide all" : "Show all", () => showUi.val = !showUi.val), act("edit"), act("theme"), act("bigger"), act("smaller"), act("fitless"), act("fitmore"), act("movemenu"), new RItem("Reset layout", ResetLayout) }),
                 act("menu"),
@@ -466,7 +466,7 @@ namespace Brene
         void LateUpdate()
         {
             if (menuFit == null) return;   // Brene could not start
-            try { FitMenu(); TickVamMenu(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } } catch (Exception e) { FrameError("late update", e); }
+            try { FitMenu(); TickVamMenu(); TickMR(); if (vit != null) { vit.LateUpdate(); vit.Hands(); } } catch (Exception e) { FrameError("late update", e); }
         }
 
         // leaving (plugin removed or reloaded, scene closed): everything Brene changed in VaM is put back, each part on its own so
@@ -476,6 +476,7 @@ namespace Brene
             try { if (vit != null) vit.Shutdown(); } catch (Exception e) { Report("Brene closing (camera): " + e.Message); }
             try { if (vr) LeaveVR(); } catch (Exception e) { Report("Brene closing (headset): " + e.Message); }
             try { RestoreVamMenu(); } catch (Exception) { }
+            try { MrStop(); } catch (Exception) { }   // the sky and the scenery come back
             // the wider view of "Fit VaM menu": back to VaM's own, or the next start would widen an already widened view
             try { if (fovWrote >= 0) { var cam = Vam.MonitorCam(); if (cam != null && Mathf.Abs(cam.fieldOfView - fovWrote) < 0.01f) cam.fieldOfView = fovBase; fovWrote = -1; } } catch (Exception) { }
             try { if (radial != null) radial.Close(); } catch (Exception) { }
