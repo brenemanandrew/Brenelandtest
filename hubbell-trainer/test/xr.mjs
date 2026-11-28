@@ -113,7 +113,21 @@ const r5 = await page.evaluate(async () => {
   await wait(400); out.wristVisible = T.wrist.visible;
   return out;
 });
-console.log('board, poke, wrist', JSON.stringify(r5)); await page.screenshot({ path: 'xr2.png' });
+console.log('board, poke, wrist', JSON.stringify(r5));
+const r6 = await page.evaluate(async () => {
+  const T = window.TR, d = window.__dev, THREE = T.THREE, wait = ms => new Promise(r => setTimeout(r, ms)), V = () => new THREE.Vector3();
+  const out = {}; T.menu(); await wait(200);
+  d.controllers.right.position.set(.2, 1.3, -.35); d.controllers.right.quaternion.set(0, 0, 0, 1); d.controllers.left.position.set(-.2, 1.3, -.35); d.controllers.left.quaternion.set(0, 0, 0, 1); await wait(400);
+  out.controllers = T.HANDS.map(H => ({ shown: H.palm.visible && H.finger.visible, palmAtGrip: +H.palm.getWorldPosition(V()).distanceTo(H.grip.getWorldPosition(V())).toFixed(3), tipAtPointer: +H.tip.getWorldPosition(V()).distanceTo(H.c.localToWorld(new THREE.Vector3(0, 0, -.05))).toFixed(3), fingerLen: +H.finger.scale.y.toFixed(3) }));
+  await new Promise(r => requestAnimationFrame(r));
+  try {
+    d.primaryInputMode = 'hand'; await wait(900);
+    out.handMode = T.HANDS.map(H => ({ tracked: H.tracked, joints: Object.keys(H.xrHand.joints || {}).length, mittenHidden: !H.palm.visible, tipIsJoint: H.tracked ? +H.tipW.distanceTo(H.xrHand.joints['index-finger-tip'].getWorldPosition(V())).toFixed(3) : null }));
+  } catch (e) { out.handMode = 'emulator: ' + e.message; }
+  return out;
+});
+console.log('hands', JSON.stringify(r6)); await page.screenshot({ path: 'xr3.png' });
+await page.evaluate(async () => { const d = window.__dev; d.primaryInputMode = 'controller'; await new Promise(r => setTimeout(r, 500)); }); await page.screenshot({ path: 'xr4.png' }); await page.screenshot({ path: 'xr2.png' });
 await page.screenshot({ path: 'xr.png' });
 console.log('ERRORS', JSON.stringify(errs.slice(0, 8)));
 await browser.close();
