@@ -1,5 +1,5 @@
 // Glowing hands for the headset view (WebXR), drawn instead of rays and dots.
-// Tracked hands (the Quest's hand tracking): every joint the headset reports, joined into a glowing outline of your real hand.
+// Tracked hands (the Quest's hand tracking): the joints the headset reports, drawn as one smooth hand with a glowing edge.
 // Controllers: a glowing hand sits on each controller, open, with the fingers curling as the trigger (index) and the grip (the rest)
 // are squeezed. Each frame update() also says where each hand can grab from (between thumb and index tip, or the palm of a held
 // controller), how it is turned, and how hard it is squeezing.
@@ -9,19 +9,29 @@
 export function xrHands(THREE, scene) {
   const FINGERS = ['thumb', 'index-finger', 'middle-finger', 'ring-finger', 'pinky-finger'];
   const PARTS = { thumb: ['metacarpal', 'phalanx-proximal', 'phalanx-distal', 'tip'], other: ['metacarpal', 'phalanx-proximal', 'phalanx-intermediate', 'phalanx-distal', 'tip'] };
-  const CORE = new THREE.MeshBasicMaterial({ color: '#c9f7ff', transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
-  const HALO = new THREE.MeshBasicMaterial({ color: '#4fd8ff', transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending });
-  const HOT = new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
-  const seg = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true), ball = new THREE.SphereGeometry(1, 10, 8), up = new THREE.Vector3(0, 1, 0);
-  // one drawn hand: a set of segments (core and halo) and joint balls, laid out from a list of points each frame
-  function makeHand() { const g = new THREE.Group(); g.renderOrder = 996; g.segs = []; g.balls = []; scene.add(g); g.visible = false; return g; }
-  function lay(g, chains, r, hot) {
-    let si = 0, bi = 0;
-    for (const pts of chains) for (let i = 0; i < pts.length; i++) {
-      const p = pts[i]; let b = g.balls[bi]; if (!b) { b = new THREE.Mesh(ball, CORE); b.renderOrder = 997; g.add(b); g.balls.push(b); } b.visible = true; b.position.copy(p); b.scale.setScalar(r * (i === pts.length - 1 ? 1.15 : 0.95)); b.material = hot && i === pts.length - 1 ? HOT : CORE; bi++;
-      if (i === 0) continue; const a = pts[i - 1], len = a.distanceTo(p); if (len < 1e-4) continue;
-      for (const [mat, k] of [[CORE, 0.55], [HALO, 1.9]]) { let s = g.segs[si]; if (!s) { s = new THREE.Mesh(seg, mat); s.renderOrder = 996; g.add(s); g.segs.push(s); } s.material = mat; s.visible = true; s.position.copy(a).add(p).multiplyScalar(0.5); s.quaternion.setFromUnitVectors(up, tmp.copy(p).sub(a).normalize()); s.scale.set(r * k, len, r * k); si++; } }
-    for (let k = si; k < g.segs.length; k++) g.segs[k].visible = false; for (let k = bi; k < g.balls.length; k++) g.balls[k].visible = false; g.visible = true; }
+  // The look: a smooth, see-through hand whose edges glow. Every finger bone is a fat rounded piece and the pieces overlap into one
+  // hand shape. Each piece is drawn twice: first only into the depth buffer, so pieces behind others are hidden, then with a rim
+  // shader that is bright where the surface turns away from you (the outline) and faint where it faces you. No bones, no joint dots.
+  const rim = (c, fill) => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthFunc: THREE.LessEqualDepth, blending: THREE.AdditiveBlending, uniforms: { rimC: { value: new THREE.Color(c) }, fillC: { value: new THREE.Color(fill) } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 rimC; uniform vec3 fillC; varying vec3 vN; varying vec3 vV; void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.6); gl_FragColor = vec4(mix(fillC, rimC, f) * (0.16 + 1.25 * f), 1.0); }' });
+  const RIM = rim('#b8f4ff', '#2f9fd0'), HOT = rim('#ffe2a0', '#d08a2a'), DEPTH = new THREE.MeshBasicMaterial({ colorWrite: false, transparent: true });
+  const seg = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true), ball = new THREE.SphereGeometry(1, 14, 10), up = new THREE.Vector3(0, 1, 0);
+  function makeHand() { const g = new THREE.Group(); g.parts = []; scene.add(g); g.visible = false; return g; }
+  function piece(g, k, geo) { let p = g.parts[k]; if (!p) { const d = new THREE.Mesh(geo, DEPTH), m = new THREE.Mesh(geo, RIM); d.renderOrder = 995; m.renderOrder = 996; g.add(d, m); p = g.parts[k] = { d, m }; } if (p.d.geometry !== geo) { p.d.geometry = geo; p.m.geometry = geo; } p.d.visible = p.m.visible = true; return p; }
+  // chains: one list of points per finger (thumb first), from the wrist end. kn = which point of a finger is its knuckle. The palm is one
+  // flattened rounded shape from the wrist end to the four knuckles; the fingers start at the knuckles; the thumb is drawn whole.
+  const pA = new THREE.Vector3(), pB = new THREE.Vector3(), pF = new THREE.Vector3(), pS = new THREE.Vector3(), pN = new THREE.Vector3(), pM = new THREE.Matrix4();
+  function lay(g, chains, r, hot, kn) { let k = 0; const mat = hot ? HOT : RIM, put = (geo, fn) => { const pc = piece(g, k++, geo); for (const o of [pc.d, pc.m]) fn(o); pc.m.material = mat; };
+    pA.set(0, 0, 0); pB.set(0, 0, 0); for (let c = 1; c < 5; c++) { pA.add(chains[c][0]); pB.add(chains[c][kn]); } pA.multiplyScalar(0.25); pB.multiplyScalar(0.25);
+    pF.copy(pB).sub(pA); const fl = pF.length() || 0.08; pF.multiplyScalar(1 / fl); pS.copy(chains[1][kn]).sub(chains[4][kn]); const sw = pS.length() || 0.06; pS.addScaledVector(pF, -pS.dot(pF)).normalize(); pN.crossVectors(pF, pS).normalize();
+    put(ball, o => { pM.makeBasis(pS, pN, pF); o.quaternion.setFromRotationMatrix(pM); o.position.copy(pA).add(pB).multiplyScalar(0.5); o.scale.set(sw * 0.5 + r * 2.1, r * 2.3, fl * 0.5 + r * 1.9); });
+    for (let c = 0; c < chains.length; c++) { const pts = chains[c], thumb = c === 0, from = thumb ? 0 : kn;
+      for (let i = from; i < pts.length; i++) { const p = pts[i], rr = r * (thumb ? 1.5 : 1.35) * (1 - 0.05 * (i - from));
+        put(ball, o => { o.position.copy(p); o.quaternion.identity(); o.scale.setScalar(rr); });
+        if (i === from) continue; const a = pts[i - 1], len = a.distanceTo(p); if (len < 1e-4) continue;
+        put(seg, o => { o.position.copy(a).add(p).multiplyScalar(0.5); o.quaternion.setFromUnitVectors(up, tmp.copy(p).sub(a).normalize()); o.scale.set(rr, len, rr); }); } }
+    for (; k < g.parts.length; k++) g.parts[k].d.visible = g.parts[k].m.visible = false; g.visible = true; }
   const tmp = new THREE.Vector3(), M = new THREE.Matrix4(), Q = new THREE.Quaternion(), V = () => new THREE.Vector3();
   // the open hand held on a controller, in the controller's grip space: fingers forward along -Z, palm facing inward (toward the other
   // hand), thumb up. Each finger bends about its own knuckles as the trigger or grip is squeezed.
@@ -46,12 +56,12 @@ export function xrHands(THREE, scene) {
         for (const f of FINGERS) { const pts = [W.clone()]; for (const part of f === 'thumb' ? PARTS.thumb : PARTS.other) { const j = src.hand.get(f + '-' + part), jp = j && xf.getJointPose(j, ref); if (jp) pts.push(V().setFromMatrixPosition(M.fromArray(jp.transform.matrix).premultiply(rigM))); } chains.push(pts); tips[f] = pts[pts.length - 1]; }
         const pinchD = tips.thumb && tips['index-finger'] ? tips.thumb.distanceTo(tips['index-finger']) : 1, pinch = Math.max(0, Math.min(1, (0.045 - pinchD) / 0.03));
         const at = tips.thumb && tips['index-finger'] ? tips.thumb.clone().add(tips['index-finger']).multiplyScalar(0.5) : W.clone();
-        lay(g, chains, 0.0055, pinch > 0.5); out.push({ src, side, kind: 'hand', at, q: wq, pinch, squeeze: pinch, buttons, axes, tip: tips['index-finger'] || at, wrist: W.clone() });
+        lay(g, chains, 0.0055, pinch > 0.5, 2); out.push({ src, side, kind: 'hand', at, q: wq, pinch, squeeze: pinch, buttons, axes, tip: tips['index-finger'] || at, wrist: W.clone() });
       } else if (src.gripSpace) {   /* a controller: the hand drawn on it */
         const pose = xf.getPose(src.gripSpace, ref); if (!pose) { g.visible = false; continue; } M.fromArray(pose.transform.matrix).premultiply(rigM);
         const trig = buttons[0] || 0, grip = buttons[1] || 0, chains = controllerHand(side, trig, grip).map(pts => pts.map(p => p.applyMatrix4(M)));
         const at = V().set(0, 0.005, -0.02).applyMatrix4(M), q = new THREE.Quaternion().setFromRotationMatrix(M);
-        lay(g, chains, 0.0065, Math.max(trig, grip) > 0.5); out.push({ src, side, kind: 'controller', at, q, pinch: trig, squeeze: grip, buttons, axes, tip: chains[1][chains[1].length - 1], wrist: V().set(0, -0.005, 0.085).applyMatrix4(M) });
+        lay(g, chains, 0.0062, Math.max(trig, grip) > 0.5, 1); out.push({ src, side, kind: 'controller', at, q, pinch: trig, squeeze: grip, buttons, axes, tip: chains[1][chains[1].length - 1], wrist: V().set(0, -0.005, 0.085).applyMatrix4(M) });
       } else g.visible = false; }
     for (const [src, g] of drawn) if (!live.has(src)) { g.visible = false; scene.remove(g); drawn.delete(src); }
     return out; }
