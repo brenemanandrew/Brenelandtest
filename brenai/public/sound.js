@@ -194,6 +194,7 @@
   }
   function tick() {
     if (!ctx || ctx.state !== 'running') return;
+    if (REC && REC.music.length) { recLoadFx(); if (!chaseOn) { if (track) { const old = track; old.dead = true; old.gain.gain.cancelScheduledValues(ctx.currentTime); old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.6); setTimeout(() => old.gain.disconnect(), 4000); track = null; } recTick(); return; } recHush(); }   /* recorded music, except during the chase */
     const want = wantTrack(), stale = performance.now() - trackSince > 170000;
     if (!track || !want.includes(track.name) || (stale && want.length > 1)) startTrack(pick(want.filter(n => n !== lastName).length ? want.filter(n => n !== lastName) : want));
     if (stopped) { track.next = Math.max(track.next, ctx.currentTime + 0.1); return; }   /* time stopped: nothing new is played */
@@ -257,9 +258,30 @@
     saxwolf(t) { sax(fxBus, 67, t, 0.3, 0.12, { scoop: 0.2 }); sax(fxBus, 74, t + 0.35, 0.6, 0.12, { scoop: 0.25, fall: 9 }); },   // a wolf whistle on sax
   };
   const EMOTE = { '✨': 'sparkle', '💗': 'heart', '💢': 'anger', '❓': 'ask', '💦': 'sweat' };
+  // ---------- recorded sound (public/audio): real lo-fi tracks and real recordings for the effects ----------
+  // /audio/index.json lists the music ({ file, title, tags }) and, per effect name, one or more recordings. When it is there, music
+  // plays from those files (one at a time, crossfaded, picked by where you are: chat, house, dorm, beach, photo, night) and an effect
+  // plays one of its recordings, a touch higher or lower each time so repeats do not sound the same. Anything without a recording
+  // (and the water-fight chase music) still comes from the synthesizer below. All CC0: see public/audio/CREDITS.md.
+  let REC = null, rec = null, recLast = ''; const sfxBuf = {}, recOld = [];
+  fetch('/audio/index.json').then(r => r.ok ? r.json() : null).then(j => { if (j && j.music) { REC = j; if (ctx) recLoadFx(); } }).catch(() => {});
+  function recLoadFx() { if (!REC || recLoadFx.done) return; recLoadFx.done = true; for (const name in REC.sfx) REC.sfx[name].forEach((f, i) => { fetch('/audio/sfx/' + f).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(buf => { (sfxBuf[name] = sfxBuf[name] || [])[i] = buf; }).catch(() => {}); }); }
+  const SFX_GAIN = { type: 0.35, click: 0.5, step: 0.45, pop: 0.8, thunder: 0.9, sweat: 0.6, phone: 0.7, ring: 0.7, dial: 0.6 };
+  function recFx(name) { const list = (sfxBuf[name] || []).filter(Boolean); if (!list.length) return false; const src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = list[Math.floor(Math.random() * list.length)]; src.playbackRate.value = 0.96 + Math.random() * 0.08; g.gain.value = SFX_GAIN[name] ?? 0.75; src.connect(g).connect(fxBus); src.start(); return true; }
+  function recWant() { const tag = override && ROTATION[override] ? override : scene, all = REC.music, fit = all.filter(m => m.tags.includes(tag) || (nightNow() && m.tags.includes('night'))); return fit.length ? fit : all; }
+  function recFade(r, to, secs) { try { r.gain.gain.cancelScheduledValues(ctx.currentTime); r.gain.gain.setTargetAtTime(to, ctx.currentTime, secs / 3); } catch {} }
+  function recStart(m) { if (rec) { const old = rec; recFade(old, 0, 2.5); recOld.push(old); setTimeout(() => { try { old.el.pause(); old.el.src = ''; old.gain.disconnect(); } catch {} recOld.splice(recOld.indexOf(old), 1); }, 4000); }
+    const el = new Audio('/audio/music/' + m.file); el.preload = 'auto'; const gain = ctx.createGain(); gain.gain.value = 0; try { ctx.createMediaElementSource(el).connect(gain).connect(musicBus); } catch { return; }
+    rec = { el, gain, m, at: performance.now() }; recLast = m.file; recFade(rec, 1, 2.5); el.play().catch(() => { rec.failed = true; }); }
+  function recTick() { const want = recWant();
+    if (stopped) { if (rec && !rec.el.paused) rec.el.pause(); return; } if (rec && rec.el.paused && !rec.el.ended && !rec.failed && performance.now() - rec.at > 1500) rec.el.play().catch(() => {});
+    const done = !rec || rec.el.ended || rec.failed || (rec.el.duration && rec.el.currentTime > rec.el.duration - 2.5), wrong = rec && !want.includes(rec.m) && performance.now() - rec.at > 8000;   /* the place changed: move on, but not within the first seconds of a track */
+    if (done || wrong) { const pool = want.filter(m => m.file !== recLast); recStart((pool.length ? pool : want)[Math.floor(Math.random() * (pool.length || want.length))]); } }
+  function recHush() { if (rec) { const old = rec; rec = null; recFade(old, 0, 1.2); setTimeout(() => { try { old.el.pause(); old.el.src = ''; old.gain.disconnect(); } catch {} }, 2500); } }
   function fx(name) {
-    if (!ctx || ctx.state !== 'running' || !FX[name] || vol.fx <= 0) return;
+    if (!ctx || ctx.state !== 'running' || vol.fx <= 0) return;
     if (name === 'type') { const now = performance.now(); if (now - lastType < 55) return; lastType = now; }
+    if (recFx(name)) return; if (!FX[name]) return;
     FX[name](ctx.currentTime + 0.005);
   }
 
@@ -295,6 +317,6 @@
     play(name, secs = 120) { if (!TRACKS[name]) return Object.keys(TRACKS); theme = name; themeUntil = performance.now() + secs * 1000; return name; },   /* try one track (for tests, or the console) */
     intensity(x) { inten = Math.max(0, Math.min(1, +x || 0)); },
     volume(which, v) { if (v === undefined) return vol[which]; vol[which] = Math.max(0, Math.min(1, v)); localStorage.setItem('brenai.vol.' + which, vol[which]); if (ctx && which === 'fx') fxBus.gain.value = vol.fx; },
-    duckWhen(fn) { duck = fn; }, playing: () => track && track.name,
+    duckWhen(fn) { duck = fn; }, playing: () => rec ? rec.m.title : track && track.name,
   };
 })();

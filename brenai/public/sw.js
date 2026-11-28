@@ -9,7 +9,7 @@ self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 // Notifications from Wizra when the page is closed (she is calling, sent something, or is back); tapping one opens the game.
 self.addEventListener('push', e => { let d = {}; try { d = e.data.json(); } catch {} e.waitUntil(self.registration.showNotification(d.title || 'Wizra', { body: d.body || '', icon: '/me.svg', badge: '/me.svg', tag: 'wizra' })); });
 self.addEventListener('notificationclick', e => { e.notification.close(); e.waitUntil(self.clients.matchAll({ type: 'window' }).then(list => { for (const c of list) if ('focus' in c) return c.focus(); return self.clients.openWindow('/'); })); });
-const isAsset = u => (u.origin === self.location.origin && (/^\/api\/(outfit|clips|extra|thumb)\//.test(u.pathname) || u.pathname === '/api/anims' || /^\/(vendor|fonts|art)\//.test(u.pathname)))
+const isAsset = u => (u.origin === self.location.origin && (/^\/api\/(outfit|clips|extra|thumb)\//.test(u.pathname) || u.pathname === '/api/anims' || /^\/(vendor|fonts|art)\//.test(u.pathname) || /^\/audio\/sfx\//.test(u.pathname)))
   || /^https:\/\/cdn\.jsdelivr\.net\/npm\/@mediapipe\//.test(u.href) || /^https:\/\/storage\.googleapis\.com\/mediapipe-models\//.test(u.href);
 const isCode = u => u.origin === self.location.origin && (u.pathname === '/' || /\.(js|mjs|css|html)$/.test(u.pathname)) && u.pathname !== '/sw.js';
 self.addEventListener('fetch', e => {

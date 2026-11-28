@@ -790,7 +790,9 @@ function sendFile(req, res, file, type, cache) { let st; try { st = fs.statSync(
   const etag = '"' + st.size.toString(36) + '-' + Math.round(st.mtimeMs).toString(36) + '"', h = { 'content-type': type, etag, ...(cache ? { 'cache-control': cache } : {}) };
   if (req.headers['if-none-match'] === etag) { res.writeHead(304, h); return res.end(); }
   const zip = /gzip/.test(req.headers['accept-encoding'] || '') && /javascript|json|html|css|svg|text/.test(type) && st.size > 1024;
-  if (!zip) { res.writeHead(200, { ...h, 'content-length': st.size }); return fs.createReadStream(file).pipe(res); }
+  if (!zip) { const rg = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');   /* part of a file (a browser playing music asks for it in pieces) */
+    if (rg && (rg[1] || rg[2])) { let a = rg[1] ? +rg[1] : Math.max(0, st.size - +rg[2]), b = rg[1] && rg[2] ? Math.min(+rg[2], st.size - 1) : st.size - 1; if (a > b || a >= st.size) { res.writeHead(416, { 'content-range': 'bytes */' + st.size }); return res.end(); } res.writeHead(206, { ...h, 'accept-ranges': 'bytes', 'content-range': `bytes ${a}-${b}/${st.size}`, 'content-length': b - a + 1 }); return fs.createReadStream(file, { start: a, end: b }).pipe(res); }
+    res.writeHead(200, { ...h, 'accept-ranges': 'bytes', 'content-length': st.size }); return fs.createReadStream(file).pipe(res); }
   let g = GZ.get(file); if (!g || g.etag !== etag) { g = { etag, buf: zlib.gzipSync(fs.readFileSync(file), { level: 9 }) }; GZ.set(file, g); if (GZ.size > 400) GZ.delete(GZ.keys().next().value); }
   res.writeHead(200, { ...h, 'content-encoding': 'gzip', vary: 'Accept-Encoding', 'content-length': g.buf.length }); res.end(g.buf); }
 // Model files (.vrm, .glb) sent compressed: most of a model is mesh and face-shape numbers, which gzip shrinks a lot. The compressed copy
@@ -801,7 +803,7 @@ function sendModel(req, res, file, cache) { let st; try { st = fs.statSync(file)
   if (fresh && /gzip/.test(req.headers['accept-encoding'] || '')) { res.writeHead(200, { ...h, 'content-encoding': 'gzip', 'content-length': gst.size }); return fs.createReadStream(gz).pipe(res); }
   if (!fresh && !GZING.has(gz)) { GZING.add(gz); const tmp = gz + '.part'; fs.createReadStream(file).pipe(zlib.createGzip({ level: 6 })).pipe(fs.createWriteStream(tmp)).on('finish', () => { try { fs.renameSync(tmp, gz); } catch {} GZING.delete(gz); }).on('error', () => GZING.delete(gz)); }
   res.writeHead(200, { ...h, 'content-length': st.size }); return fs.createReadStream(file).pipe(res); }
-const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.py': 'text/x-python; charset=utf-8', '.bat': 'application/octet-stream' };
+const TYPES = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.py': 'text/x-python; charset=utf-8', '.bat': 'application/octet-stream', '.mp3': 'audio/mpeg', '.json': 'application/json; charset=utf-8', '.md': 'text/plain; charset=utf-8' };
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let s = '';
@@ -1562,7 +1564,7 @@ async function handle(req, res) {
     const file = path.join(here, 'public', p);
     if (!file.startsWith(path.join(here, 'public'))) return json(res, 403, { error: 'no' });
     /* the 3D engine and fonts change rarely: kept a week; the game's own files are checked each time (a quick "not changed" answer when they have not) */
-    return sendFile(req, res, file, TYPES[path.extname(file)] || 'application/octet-stream', p.startsWith('vendor') || p.startsWith('fonts') ? 'public, max-age=604800' : p.startsWith('art/') ? 'public, max-age=86400' : 'no-cache');
+    return sendFile(req, res, file, TYPES[path.extname(file)] || 'application/octet-stream', p.startsWith('vendor') || p.startsWith('fonts') ? 'public, max-age=604800' : p.startsWith('art/') ? 'public, max-age=86400' : p.startsWith('audio/') && !p.endsWith('.json') ? 'public, max-age=604800' : 'no-cache');
   } catch (e) {
     console.error('[http]', e.message);
     if (!res.headersSent) json(res, 500, { error: e.message }); else res.end();

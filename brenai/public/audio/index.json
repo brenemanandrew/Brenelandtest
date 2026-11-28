@@ -1,0 +1,245 @@
+{
+ "music": [
+  {
+   "file": "a-cup-of-tea.mp3",
+   "title": "A cup of tea",
+   "by": "TAD",
+   "secs": 169,
+   "tags": [
+    "chat",
+    "house"
+   ]
+  },
+  {
+   "file": "cat-caffe.mp3",
+   "title": "Cat caffe",
+   "by": "TAD",
+   "secs": 133,
+   "tags": [
+    "chat",
+    "house",
+    "dorm"
+   ]
+  },
+  {
+   "file": "cue.mp3",
+   "title": "Cue",
+   "by": "TAD",
+   "secs": 147,
+   "tags": [
+    "chat",
+    "dorm",
+    "photo"
+   ]
+  },
+  {
+   "file": "florist.mp3",
+   "title": "Florist",
+   "by": "TAD",
+   "secs": 113,
+   "tags": [
+    "chat",
+    "house",
+    "photo"
+   ]
+  },
+  {
+   "file": "countryside.mp3",
+   "title": "Countryside",
+   "by": "TAD",
+   "secs": 92,
+   "tags": [
+    "chat",
+    "house",
+    "beach"
+   ]
+  },
+  {
+   "file": "oceanside.mp3",
+   "title": "Oceanside",
+   "by": "TAD",
+   "secs": 103,
+   "tags": [
+    "beach"
+   ]
+  },
+  {
+   "file": "bartender.mp3",
+   "title": "Bartender",
+   "by": "TAD",
+   "secs": 247,
+   "tags": [
+    "photo",
+    "night"
+   ]
+  },
+  {
+   "file": "rainy-forest.mp3",
+   "title": "Rainy Forest",
+   "by": "TAD",
+   "secs": 100,
+   "tags": [
+    "night",
+    "dorm"
+   ]
+  },
+  {
+   "file": "morning-rain.mp3",
+   "title": "Morning rain",
+   "by": "TAD",
+   "secs": 64,
+   "tags": [
+    "house",
+    "night"
+   ]
+  },
+  {
+   "file": "chill-lofi-inspired.mp3",
+   "title": "Chill lofi inspired",
+   "by": "omfgdude",
+   "secs": 123,
+   "tags": [
+    "chat",
+    "dorm"
+   ]
+  },
+  {
+   "file": "lofi-hip-hop.mp3",
+   "title": "lofi hip hop",
+   "by": "omfgdude",
+   "secs": 150,
+   "tags": [
+    "chat",
+    "dorm"
+   ]
+  },
+  {
+   "file": "lofi-again.mp3",
+   "title": "Lofi again",
+   "by": "omfgdude",
+   "secs": 88,
+   "tags": [
+    "chat",
+    "dorm"
+   ]
+  },
+  {
+   "file": "happy-lofi-day.mp3",
+   "title": "happy lofi day",
+   "by": "Tarush Singhal",
+   "secs": 116,
+   "tags": [
+    "chat",
+    "house",
+    "beach"
+   ]
+  },
+  {
+   "file": "since-2-a-m.mp3",
+   "title": "Since 2 A.M.",
+   "by": "TAD",
+   "secs": 257,
+   "tags": [
+    "night"
+   ]
+  },
+  {
+   "file": "a-day-in-night-out.mp3",
+   "title": "A Day In, Night Out",
+   "by": "Tsorthan Grove",
+   "secs": 88,
+   "tags": [
+    "house",
+    "photo",
+    "night"
+   ]
+  }
+ ],
+ "sfx": {
+  "type": [
+   "type1.mp3",
+   "type2.mp3"
+  ],
+  "pop": [
+   "pop1.mp3",
+   "pop2.mp3",
+   "pop3.mp3"
+  ],
+  "sparkle": [
+   "sparkle1.mp3",
+   "sparkle2.mp3"
+  ],
+  "heart": [
+   "heart1.mp3",
+   "heart2.mp3"
+  ],
+  "ask": [
+   "ask1.mp3"
+  ],
+  "sweat": [
+   "sweat1.mp3",
+   "sweat2.mp3",
+   "sweat3.mp3"
+  ],
+  "step": [
+   "step1.mp3",
+   "step2.mp3"
+  ],
+  "sit": [
+   "sit1.mp3"
+  ],
+  "tv": [
+   "tv1.mp3"
+  ],
+  "thunder": [
+   "thunder1.mp3",
+   "thunder2.mp3"
+  ],
+  "powerdown": [
+   "powerdown1.mp3",
+   "powerdown2.mp3"
+  ],
+  "click": [
+   "click1.mp3",
+   "click2.mp3"
+  ],
+  "door": [
+   "door1.mp3"
+  ],
+  "pour": [
+   "pour1.mp3",
+   "pour2.mp3"
+  ],
+  "send": [
+   "send1.mp3",
+   "send2.mp3"
+  ],
+  "bond": [
+   "bond1.mp3"
+  ],
+  "connect": [
+   "connect1.mp3",
+   "connect2.mp3"
+  ],
+  "hangup": [
+   "hangup1.mp3",
+   "hangup2.mp3"
+  ],
+  "dial": [],
+  "phone": [
+   "phone1.mp3",
+   "phone2.mp3",
+   "phone3.mp3"
+  ],
+  "ring": [
+   "ring1.mp3",
+   "ring2.mp3"
+  ],
+  "saxwin": [
+   "saxwin1.mp3"
+  ],
+  "saxfall": [
+   "saxfall1.mp3"
+  ]
+ }
+}
