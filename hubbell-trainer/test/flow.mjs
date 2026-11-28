@@ -63,7 +63,7 @@ const res = await page.evaluate(async () => {
   const r0 = runAuto('pit'); log.push(['pit-pre', r0, 'defect=' + T.F.defect, 'onboard=' + T.F.onboard]);
   const F = T.F, P = T.recvPallet;
   // step: drive to the pallet: place truck behind it
-  F.pos.set(P.position.x, 0, P.position.z + 0.5 + 1.42 + 0.35); F.heading = Math.PI; F.h = .05; F.v = 0; T.placeTruck();
+  F.pos.set(P.position.x, 0, P.position.z - 2.27); F.heading = 0; F.h = .05; F.v = 0; T.placeTruck();
   tick(5); log.push(['after reach', T.cur().title]);
   T.setInput({ t: .25, s: 0, l: 0, q: 0 }); tick(240);
   const local = P.worldToLocal(T.TR_.carriage.localToWorld(new (T.camera.position.constructor)(0, -.31, .14)));
@@ -72,22 +72,22 @@ const res = await page.evaluate(async () => {
   T.setInput({ t: 0, s: 0, l: 0, q: -1 }); tick(50);
   log.push(['loaded', F.load === P, 'h', F.h.toFixed(2), 'step', T.cur().title, 'viol', T.S.viol.length]);
   // go to the aisle: honk, then enter intersection and aisle
-  F.pos.set(-3.0, 0, -11.5); F.heading = -Math.PI / 2; T.placeTruck(); tick(3);
+  F.pos.set(-17.7, 0, 5.5); F.heading = Math.PI; T.placeTruck(); tick(3);
   T.setInput({ t: 0, s: 0, l: 0, q: 0, horn: true }); tick(1);
   T.setInput({ t: .4, s: 0, l: 0, q: 0 }); tick(400);
-  log.push(['aisle', 'x', F.pos.x.toFixed(2), 'step', T.cur().title, 'viol', T.S.viol.map(v => v.msg)]);
+  log.push(['aisle', 'z', F.pos.z.toFixed(2), 'step', T.cur().title, 'viol', T.S.viol.map(v => v.msg)]);
   // put away: square to P104, raise, ease in, lower
   const slot = T.SLOTS['P104-B'];
-  F.v = 0; F.pos.set(slot.x, 0, -12.2); F.heading = Math.PI; T.placeTruck(); tick(3);
+  F.v = 0; F.pos.set(-18.4, 0, slot.z); F.heading = -Math.PI / 2; T.placeTruck(); tick(3);
   T.setInput({ t: 0, s: 0, l: 1, q: 0 }); tick(260);
   log.push(['raised h', F.h.toFixed(2), 'pallet y', P.getWorldPosition(new (T.camera.position.constructor)()).y.toFixed(2)]);
   T.setInput({ t: .2, s: 0, l: 0, q: 0 }); tick(300);
   T.setInput({ t: 0, s: 0, l: -1, q: 0 }); tick(120);
-  log.push(['placed', slot.filled === P, 'load', !!F.load, 'pos.z', F.pos.z.toFixed(2), 'step', T.cur().title]);
+  log.push(['placed', slot.filled === P, 'load', !!F.load, 'pos.x', F.pos.x.toFixed(2), 'step', T.cur().title]);
   // lower forks fully, back out, park
   T.setInput({ t: 0, s: 0, l: -1, q: 0 }); tick(300);
   T.setInput({ t: -.5, s: 0, l: 0, q: 0 }); tick(60);
-  F.pos.set(-2, 0, 12); F.heading = Math.PI; F.v = 0; T.setInput({ t: 0, s: 0, l: 0, q: 0 }); T.placeTruck(); tick(30);
+  F.pos.set(28, 0, 5.5); F.heading = 0; F.v = 0; T.setInput({ t: 0, s: 0, l: 0, q: 0 }); T.placeTruck(); tick(30);
   log.push(['parked step', T.cur() && T.cur().title]);
   if (T.cur() && T.cur().type === 'choice') T.answer(0);
   T.setInput(null);
@@ -95,6 +95,8 @@ const res = await page.evaluate(async () => {
   /* hunt */
   T.startHunt(); for (const h of T.HUNT) { T.huntHit(h.id); const opts = T.panelState().btns; const j = opts.findIndex(b => h.answer.includes(b.label)); opts[j].fn(); }
   log.push(['hunt', T.panelState().title, T.panelState().sub]);
+  /* nothing a module needs may sit inside a solid: every start position must be walkable */
+  log.push(['starts clear', Object.values(T.MODS).map(m => m.id + ':' + (T.hitsSolid(m.start.x, m.start.z, .3, 'walk') ? 'BLOCKED' : 'ok')).join(' ')]);
   T.menu(); T.tick(1/60); T.renderer.render(T.camera.parent.parent, T.camera); log.push(['draw calls', T.renderer.info.render.calls, 'triangles', T.renderer.info.render.triangles]);
   return log;
 });

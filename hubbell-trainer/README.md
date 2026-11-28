@@ -92,6 +92,17 @@ Checked in the emulated Quest 3: board at 0.62 m and 29 degrees, a poke on the f
 - `test/phone.mjs` (touch), `test/demo.mjs` (records the demo video), `test/xr.mjs` (now also checks the hands in controller and hand-tracking mode).
 - Checked in the emulator only: a hand on each controller, the index curls with the trigger, poke with the drawn fingertip starts a module, tracked-hand mode draws both hands. **Not checked in a headset.**
 
+## Floor layout from the Arden floor plan (2026-11-28)
+The floor now follows the plan in `Facility_Outlook_Arden.pptx` (Drive, Jan 2026; the DWG `Arden_Facility_Layout_7.9.25.dwg` is the source drawing but could not be opened here) plus Andrew's notes: cantilever on the west wall, staging in the middle strip with induction at its north end and the Lead Hub and Non Conf at its south end, truck pack next to parcel pack. Top view: `floorplan-top-view.png` (north up).
+
+West to east: cantilever (long product) on the west wall; Pallet Land with north-south aisles (the working aisle is P101-P106 on its west side, P111-P116 on its east side, a cross aisle with the striped stop, then a south block); the middle strip (induction and the THORs at the north end, staging lanes L01 to L05, Lead Hub and Non Conf at the south end); Unit / Carton Pick (flow racks D100-D300 on the north wall, shelf rows, the conveyor running down the east side to pack); the walkway; VA and Slow Moving; maintenance. South of Unit Pick: Truck Pack (PK10) then Parcel Pack (PK03, PK04). A main aisle runs east-west across the building; south of it are the inbound dock, the outbound dock (Door 4), and the offices. East: East Warehouse Storage and the chargers.
+
+It is about 1:3 scale (60 x 34 m), so there are 3 rack aisles where the building has about 14, and aisle widths are kept at real size so the forklift fits. The forklift module is now a real route: chargers, west along the main aisle to the inbound dock, back and north into Pallet Land, put away, return.
+
+Not from the plan (assumed): where the THORs park, the exact spot of the induction computer, lane numbering (L05 nearest the Lead Hub), which dock door is Door 4, and everything inside VA, Slow Moving and East Warehouse Storage (scenery only).
+
+`test/map.mjs` renders the top view. All module tests, the VR emulator checks and the phone checks pass on the new floor.
+
 ## Placeholders to confirm
 - Box sizes #2-#6 and the product dimensions in Pack step 4.
 - Forklift capacity plate (5000 lb @ 24 in), truck type (sit-down counterbalance). Arden's reach trucks are not modeled.

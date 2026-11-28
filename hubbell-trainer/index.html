@@ -373,12 +373,16 @@ laserLine.visible = false; laserLine.frustumCulled = false; scene.add(laserLine)
 function laser(from, to) { const a = from.getWorldPosition(new THREE.Vector3()); laserLine.geometry.setFromPoints([a, to.clone()]); laserLine.visible = true; setTimeout(() => { laserLine.visible = false; }, 160); }
 
 /* ============================================================
-   THE WAREHOUSE (meters; x east, z south; door and dock to the south)
+   THE WAREHOUSE (meters; x east, z south). Laid out from the Arden floor plan (Facility Outlook deck, Jan 2026) plus
+   Andrew's notes of 2026-11-28, at about 1:3 scale: cantilever (long product) on the west wall, Pallet Land with north-south
+   aisles, a middle strip with induction at its north end, staging lanes, then the Lead Hub and Non Conf at its south end,
+   Unit / Carton Pick (flow racks, conveyor) in the centre, Truck Pack and Parcel Pack south of it, the walkway, VA and Slow
+   Moving to the north-east, East Warehouse Storage and the chargers to the east, a main aisle, then docks and offices on the south wall.
    ============================================================ */
 const C = { brown: 0xa77b4f, cardboard: 0xc49a6c, rackBlue: 0x1f4fa8, beam: 0xf07c00, pallet: 0xb48a58, conc: 0xb9bcbd, yellow: 0xfddb33, green: 0x2e9d3a, red: 0xc0392b, blue: 0x2a6fd6, orange: 0xf28c28, black: 0x111111, white: 0xffffff, gray: 0x777777 };
 const ZONE = {
-  walkway: [1, 2.5, -7, 16.5], intersection: [-5.8, -3.8, -13.4, -9.6], aisle: [-22, -5.8, -13.4, -9.6],
-  charger: [-3.6, -0.4, 10, 14.2], hospital: [3.6, 6.4, -4.5, -1.5], receive: [-6.2, -3.8, 4, 7]
+  walkway: [7.4, 8.7, -14, 8.4], intersection: [-19.6, -15.8, 0.9, 3.4], aisle: [-19.6, -15.8, -15.3, 0.9],
+  charger: [26.4, 29.6, 3.4, 7.6], hospital: [-8.2, -5.4, 3.6, 6.6], receive: [-24.2, -21.8, 13, 16]
 };
 /* floor and walls */
 box(60, .02, 34, M(C.conc), 0, -.02, 1);
@@ -395,18 +399,19 @@ const LIGHT_MAT = new THREE.MeshBasicMaterial({ color: 0xffffff });
 for (let x = -24; x <= 24; x += 8) for (let z = -12; z <= 14; z += 7) box(2.4, .08, .4, LIGHT_MAT, x, 7.6, z);
 
 floorPaint(ZONE.walkway, 0x2e9d3a); floorPaint([ZONE.walkway[0] + .1, ZONE.walkway[1] - .1, ZONE.walkway[2], ZONE.walkway[3]], 0x55c25f, .004);
-for (let z = -5; z < 16; z += 6) floorText('WALKWAY\nNO PIT', 1.75, z, 1.3, 1.1, Math.PI / 2, { fg: '#fff' });
+for (let z = -11; z < 8; z += 6) floorText('WALKWAY\nNO PIT', 8.05, z, 1.2, 1.0, Math.PI / 2, { fg: '#fff' });
+for (let i = 0; i < 7; i++) box(1.3, .004, .25, M(i % 2 ? C.conc : C.white), 8.05, .003, 8.75 + i * .5);   /* crosswalk over the main aisle */
 /* intersection stripes */
-{ const r = ZONE.intersection; for (let i = 0; i < 8; i++) { const m = box(.25, .004, r[3] - r[2], M(i % 2 ? C.black : C.yellow), r[0] + .125 + i * .25, .003, (r[2] + r[3]) / 2); } }
-{ const post = box(.08, 2.2, .08, M(C.gray), -3.6, 0, -9.3); const s = label('STOP\nSOUND HORN', .7, .7, { bg: '#c0392b', fg: '#fff' }); place(s, -3.6, 2.4, -9.25, Math.PI / 2); const s2 = s.clone(); place(s2, -3.6, 2.4, -9.35, -Math.PI / 2); }
+{ const r = ZONE.intersection; for (let i = 0; i < Math.round((r[1] - r[0]) / .25); i++) { const m = box(.25, .004, r[3] - r[2], M(i % 2 ? C.black : C.yellow), r[0] + .125 + i * .25, .003, (r[2] + r[3]) / 2); } }
+{ const post = box(.08, 2.2, .08, M(C.gray), -15.5, 0, 3.6); const s = label('STOP\nSOUND HORN', .7, .7, { bg: '#c0392b', fg: '#fff' }); place(s, -15.5, 2.4, 3.65, 0); const s2 = s.clone(); place(s2, -15.5, 2.4, 3.55, Math.PI); }
 floorPaint(ZONE.charger, C.yellow); floorPaint([ZONE.charger[0] + .12, ZONE.charger[1] - .12, ZONE.charger[2] + .12, ZONE.charger[3] - .12], C.conc, .004);
-place(label('PIT CHARGING', 1.6, .45, { bg: '#FDDB33' }), -2, 2.6, 14.5, Math.PI); box(.08, 2.4, .08, M(C.gray), -2, 0, 14.6);
-box(.6, 1.4, .4, M(0x333333), -3.2, 0, 14.6);   /* charger */
+place(label('PIT CHARGING', 1.6, .45, { bg: '#FDDB33' }), 28, 2.6, 2.9, 0); box(.08, 2.4, .08, M(C.gray), 28, 0, 2.8);
+for (const z of [3.9, 5.5, 7.1]) box(.4, 1.4, .6, M(0x333333), 29.6, 0, z);   /* chargers on the east wall */
 floorPaint(ZONE.hospital, 0xc0392b); floorPaint([ZONE.hospital[0] + .12, ZONE.hospital[1] - .12, ZONE.hospital[2] + .12, ZONE.hospital[3] - .12], C.conc, .004);
-place(label('NON CONF\nPICK HOSPITAL', 1.6, .8, { bg: '#c0392b', fg: '#fff' }), 5, 2.2, -4.6); box(.08, 2, .08, M(C.gray), 5, 0, -4.7);
-const hospitalPad = box(2.6, .02, 2.8, HIDDEN, 5, .01, -3);
+place(label('NON CONF\nPICK HOSPITAL', 1.6, .8, { bg: '#c0392b', fg: '#fff' }), -6.8, 2.2, 3.5); box(.08, 2, .08, M(C.gray), -6.8, 0, 3.4);
+const hospitalPad = box(2.6, .02, 2.8, HIDDEN, -6.8, .01, 5.1);
 reg(hospitalPad, 'hospital', 'Non Conf area (pick hospital)');
-floorPaint(ZONE.receive, 0x8e44ad); floorText('RECEIVING DROP', -5, 7.4, 2.2, .4);
+floorPaint(ZONE.receive, 0x8e44ad); floorText('RECEIVING DROP', -23, 12.6, 2.2, .4);
 
 /* ---------- pallets and cartons ---------- */
 function makePallet(withLoad = 0, opt = {}) {
@@ -432,32 +437,32 @@ function carton(w, h, d, color = C.cardboard, text) {
   return g;
 }
 
-/* ---------- Pallet Land: rack rows A (north, faces aisle) and B ---------- */
-const BAY = 2.7, RX0 = -22, BAYS = 6, LEVELS = [0, 1.6, 3.2];
+/* ---------- Pallet Land: the working aisle runs north-south; row A is its west side, row B its east side ---------- */
+const BAY = 2.7, RZ0 = -15.3, BAYS = 6, LEVELS = [0, 1.6, 3.2];
 const SLOTS = {};
-function rackRow(rowName, zFront, facing /* +1 faces +z */, firstNum) {
-  const depth = 1.1, zBack = zFront - facing * depth, zc = (zFront + zBack) / 2;
+function rackRow(rowName, xFront, facing /* +1 faces +x (east) */, firstNum) {
+  const depth = 1.1, xBack = xFront - facing * depth, xc = (xFront + xBack) / 2, ry = facing > 0 ? Math.PI / 2 : -Math.PI / 2;
   const um = M(C.rackBlue), bm = M(C.beam);
-  for (let i = 0; i <= BAYS; i++) { const x = RX0 + i * BAY; box(.1, 4.6, .1, um, x, 0, zFront - facing * .05); box(.1, 4.6, .1, um, x, 0, zBack + facing * .05); for (const y of [1, 2.5, 4]) box(.06, .06, depth, um, x, y, zc); }
+  for (let i = 0; i <= BAYS; i++) { const z = RZ0 + i * BAY; box(.1, 4.6, .1, um, xFront - facing * .05, 0, z); box(.1, 4.6, .1, um, xBack + facing * .05, 0, z); for (const y of [1, 2.5, 4]) box(depth, .06, .06, um, xc, y, z); }
   for (let b = 0; b < BAYS; b++) {
-    const xc = RX0 + (b + .5) * BAY, num = firstNum + b;
+    const zc = RZ0 + (b + .5) * BAY, num = firstNum + b;
     for (let li = 0; li < LEVELS.length; li++) {
       const y = LEVELS[li], lv = 'ABC'[li];
-      if (y > 0) { box(BAY - .1, .12, .06, bm, xc, y - .12, zFront - facing * .05); box(BAY - .1, .12, .06, bm, xc, y - .12, zBack + facing * .05); }
+      if (y > 0) { box(.06, .12, BAY - .1, bm, xFront - facing * .05, y - .12, zc); box(.06, .12, BAY - .1, bm, xBack + facing * .05, y - .12, zc); }
       const id = `P${num}-${lv}`;
-      SLOTS[id] = { id, x: xc, y, z: zc, ry: facing > 0 ? 0 : Math.PI, filled: null, row: rowName };
+      SLOTS[id] = { id, x: xc, y, z: zc, ry, filled: null, row: rowName };
     }
     /* location labels at standing height, facing the aisle */
     const code = `P${num}-01-A`;
-    const lab = barcode(code, .32, .16, code); place(lab, xc - .6, 1.25, zFront + facing * .01, facing > 0 ? 0 : Math.PI);
-    const labB = label(`P${num}-01-B`, .32, .1, { code: `P${num}-01-B` }); place(labB, xc + .6, 1.6 - .06, zFront + facing * .04, facing > 0 ? 0 : Math.PI);
-    place(label(`P${num}`, .5, .25, { bg: '#FDDB33' }), xc, 4.5, zFront + facing * .02, facing > 0 ? 0 : Math.PI);
+    const lab = barcode(code, .32, .16, code); place(lab, xFront + facing * .01, 1.25, zc + facing * .6, ry);
+    const labB = label(`P${num}-01-B`, .32, .1, { code: `P${num}-01-B` }); place(labB, xFront + facing * .04, 1.6 - .06, zc - facing * .6, ry);
+    place(label(`P${num}`, .5, .25, { bg: '#FDDB33' }), xFront + facing * .02, 4.5, zc, ry);
   }
-  solid(RX0 - .05, RX0 + BAYS * BAY + .05, Math.min(zFront, zBack), Math.max(zFront, zBack));
+  solid(Math.min(xFront, xBack), Math.max(xFront, xBack), RZ0 - .05, RZ0 + BAYS * BAY + .05);
 }
-rackRow('A', -13.4, +1, 101);
-rackRow('B', -9.6, -1, 111);
-place(label('PALLET LAND\nZONE P100', 1.4, .7, { bg: '#FDDB33' }), -5.6, 3.2, -11.5, Math.PI / 2);
+rackRow('A', -19.6, +1, 101);
+rackRow('B', -15.8, -1, 111);
+place(label('PALLET LAND\nZONE P100', 1.4, .7, { bg: '#FDDB33' }), -17.7, 4.3, 0.95, 0);
 /* decor pallets in the rack */
 for (const id in SLOTS) {
   const s = SLOTS[id];
@@ -467,11 +472,12 @@ for (const id in SLOTS) {
 /* pick locations used by the Pick module */
 const PICK = {};
 function pickFace(slotId, part, qty) {
-  const s = SLOTS[slotId]; const p = makePallet(0); p.position.set(s.x, s.y, s.z); p.rotation.y = s.ry; scene.add(p); s.filled = p;
-  const g = new THREE.Group(); g.position.set(s.x, .13, s.z + (s.ry ? -1 : 1) * .1); scene.add(g);
+  const s = SLOTS[slotId], fx = Math.sin(s.ry), fz = Math.cos(s.ry), rx = Math.cos(s.ry), rz = -Math.sin(s.ry);   /* f = out of the rack, r = to the right of the face */
+  const p = makePallet(0); p.position.set(s.x, s.y, s.z); p.rotation.y = s.ry; scene.add(p); s.filled = p;
+  const g = new THREE.Group(); g.position.set(s.x + fx * .1, .13, s.z + fz * .1); g.rotation.y = s.ry; scene.add(g);
   const items = [];
-  for (let i = 0; i < qty; i++) { const c = carton(.36, .24, .3, C.cardboard, part); c.position.set(-.4 + (i % 3) * .4, Math.floor(i / 3) * .25, 0); c.rotation.y = s.ry; g.add(c); items.push(c); }
-  const lbl = barcode(part, .24, .12, part); place(lbl, s.x + .45, .75, s.z + (s.ry ? -1 : 1) * .58, s.ry);
+  for (let i = 0; i < qty; i++) { const c = carton(.36, .24, .3, C.cardboard, part); c.position.set(-.4 + (i % 3) * .4, Math.floor(i / 3) * .25, 0); g.add(c); items.push(c); }
+  const lbl = barcode(part, .24, .12, part); place(lbl, s.x + fx * .58 + rx * .45, .75, s.z + fz * .58 + rz * .45, s.ry);
   PICK[slotId] = { g, items, part, qty };
   reg(g, 'stock:' + slotId, `${part} cartons in ${slotId}`);
   movable(g); items.forEach(movable);
@@ -482,7 +488,7 @@ pickFace('P106-A', 'HBL2621', 4);
 
 /* ---------- induction flow rack and THORs ---------- */
 {
-  const ix = 3.6, iz = -12.6;
+  const ix = -8.2, iz = -14.6;
   box(2.4, .05, 1, M(0x888888), ix, .8, iz); box(2.4, .05, 1, M(0x888888), ix, 1.5, iz);
   for (const x of [-1.2, 1.2]) for (const z of [-.5, .5]) box(.06, 1.8, .06, M(C.gray), ix + x, 0, iz + z);
   place(label('INDUCTION\nFLOW RACK', 1.1, .5, { bg: '#FDDB33' }), ix, 2.1, iz + .5);
@@ -498,17 +504,17 @@ pickFace('P106-A', 'HBL2621', 4);
   OBJ.indTotes = totes;
   const shelf = box(2.4, .05, 1, HIDDEN, ix, .86, iz); reg(shelf, 'ind_rack', 'Induction flow rack');
   /* induction computer, scanner, tote stacks, flow rack pallet, turnover log */
-  box(.08, 1.15, .08, M(0x333333), 1.7, 0, -12.35); box(.5, .04, .35, M(0x333333), 1.7, 1.0, -12.3);
-  const d = makeDevice('ind', 'gui', .62, .39, 'Induction computer (EWM)'); d.mesh.position.set(1.7, 1.45, -12.42); scene.add(d.mesh); box(.66, .43, .03, M(0x111111), 1.7, 1.235, -12.45);
-  gunProp(1.55, 1.07, -12.2, 'ind_gun', 'Induction scanner');
-  const log = new THREE.Group(); box(.22, .02, .3, M(0x8b5a2b), 0, 0, 0, log); box(.2, .005, .26, M(0xffffff), 0, .02, 0, log); log.position.set(1.88, 1.04, -12.25); scene.add(log); reg(log, 'ind_log', 'Turnover log');
-  for (const [x, col, code, id] of [[5.4, 0x6b4a2b, 'T-10240', 'ind_brown'], [6.1, C.blue, 'T-10250', 'ind_blue']]) {
-    for (let k = 0; k < 3; k++) box(.55, .3, .38, M(col), x, k * .31, -11.3);
-    const top = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, top); top.position.set(x, .93, -11.3); scene.add(top);
+  box(.08, 1.15, .08, M(0x333333), -10.1, 0, -14.35); box(.5, .04, .35, M(0x333333), -10.1, 1.0, -14.3);
+  const d = makeDevice('ind', 'gui', .62, .39, 'Induction computer (EWM)'); d.mesh.position.set(-10.1, 1.45, -14.42); scene.add(d.mesh); box(.66, .43, .03, M(0x111111), -10.1, 1.235, -14.45);
+  gunProp(-10.25, 1.07, -14.2, 'ind_gun', 'Induction scanner');
+  const log = new THREE.Group(); box(.22, .02, .3, M(0x8b5a2b), 0, 0, 0, log); box(.2, .005, .26, M(0xffffff), 0, .02, 0, log); log.position.set(-9.92, 1.04, -14.25); scene.add(log); reg(log, 'ind_log', 'Turnover log');
+  for (const [x, col, code, id] of [[-6.4, 0x6b4a2b, 'T-10240', 'ind_brown'], [-5.7, C.blue, 'T-10250', 'ind_blue']]) {
+    for (let k = 0; k < 3; k++) box(.55, .3, .38, M(col), x, k * .31, -13.3);
+    const top = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, top); top.position.set(x, .93, -13.3); scene.add(top);
     const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); top.add(b); movable(top); OBJ[id] = top;
   }
-  const frp = makePallet(0); frp.position.set(5.6, 0, -9.8); scene.add(frp); reg(frp, 'ind_frpallet', 'Flow rack induction pallet');
-  place(label('FLOW RACK\nINDUCTION', .7, .35, { bg: '#FDDB33' }), 5.6, 1.3, -10.35);
+  const frp = makePallet(0); frp.position.set(-6.2, 0, -11.8); scene.add(frp); reg(frp, 'ind_frpallet', 'Flow rack induction pallet');
+  place(label('FLOW RACK\nINDUCTION', .7, .35, { bg: '#FDDB33' }), -6.2, 1.3, -12.35);
 }
 function makeThor(id, battery) {
   /* rider pallet truck with a THOR vehicle-mount terminal; the operator stands at the origin facing -z */
@@ -524,47 +530,47 @@ function makeThor(id, battery) {
   reg(body, id, name);
   return g;
 }
-const thor1 = makeThor('thor1', 12); thor1.position.set(-1.2, 0, -5); scene.add(thor1);
-const thor2 = makeThor('thor2', 91); thor2.position.set(.2, 0, -5); scene.add(thor2);
+const thor1 = makeThor('thor1', 12); thor1.position.set(-11.6, 0, -11.2); scene.add(thor1);
+const thor2 = makeThor('thor2', 91); thor2.position.set(-10.2, 0, -11.2); scene.add(thor2);
 movable(thor1); movable(thor2);
-{ const card = box(.25, .04, .18, M(0xffffff), 0, 0, 0); card.position.set(5.8, .9, -1.9); box(.8, .9, .5, M(0x666666), 5.8, 0, -1.9); reg(card, 'disc_card', 'Discrepancy cards'); place(label('DISCREPANCY\nCARDS', .5, .2), 5.8, 1.15, -1.64); }
+{ const card = box(.25, .04, .18, M(0xffffff), 0, 0, 0); card.position.set(-6.0, .9, 6.2); box(.8, .9, .5, M(0x666666), -6.0, 0, 6.2); reg(card, 'disc_card', 'Discrepancy cards'); place(label('DISCREPANCY\nCARDS', .5, .2), -6.0, 1.15, 6.46); }
 
 /* ---------- flow rack zone D (decor and waste hunt) ---------- */
-for (let i = 0; i < 4; i++) {
-  const x0 = 8 + i * 3;
+for (let i = 0; i < 3; i++) {
+  const x0 = -3.6 + i * 3;
   const fr = new THREE.Group(); fr.position.set(x0 + 1.4, 0, -14.4); scene.add(fr);
   for (let l = 0; l < 4; l++) { const s = box(2.8, .04, 1, M(0x999999), 0, .5 + l * .45, 0, fr); s.rotation.x = .12; for (let k = 0; k < 5; k++) box(.45, .3, .5, M(C.cardboard), -1.1 + k * .55, .56 + l * .45, .2, fr); }
   bake(fr);
   place(label('D' + (1 + i) + '00', .5, .25, { bg: '#FDDB33' }), x0 + 1.4, 2.6, -13.85);
 }
-solid(8, 20, -15, -13.8);
-const frConv = box(12, .7, .6, M(0x555555), 14, 0, -12.9); solid(8, 20, -13.2, -12.6);   /* pick conveyor */
+solid(-3.6, 5.4, -15, -13.8);
+const frConv = box(10.2, .7, .6, M(0x555555), 1.2, 0, -12.9); solid(-3.9, 6.3, -13.2, -12.6);   /* pick conveyor */
 reg(frConv, 'fr_conv', 'Pick conveyor');
-for (let l = 1; l <= 2; l++) for (let k = 0; k < 5; k++) { const code = `D30${k + 1}-0${l + 1}`; const b = barcode(code, .2, .08, code); b.position.set(15.4 - 1.1 + k * .55, .47 + l * .45, -13.86); scene.add(b); }
-{ const b = barcode('HBL7740', .16, .08, 'HBL7740'); b.position.set(15.4 - 1.1 + 2 * .55, .47 + .45 + .12, -13.86); scene.add(b); }
-for (const [x, col, code, red] of [[10.4, C.blue, 'T-20006'], [11.1, C.blue, 'T-20007'], [11.8, C.red, 'T-20009', 1], [12.5, C.blue, 'T-20008']]) {
+for (let l = 1; l <= 2; l++) for (let k = 0; k < 5; k++) { const code = `D30${k + 1}-0${l + 1}`; const b = barcode(code, .2, .08, code); b.position.set(3.8 - 1.1 + k * .55, .47 + l * .45, -13.86); scene.add(b); }
+{ const b = barcode('HBL7740', .16, .08, 'HBL7740'); b.position.set(3.8 - 1.1 + 2 * .55, .47 + .45 + .12, -13.86); scene.add(b); }
+for (const [x, col, code, red] of [[-1.2, C.blue, 'T-20006'], [-.5, C.blue, 'T-20007'], [.2, C.red, 'T-20009', 1], [.9, C.blue, 'T-20008']]) {
   const t = new THREE.Group(); box(.55, .3, .38, M(col), 0, 0, 0, t); t.position.set(x, .7, -12.9); scene.add(t);
   const b = barcode(code, .2, .1, code); b.position.set(0, .16, .195); t.add(b); movable(t); if (red) OBJ.fr_red = t;
 }
-{ const base = box(.35, .95, .3, M(0x444444), 9.4, 0, -11.3); reg(base, 'mc_cradle', 'Handheld charging cradle'); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), 9.4, .7, -11.14);
+{ const base = box(.35, .95, .3, M(0x444444), -2.2, 0, -11.3); reg(base, 'mc_cradle', 'Handheld charging cradle'); place(label('HANDHELDS', .4, .12, { bg: '#FDDB33' }), -2.2, .7, -11.14);
   const mc = new THREE.Group(); box(.1, .17, .025, M(0x1a1a1a), 0, -.085, -.0125, mc);
   const d = makeDevice('mc', 'rf', .09, .135, 'Handheld (mobile computer)', 88); d.mesh.position.z = .002; mc.add(d.mesh);
-  mc.position.set(9.4, 1.05, -11.3); mc.rotation.x = -.6; scene.add(mc); movable(mc); d.group = mc; }
+  mc.position.set(-2.2, 1.05, -11.3); mc.rotation.x = -.6; scene.add(mc); movable(mc); d.group = mc; }
 
 /* ---------- pack stations ---------- */
 function packBench(x, z, name) {
   box(2.4, .9, .8, M(0x8d6e4f), x, 0, z); solid(x - 1.2, x + 1.2, z - .4, z + .4);
   place(label(name, .5, .25, { bg: '#FDDB33' }), x, 2.3, z - .45); box(.06, 2.2, .06, M(C.gray), x, 0, z - .45);
 }
-packBench(8, 3, 'PK03'); packBench(12, 3, 'PK04');
-box(14, .75, .6, M(0x555555), 12, 0, 1.9); solid(5, 19, 1.6, 2.2);             /* outfeed conveyor behind benches */
-for (let x = 5.3; x < 19; x += .3) box(.06, .04, .55, M(0x999999), x, .75, 1.9);
-const outfeed = box(1.2, .05, .6, HIDDEN, 12, .78, 1.9);
+packBench(1.3, 5.4, 'PK03'); packBench(5.3, 5.4, 'PK04');
+box(7.4, .75, .6, M(0x555555), 3.5, 0, 4.3); solid(-.2, 7.2, 4.0, 4.6);             /* outfeed conveyor behind benches */
+for (let x = 0; x < 7.1; x += .3) box(.06, .04, .55, M(0x999999), x, .75, 4.3);
+const outfeed = box(1.2, .05, .6, HIDDEN, 5.3, .78, 4.3);
 reg(outfeed, 'pk_outfeed', 'Outfeed conveyor');
 /* PK04 details */
 const PK = {};
 {
-  const bx = 12, bz = 3, top = .9;
+  const bx = 5.3, bz = 5.4, top = .9;
   const pd = makeDevice('pack', 'gui', .62, .39, 'Pack station screen (EWM)'); pd.mesh.position.set(bx - .8, top + .45, bz - .2); scene.add(pd.mesh);
   box(.66, .43, .04, M(0x111111), bx - .8, top + .24, bz - .24); box(.06, .25, .06, M(0x111111), bx - .8, top, bz - .24);
   gunProp(bx - .25, top + .04, bz - .25, 'pk_gun', 'Pack station scanner');
@@ -601,7 +607,7 @@ function setMonitor(title, lines) { devSet('pack', { head: title, lines, pad: fa
 /* ---------- truck pack area PK10 (Ship module) ---------- */
 const TK = {};
 {
-  const ax = 12, az = 9.5;
+  const ax = -2.6, az = 6.0;
   floorPaint([ax - 2.5, ax + 2.5, az - 1.5, az + 1.5], C.yellow); floorPaint([ax - 2.4, ax + 2.4, az - 1.4, az + 1.4], C.conc, .004);
   place(label('PK10 TRUCK PACK', 1.6, .4, { bg: '#FDDB33' }), ax, 2.6, az - 1.6); box(.06, 2.5, .06, M(C.gray), ax, 0, az - 1.65);
   const pal = makePallet(0); pal.position.set(ax, 0, az); scene.add(pal); reg(pal, 'tk_pallet', 'Empty pallet'); TK.pallet = pal;
@@ -619,17 +625,17 @@ const TK = {};
   const bol = new THREE.Group(); box(.21, .01, .28, M(0xffffff), 0, 0, 0, bol); bol.position.set(ax + 2.1, 1.12, az + 1.1); scene.add(bol); bol.visible = false; reg(bol, 'tk_bol', 'Packing list, shipping label and BOL'); TK.bol = bol; movable(bol);
   const wrapSkin = new THREE.Mesh(GEO, new THREE.MeshStandardMaterial({ color: 0xdfe8ee, transparent: true, opacity: .35 })); wrapSkin.scale.set(1.25, .85, 1.05); wrapSkin.position.set(0, .55, 0); pal.add(wrapSkin); wrapSkin.visible = false; TK.wrapSkin = wrapSkin;
 }
-/* staging lanes */
+/* staging lanes: the middle strip between Pallet Land and Unit Pick. L01 is the north lane, L05 the one closest to the Lead Hub */
 const LANES = [];
 for (let i = 0; i < 5; i++) {
-  const x = -20 + i * 2.5, id = 'L0' + (i + 1);
-  floorPaint([x - 1.05, x - .95, 4, 12], C.yellow); floorPaint([x + .95, x + 1.05, 4, 12], C.yellow);
-  const lb = barcode('LANE-' + id, .5, .25, id); lb.rotation.x = -Math.PI / 2 + .5; lb.position.set(x, .3, 12.4); scene.add(lb);
-  box(.5, .3, .1, M(0x333333), x, 0, 12.55);
-  LANES.push({ id, x });
+  const z = -8.6 + i * 2.4, id = 'L0' + (i + 1);
+  floorPaint([-12.8, -6.6, z - 1.15, z - 1.05], C.yellow); floorPaint([-12.8, -6.6, z + 1.05, z + 1.15], C.yellow);
+  const lb = barcode('LANE-' + id, .5, .25, id); place(lb, -6.44, .95, z, Math.PI / 2);   /* label at the east end, facing the travel aisle */
+  box(.1, 1.1, .5, M(0x333333), -6.5, 0, z);
+  LANES.push({ id, z });
 }
-place(label('LEAD HUB', 1.2, .4, { bg: '#FDDB33' }), -7.5, 2.4, 12.6, Math.PI); box(1.4, 1, .6, M(0x445566), -7.5, 0, 12.8); solid(-8.2, -6.8, 12.5, 13.1);
-place(label('STAGING', 1.4, .4, { bg: '#FDDB33' }), -15, 3, 3.6);
+place(label('LEAD HUB', 1.2, .4, { bg: '#FDDB33' }), -10, 2.4, 4.3, 0); box(1.4, 1, .6, M(0x445566), -10, 0, 4.6); solid(-10.7, -9.3, 4.3, 4.9);
+place(label('STAGING', 1.4, .4, { bg: '#FDDB33' }), -6.3, 3.2, -3.8, Math.PI / 2); box(.08, 3.4, .08, M(C.gray), -6.4, 0, -3.8);
 /* dock and trailer */
 {
   floorPaint([-15.5, -12.5, 16.5, 18], C.yellow);
@@ -640,6 +646,51 @@ place(label('STAGING', 1.4, .4, { bg: '#FDDB33' }), -15, 3, 3.6);
   box(2.6, .05, 12, M(0x8a7a66), 0, -.02, 6, tr); box(.08, 2.8, 12, M(0xbfc5c9), -1.3, 0, 6, tr); box(.08, 2.8, 12, M(0xbfc5c9), 1.3, 0, 6, tr); box(2.6, .08, 12, M(0xbfc5c9), 0, 2.8, 6, tr); box(2.6, 2.8, .08, M(0xbfc5c9), 0, 0, 12, tr);
   solid(-15.4, -15.2, 18, 30.5); solid(-12.8, -12.6, 18, 30.5); solid(-15.4, -12.6, 30.3, 30.6);
 }
+
+/* ---------- the rest of the floor plan: decor, merged into a few meshes at the end ---------- */
+function decorRack(xc, z0, z1, dbl, seed) {   /* a north-south pallet rack; dbl = two rows back to back */
+  const depth = dbl ? 2.2 : 1.1, um = M(C.rackBlue), bm = M(C.beam), n = Math.max(1, Math.round((z1 - z0) / BAY)), bay = (z1 - z0) / n;
+  const faces = dbl ? [-1.05, 0, 1.05] : [-.5, .5];
+  for (let i = 0; i <= n; i++) for (const f of faces) box(.1, 4.6, .1, um, xc + f, 0, z0 + i * bay);
+  for (let i = 0; i < n; i++) for (const y of [1.6, 3.2]) for (const f of faces) box(.06, .12, bay - .1, bm, xc + f, y - .12, z0 + (i + .5) * bay);
+  for (let i = 0; i < n; i++) for (const y of LEVELS) for (const cx of (dbl ? [-.55, .55] : [0])) {
+    const h = hash(seed + ':' + i + ':' + y + ':' + cx); if (h % 10 > 6) continue;
+    box(1.0, .13, 1.2, M(C.pallet), xc + cx, y, z0 + (i + .5) * bay); box(.95, .35 + (h >> 4) % 3 * .28, 1.15, M(C.cardboard), xc + cx, y + .13, z0 + (i + .5) * bay);
+  }
+  solid(xc - depth / 2, xc + depth / 2, z0, z1);
+}
+function decorShelf(x0, x1, zc, seed) {   /* an east-west carton shelf row */
+  const xc = (x0 + x1) / 2, len = x1 - x0;
+  for (let x = x0; x <= x1 + .01; x += len / 4) for (const dz of [-.45, .45]) box(.06, 2, .06, M(C.gray), x, 0, zc + dz);
+  for (let l = 0; l < 4; l++) { box(len, .04, 1, M(0x999999), xc, .3 + l * .45, zc); for (let k = 0; k < Math.floor(len / .6); k++) if (hash(seed + l + ':' + k) % 5) box(.45, .28, .8, M(C.cardboard), x0 + .35 + k * .6, .34 + l * .45, zc); }
+  solid(x0, x1, zc - .5, zc + .5);
+}
+/* Pallet Land: more aisles west and east of the working aisle, and the south block past the cross aisle */
+decorRack(-25.9, RZ0, 0.9, true, 'w1'); decorRack(-21.25, RZ0, 0.9, false, 'w2'); decorRack(-14.15, RZ0, 0.9, false, 'e1');
+decorRack(-25.9, 3.4, 8.8, true, 's1'); decorRack(-20.7, 3.4, 8.8, true, 's2'); decorRack(-14.7, 3.4, 8.8, true, 's3');
+/* cantilever (long product) on the west wall */
+for (let z = -15; z <= 8.1; z += 2.1) { box(.15, 4, .15, M(C.rackBlue), -29.7, 0, z); for (const y of [.9, 1.9, 2.9]) box(.9, .08, .1, M(C.beam), -29.3, y, z); }
+for (const y of [.98, 1.98, 2.98]) for (const z0 of [-14.6, -8.2, -1.8, 4.2]) box(.3 + (hash('lp' + y + z0) % 3) * .15, .22, 5.6 - (hash('lq' + y + z0) % 3) * .8, M(hash('lr' + y + z0) % 2 ? 0x9aa3a8 : 0x6f7b80), -29.3, y, z0 + 2.6);
+solid(-30, -28.85, -15.5, 8.6); place(label('LONG PRODUCT\nCANTILEVER', 1.4, .6, { bg: '#FDDB33' }), -28.8, 4.4, -3, Math.PI / 2);
+/* Unit / Carton Pick: more shelf rows south of the flow racks, and the conveyor that runs down the east side to pack */
+for (const [i, z] of [-8.6, -5.6, -2.6, 0.4].entries()) decorShelf(-3.4, 5.2, z, 'u' + i);
+box(.6, .2, 17, M(0x555555), 6.3, 2.4, -4.3); for (const z of [-12.6, -8.5, -4.3, 0, 4]) for (const dx of [-.25, .25]) box(.06, 2.4, .06, M(C.gray), 6.3 + dx, 0, z);
+place(label('UNIT / CARTON PICK', 2.2, .4, { bg: '#FDDB33' }), .9, 3.3, 2.1, 0); box(.08, 3.5, .08, M(C.gray), .9, 0, 2.0);
+/* north-east: VA area and Slow Moving; east: maintenance, East Warehouse Storage, chargers */
+for (const [x, z] of [[10.2, -12.5], [12.4, -12.5], [10.2, -8.5], [12.4, -8.5], [10.2, -4.5]]) { box(1.6, .9, .8, M(0x8d6e4f), x, 0, z); solid(x - .8, x + .8, z - .4, z + .4); }
+box(4.4, 2.4, .08, M(0x9aa3a8), 11.3, 0, 0.9); solid(9.1, 13.5, .8, 1.0); place(label('VA AREA', 1.2, .4, { bg: '#FDDB33' }), 11.3, 3.2, -1.0, 0); box(.08, 3.4, .08, M(C.gray), 11.3, 0, -1.1);
+decorRack(16, RZ0, 0.9, true, 'm1'); decorRack(20.6, RZ0, 0.9, true, 'm2'); decorRack(25.2, RZ0, -8.4, true, 'm3');
+place(label('SLOW MOVING', 1.6, .4, { bg: '#FDDB33' }), 18.3, 4.6, 1.0, 0);
+box(3.3, 2.6, 6.4, M(0x4a5a52), 28.2, 0, -6.8); solid(26.5, 30, -6.8, -.4); place(label('MAINTENANCE', 1.6, .4, { bg: '#FDDB33' }), 26.5, 2.9, -3.6, -Math.PI / 2);
+decorRack(11.6, 2.6, 8.0, true, 'x1'); decorRack(16.6, 2.6, 8.0, true, 'x2'); decorRack(21.6, 2.6, 8.0, true, 'x3');
+decorRack(12.6, 12.6, 17.6, true, 'x4'); decorRack(17.6, 12.6, 17.6, true, 'x5'); decorRack(22.6, 12.6, 17.6, true, 'x6');
+place(label('EAST WAREHOUSE STORAGE', 2.6, .4, { bg: '#FDDB33' }), 16.6, 4.6, 8.2, 0);
+/* south wall: inbound dock, outbound dock (Door 4 and the trailer are above), offices */
+box(3, 4.5, .1, M(0x3a4046), -23, 0, 17.95); place(label('INBOUND DOCK', 1.6, .4, { bg: '#FDDB33' }), -23, 4.9, 17.9, Math.PI);
+place(label('OUTBOUND DOCK', 1.6, .4, { bg: '#FDDB33' }), -9, 4.9, 17.9, Math.PI);
+floorPaint([-27, -18, 12.3, 12.4], C.yellow); floorPaint([-16.6, -5.4, 12.3, 12.4], C.yellow);
+box(13, 3.4, 5.4, M(0xd9d4c8), 2.5, 0, 15.3); solid(-4, 9, 12.6, 18); for (let x = -2.5; x < 8.6; x += 2.2) box(1.4, 1.1, .06, M(0x2c3e50), x, 1.2, 12.58);
+place(label('OFFICES', 1.2, .4, { bg: '#FDDB33' }), 2.5, 2.9, 12.55, Math.PI);
 
 /* ---------- people (simple mannequins) ---------- */
 function person(x, z, ry, vest = 0xc6ff2e) {
@@ -652,7 +703,7 @@ function person(x, z, ry, vest = 0xc6ff2e) {
 /* ============================================================
    THE FORKLIFT (counterbalance, sit-down). Forks point to local +z.
    ============================================================ */
-const F = { pos: new THREE.Vector3(-2, 0, 12.2), heading: Math.PI, v: 0, steer: 0, h: .05, tilt: 0, load: null, onboard: false, honkT: -99, inserted: null, lookYaw: 0, defect: null, lastV: {}, prevIn: {} };
+const F = { pos: new THREE.Vector3(28, 0, 5.5), heading: 0, v: 0, steer: 0, h: .05, tilt: 0, load: null, onboard: false, honkT: -99, inserted: null, lookYaw: 0, defect: null, lastV: {}, prevIn: {} };
 const truck = new THREE.Group(); scene.add(truck);
 const TR_ = {};
 {
@@ -709,10 +760,10 @@ function setDefect(id) {
 function inspHotspots(on) { for (const it of INSP) TR_[it.id].visible = on; }
 /* the pallet the forklift module moves */
 const recvPallet = makePallet(2); scene.add(recvPallet);
-recvPallet.position.set(-5, 0, 5.5); movable(recvPallet);
+recvPallet.position.set(-23, 0, 14.5); movable(recvPallet);
 const PALLETS = [recvPallet];
 function resetTruck() {
-  F.pos.set(-2, 0, 12.2); F.heading = Math.PI; F.v = 0; F.steer = 0; F.h = .05; F.tilt = 0; F.onboard = false; F.honkT = -99; F.inserted = null; F.lookYaw = 0; F.prevIn = {};
+  F.pos.set(28, 0, 5.5); F.heading = 0; F.v = 0; F.steer = 0; F.h = .05; F.tilt = 0; F.onboard = false; F.honkT = -99; F.inserted = null; F.lookYaw = 0; F.prevIn = {};
   if (F.load) { scene.attach(F.load); F.load = null; }
   for (const s of Object.values(SLOTS)) if (PALLETS.includes(s.filled)) s.filled = null;
   setDefect(null); inspHotspots(false); placeTruck();
@@ -1001,7 +1052,7 @@ const drive = (title, text, check, why, o = {}) => ({ type: 'drive', title, text
 /* ---------- 1. Forklift ---------- */
 const SLOT_T = 'P104-B';
 MODS.pit = {
-  id: 'pit', name: 'Forklift (PIT)', start: { x: 0, z: 12.5, yaw: Math.PI / 2 },
+  id: 'pit', name: 'Forklift (PIT)', start: { x: 24.6, z: 9.8, yaw: -.69 },
   target: 'zero safety calls. PIT is the one training Arden refreshes on a schedule.',
   setup() { setDefect(Math.random() < .85 ? INSP[Math.floor(Math.random() * INSP.length)].id : null); },
   steps: [
@@ -1014,11 +1065,11 @@ MODS.pit = {
     choice('Mounting', 'How do you get on and off?', ['Face the truck, three points of contact, use the step and grab handle', 'Jump up from the side', 'Step up on the forks', 'Whatever is fastest'], 0, 'Most PIT injuries off the job site are slips getting on and off.', { fb: ['', 'Jumping is how ankles go.', 'Never stand on the forks.', 'Three points of contact, every time.'], onDone() { mountTruck(); } }),
     choice('Seated', 'First thing once you are seated?', ['Fasten the seatbelt', 'Raise the forks so you are ready', 'Drive off, the belt slows you down', 'Sound the horn'], 0, 'In a tip-over the belt keeps you inside the overhead guard. Jumping out is what kills.', { critical: true, fb: ['', 'Forks stay low.', 'Belt first. Always.', 'Belt first.'] }),
     info('Controls', 'PC: W/S drive, A/D steer, R/F forks up/down, T/G tilt back/forward, H horn.\nQuest: left stick drives and steers, right stick up/down lifts, right stick left/right tilts, A is the horn.\n\nTravel with the forks 4 to 6 in off the floor. The panel bottom shows speed and fork height.', 'Forks low and tilted back keep the load stable and the forks out of people\'s legs.'),
-    drive('Drive to the pallet', 'Drive to the receiving drop (purple square). Forks low. Stay out of the green walkway.', () => F.pos.distanceTo(recvPallet.position) < 4.2, 'Pedestrians own the walkway. A PIT never enters it.', { target: 'recv' }),
+    drive('Drive to the pallet', 'Drive to the receiving drop (purple square) at the inbound dock: out of the chargers, west along the main aisle. Forks low. Stay out of the green walkway.', () => F.pos.distanceTo(recvPallet.position) < 4.2, 'Pedestrians own the walkway. A PIT never enters it.', { target: 'recv' }),
     drive('Pick up the pallet', 'Square up to the pallet. Forks flat at floor height, drive straight in until the pallet touches the carriage, lift a few inches, tilt back.', () => F.load === recvPallet && F.h > .12, 'Forks all the way in spreads the load on the forks. Tilt back cradles it.', { target: 'recv' }),
-    drive('Go to Pallet Land', 'Take the pallet to the Pallet Land aisle. Stop at the striped intersection and sound the horn before you enter.', () => F.load === recvPallet && inRect(F.pos.x, F.pos.z, ZONE.aisle), 'Rack ends are blind corners. The horn tells people you are coming.', { target: 'aisleStop' }),
-    drive('Put it away in P104-B', `Put the pallet on level B (beam at 1.6 m) of bay P104, north side. Stop square to the rack, raise the load above the beam, ease in, lower it onto the beam, then back straight out.`, () => SLOTS[SLOT_T].filled === recvPallet && !F.load, 'Raise only when stopped and square. Lower onto the beam before you back out, or you drag the pallet off the rack.', { target: 'slot' }),
-    drive('Park it', 'Lower the forks to the floor, back out of the aisle (horn at the intersection) and park in PIT Charging. Come to a full stop.', () => inRect(F.pos.x, F.pos.z, ZONE.charger) && F.h < .07 && Math.abs(F.v) < .05, 'A parked truck with forks up is a trip and shin hazard.', { target: 'charger' }),
+    drive('Go to Pallet Land', 'Take the pallet to the Pallet Land aisle: along the main aisle, then north between the racks. Stop at the striped intersection and sound the horn before you enter.', () => F.load === recvPallet && inRect(F.pos.x, F.pos.z, ZONE.aisle), 'Rack ends are blind corners. The horn tells people you are coming.', { target: 'aisleStop' }),
+    drive('Put it away in P104-B', `Put the pallet on level B (beam at 1.6 m) of bay P104, on the west side of the aisle. Stop square to the rack, raise the load above the beam, ease in, lower it onto the beam, then back straight out.`, () => SLOTS[SLOT_T].filled === recvPallet && !F.load, 'Raise only when stopped and square. Lower onto the beam before you back out, or you drag the pallet off the rack.', { target: 'slot' }),
+    drive('Park it', 'Lower the forks to the floor, back out of the aisle (horn at the intersection) and park in PIT Charging, at the east end of the main aisle. Come to a full stop.', () => inRect(F.pos.x, F.pos.z, ZONE.charger) && F.h < .07 && Math.abs(F.v) < .05, 'A parked truck with forks up is a trip and shin hazard.', { target: 'charger' }),
     choice('Shut down', 'Before you get off, the truck must be:', ['Forks flat on the floor, neutral, park brake set, power off', 'Forks raised so the next driver is ready', 'Left running for the next person', 'Parked in the walkway so it is easy to find'], 0, 'A truck left running or with forks up can move or be hit. Off and flat is the only safe state.', { critical: true, fb: ['', 'Forks up is a hazard.', 'Never leave it running unattended.', 'Never in the walkway.'], onDone() { dismountTruck(); } })
   ]
 };
@@ -1031,7 +1082,7 @@ const T415 = { head: 'SAP EWM RF', lines: ['Transaction'], fields: [{ label: 'Tr
 
 /* ---------- 2. Pick: Pallet Land with the THOR ---------- */
 MODS.pick = {
-  id: 'pick', name: 'Pick: Pallet Land (THOR)', start: { x: -.5, z: -2, yaw: 0 }, target: 'lines per hour. The scan confirms the part, your eyes confirm the count.',
+  id: 'pick', name: 'Pick: Pallet Land (THOR)', start: { x: -10.9, z: -8.6, yaw: 0 }, target: 'lines per hour. The scan confirms the part, your eyes confirm the count.',
   steps: [
     info('Pallet Land Pick', 'Core process, Draft 1.0 (10/17/2026). You work from a THOR: its terminal runs the EWM RF screens and its handheld scanner reads every barcode. Tools: THOR, handheld scanner, safety knife, marker, pen.', 'One sheet for the normal job; Short Pick, Add-On Tote and Scan and System Errors have their own.'),
     choice('PPE', 'What PPE does Pallet Land Pick require?', ['General PPE, bump cap, cut-resistant gloves', 'General PPE only', 'Hard hat and harness', 'Gloves only'], 0, 'Bump cap for the rack beams, cut gloves for the safety knife and carton edges.'),
@@ -1043,10 +1094,10 @@ MODS.pick = {
     rf('thor2', '2. Check your zone', 'Compare the zone on the screen with the sign at the end of the rack: P100. Wrong zone? F7.', { head: '415 Resource', lines: ['Res:  THOR2', 'Zone: D300', '', 'F4 = start', 'F7 = change zone'] }, { key: 'F7', keyFb: { F4: 'D300 is flow rack. The sign says P100: F7 first.', ENT: 'Check the zone first: F7.' }, why: 'The zone decides which tasks the system gives you.' }),
     rf('thor2', '2. Change the zone', 'Type P100, press ENT.', { head: 'Change zone', fields: [{ label: 'Zone', via: 'type', expect: 'P100', err: 'Type the zone on the sign: P100.' }] }, { why: 'Wrong zone means wasted travel and misrouted picks.' }),
     choice('3. Totes', 'Order 4400101 is LTL. How many totes do you take?', ['1 tote', 'Up to 4 totes', 'As many as fit', 'None'], 0, '1 tote for LTL, up to 4 for parcel.'),
-    rf('thor2', '3. Scan your tote', 'Ride to the induction flow rack (north-east). Scan the first tote, T-10230, then press F4.', { head: 'Totes 4400101', lines: ['Wave LTL', 'Totes: 1'], fields: [{ label: 'Tote', expect: 'T-10230', wrong: { 'T-10231': 'Take the first tote in line: T-10230.', 'T-10232': 'Take the first tote in line: T-10230.', 'T-10233': 'Take the first tote in line: T-10230.' } }] }, { key: 'F4', why: 'The tote ties the order to you.' }),
+    rf('thor2', '3. Scan your tote', 'Ride to the induction flow rack, at the north end of the staging strip. Scan the first tote, T-10230, then press F4.', { head: 'Totes 4400101', lines: ['Wave LTL', 'Totes: 1'], fields: [{ label: 'Tote', expect: 'T-10230', wrong: { 'T-10231': 'Take the first tote in line: T-10230.', 'T-10232': 'Take the first tote in line: T-10230.', 'T-10233': 'Take the first tote in line: T-10230.' } }] }, { key: 'F4', why: 'The tote ties the order to you.' }),
     carry('3. Tote on the THOR', 'Put the tote on the pallet on your THOR.', ['ind_tote0', 'bc:T-10230'], 'thor2_pallet', 'The tote rides with you to every location.', { dropOn: () => [OBJ.thor2_pallet, V3(.3, .13, .25)] }),
     choice('3. Cones', 'What is in each tote?', ['1 green, 1 orange and 1 blue cone', '3 green cones', 'No cones', '1 red cone'], 0, 'Without the cones you cannot mark the order later.'),
-    rf('thor2', '4. Go to the location', 'Ride into the Pallet Land aisle to the SRCBIN on the screen. Scan the location label.', { head: 'Task 1 of 2', lines: ['SRCBIN P104-01-A', 'Prod   HBL5262', 'Qty    6 EA'], fields: [{ label: 'Loc', expect: 'P104-01-A', err: 'Wrong location. The RF says P104-01-A.' }] }, { why: 'Scanning the location proves you are at the right bin before you touch product.' }),
+    rf('thor2', '4. Go to the location', 'Ride into the Pallet Land aisle (west of staging) to the SRCBIN on the screen. The racks on your left as you ride north are row P10x. Scan the location label.', { head: 'Task 1 of 2', lines: ['SRCBIN P104-01-A', 'Prod   HBL5262', 'Qty    6 EA'], fields: [{ label: 'Loc', expect: 'P104-01-A', err: 'Wrong location. The RF says P104-01-A.' }] }, { why: 'Scanning the location proves you are at the right bin before you touch product.' }),
     rf('thor2', '5. Scan the product', 'Scan the part number label on the box.', { head: 'Task 1 of 2', lines: ['SRCBIN P104-01-A', 'Prod   HBL5262', 'Qty    6 EA'], fields: [{ label: 'Prod', expect: 'HBL5262', err: 'Wrong part. Scan only the product in front of you.' }] }, { why: 'The scan confirms the part.' }),
     choice('5. Count', 'The RF wants 6 EA. Count the cartons in the location with your eyes.', ['6. It matches, pull them', '5', 'Confirm 6 whatever is there', 'Skip the count, the scan checked it'], 0, 'Never confirm without checking the count. Your eyes confirm the count.', { fb: ['', 'Count again.', 'Never confirm a quantity you do not have.', 'The scan checks the part, not the count.'] }),
     carry('6. Build the pallet', 'Full cases go on the pallet. Pick up the HBL5262 cartons and put them on your THOR pallet.', 'stock:P104-A', 'thor2_pallet', 'Heaviest on the bottom, labels out, nothing hanging off.', { dropOn: () => [OBJ.thor2_pallet, V3(0, .13, -.2)] }),
@@ -1065,7 +1116,7 @@ MODS.pick = {
 
 /* ---------- 3. Pick: Flow Rack with a handheld ---------- */
 MODS.flow = {
-  id: 'flow', name: 'Pick: Flow Rack (handheld)', start: { x: 10.2, z: -10, yaw: 0 }, target: 'lines per hour. Hot orders first.',
+  id: 'flow', name: 'Pick: Flow Rack (handheld)', start: { x: -1.4, z: -10.4, yaw: 0 }, target: 'lines per hour. Hot orders first.',
   steps: [
     info('Flow Rack Pick', 'Core process, Draft 1.0. Your tool is the handheld: one device that scans, shows the RF screens and has the keys. Zone D###: D100, D200, D300, D400, D600, D700.', 'Totes ride the conveyor with you; the handheld goes everywhere you go.'),
     act('1. Get your handheld', 'Take a handheld from the charging cradle.', ['mc_cradle', 'dev:mc'], 'A scanner that dies mid-pick leaves totes half-picked on the line.', { onHit() { equip('mc'); } }),
@@ -1090,7 +1141,7 @@ MODS.flow = {
 
 /* ---------- 4. Induction ---------- */
 MODS.induct = {
-  id: 'induct', name: 'Induction', start: { x: 2.6, z: -9.4, yaw: .25 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
+  id: 'induct', name: 'Induction', start: { x: -9.0, z: -11.2, yaw: .3 }, target: 'orders inducted per hour. Induction sets the pace for the whole line.',
   steps: [
     info('Induction', 'Core process, Draft 1.0. Tools: computer (SAP EWM), scanner. Induction is where an order gets its totes. Nothing gets picked until it is inducted.', 'Induction steers the work for every picker behind you.'),
     getGun('ind_gun', 'scanner at the induction computer'),
@@ -1101,9 +1152,9 @@ MODS.induct = {
     choice('2. Supervisor', 'Your supervisor asks you to do 4400125 next instead.', ['Do that one', 'Finish the queue your way first', 'Ignore it, oldest first is the rule', 'Ask another inducter to do it'], 0, 'Don\'t set your own priorities for an area. A supervisor-directed order goes next.'),
     rf('ind', '3. Induct the LTL order', 'Order 4400101, LTL wave, color BROWN. Scan 1 tote in the wave color (the tote stacks are to your right).', { head: 'Induct 4400101', lines: ['Wave LTL  color BROWN', 'Totes needed: 1'], fields: [{ label: 'Tote', expect: 'T-10240', wrong: { 'T-10250': 'Blue is static / flow rack. Match the wave: brown.' } }], pad: false }, { why: 'The tote color tells pack and the dock how the order ships.' }),
     choice('3. Cones', 'Before the tote goes on the rack:', ['1 green, 1 orange and 1 blue cone in it', 'Nothing, the picker adds cones', 'Only a green cone', 'Write the order number on it'], 0, 'Pallet Land pickers take their totes from this rack, ready to go.'),
-    act('3. Place it', 'Put the tote on the induction flow rack.', 'ind_rack', 'Pallet Land pickers take their totes from this rack, so it has to be stocked and in order.', { onHit() { OBJ.ind_brown.position.set(3.6 + .9, 1.55, -12.5); } }),
+    act('3. Place it', 'Put the tote on the induction flow rack.', 'ind_rack', 'Pallet Land pickers take their totes from this rack, so it has to be stocked and in order.', { onHit() { OBJ.ind_brown.position.set(-8.2 + .9, 1.55, -14.5); } }),
     rf('ind', '4. Induct a flow rack order', 'Order 4400125, FLOW wave, color BLUE. Scan a tote in the wave color.', { head: 'Induct 4400125', lines: ['Wave FLOW  color BLUE', 'Totes needed: 1'], fields: [{ label: 'Tote', expect: 'T-10250', wrong: { 'T-10240': 'Brown is Pallet Land. This wave is blue.' } }], pad: false }),
-    act('4. Place it', 'Put it on the flow rack induction pallet.', 'ind_frpallet', 'Match the tote color to the wave every time.', { onHit() { OBJ.ind_blue.position.set(5.6, .13, -9.8); } }),
+    act('4. Place it', 'Put it on the flow rack induction pallet.', 'ind_frpallet', 'Match the tote color to the wave every time.', { onHit() { OBJ.ind_blue.position.set(-6.2, .13, -11.8); } }),
     choice('5. Completed totes', 'How many completed totes do you move at a time?', ['Up to 10: zone-complete to the conveyor, order-complete to D100', 'All of them at once', 'One at a time', 'Leave them for the pickers'], 0, 'Too few and pickers wait; too many and the line jams.'),
     choice('6. Stock', 'How do you keep empty pallets ready?', ['3 stacks about 10 high, plus a row of singles in front', 'One big stack', 'Whatever is left', 'Pickers get their own'], 0, 'A picker who has to hunt for a pallet or cones isn\'t picking.'),
     choice('7. Release work', 'How do you decide which work to release?', ['Check with the supervisors where the demand is', 'Run down the queue', 'Whatever is easiest', 'Biggest orders first'], 0, 'Releasing by need keeps every area busy and nothing waiting.'),
@@ -1114,7 +1165,7 @@ MODS.induct = {
 /* ---------- 5. Pack (parcel core process, Kaizen 03 rev 0.6) ---------- */
 const PACK_KEYS = ['Move HU', 'Unpack HU', 'Create HU', 'Ship'];
 MODS.pack = {
-  id: 'pack', name: 'Pack: parcel', start: { x: 12, z: 4.6, yaw: 0 }, target: '35 s per parcel carton (Kaizen 03 pilot, down from 44 s).',
+  id: 'pack', name: 'Pack: parcel', start: { x: 5.3, z: 7.0, yaw: 0 }, target: '35 s per parcel carton (Kaizen 03 pilot, down from 44 s).',
   setup() { setScale('2.3 kg', '#ffb040'); },
   steps: [
     info('Parcel core process', 'Kaizen 03 rev 0.6: 10 steps, worked on the pack station screen with the station scanner. Built on the scale, labels on top, most old stickers gone.', 'One way is the whole point. That is what took the carton from 44 s to 35 s.'),
@@ -1143,14 +1194,14 @@ MODS.pack = {
     act('9. Tape it shut', 'Tape the carton shut.', 'pk_tape', 'Closed carton, ready for labels.'),
     choice('9. Labels', 'Where do the labels go?', ['Both on top: shipping label upper-right over your writing, "Packing list inside" lower-left', 'Shipping label on the side', 'Anywhere flat', 'Inside the box'], 0, 'With both labels on top, the dock and the customer read them without flipping the box.'),
     choice('9. Stickers', 'Which other stickers still go on?', ['Only pink (FedEx), yellow (international), Heavy (lower-right), mixed-carton', 'All the old colored stickers', 'None at all', 'Whatever the last packer used'], 0, 'Most old colored stickers are gone. These four stay.'),
-    act('10. Send it', 'Put the carton on the conveyor, label up.', 'pk_outfeed', 'The conveyor sorts to the door.', { onHit() { PK.box3.position.set(12, .8, 1.9); } }),
+    act('10. Send it', 'Put the carton on the conveyor, label up.', 'pk_outfeed', 'The conveyor sorts to the door.', { onHit() { PK.box3.position.set(5.3, .8, 4.3); } }),
     choice('10. Too big', 'Next order: a #6 carton at 42 lb. Where does it go?', ['On a pallet', 'On the conveyor', 'In a tote', 'Split it'], 0, 'Bigger than a #6 or over 35 lb: pallet. Smaller than a #2: tote.')
   ]
 };
 
 /* ---------- 6. Ship (truck core process, Kaizen 03 rev 0.6, + staging and dock) ---------- */
 MODS.ship = {
-  id: 'ship', name: 'Ship: truck pack and dock', start: { x: 12, z: 12, yaw: 0 }, target: 'no skid-weight wait. System weight plus pallet weight.',
+  id: 'ship', name: 'Ship: truck pack and dock', start: { x: -2.6, z: 8.3, yaw: 0 }, target: 'no skid-weight wait. System weight plus pallet weight.',
   steps: [
     info('Truck core process', 'Kaizen 03 rev 0.6, worked on the PK10 station screen and scanner, then staging and the dock.', 'A truck order ships once, so a pallet built wrong gets rebuilt or ships short.'),
     getGun('tk_gun', 'PK10 scanner'),
@@ -1170,7 +1221,7 @@ MODS.ship = {
     rf('pk10', '9. Full Ship Screen', 'Type the total weight, ENT, then F8. The packing list, shipping label and BOL print.', { head: 'Full Ship Screen', lines: ['Pallet HU 00340012'], fields: [{ label: 'Weight (lb)', via: 'type', expect: '652', err: '612 lb product + 40 lb standard pallet = 652.' }] }, { key: 'F8', onDone() { TK.bol.visible = true; } }),
     carry('9. Pin the paperwork', 'Sign the BOL and push-pin all three to the top of the pallet, facing the aisle.', 'tk_bol', 'tk_pallet', 'If the paperwork isn\'t on top, the pallet sits.', { dropAt: () => TK.pallet.position.clone().add(V3(0, 1.12, .1)) }),
     choice('10. Label every piece', 'On each pallet and loose-carton label:', ['Weight top-right, #/# middle, #P or #L bottom-left, then a big C around the #/#', 'Just the weight', 'Only the order number', 'Weight in the middle'], 0, 'The C says it is complete and ready to load.'),
-    rf('pk10', 'Stage it', 'Stage the pallet in the open lane closest to the Lead Hub (L05). Scan the lane label with your scanner.', { head: 'Stage HU', lines: ['HU 00340012', 'Scan lane'], fields: [{ label: 'Lane', expect: 'LANE-L05', err: 'Use the open lane closest to the Lead Hub: L05.' }], pad: false }),
+    rf('pk10', 'Stage it', 'Stage the pallet in the open lane closest to the Lead Hub (L05), in the staging strip west of pack. Scan the lane label with your scanner.', { head: 'Stage HU', lines: ['HU 00340012', 'Scan lane'], fields: [{ label: 'Lane', expect: 'LANE-L05', err: 'Use the open lane closest to the Lead Hub: L05.' }], pad: false }),
     choice('More pallets', 'A second pallet for the same order is done.', ['Same lane as the first', 'The next open lane', 'Anywhere near the dock', 'Leave it at the station'], 0, 'Same order, same lane. Lane full? Start a new one.'),
     act('Dock: check the trailer', 'Before any truck enters the trailer at Door 4, check the dock lock light.', 'dock_lock', 'A trailer that creeps away from the dock drops the forklift between dock and trailer.'),
     choice('Dock: red light', 'The light is red. The trailer is not locked or chocked.', ['Don\'t enter. Get it locked or chocked and the plate set, then check the trailer floor', 'Go in quickly', 'Go in, the driver is in the cab', 'Honk and go'], 0, 'Generic dock safety (OSHA). Replace with the Arden loading SW when written.', { critical: true, fb: ['', 'Never enter an unsecured trailer.', 'Drivers pull away.', 'A horn does not secure a trailer.'], onDone() { TK.lamp.material.color.set(0x20ff40); toast('Trailer locked. Light green.', 'good'); } })
@@ -1187,19 +1238,19 @@ function huntSpot(id, x, y, z, answer, what, propFn) {
   m.position.set(x, y, z); m.visible = false; scene.add(m); reg(m, id, 'Something to look at');
   HUNT.push({ id, m, answer, what });
 }
-huntSpot('w_stickers', 8, 1.4, 3, ['Over-processing'], 'A carton covered in old colored stickers. Most of them were removed in Kaizen 03.', () => { const c = carton(.4, .3, .3); c.position.set(8.3, .9, 3); HP.add(c); for (let i = 0; i < 6; i++) { const s = box(.08, .005, .06, M([C.red, C.yellow, C.green, 0xff66cc, C.blue, C.orange][i]), 8.15 + (i % 3) * .1, 1.2, 2.95 + Math.floor(i / 3) * .08); } });
-huntSpot('w_boxstock', 18, 1.6, 6, ['Motion'], 'Box stock for PK03 kept here, 10 m from the bench. Every carton is a walk.', () => { for (let i = 0; i < 3; i++) box(.6, .5, .5, M(C.cardboard), 18, i * .5, 6.5); });
-huntSpot('w_pallets', 6, 2.6, -8, ['Inventory'], 'Empty pallets stacked far past the 3 stacks of about 10 the Induction SW calls for.', () => { for (let s = 0; s < 6; s++) for (let i = 0; i < 16; i++) box(1.2, .14, 1, M(C.pallet), 5 + (s % 3) * 1.3, i * .145, -8.6 + Math.floor(s / 3) * 1.1); });
-huntSpot('w_waiting', 2.2, 2.0, -11.2, ['Waiting'], 'A picker standing at an empty induction rack. No totes inducted, nothing to pick.', () => { person(2.2, -11.2, Math.PI); });
-huntSpot('w_banding', -17.5, 1.6, 8, ['Over-processing'], 'Every pallet in this lane is banded. Only UK, long product and 24-50 in cabinets need bands.', () => { for (let i = 0; i < 2; i++) { const p = makePallet(2, { wrap: true }); p.position.set(-17.5, 0, 6 + i * 1.6); HP.add(p); for (const x of [-.3, .3]) box(.03, .02, 1.02, M(0x111111), -17.5 + x, .75, 6 + i * 1.6); } });
-huntSpot('w_damaged', 14.5, 1.3, 1.9, ['Defects'], 'A crushed carton riding the outfeed conveyor. It will be refused or claimed.', () => { const c = carton(.4, .2, .35, 0x9b7a50); c.position.set(14.5, .8, 1.9); c.rotation.z = .3; HP.add(c); });
-huntSpot('w_prebuilt', 16, 2.2, 4.4, ['Overproduction'], 'A tower of cartons built hours ahead of any order. They take space and get crushed.', () => { for (let i = 0; i < 7; i++) box(.5, .3, .4, M(C.cardboard), 16, i * .3, 4.6); });
-huntSpot('w_double', 1.75, 1.2, 9, ['Transport'], 'A pallet dropped in the walkway to be moved again later: moved twice, and blocking people.', () => { const p = makePallet(1); p.position.set(1.75, 0, 9); HP.add(p); });
-huntSpot('w_retype', -7.5, 2.0, 12, ['Over-processing', 'Skills (unused talent)'], 'The lead is re-typing hand-written carton weights into EWM. The weight should carry from the scale (Rec. 1).', () => { person(-6.6, 12.3, Math.PI, 0xff8c00); });
+huntSpot('w_stickers', 1.3, 1.4, 5.4, ['Over-processing'], 'A carton covered in old colored stickers. Most of them were removed in Kaizen 03.', () => { const c = carton(.4, .3, .3); c.position.set(1.6, .9, 5.4); HP.add(c); for (let i = 0; i < 6; i++) { const s = box(.08, .005, .06, M([C.red, C.yellow, C.green, 0xff66cc, C.blue, C.orange][i]), 1.45 + (i % 3) * .1, 1.2, 5.35 + Math.floor(i / 3) * .08); } });
+huntSpot('w_boxstock', 9.4, 1.6, 7.2, ['Motion'], 'Box stock for PK03 kept here, across the walkway from the bench. Every carton is a walk.', () => { for (let i = 0; i < 3; i++) box(.6, .5, .5, M(C.cardboard), 9.4, i * .5, 7.6); });
+huntSpot('w_pallets', -11.3, 2.6, -8.6, ['Inventory'], 'Empty pallets stacked far past the 3 stacks of about 10 the Induction SW calls for.', () => { for (let s = 0; s < 6; s++) for (let i = 0; i < 16; i++) box(1.2, .14, 1, M(C.pallet), -12.6 + (s % 3) * 1.3, i * .145, -9.2 + Math.floor(s / 3) * 1.1); });
+huntSpot('w_waiting', -8.2, 2.0, -13.3, ['Waiting'], 'A picker standing at an empty induction rack. No totes inducted, nothing to pick.', () => { person(-8.2, -13.3, 0); });
+huntSpot('w_banding', -10.2, 1.6, -6.2, ['Over-processing'], 'Every pallet in this lane is banded. Only UK, long product and 24-50 in cabinets need bands.', () => { for (let i = 0; i < 2; i++) { const p = makePallet(2, { wrap: true }); p.position.set(-11 + i * 1.6, 0, -6.2); HP.add(p); for (const x of [-.3, .3]) box(.03, .02, 1.02, M(0x111111), -11 + i * 1.6 + x, .75, -6.2); } });
+huntSpot('w_damaged', 6.4, 1.3, 4.3, ['Defects'], 'A crushed carton riding the outfeed conveyor. It will be refused or claimed.', () => { const c = carton(.4, .2, .35, 0x9b7a50); c.position.set(6.4, .8, 4.3); c.rotation.z = .3; HP.add(c); });
+huntSpot('w_prebuilt', 3.1, 2.4, 6.9, ['Overproduction'], 'A tower of cartons built hours ahead of any order. They take space and get crushed.', () => { for (let i = 0; i < 7; i++) box(.5, .3, .4, M(C.cardboard), 3.1, i * .3, 6.9); });
+huntSpot('w_double', 8.05, 1.2, -1, ['Transport'], 'A pallet dropped in the walkway to be moved again later: moved twice, and blocking people.', () => { const p = makePallet(1); p.position.set(8.05, 0, -1); HP.add(p); });
+huntSpot('w_retype', -10, 2.0, 4.6, ['Over-processing', 'Skills (unused talent)'], 'The lead is re-typing hand-written carton weights into EWM. The weight should carry from the scale (Rec. 1).', () => { person(-10, 5.4, Math.PI, 0xff8c00); });
 function huntMarkers(on) { HP.visible = on; HUNT.forEach(h => { h.m.visible = on && !S.found[h.id]; }); }
 function startHunt() {
   S.mod = { id: 'hunt', name: 'Gemba waste hunt', steps: [] }; S.phase = 'hunt'; S.found = {}; S.mistakes = []; S.viol = []; S.t0 = now();
-  clearToast(); S.held = null; S.sub = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 4, 0); huntPanel();
+  clearToast(); S.held = null; S.sub = null; unequip(); S.riding = null; resetMovables(); resetTruck(); setupScene('hunt'); huntMarkers(true); placePlayer(0, 10.2, 0); huntPanel();
 }
 function huntPanel() {
   const n = Object.keys(S.found).length;
@@ -1568,8 +1619,8 @@ function updateHover() {
 /* guide arrow over the current target */
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(.16, .4, 16), new THREE.MeshBasicMaterial({ color: 0xfddb33 })); arrow.rotation.x = Math.PI; scene.add(arrow);
 const TARGET_POS = {
-  recv: () => recvPallet.getWorldPosition(new THREE.Vector3()), aisleStop: () => new THREE.Vector3(-4.8, 0, -11.5),
-  slot: () => { const s = SLOTS[SLOT_T]; return new THREE.Vector3(s.x, s.y, s.z + .6); }, charger: () => new THREE.Vector3(-2, 0, 12)
+  recv: () => recvPallet.getWorldPosition(new THREE.Vector3()), aisleStop: () => new THREE.Vector3(-17.7, 0, 2.2),
+  slot: () => { const s = SLOTS[SLOT_T]; return new THREE.Vector3(s.x + .6, s.y, s.z); }, charger: () => new THREE.Vector3(28, 0, 5.5)
 };
 function updateGuide(t) {
   const st = cur(); arrow.visible = false;
@@ -1742,12 +1793,13 @@ for (const [id, ic] of [['menuBtn', 'menu'], ['recBtn', 'records'], ['nameBtn', 
 $('#helpBtn').firstChild.style.marginRight = '0';
 bake(scene); bake(HP);
 const TESTING = /[?&]test/.test(location.search);
+placePlayer(0, 10.4, 0);
 showWho(); hudVis(); if (!TESTING && LS.getItem(LS_TOUR) !== '1') { menu(); tour(0); } else menu();
 if (!trainee() && !TESTING) askName();
 
 /* test hook for the headless checks */
 window.TR = { S, MODS, F, OBJ, SLOTS, PALLETS, recvPallet, startModule, answer, pressKey, onInteract, next, menu, tick, cur, startHunt, huntHit, HUNT, ZONE,
-  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo, tour, TOUR, panel, wrist, setChip, placePanelVR, HANDS, TOUCH, selectFrom, castFrom, HITS, placePlayer, getYaw: () => yaw, setLook(y, p) { yaw = y; pitch = p; } };
+  setInput(i) { INPUT_OVERRIDE = i; }, placeTruck, mountTruck, panelState: () => P, truck, TR_, inspAnswer, INSP, camera, DEV, devKey, devScan, devPress, equip, ride, rig, THREE, ctrls, renderer, headTo, tour, TOUR, panel, wrist, setChip, placePanelVR, hitsSolid, scene, HANDS, TOUCH, selectFrom, castFrom, HITS, placePlayer, getYaw: () => yaw, setLook(y, p) { yaw = y; pitch = p; } };
 </script>
 </body>
 </html>

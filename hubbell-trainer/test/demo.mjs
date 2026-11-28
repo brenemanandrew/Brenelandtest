@@ -21,21 +21,21 @@ const hud = async n => { await p.click(`#hBtns button >> nth=${n}`); };
 await w(2500); await hud(0); await w(3000); await hud(0); await w(3000); await ev(() => window.TR.menu()); await w(2500);
 /* 2. Pallet Land pick on the THOR */
 await hud(2); await w(2500); await ev(() => window.TR.next()); await w(1800); await ev(() => window.ok()); await w(900);
-await ev(() => window.glide(-1.2, -3.4, 0, -.45, 1200)); await ev(() => window.use('thor1')); await w(2200); await ev(() => window.ok()); await w(1200);
-await ev(() => window.use('thor2')); await w(600); await ev(() => window.glide(.2, -5, 0, -.5, 800)); await w(800); await ev(() => window.use('thor2_gun')); await w(1500);
+await ev(() => window.glide(-11.6, -9.6, 0, -.45, 1200)); await ev(() => window.use('thor1')); await w(2200); await ev(() => window.ok()); await w(1200);
+await ev(() => window.use('thor2')); await w(600); await ev(() => window.glide(-10.2, -11.2, 0, -.5, 800)); await w(800); await ev(() => window.use('thor2_gun')); await w(1500);
 await keys('thor2', ['4', '1', '5', 'ENT']); await w(1200); await keys('thor2', ['F7']); await w(900); await keys('thor2', ['P', '1', '0', '0', 'ENT']); await w(1000);
 await ev(() => window.ok()); await w(900);
-await ev(() => window.glide(3.2, -10.6, 0, -.25, 2600)); await w(500);
+await ev(() => window.glide(-8.4, -12.4, 0, -.25, 2200)); await w(500);
 await ev(() => window.scan('T-10232')); await w(2600);                       /* wrong tote: the device says so */
 await ev(() => window.scan('T-10230')); await w(1200); await keys('thor2', ['F4']); await w(900);
 await ev(() => { window.use('ind_tote0'); }); await w(900); await ev(() => window.use('thor2_pallet')); await w(900); await ev(() => window.ok()); await w(900);
-await ev(() => window.glide(-3.5, -11.4, Math.PI / 2, -.2, 2200)); await ev(() => window.glide(-12.9, -11.25, 0, -.3, 3200)); await w(600);
+await ev(() => window.glide(-9.4, 2.2, Math.PI / 2, -.15, 3000)); await ev(() => window.glide(-17.4, 2.2, Math.PI / 2, -.15, 2200)); await ev(() => window.glide(-17.4, -3.6, 0, -.15, 2200)); await ev(() => window.glide(-17.0, -5.5, Math.PI / 2, -.3, 1600)); await w(600);
 await ev(() => window.scan('P104-01-A')); await w(1500); await ev(() => window.scan('HBL5262')); await w(1500); await ev(() => window.ok()); await w(1000);
 await ev(() => window.use('stock:P104-A')); await w(1000); await ev(() => window.use('thor2_pallet')); await w(1200);
 await ev(() => window.scan('T-10230')); await w(900); await keys('thor2', ['F4']); await w(1500);
 /* 3. pack station */
 await ev(() => { window.TR.startModule('pack'); window.look(0, -.2); }); await w(2200); await ev(() => window.TR.next()); await w(600); await ev(() => window.use('pk_gun')); await w(1200);
-await ev(() => window.glide(11.6, 4.3, 0, -.25, 800));
+await ev(() => window.glide(4.9, 6.7, 0, -.25, 800));
 await keys('pack', ['0', '1', '0', '3', 'ENT', 'P', 'K', '0', '4', 'F8'], 330); await w(900);
 await ev(() => window.use('pk_scale')); await w(1000); await ev(() => window.ok()); await w(1000);
 await ev(() => window.scan('HU8000451')); await w(1500); await ev(() => window.ok()); await w(1500); await ev(() => window.scan('HU8000452')); await w(800); await keys('pack', ['F8']); await w(800);
@@ -45,16 +45,16 @@ await ev(() => window.use('box3')); await w(900); await ev(() => window.use('pk_
 await ev(() => { const T = window.TR; T.startModule('pit'); T.F.defect = null; T.next(); T.answer(1); T.onInteract('fl_seat', T.camera);
   for (const it of T.INSP) { T.onInteract(it.id, T.camera); T.inspAnswer(it, false); } });
 await w(400); await ev(() => { const T = window.TR; while (T.cur().type !== 'drive') { const st = T.cur(); if (st.type === 'choice') window.ok(); else if (st.type === 'interact') window.use('fl_seat'); else T.next(); } window.look(0, -.25); });
-await ev(() => { const T = window.TR, F = T.F, P = T.recvPallet; F.pos.set(P.position.x, 0, P.position.z + 4.2); F.heading = Math.PI; F.v = 0; T.placeTruck(); }); await w(1500);
+await ev(() => { const T = window.TR, F = T.F, P = T.recvPallet; F.pos.set(P.position.x, 0, P.position.z - 4.2); F.heading = 0; F.v = 0; T.placeTruck(); }); await w(1500);
 await ev(() => window.TR.setInput({ t: .45, s: 0, l: 0, q: 0 }));
 await p.waitForFunction(() => window.TR.F.inserted && Math.abs(window.TR.F.v) < .02, null, { timeout: 60000 }); 
 await ev(() => window.TR.setInput({ t: 0, s: 0, l: 1, q: 0 })); await p.waitForFunction(() => window.TR.F.load && window.TR.F.h > .2, null, { timeout: 30000 });
 await ev(() => window.TR.setInput({ t: 0, s: 0, l: 0, q: -1 })); await w(1200);
-await ev(() => { const T = window.TR, F = T.F, s = T.SLOTS['P104-B']; T.setInput({ t: 0, s: 0, l: 0, q: 0 }); F.v = 0; F.pos.set(-3, 0, -11.5); F.heading = -Math.PI / 2; T.placeTruck(); T.setInput({ t: 0, s: 0, l: 0, q: 0, horn: true }); });
-await w(300); await ev(() => window.TR.setInput({ t: .5, s: 0, l: 0, q: 0 })); await p.waitForFunction(() => window.TR.F.pos.x < -8, null, { timeout: 60000 });
-await ev(() => { const T = window.TR, F = T.F, s = T.SLOTS['P104-B']; F.v = 0; F.pos.set(s.x, 0, -11.9); F.heading = Math.PI; T.placeTruck(); T.setInput({ t: 0, s: 0, l: 1, q: 0 }); window.look(0, .15); });
+await ev(() => { const T = window.TR, F = T.F, s = T.SLOTS['P104-B']; T.setInput({ t: 0, s: 0, l: 0, q: 0 }); F.v = 0; F.pos.set(-17.7, 0, 7.0); F.heading = Math.PI; T.placeTruck(); T.setInput({ t: 0, s: 0, l: 0, q: 0, horn: true }); });
+await w(300); await ev(() => window.TR.setInput({ t: .5, s: 0, l: 0, q: 0 })); await p.waitForFunction(() => window.TR.F.pos.z < 0.4, null, { timeout: 60000 });
+await ev(() => { const T = window.TR, F = T.F, s = T.SLOTS['P104-B']; F.v = 0; F.pos.set(-18.1, 0, s.z); F.heading = -Math.PI / 2; T.placeTruck(); T.setInput({ t: 0, s: 0, l: 1, q: 0 }); window.look(0, .15); });
 await p.waitForFunction(() => window.TR.F.h > 2.2, null, { timeout: 60000 });
-await ev(() => window.TR.setInput({ t: .2, s: 0, l: 0, q: 0 })); await p.waitForFunction(() => window.TR.F.pos.z < -12.5 && Math.abs(window.TR.F.v) < .02, null, { timeout: 60000 });
+await ev(() => window.TR.setInput({ t: .2, s: 0, l: 0, q: 0 })); await p.waitForFunction(() => window.TR.F.pos.x < -18.7 && Math.abs(window.TR.F.v) < .02, null, { timeout: 60000 });
 await ev(() => window.TR.setInput({ t: 0, s: 0, l: -1, q: 0 })); await p.waitForFunction(() => !window.TR.F.load, null, { timeout: 60000 }); await w(1200);
 await ev(() => window.TR.setInput({ t: -.5, s: 0, l: -1, q: 0 })); await w(2500); await ev(() => window.TR.setInput(null));
 await w(800);
